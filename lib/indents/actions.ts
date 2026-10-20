@@ -3,6 +3,7 @@
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage, guardError } from "@/lib/db-error";
 import { isActiveUom } from "@/lib/masters/uoms";
+import { notifyAfter } from "@/lib/push/send";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { approvalBlocker } from "./workflow";
@@ -572,6 +573,21 @@ export async function approveIndent(indentId: string): Promise<ActionState> {
       return { error: "Only a named indent approver or an admin can approve an indent." };
     }
     return guardError(error, "Could not approve this indent. Try again.", INDENT_GUARD_PHRASES);
+  }
+
+  // Whoever raised it hears, on their phone; the approval stands whatever happens to the notice.
+  const { data: approved, error: readError } = await supabase
+    .from("indents")
+    .select("reference, created_by, submitted_by")
+    .eq("id", indentId)
+    .maybeSingle();
+  if (readError) console.error("approveIndent notice read failed:", readError);
+  else if (approved) {
+    notifyAfter([approved.created_by, approved.submitted_by], user.id, {
+      title: "Indent approved",
+      body: `${approved.reference} is approved.`,
+      url: `/indents/${indentId}`,
+    });
   }
 
   revalidatePath("/indents", "layout");

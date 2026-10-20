@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
 import { closeRight, isActionStatus } from "@/lib/next-steps/rules";
+import { notifyAfter } from "@/lib/push/send";
 import { createClient } from "@/lib/supabase/server";
 
 import { isStepStatus } from "./board";
@@ -52,6 +53,30 @@ function validDate(value: string): boolean {
 
 function cleanPeople(peopleIds: string[]): string[] {
   return [...new Set(peopleIds.filter(Boolean))];
+}
+
+/** Everyone just put on a stage hears on their phone. The write has already stood; this never fails it. */
+async function tellPeople(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  unitId: string,
+  stageId: string,
+  people: string[],
+  actorId: string,
+): Promise<void> {
+  const [unit, stage] = await Promise.all([
+    supabase.from("units").select("name").eq("id", unitId).maybeSingle(),
+    supabase.from("design_stages").select("name").eq("id", stageId).maybeSingle(),
+  ]);
+  if (unit.error || stage.error) {
+    console.error("Design board notice read failed:", unit.error ?? stage.error);
+    return;
+  }
+  notifyAfter(people, actorId, {
+    title: "A design stage is yours",
+    body:
+      [unit.data?.name, stage.data?.name].filter(Boolean).join(": ") || "Open the design board.",
+    url: `/design-management/villas/${unitId}`,
+  });
 }
 
 /** A stage with no step starts with this status. Revising needs a reason (the database insists too). */
@@ -111,7 +136,7 @@ export async function setStepNote(stepId: string, note: string): Promise<ActionS
 }
 
 export async function addStepPerson(stepId: string, personId: string): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   if (!personId) return { error: "Pick who to put on it." };
 
   const supabase = await createClient();
@@ -122,6 +147,15 @@ export async function addStepPerson(stepId: string, personId: string): Promise<A
     if ("code" in error && error.code === "23505") return { error: "They are already on it." };
     return friendly(error, "Could not put them on it. Try again.");
   }
+
+  const { data: step, error: stepError } = await supabase
+    .from("design_steps")
+    .select("unit_id, design_stage_id")
+    .eq("id", stepId)
+    .maybeSingle();
+  if (stepError) console.error("Design board notice read failed:", stepError);
+  else if (step)
+    await tellPeople(supabase, step.unit_id, step.design_stage_id, [personId], user.id);
 
   revalidateAll();
   return undefined;
@@ -147,7 +181,7 @@ export async function startStep(
   stageId: string,
   peopleIds: string[],
 ): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const people = cleanPeople(peopleIds);
   if (people.length === 0) return { error: "Pick who takes it." };
 
@@ -186,6 +220,7 @@ export async function startStep(
     const state = friendly(peopleError, "Could not put everyone on it.");
     return { error: `Started. ${state?.error ?? ""} Put the right people on it from the stage.` };
   }
+  await tellPeople(supabase, unitId, stageId, people, user.id);
   return undefined;
 }
 
@@ -196,7 +231,7 @@ export async function passStep(input: {
   peopleIds: string[];
   note?: string;
 }): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const people = cleanPeople(input.peopleIds);
   if (!input.toStageId) return { error: "Pick the stage it goes to." };
   if (people.length === 0) return { error: "Pick who takes it." };
@@ -213,6 +248,7 @@ export async function passStep(input: {
   });
   if (error) return friendly(error, "Could not pass it on. Try again.");
 
+  await tellPeople(supabase, input.unitId, input.toStageId, people, user.id);
   revalidateAll();
   return undefined;
 }
@@ -223,7 +259,7 @@ export async function setWhereItIs(
   stageId: string,
   peopleIds: string[],
 ): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const people = cleanPeople(peopleIds);
   if (!stageId) return { error: "Pick the stage it is at." };
   if (people.length === 0) return { error: "Pick who is on it." };
@@ -236,6 +272,7 @@ export async function setWhereItIs(
   });
   if (error) return friendly(error, "Could not set where it is. Try again.");
 
+  await tellPeople(supabase, unitId, stageId, people, user.id);
   revalidateAll();
   return undefined;
 }

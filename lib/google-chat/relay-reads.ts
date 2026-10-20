@@ -62,6 +62,7 @@ function toSummary(
     legCount: row.leg_count ?? 0,
     legLabel:
       row.current_leg !== null ? (legLabels.get(`${chainId}:${row.current_leg}`) ?? null) : null,
+    holderId: row.holder_id,
     holderName: row.holder_id ? (holderNames.get(row.holder_id) ?? null) : null,
     daysInLeg: row.days_in_leg ?? 0,
     expectedDays: row.expected_days ?? 0,

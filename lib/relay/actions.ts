@@ -4,6 +4,7 @@ import { text } from "@/lib/form-data";
 import { requireTool } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { guardError } from "@/lib/db-error";
+import { notifyAfter } from "@/lib/push/send";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -31,6 +32,31 @@ const RELAY_GUARD_PHRASES = [
 // Layout form: the welcome screen's counters go stale on an exact-path call (CLAUDE.md).
 function revalidateRelay() {
   revalidatePath("/relay", "layout");
+}
+
+/** The baton's new holder hears on their phone. The move has already stood; this never fails it. */
+async function tellHolder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  chainId: string,
+  actorId: string,
+  title: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("pusher_chain_state")
+    .select("holder_id, title, unit_name, project_name, activity_name, is_finished")
+    .eq("chain_id", chainId)
+    .maybeSingle();
+  if (error) {
+    console.error("relay notice read failed:", error);
+    return;
+  }
+  if (!data || data.is_finished) return;
+  const where = data.unit_name ?? data.project_name ?? data.title;
+  notifyAfter([data.holder_id], actorId, {
+    title,
+    body: [where, data.activity_name].filter(Boolean).join(": ") || "Open Relay to see it.",
+    url: `/relay/trails/${chainId}`,
+  });
 }
 
 export type LegInput = { activityId: string; assigneeId: string; expectedDays: number };
@@ -110,7 +136,7 @@ export async function pushBaton(
   fromLeg: number,
   note: string | null,
 ): Promise<ActionState> {
-  await requireTool("/relay");
+  const user = await requireTool("/relay");
 
   const supabase = await createClient();
   const { error } = await supabase.from("pusher_chain_events").insert({
@@ -122,6 +148,7 @@ export async function pushBaton(
   });
 
   if (error) return guardError(error, "Could not push this trail forward.", RELAY_GUARD_PHRASES);
+  await tellHolder(supabase, chainId, user.id, "A baton is waiting for you");
   revalidateRelay();
   return undefined;
 }
@@ -202,7 +229,7 @@ export async function bounceBaton(
   reason: string,
   note: string,
 ): Promise<ActionState> {
-  await requireTool("/relay");
+  const user = await requireTool("/relay");
 
   // The database refuses these too (0036 §6); checked here for a readable message.
   if (!reason) return { error: "Pick a reason — a bounce is never silent." };
@@ -220,6 +247,7 @@ export async function bounceBaton(
   });
 
   if (error) return guardError(error, "Could not bounce this trail back.", RELAY_GUARD_PHRASES);
+  await tellHolder(supabase, chainId, user.id, "A baton has come back to you");
   revalidateRelay();
   return undefined;
 }
@@ -247,6 +275,7 @@ export async function handBaton(
   });
 
   if (error) return guardError(error, "Could not hand this baton over.", RELAY_GUARD_PHRASES);
+  await tellHolder(supabase, chainId, user.id, "A baton has been handed to you");
   revalidateRelay();
   return undefined;
 }

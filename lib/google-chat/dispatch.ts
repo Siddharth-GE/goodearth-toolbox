@@ -42,6 +42,7 @@ import {
   trailStepsDialog,
 } from "@/lib/google-chat/cards";
 import { actAs } from "@/lib/google-chat/act-as";
+import { notifyAfter } from "@/lib/push/send";
 import { resolveIdentity } from "@/lib/google-chat/identity";
 import { updateCardMessage } from "@/lib/google-chat/outbound";
 import {
@@ -392,6 +393,15 @@ async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string 
 // unless the account that came back is this exact id.
 type Actor = { userId: string; email: string; firstName: string };
 
+// The baton's new holder hears on their phone, as when it moves in the app (lib/relay/actions.ts).
+function tellHolder(trail: TrailSummary, actorId: string, title: string): void {
+  notifyAfter([trail.holderId], actorId, {
+    title,
+    body: `${trail.unitName ?? trail.projectName}: ${trail.activityName}`,
+    url: `/relay/trails/${trail.chainId}`,
+  });
+}
+
 function confirmation(action: string, firstName: string, trail: TrailSummary): string {
   if (action === "push") return pushedText(firstName, trail);
   if (action === "finish") return finishedText(firstName, trail);
@@ -424,6 +434,8 @@ async function handleButtonPress(event: ChatEvent, actor: Actor, privateTo: stri
   // write still happened, so say so plainly.
   const trail = await getTrailSummary(press.chainId);
   const sentence = trail ? confirmation(press.action, actor.firstName, trail) : doneText();
+  if (trail && press.action === "push")
+    tellHolder(trail, actor.userId, "A baton is waiting for you");
 
   // Awaited so it lands before the answer; its outcome never changes the answer.
   await refreshPressedCard(event, spaceName(event), actor, sentence);
@@ -477,6 +489,7 @@ async function handleBounceSubmit(event: ChatEvent, actor: Actor, privateTo: str
   const sentence = trail
     ? bouncedText(actor.firstName, trail, bounceReasonText(form.reason), form.note)
     : doneText();
+  if (trail) tellHolder(trail, actor.userId, "A baton has come back to you");
 
   // A dialog Save may carry no card name; then the refresh logs `message: null` and skips.
   await refreshPressedCard(event, spaceName(event), actor, sentence);

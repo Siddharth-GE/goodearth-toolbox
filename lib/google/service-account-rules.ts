@@ -1,7 +1,11 @@
 // The pure half of acting as one of our Google service accounts (see service-account.ts): the
 // Chat door's card refresh and push notifications. Imports nothing.
 
-export type ServiceAccountKey = { clientEmail: string; privateKey: string; projectId: string | null };
+export type ServiceAccountKey = {
+  clientEmail: string;
+  privateKey: string;
+  projectId: string | null;
+};
 
 // Never throws: unusable JSON or missing fields is null, which means "that feature is off".
 export function parseServiceAccountKey(raw: string | undefined | null): ServiceAccountKey | null {
