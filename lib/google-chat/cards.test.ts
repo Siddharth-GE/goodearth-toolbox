@@ -305,6 +305,7 @@ function row(overrides: Partial<TrailSummary> = {}): TrailSummary {
     currentLeg: 2,
     legCount: 5,
     legLabel: "Structural drawings",
+    holderId: "anil-id",
     holderName: "Anil",
     daysInLeg: 4,
     expectedDays: 3,
@@ -1194,6 +1195,7 @@ function pushedRow(overrides: Partial<TrailSummary> = {}): TrailSummary {
     currentLeg: 3,
     legCount: 8,
     legLabel: "Client sign-off",
+    holderId: "anil-id",
     holderName: "Anil",
     ...overrides,
   });

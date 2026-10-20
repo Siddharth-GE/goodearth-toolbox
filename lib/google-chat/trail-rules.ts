@@ -14,6 +14,7 @@ export type TrailSummary = {
   currentLeg: number | null;
   legCount: number;
   legLabel: string | null;
+  holderId: string | null;
   holderName: string | null;
   daysInLeg: number;
   expectedDays: number;

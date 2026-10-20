@@ -62,7 +62,8 @@ captures/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Firebase's file is copied in from android-signing at build (mobile/PLAN.md); the repo is public.
+app/google-services.json
 
 # Freeline
 freeline.py

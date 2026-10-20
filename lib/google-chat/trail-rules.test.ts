@@ -37,6 +37,7 @@ function row(overrides: Partial<TrailSummary> = {}): TrailSummary {
     currentLeg: 2,
     legCount: 5,
     legLabel: "Structural drawings",
+    holderId: "anil-id",
     holderName: "Anil",
     daysInLeg: 4,
     expectedDays: 3,

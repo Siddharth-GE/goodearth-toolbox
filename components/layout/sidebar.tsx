@@ -12,7 +12,9 @@ import {
 import { GROUND_SWATCH } from "@/components/ui/ground";
 import { ThemeMenuItem } from "@/components/ui/theme-toggle";
 import { biometricStatus, forgetBiometricSignIn } from "@/lib/native/biometric-sign-in";
+import { pushToken, startPush } from "@/lib/native/push";
 import { isInTool, sectionOfPage, type ToolSection } from "@/lib/nav/arrange";
+import { registerPushDevice } from "@/lib/push/actions";
 import { TOOL_ICONS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -189,7 +191,7 @@ function SidebarContent({
             <ThemeMenuItem />
             <ForgetFingerprintItem />
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => logout()}>
+            <DropdownMenuItem onSelect={() => logout(pushToken() ?? undefined)}>
               <LogOut className="size-4" />
               Sign out
             </DropdownMenuItem>
@@ -204,6 +206,15 @@ function SidebarContent({
 export function Sidebar({ sections, userName }: { sections: ToolSection[]; userName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // In the phone app, once per signed-in launch (lib/native/push.ts); nothing on the website.
+  useEffect(
+    () =>
+      startPush((token, platform) => {
+        void registerPushDevice(token, platform);
+      }),
+    [],
+  );
 
   return (
     <>

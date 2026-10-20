@@ -5,8 +5,10 @@
 // Google's body; waits at most REFRESH_TIMEOUT_MS.
 import "server-only";
 
+import { parseServiceAccountKey, tokenIsFresh } from "@/lib/google/service-account-rules";
+
 import { fetchAppToken, patchCard } from "./app-token";
-import { REFRESH_TIMEOUT_MS, parseServiceAccountKey, tokenIsFresh } from "./outbound-rules";
+import { REFRESH_TIMEOUT_MS } from "./outbound-rules";
 
 // Module scope: a warm lambda reuses the token for its hour. Nothing is persisted.
 let cachedToken: { token: string; expiresAt: number } | null = null;

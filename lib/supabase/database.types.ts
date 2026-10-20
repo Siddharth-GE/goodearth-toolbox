@@ -7566,6 +7566,38 @@ export type Database = {
           },
         ]
       }
+      push_devices: {
+        Row: {
+          created_at: string
+          platform: string
+          profile_id: string
+          seen_at: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          platform: string
+          profile_id: string
+          seen_at?: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          platform?: string
+          profile_id?: string
+          seen_at?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_devices_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pusher_activities: {
         Row: {
           created_at: string
@@ -11018,6 +11050,10 @@ export type Database = {
       birdwing_mint: { Args: { p_scope: string }; Returns: number }
       can_approve_bills: { Args: { uid: string }; Returns: boolean }
       can_approve_indents: { Args: { uid: string }; Returns: boolean }
+      claim_push_device: {
+        Args: { p_platform: string; p_token: string }
+        Returns: undefined
+      }
       client_relations_team: {
         Args: never
         Returns: {

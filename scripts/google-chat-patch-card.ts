@@ -16,7 +16,7 @@ import { config } from "dotenv";
 import { resolve } from "node:path";
 
 import { fetchAppToken, patchCard } from "../lib/google-chat/app-token";
-import { parseServiceAccountKey } from "../lib/google-chat/outbound-rules";
+import { parseServiceAccountKey } from "../lib/google/service-account-rules";
 
 config({ path: resolve(import.meta.dirname, "..", ".env.local") });
 

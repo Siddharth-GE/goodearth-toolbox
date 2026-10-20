@@ -216,8 +216,13 @@ export async function signInWithGoogle() {
   redirect(data.url);
 }
 
-export async function logout() {
+/** `pushToken`: in the phone app, this phone's notifications stop with the sign-out (lib/push/). */
+export async function logout(pushToken?: string) {
   const supabase = await createClient();
+  if (typeof pushToken === "string" && pushToken) {
+    const { error } = await supabase.from("push_devices").delete().eq("token", pushToken);
+    if (error) console.error("logout: forgetting this phone failed:", error.code);
+  }
   await supabase.auth.signOut();
   // The trusted-device cookie stays: it skips only the code, never the password.
   await clearVerified();
