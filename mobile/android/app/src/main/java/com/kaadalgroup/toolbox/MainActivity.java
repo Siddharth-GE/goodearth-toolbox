@@ -39,6 +39,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ExternalLinksPlugin.class);
+        registerPlugin(BiometricSignInPlugin.class);
         super.onCreate(savedInstanceState);
         downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
         ContextCompat.registerReceiver(
