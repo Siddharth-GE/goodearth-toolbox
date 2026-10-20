@@ -11,14 +11,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { GROUND_SWATCH } from "@/components/ui/ground";
 import { ThemeMenuItem } from "@/components/ui/theme-toggle";
+import { biometricStatus, forgetBiometricSignIn } from "@/lib/native/biometric-sign-in";
 import { isInTool, sectionOfPage, type ToolSection } from "@/lib/nav/arrange";
 import { TOOL_ICONS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { LayoutGrid, LogOut, Menu, X } from "lucide-react";
+import { Fingerprint, LayoutGrid, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // The rail is a brand ground: everything on it is drawn in its on-ground colour.
 const rowBase =
@@ -86,6 +87,32 @@ function TeamRow({
         </div>
       )}
     </div>
+  );
+}
+
+/** In the phone app, while this phone keeps a fingerprint sign-in (lib/native/biometric-sign-in.ts). */
+function ForgetFingerprintItem() {
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    let left = false;
+    void biometricStatus().then((status) => {
+      if (!left) setSaved(Boolean(status?.email));
+    });
+    return () => {
+      left = true;
+    };
+  }, []);
+  if (!saved) return null;
+  return (
+    <DropdownMenuItem
+      onSelect={() => {
+        void forgetBiometricSignIn();
+        setSaved(false);
+      }}
+    >
+      <Fingerprint className="size-4" />
+      Turn off fingerprint sign-in
+    </DropdownMenuItem>
   );
 }
 
@@ -160,6 +187,7 @@ function SidebarContent({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             <ThemeMenuItem />
+            <ForgetFingerprintItem />
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => logout()}>
               <LogOut className="size-4" />
