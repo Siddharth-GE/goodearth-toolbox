@@ -18,7 +18,7 @@ Everything for the phone apps that must stay off GitHub sits beside the main fol
 
 - **Upload key:** `android-signing\upload.keystore`, its password in the `README.txt` beside it. Never in the repo. Losing it is recoverable (Play Console → Test and release → App integrity → request an upload key reset), but slow. The founder keeps a backup.
 - **Firebase** (push, project `kaadal-toolbox` under `admin@kaadal.co.in`): `android-signing\google-services.json`, and the service-account key `kaadal-toolbox-firebase-adminsdk-*.json`, which is a password and lives only there and in Vercel's settings.
-- **App signing key:** held by Google (Play App Signing). Its SHA-256 is on Play Console → App integrity → App signing, and goes into `assetlinks.json` and `twa-manifest.json`'s `fingerprints`.
+- **App signing key:** held by Google (Play App Signing), created with the first upload (2.3.0, internal testing, 2026-10-20). SHA-1 `38:F6:C0:DE:1A:4F:07:02:C5:40:CF:CE:A8:AF:49:BA:1C:50:24:F1`, SHA-256 `AE:84:3D:DF:0B:2A:BF:11:E9:CA:48:64:49:4A:B1:C4:CB:F6:5C:26:D4:A1:A1:A8:6A:48:13:26:8B:0D:B5:36`. Play Console hides its page; App bundle explorer → Downloads → the signed universal APK, read with `apksigner verify --print-certs`, gives them. The upload key's SHA-1 is `6E:CA:0C:A9:A4:1F:12:E8:60:5A:CE:D6:CA:0D:45:69:A5:E0:1E:A5`. Both SHA-1s must be on the Firebase Android API key's restriction in Google Cloud (key ending `f5ik`), or a Play install gets no notifications.
 
 ## Building a new version
 
