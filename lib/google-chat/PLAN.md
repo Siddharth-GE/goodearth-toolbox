@@ -10,7 +10,7 @@ Prove it is our Google, prove the person, act as the person — the three trust 
 
 ## Code map
 
-`verify.ts` the lock · `events.ts` Google's envelope, pure readers · `identity-rules.ts` / `identity.ts` who typed · `space-match.ts` / `spaces.ts` scoping · `trail-rules.ts` pure ordering, search, parsers · `relay-reads.ts` admin reads · `relay-writes.ts` writes through the minted client · `act-as.ts` the one place that mints a session for somebody else · `outbound-rules.ts` / `outbound.ts` the app's own voice (round two: the service-account token and the one PATCH that rewrites a pressed card) · `cards.ts` every sentence the bot says · `route.ts` the lock and the 401 · `dispatch.ts` everything after it. Pure files are tested; `server-only` files cannot be imported by `tsx --test`, which is why rules live apart from reads.
+`verify.ts` the lock · `events.ts` Google's envelope, pure readers · `identity-rules.ts` / `identity.ts` who typed · `space-match.ts` / `spaces.ts` scoping · `trail-rules.ts` pure ordering, search, parsers · `relay-reads.ts` admin reads · `relay-writes.ts` writes through the minted client · `act-as.ts` the one place that mints a session for somebody else · `outbound-rules.ts` / `outbound.ts` the app's own voice (round two: the service-account token, signed by the shared `lib/google/`, and the one PATCH that rewrites a pressed card) · `cards.ts` every sentence the bot says · `route.ts` the lock and the 401 · `dispatch.ts` everything after it. Pure files are tested; `server-only` files cannot be imported by `tsx --test`, which is why rules live apart from reads.
 
 ## Round two — the pressed card rewrites itself (2026-09-07)
 

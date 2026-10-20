@@ -14,13 +14,14 @@ Kaadal Toolbox for Android (and later iPhone), `com.kaadalgroup.toolbox`: a **Ca
 - **Prints and exports** (`lib/pdf/`, `lib/csv.ts`): a web view can't show a PDF, so `MainActivity` hands every download to Android's DownloadManager with the session's cookies, then opens it in the phone's PDF viewer or spreadsheet app. Files live in the app's own storage (no permission asked); the same print downloaded again replaces the old copy.
 - **Links to other sites** (Google's sign-in, Zoho WorkDrive, product pages) open in a Chrome tab over the app (`ExternalLinksPlugin`), and closing it returns to the page the person was on.
 - **Pictures:** a field that takes a picture offers **Camera** beside the phone's picker, as Chrome does (`CameraFileChooser`); other files get the picker alone. The phone's own camera app takes the shot into the app's cache, so no camera permission is asked, and each shot is dropped when the next is taken. The iPhone's web view offers the camera by itself.
+- **Push notifications** (`@capacitor/push-notifications`, `lib/native/push.ts`; the server's rules are `SECURITY.md`). Once someone is signed in, the sidebar asks once for permission, creates the "Toolbox" channel (pops up on screen), registers with Firebase and records the phone for that person; sign-out forgets it. A tap opens the notification's page, from a closed app too. The status-bar icon is the K (`ic_stat_kaadal`). An emulator without a Google account never receives one, though Firebase accepts the send: try delivery on a real phone.
 
 ## Building a new version
 
 On this PC: **Java 21** in `C:\Users\goodearth\.bubblewrap\jdk\jdk-21.0.12.1+1` (Capacitor 8 needs 21; the wrapper's Java 17 sits beside it), and the Android SDK in `C:\Users\goodearth\.bubblewrap\android_sdk`, named in the ignored `mobile/android/local.properties` (`sdk.dir=C\:/Users/goodearth/.bubblewrap/android_sdk`).
 
 1. Raise `versionCode` (+1, every upload) and `versionName` in `mobile/android/app/build.gradle`; commit.
-2. In `mobile/`: `npm install`, then `npm run sync`.
+2. Copy `google-services.json` from `android-signing` (beside the repo) into `mobile/android/app/`; it is ignored, never committed, and without it the app gets no notifications. In `mobile/`: `npm install`, then `npm run sync`.
 3. In PowerShell: unset `NoDefaultCurrentDirectoryInExePath`, set `JAVA_HOME` to the Java 21 folder and put its `bin` first on `PATH`, and set `KAADAL_UPLOAD_KEYSTORE` (the upload key's path), `KAADAL_UPLOAD_STORE_PASSWORD` and `KAADAL_UPLOAD_KEY_PASSWORD` (both from the `README.txt` beside the key, `android/PLAN.md`). Without them the build is unsigned.
 4. In `mobile/android/`: `.\gradlew.bat bundleRelease assembleRelease`.
 5. Upload `app/build/outputs/bundle/release/app-release.aab` in Play Console; `app/build/outputs/apk/release/app-release.apk` installs directly on a test phone.
