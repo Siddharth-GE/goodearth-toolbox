@@ -16,13 +16,13 @@ Everything for the phone apps that must stay off GitHub sits beside the main fol
 
 Drafted for the founder; the founder submits them. If the app starts collecting something new, this list and the public `/privacy` page change together, or Play's review rejects the mismatch.
 
-- **App access:** all functionality is behind sign-in. The reviewer account is `tester@kaadal.co.in` (Google Workspace, 2-Step Verification off), in Toolbox as "Play Store reviewer", staff, Relay only. It signs in with **Continue with Google**, which stands in for the emailed code. Console notes: "Tap 'Continue with Google' and sign in with this Google account. Accounts are created by the company; there is no sign-up."
+- **App access:** all functionality is behind sign-in. The reviewer account is `tester@kaadal.co.in` (Google Workspace, 2-Step Verification off), in Toolbox as "Play Store reviewer", staff (never admin), with **every tool**: Play will not save the declaration without "full access" ticked, so the founder made it true. The account is **switched off** in Settings except while a version is in review, so no live login sits idle; after each review, check what it created or changed. It signs in with **Continue with Google**, which stands in for the emailed code. Console notes: "Tap 'Continue with Google' and sign in with this Google account; Google sign-in needs no code. Accounts are created by the company; there is no sign-up. Fingerprint sign-in is optional and can be skipped. Each staff member sees only the tools the company has given them; this account has a representative set. There is no paid or premium content."
 - **Ads:** no. **Advertising ID:** no. **Government app, financial features, health, news:** no. **Target audience:** 18 and over. **Category:** Business.
 - **Content rating** (IARC, "All other app types"): no violence, sexuality, language, drugs or gambling. Users interact (staff share work records): yes. Shares location: no. Digital purchases: no.
 - **Data safety:**
-  - Collected: name, email address, user IDs, phone number, photos, files and docs, other user-generated content (work records), crash logs and diagnostics, and device or other IDs (the phone's notification address).
-  - Every one is for app functionality, the account items for account management too; none is shared with third parties (service providers are not sharing); none is optional except photos.
-  - Fingerprint and face are not collected: they never leave the phone.
+  - Collected: name, email address, user IDs, address (vendors', guests'), phone number, other info (dates of birth, emergency contacts, guests' ID documents), health info (the directory's blood group), photos, files and docs, other user-generated content (work records), crash logs and diagnostics, and device or other IDs (the phone's notification address).
+  - Every one is collected, not shared, not processed ephemerally; for app functionality, the account items (name, email, user IDs, phone) for account management too; none is shared with third parties (service providers are not sharing); none is optional except photos.
+  - Not declared, because not collected: messages (add it, and a line on `/privacy`, the day in-app chat ships), fingerprint and face (they never leave the phone).
   - Encrypted in transit: yes.
   - Accounts: users cannot create one in the app; they sign in with accounts the company creates. Deletion requests go to admin@kaadal.co.in.
 - **Privacy policy:** `https://toolbox.kaadalgroup.com/privacy`. **Website:** `https://toolbox.kaadalgroup.com`. **Contact email:** admin@kaadal.co.in.
@@ -45,6 +45,7 @@ Drafted for the founder; the founder submits them. If the app starts collecting 
 
 - [x] [Founder] Play Console: the app created, 2.3.0 on **Internal testing**, installed from Play and vetted (2026-10-20).
 - [x] [Founder] The reviewer Google account; [Opus, at the founder's word] its Toolbox account (2026-10-21).
-- [ ] [Founder] Fill in App content, Store settings and the main store listing from the answers above, with the screenshots.
-- [ ] [Founder] Production: countries, a release from the library (2.3.0), **Send changes for review**. Google's review usually takes from a few days to a week; Managed publishing holds the go-live for the founder's press.
+- [x] [Founder] App content, Store settings and the main store listing, from the answers above.
+- [x] [Founder] Production: India, 2.3.0 from the library, sent for review 2026-10-21 (submission 1). Google's review usually takes from a few days to a week.
+- [ ] [Opus] Once approved: list what `tester@kaadal.co.in` created or changed; [Founder] switch the account off.
 - [ ] [Founder] Once live, share `https://play.google.com/store/apps/details?id=com.kaadalgroup.toolbox` with staff. Internal testers get it as an update.
