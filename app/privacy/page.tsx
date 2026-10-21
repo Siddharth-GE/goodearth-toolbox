@@ -25,7 +25,7 @@ export default function PrivacyPage() {
       <article className="mx-auto w-full max-w-2xl">
         <Logo className="size-10" />
         <h1 className="text-foreground font-display mt-4 text-3xl font-medium">Privacy</h1>
-        <p className="text-muted mt-2 text-sm">Kaadal Toolbox · updated 18 October 2026</p>
+        <p className="text-muted mt-2 text-sm">Kaadal Toolbox · updated 21 October 2026</p>
 
         <Part title="What this app is">
           <p>
@@ -46,6 +46,13 @@ export default function PrivacyPage() {
               <strong>Signing in:</strong> sign-in attempts and the devices you have verified, so we
               can stop someone guessing a password. If you sign in with Google, Google tells us your
               name and email address.
+            </li>
+            <li>
+              <strong>Your phone, in the app:</strong> if you allow notifications, the address
+              Google&apos;s Firebase gives your phone, so we can tell you when work reaches you. It
+              is forgotten when you sign out. If you use fingerprint or face sign-in, your
+              fingerprint and face never leave the phone; your password is kept locked on the phone
+              itself and is never sent anywhere new.
             </li>
             <li>
               <strong>Your work:</strong> what you enter in the tools — indents, orders, stock,
@@ -71,8 +78,9 @@ export default function PrivacyPage() {
           <p>
             Everything is stored with Supabase (database and files) and served by Vercel, both in
             Mumbai, India, and always sent over an encrypted connection. Sign-in emails go out
-            through Resend. Google handles &ldquo;Sign in with Google&rdquo; and the Google Chat
-            app. These companies keep the data for us and do not use it for themselves.
+            through Resend. Google handles &ldquo;Sign in with Google&rdquo;, the Google Chat app,
+            and delivering notifications to the phone app. These companies keep the data for us and
+            do not use it for themselves.
           </p>
           <p>
             Inside the company, each person sees only the tools they have been given. Our admins can
