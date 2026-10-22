@@ -18,7 +18,9 @@ import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/mast
 import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
 import { WORK_CLASS_LABEL, isWorkClass } from "@/lib/masters/work-classes";
+import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
+import { SiteConfirmationNote } from "../../_components/site-confirmation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
@@ -28,6 +30,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
     listWorkCategories(),
   ]);
   if (!issue) notFound();
+  const confirmation = issue.is_transfer ? null : await getSiteConfirmation("issue", issue.id);
 
   // Flag, never refuse: derived fresh, so a resubmitted estimate that covers the material clears the banner.
   const overRows =
@@ -113,6 +116,10 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           </div>
         )}
       </section>
+
+      {!issue.is_transfer && (
+        <SiteConfirmationNote confirmation={confirmation} lines={issue.lines} />
+      )}
 
       {issue.is_transfer && (
         <p className="text-muted text-sm">

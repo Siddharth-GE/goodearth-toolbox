@@ -14,14 +14,17 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { getGoodsReceipt } from "@/lib/inventory/receipts-queries";
+import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
 import { BatchId } from "../../_components/batch-id";
 import { ReceiptRate } from "../../_components/receipt-rate";
+import { SiteConfirmationNote } from "../../_components/site-confirmation";
 
 export default async function ReceiptPage({ params }: { params: Promise<{ receiptId: string }> }) {
   const { receiptId } = await params;
   const receipt = await getGoodsReceipt(receiptId);
   if (!receipt) notFound();
+  const confirmation = receipt.to_site ? await getSiteConfirmation("receipt", receipt.id) : null;
 
   return (
     <div className="space-y-4">
@@ -77,6 +80,10 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
           These goods were unloaded at site and are used where they landed — they count toward the
           purchase order but never entered store stock.
         </p>
+      )}
+
+      {receipt.to_site && (
+        <SiteConfirmationNote confirmation={confirmation} lines={receipt.lines} />
       )}
 
       <Table>
