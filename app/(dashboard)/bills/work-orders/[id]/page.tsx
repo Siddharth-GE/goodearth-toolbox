@@ -111,6 +111,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
                   <TableHeaderCell className="text-right">Rate</TableHeaderCell>
                   <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Billed</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Left</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -144,6 +146,14 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                       <TableCell className="text-right font-mono">
                         {formatMoney(amount, { paise: amount !== null && amount % 1 !== 0 })}
                       </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {line.billed > 0 ? formatMoney(line.billed, { paise: true }) : "—"}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono ${amount !== null && line.billed > amount + 0.005 ? "text-danger" : ""}`}
+                      >
+                        {amount === null ? "—" : formatMoney(amount - line.billed, { paise: true })}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -155,6 +165,19 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                     {formatMoney(order.contract_value, {
                       paise: order.contract_value % 1 !== 0,
                     })}
+                  </TableTotalCell>
+                  <TableTotalCell className="text-right font-mono">
+                    {formatMoney(
+                      order.lines.reduce((sum, line) => sum + line.billed, 0),
+                      { paise: true },
+                    )}
+                  </TableTotalCell>
+                  <TableTotalCell className="text-right font-mono">
+                    {formatMoney(
+                      order.contract_value -
+                        order.lines.reduce((sum, line) => sum + line.billed, 0),
+                      { paise: true },
+                    )}
                   </TableTotalCell>
                 </TableRow>
               </TableFoot>

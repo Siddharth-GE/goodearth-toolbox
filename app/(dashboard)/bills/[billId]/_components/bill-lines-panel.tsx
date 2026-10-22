@@ -23,6 +23,7 @@ const toEditor = (row: BillLineRow): EditorLine =>
       poLineId: row.po_line_id,
       itemId: row.item_id,
       labourLogId: row.labour_log_id,
+      labourContractLineId: row.labour_contract_line_id,
       workItemId: row.work_item_id,
       description: row.description,
       uom: row.uom,

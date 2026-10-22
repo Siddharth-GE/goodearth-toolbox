@@ -5,11 +5,13 @@ import {
   billLineProblem,
   billLinesProblem,
   dayRatesFromLines,
+  leftOnWorkOrderLine,
   leftToBill,
   linesFromPo,
   linesFromWorkOrder,
   type BillLineDraft,
   type PoLineForBill,
+  type WorkOrderLineForBill,
 } from "./lines";
 import { rollUpBill } from "./math";
 import { lineMoneyOf } from "./lines";
@@ -19,6 +21,7 @@ const line = (over: Partial<BillLineDraft> = {}): BillLineDraft => ({
   poLineId: null,
   itemId: null,
   labourLogId: null,
+  labourContractLineId: null,
   workItemId: null,
   description: "Footing",
   uom: "cum",
@@ -91,15 +94,57 @@ test("the PO's discount and charges follow the quantity billed", () => {
   assert.equal(rupees.otherCharges, 400);
 });
 
-test("a work-order bill starts from its works", () => {
+const workLine = (over: Partial<WorkOrderLineForBill> = {}): WorkOrderLineForBill => ({
+  id: "wl1",
+  work_item_id: "fd",
+  description: "Footing",
+  is_lump_sum: false,
+  quantity: 10,
+  uom: "cum",
+  rate: 4000,
+  billed: 0,
+  ...over,
+});
+
+test("a work-order bill starts from what is left of each work, naming its line", () => {
   const lines = linesFromWorkOrder([
-    { work_item_id: "fd", description: "Footing", is_lump_sum: false, uom: "cum", rate: 4000 },
-    { work_item_id: null, description: "Porch plaster", is_lump_sum: true, uom: null, rate: 15000 },
+    workLine(),
+    workLine({
+      id: "wl2",
+      work_item_id: null,
+      description: "Porch plaster",
+      is_lump_sum: true,
+      quantity: null,
+      uom: null,
+      rate: 15000,
+    }),
   ]);
   assert.equal(lines[0].kind, "pw_qty");
-  assert.equal(lines[0].quantity, null);
+  assert.equal(lines[0].quantity, 10);
+  assert.equal(lines[0].rate, 4000);
+  assert.equal(lines[0].labourContractLineId, "wl1");
   assert.equal(lines[1].kind, "pw_lump");
   assert.equal(lines[1].rate, 15000);
+  assert.equal(lines[1].labourContractLineId, "wl2");
+});
+
+test("stage by stage: a part-billed line offers the rest, a fully billed one drops out", () => {
+  const stage = workLine({
+    id: "ss",
+    description: "SS.01.00 package",
+    quantity: 1800,
+    uom: "sqft",
+    rate: 27.6,
+  });
+  // 1800 sqft × ₹27.60 = ₹49,680; ₹20,000 billed leaves ₹29,680, i.e. 1075.362 sqft.
+  const [rest] = linesFromWorkOrder([{ ...stage, billed: 20000 }]);
+  assert.equal(rest.quantity, 1075.362);
+  assert.equal(leftOnWorkOrderLine({ ...stage, billed: 20000 }), 29680);
+  assert.deepEqual(linesFromWorkOrder([{ ...stage, billed: 49680 }]), []);
+  assert.equal(leftOnWorkOrderLine({ ...stage, billed: 60000 }), 0);
+
+  const lump = workLine({ is_lump_sum: true, quantity: null, rate: 15000, billed: 6000 });
+  assert.equal(linesFromWorkOrder([lump])[0].rate, 9000);
 });
 
 test("a daily-wages bill suggests the last bill's day rates", () => {

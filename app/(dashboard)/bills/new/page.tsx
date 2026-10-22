@@ -16,6 +16,7 @@ const NMR_START: BillLineDraft = {
   poLineId: null,
   itemId: null,
   labourLogId: null,
+  labourContractLineId: null,
   workItemId: null,
   description: "Masons (man-days)",
   uom: null,

@@ -35,6 +35,7 @@ const row = (billId: string, userId: string, line: BillLineDraft, sortOrder: num
   po_line_id: line.poLineId,
   item_id: line.itemId,
   labour_log_id: line.labourLogId,
+  labour_contract_line_id: line.labourContractLineId,
   work_item_id: line.workItemId,
   description: line.description.trim(),
   uom: line.uom || null,

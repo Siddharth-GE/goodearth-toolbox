@@ -76,6 +76,7 @@ const blankOther = (): BillLineDraft => ({
   poLineId: null,
   itemId: null,
   labourLogId: null,
+  labourContractLineId: null,
   workItemId: null,
   description: "",
   uom: null,
