@@ -1,3 +1,4 @@
+import { WORK_CLASS_LABEL } from "@/lib/masters/work-classes";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -183,7 +184,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     {formatDate(log.logDate)} · {log.contractorName}
                   </p>
                   <p className="text-muted text-xs">
-                    {`${log.workLabel} — ${describeLabour(log)}${log.note ? ` · ${log.note}` : ""}`}
+                    {`${log.workLabel} — ${describeLabour(log)}${log.workClass !== "standard" ? ` · ${WORK_CLASS_LABEL[log.workClass]}` : ""}${log.note ? ` · ${log.note}` : ""}`}
                   </p>
                 </div>
                 {log.billId ? (
@@ -230,7 +231,10 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     {formatQuantity(request.quantity)} {request.itemUom} · {request.itemName}
                   </p>
                   <p className="text-muted text-xs">
-                    {request.workLabel} · asked {formatDate(request.createdAt)}
+                    {request.workLabel}
+                    {request.workClass !== "standard" &&
+                      ` · ${WORK_CLASS_LABEL[request.workClass]}`}{" "}
+                    · asked {formatDate(request.createdAt)}
                     {request.status === "declined" && request.declinedReason
                       ? ` · ${request.declinedReason}`
                       : ""}

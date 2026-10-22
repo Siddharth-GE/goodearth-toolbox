@@ -2,6 +2,7 @@
 
 import { CataloguePickerDialog, type PickedLine } from "@/components/masters/catalogue-picker";
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { WorkClassField } from "@/components/masters/work-class-field";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -152,6 +153,8 @@ export function RequestIssueDialog({
           <Label htmlFor="quantity">Quantity{item ? ` (${item.uom})` : ""}</Label>
           <Input id="quantity" name="quantity" inputMode="decimal" required />
         </div>
+
+        <WorkClassField />
 
         <div className="space-y-1.5">
           <Label htmlFor="note">Note for the store (optional)</Label>
