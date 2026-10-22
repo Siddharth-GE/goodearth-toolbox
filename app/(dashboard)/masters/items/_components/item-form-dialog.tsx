@@ -115,7 +115,6 @@ export function ItemFormDialog({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="gst_pct">GST</Label>
-        <input type="hidden" name="gst_pct_was" value={item?.gst_pct ?? ""} />
         <Select id="gst_pct" name="gst_pct" defaultValue={item?.gst_pct ?? ""}>
           <option value="">Not entered</option>
           {item?.gst_pct != null && !gstRates.includes(item.gst_pct) && (

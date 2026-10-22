@@ -1,5 +1,6 @@
 import "server-only";
 
+import { workCategoryLabel } from "@/lib/masters/works";
 import { requireTool } from "@/lib/auth/access";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -421,10 +422,10 @@ export async function getEstimatePull(
             .range(from, to),
         )
       : Promise.resolve([]),
-    fetchAll<{ id: string; name: string; sort_order: number }>((from, to) =>
+    fetchAll<{ id: string; name: string; family: string; sort_order: number }>((from, to) =>
       supabase
         .from("work_categories")
-        .select("id, name, sort_order")
+        .select("id, name, family, sort_order")
         .order("sort_order")
         .order("id")
         .range(from, to),
@@ -434,7 +435,7 @@ export async function getEstimatePull(
   const usedCategories = new Set(categoryOfWork.values());
   const stages = stageCategories
     .filter((category) => usedCategories.has(category.id))
-    .map((category) => ({ id: category.id, label: category.name }));
+    .map((category) => ({ id: category.id, label: workCategoryLabel(category) }));
   const stage = stageId ? (stages.find((s) => s.id === stageId) ?? null) : null;
 
   const workItemId = allWorks || stage ? null : indentWorkItemId;
