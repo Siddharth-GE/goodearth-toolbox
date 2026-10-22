@@ -46,6 +46,9 @@ export type RecordReceiptInput = {
   /** The work a to-site delivery serves (0081); never sent for a store. */
   workItemId: string | null;
   challanNo: string | null;
+  /** The supplier's invoice, as it came with the goods; the bill offers it (0132). */
+  invoiceNo: string | null;
+  invoiceDate: string | null;
   receivedAt: string | null;
   note: string | null;
   lines: ReceiveLineInput[];
@@ -113,6 +116,26 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     return guardError(error, "Could not record this delivery. Try again.", INVENTORY_GUARD_PHRASES);
   }
   if (!receiptId) return { error: "Could not record this delivery. Try again." };
+
+  // create_goods_receipt predates the invoice (additive-only), so it rides a second write.
+  const invoiceNo = input.invoiceNo?.trim() || null;
+  if (invoiceNo || input.invoiceDate) {
+    const { error: invoiceError } = await supabase
+      .from("goods_receipts")
+      .update({
+        invoice_no: invoiceNo,
+        invoice_date: input.invoiceDate || null,
+        updated_by: user.id,
+      })
+      .eq("id", receiptId);
+    if (invoiceError) {
+      console.error("recordGoodsReceipt invoice failed:", invoiceError);
+      revalidatePath("/inventory", "layout");
+      return {
+        error: "The delivery was recorded without its invoice number. Try entering it again.",
+      };
+    }
+  }
 
   // One line at a time: the over-receipt guard raises per line, and a batch insert would fail wholesale.
   // A refusal part-way leaves a short note; recording a second receipt for the rest is the recovery.

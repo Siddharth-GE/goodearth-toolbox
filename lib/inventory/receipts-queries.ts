@@ -500,6 +500,8 @@ export type ReceiptDetail = {
   work_name: string | null;
   work_category: string | null;
   challan_no: string | null;
+  invoice_no: string | null;
+  invoice_date: string | null;
   received_at: string;
   note: string | null;
   created_at: string;
@@ -564,7 +566,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   const { data: receipt, error: receiptError } = await supabase
     .from("goods_receipts")
     .select(
-      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
+      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, invoice_no, invoice_date, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
     )
     .eq("id", receiptId)
     .maybeSingle();
@@ -650,6 +652,8 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
       (receipt.work_items as { name: string; work_categories: { name: string } | null } | null)
         ?.work_categories?.name ?? null,
     challan_no: receipt.challan_no,
+    invoice_no: receipt.invoice_no,
+    invoice_date: receipt.invoice_date,
     received_at: receipt.received_at,
     note: receipt.note,
     created_at: receipt.created_at,
