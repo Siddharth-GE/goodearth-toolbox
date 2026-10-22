@@ -17,15 +17,15 @@ The founder's decisions (2026-10-22):
 
 ## What already exists — remind the founder, build nothing
 
-| Ask | Status | Where |
-| --- | --- | --- |
-| E&P 1 Material requests linked to approved estimates, separate approval for unbudgeted | **Done** (`0113`) | A line the estimate doesn't cover needs a reason and the estimator's yes in Site check before the approver can approve. Only an "Urgent" mark is missing (Wave 2). |
-| E&P 2 Duplicate rows in the Estimator | **Done** | Measurement sheet: **Duplicate** on a row, **Copy rows to another work**. A work can appear once per estimate by design (`unique (estimate_id, work_item_id)`). |
-| E&P 3 Indents from the estimate for a stage | **Partly** | Pull is per work, with "Show every work". A stage (category) filter is Wave 2. |
-| E&P 4 Consolidated POs, traceable per indent | **Done** | A General PO gathers several villas' approved indents; every PO line keeps `indent_line_id`; the indent shows "still to buy". |
-| E&P 6 Highest PO rate as budgeting rate; actuals at purchase rate; budget versions kept | **Done** | `0103` raises `items.indicative_price` on a dearer PO, never lowers; `0108` batches carry the PO rate so issues are valued at what was paid; official estimates are numbered and superseded, never overwritten. |
-| Commercial 3 Additional charges separate from the rate | **Partly** | Per-line "Other charges" (after GST) exist on PO and bill lines and print. A document-level charge with its own GST is Wave 2. |
-| Commercial 5 Advances to suppliers | **UI only** | The database already allows any vendor; only the picker filters to contractors. Wave 2. |
+| Ask                                                                                     | Status            | Where                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E&P 1 Material requests linked to approved estimates, separate approval for unbudgeted  | **Done** (`0113`) | A line the estimate doesn't cover needs a reason and the estimator's yes in Site check before the approver can approve. Only an "Urgent" mark is missing (Wave 2).                                              |
+| E&P 2 Duplicate rows in the Estimator                                                   | **Done**          | Measurement sheet: **Duplicate** on a row, **Copy rows to another work**. A work can appear once per estimate by design (`unique (estimate_id, work_item_id)`).                                                 |
+| E&P 3 Indents from the estimate for a stage                                             | **Partly**        | Pull is per work, with "Show every work". A stage (category) filter is Wave 2.                                                                                                                                  |
+| E&P 4 Consolidated POs, traceable per indent                                            | **Done**          | A General PO gathers several villas' approved indents; every PO line keeps `indent_line_id`; the indent shows "still to buy".                                                                                   |
+| E&P 6 Highest PO rate as budgeting rate; actuals at purchase rate; budget versions kept | **Done**          | `0103` raises `items.indicative_price` on a dearer PO, never lowers; `0108` batches carry the PO rate so issues are valued at what was paid; official estimates are numbered and superseded, never overwritten. |
+| Commercial 3 Additional charges separate from the rate                                  | **Partly**        | Per-line "Other charges" (after GST) exist on PO and bill lines and print. A document-level charge with its own GST is Wave 2.                                                                                  |
+| Commercial 5 Advances to suppliers                                                      | **UI only**       | The database already allows any vendor; only the picker filters to contractors. Wave 2.                                                                                                                         |
 
 Everything else below is new.
 

@@ -1,6 +1,6 @@
 import { roundPaise } from "@/lib/line-money";
-// Pure half of scripts/import-masters-workbook.ts. A repeated vendor name is one vendor; look-alike names stay apart for Masters to merge.
-// Contradictory works rows are fixed in the tables below, matched on code AND text so a later sheet edit fails loudly.
+// Pure half of scripts/import-masters-workbook.ts: vendors and materials (the works are works-workbook.ts).
+// A repeated vendor name is one vendor; look-alike names stay apart for Masters to merge.
 
 export type Cell = string | undefined;
 
@@ -198,227 +198,6 @@ export function vendorsFromSheet(rows: SheetRow[]): { vendors: WorkbookVendor[];
   return { vendors, notes };
 }
 
-export type WorkbookWorkCategory = { code: string; name: string; sort_order: number };
-export type WorkbookWorkGroup = {
-  code: string;
-  category: string;
-  name: string;
-  sort_order: number;
-};
-export type WorkbookWorkItem = {
-  code: string;
-  category: string;
-  group: string | null;
-  name: string;
-  sort_order: number;
-  uom: string | null;
-  labour_rate: number | null;
-};
-
-const WORK_HEADINGS: { code: string; name: string; group: string }[] = [
-  // No code in the sheet; the sheet's own FD.3 row repeats FD.6 and is left out (below).
-  { code: "", name: "FD - Rubble Foundation", group: "FD.3" },
-  { code: "FD.11", name: "FD - Isolated Foundation", group: "FD.11" },
-  { code: "FD.18", name: "FD - Pile Foundation", group: "FD.18" },
-  { code: "FD.24", name: "FD - Plinth Beam", group: "FD.24" },
-  { code: "PF", name: "PF - Plastering", group: "PF.0" },
-  // The sheet numbers this heading PF.2 (already Bull Marking); it follows PF.19, so it becomes PF.20 and its works PF.20a–PF.20s.
-  { code: "PF.2", name: "PF - Roof Fabrication", group: "PF.20" },
-  { code: "F.1", name: "F - Internal Finishing Works", group: "F.1" },
-  { code: "F.2", name: "F - External Finishes", group: "F.2" },
-];
-
-const WORK_LEFT_OUT: { code: string; name: string; why: string }[] = [
-  { code: "FD.3", name: "FD - Dry Rubble Masonry", why: "repeats FD.6, which carries the rate" },
-  {
-    code: "F.1.1",
-    name: "F - Polishing Works",
-    why: "a heading — the works under it are the Wood Polishing ones",
-  },
-  {
-    code: "F.1.7",
-    name: "F - Floor Tiling",
-    why: "a heading — each work under it is Floor Tiling with its scope",
-  },
-];
-
-const WORK_CODES: { code: string; name: string; becomes: string }[] = [
-  { code: "", name: "MEP - Electrical Connection Checking", becomes: "MEP.11b" },
-];
-
-/** Where a group ends early, because what follows is a different kind of work. */
-const GROUP_ENDS_BEFORE = new Set([
-  "PF.16", // Screed is not Plastering
-  "PF.20k", // Stair Fabrication onward is not Roof Fabrication
-]);
-
-/** Names repeated under different floors take the floor their parent row names. */
-const FLOOR: Record<string, string> = {
-  "SS.2a": "GF",
-  "SS.2b": "GF",
-  "SS.2c": "GF",
-  "SS.2d": "GF",
-  "SS.7b": "FF",
-  "SS.7c": "FF",
-  "SS.7d": "FF",
-  "SS.7e": "FF",
-  "SS.9a": "Attic",
-  "MEP.2a": "GF",
-  "MEP.3a": "FF",
-};
-
-const WORK_UOMS: Record<string, string> = {
-  m3: "cum",
-  sqft: "sqft",
-  sft: "sqft",
-  rft: "rft",
-  nos: "nos",
-  lumpsum: "lumpsum",
-  pali: "pali",
-  "per pali": "pali",
-};
-
-const same = (a: { code: string; name: string }, code: string, name: string) =>
-  a.code === code && a.name === name;
-
-export function worksFromSheet(rows: SheetRow[]): {
-  categories: WorkbookWorkCategory[];
-  groups: WorkbookWorkGroup[];
-  items: WorkbookWorkItem[];
-  notes: string[];
-} {
-  const categories: WorkbookWorkCategory[] = [];
-  const groups: WorkbookWorkGroup[] = [];
-  const items: WorkbookWorkItem[] = [];
-  const notes: string[] = [];
-  const used = new Set<object>();
-
-  let category: WorkbookWorkCategory | null = null;
-  let group: WorkbookWorkGroup | null = null;
-  let order = 0;
-
-  const cleanName = (name: string) => {
-    let clean = name;
-    for (const known of categories) {
-      if (clean.startsWith(`${known.code} - `)) clean = clean.slice(known.code.length + 3);
-    }
-    return clean.replace(/\bMoiner\b/g, "Monier");
-  };
-
-  for (const { row, cells } of underHeader(rows, "Works", [
-    "Code",
-    "Work Description",
-    "Scope",
-    "Unit",
-    "Price",
-  ])) {
-    const sheetCode = text(cells[0]);
-    const sheetName = text(cells[1]);
-    if (sheetCode === "" && sheetName === "") continue;
-    order += 10;
-
-    const heading = WORK_HEADINGS.find((h) => same(h, sheetCode, sheetName));
-    const leftOut = WORK_LEFT_OUT.find((d) => same(d, sheetCode, sheetName));
-    const recode = WORK_CODES.find((c) => same(c, sheetCode, sheetName));
-    for (const rule of [heading, leftOut, recode]) if (rule) used.add(rule);
-
-    const isCategory =
-      !heading &&
-      sheetCode !== "" &&
-      !sheetCode.includes(".") &&
-      !sheetName.startsWith(`${sheetCode} - `);
-    if (isCategory) {
-      category = { code: sheetCode, name: sheetName, sort_order: (categories.length + 1) * 10 };
-      categories.push(category);
-      group = null;
-      if (text(cells[4]) !== "") {
-        notes.push(
-          `${sheetCode}: the sheet's ${text(cells[4])} is the whole stage's rate per sqft — its works carry their own shares, so it is not stored.`,
-        );
-      }
-      continue;
-    }
-    if (!category) throw new Error(`Row ${row}: "${sheetName}" comes before any category.`);
-
-    if (heading) {
-      group = {
-        code: heading.group,
-        category: category.code,
-        name: cleanName(sheetName),
-        sort_order: order,
-      };
-      groups.push(group);
-      continue;
-    }
-    if (leftOut) {
-      notes.push(`Row ${row}: ${sheetCode} "${sheetName}" left out — ${leftOut.why}.`);
-      continue;
-    }
-
-    const code = recode?.becomes ?? sheetCode.replace(/^PF\.2([a-z])$/, "PF.20$1");
-    if (code === "") throw new Error(`Row ${row}: "${sheetName}" has no code.`);
-    if (code.split(".")[0] !== category.code) {
-      throw new Error(`Row ${row}: ${code} sits under category ${category.code}.`);
-    }
-    if (GROUP_ENDS_BEFORE.has(code)) group = null;
-
-    const scope = text(cells[2]);
-    const name =
-      cleanName(sheetName) +
-      (FLOOR[code] ? ` - ${FLOOR[code]}` : "") +
-      (scope ? ` — ${scope}` : "");
-
-    // SS and MEP write 0.12 in the unit column: a share of the stage's per-sqft rate, and the price is already that share.
-    const unit = text(cells[3]);
-    const rate = number(cells[4], `Row ${row} (${code})`);
-    let uom: string | null = null;
-    if (unit !== "" && Number.isFinite(Number(unit))) uom = "sqft";
-    else if (unit !== "") {
-      uom = WORK_UOMS[unit.toLowerCase()] ?? null;
-      if (!uom) throw new Error(`Row ${row} (${code}): unknown unit "${unit}".`);
-    } else if (rate !== null) {
-      throw new Error(`Row ${row} (${code}): a price with no unit.`);
-    }
-
-    items.push({
-      code,
-      category: category.code,
-      group: group?.code ?? null,
-      name,
-      sort_order: order,
-      uom,
-      labour_rate: rate,
-    });
-  }
-
-  for (const rule of [...WORK_HEADINGS, ...WORK_LEFT_OUT, ...WORK_CODES]) {
-    if (!used.has(rule)) {
-      throw new Error(
-        `The works sheet no longer has ${rule.code || "(no code)"} "${rule.name}" — re-check the fixes in masters-workbook.ts.`,
-      );
-    }
-  }
-
-  const codes = new Set<string>();
-  for (const entry of [...categories, ...groups, ...items]) {
-    if (codes.has(entry.code)) throw new Error(`Works: ${entry.code} is used twice.`);
-    codes.add(entry.code);
-  }
-
-  const seen = new Map<string, string>();
-  for (const item of items) {
-    const key = `${item.category}|${item.group}|${item.name.toLowerCase()}`;
-    const first = seen.get(key);
-    if (first)
-      notes.push(
-        `${first} and ${item.code} have the same name, "${item.name}" — kept both; rename one in Masters.`,
-      );
-    else seen.set(key, item.code);
-  }
-
-  return { categories, groups, items, notes };
-}
-
 export type WorkbookMaterialCategory = { code: string; name: string };
 // The Material Family column is dropped: mostly the name again.
 export type WorkbookMaterial = {
@@ -427,6 +206,8 @@ export type WorkbookMaterial = {
   category: string;
   uom: string;
   indicative_price: number | null;
+  /** Entered by hand in the sheet; null where the cell is blank, which keeps what Masters holds. */
+  gst_pct: number | null;
 };
 
 const MATERIAL_UOMS: Record<string, string> = {
@@ -452,6 +233,17 @@ const MATERIAL_UOMS: Record<string, string> = {
   pairs: "pair",
   bottle: "bottle",
 };
+
+/** "18%", "18" and Excel's percent cell (0.18) are the same 18. */
+export function gstFromCell(cell: Cell, where: string): number | null {
+  const value = text(cell).replace(/%$/, "").trim();
+  if (value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100)
+    throw new Error(`${where}: "${text(cell)}" is not a GST rate.`);
+  const pct = parsed > 0 && parsed < 1 && !text(cell).endsWith("%") ? parsed * 100 : parsed;
+  return Math.round(pct * 100) / 100;
+}
 
 /** A blank unit is "nos". */
 const BLANK_MATERIAL_UOM = "nos";
@@ -520,6 +312,7 @@ export function materialsFromSheet(
       category: category.name,
       uom,
       indicative_price: number(cells[5], `Material row ${row} (${code})`),
+      gst_pct: gstFromCell(cells[6], `Material row ${row} (${code})`),
     });
   }
 
@@ -534,18 +327,4 @@ export function materialsFromSheet(
     else byName.set(key, m.code);
   }
   return { materials, notes };
-}
-
-/** The Stages sheet has no header: one stage per row, in order. */
-export function stagesFromSheet(rows: SheetRow[]): string[] {
-  const stages: string[] = [];
-  for (const { row, cells } of rows) {
-    const name = text(cells[0]);
-    if (name === "") continue;
-    if (stages.some((s) => s.toLowerCase() === name.toLowerCase())) {
-      throw new Error(`Stages row ${row}: "${name}" is listed twice.`);
-    }
-    stages.push(name);
-  }
-  return stages;
 }
