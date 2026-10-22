@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/drawings/queries";
 import { listVendors } from "@/lib/masters/vendors";
+import { type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
@@ -135,6 +136,7 @@ export type LabourLogRow = {
   note: string | null;
   billId: string | null;
   billReference: string | null;
+  workClass: WorkClass;
 };
 
 export type IssueRequestRow = {
@@ -149,6 +151,7 @@ export type IssueRequestRow = {
   /** Why it was asked for although the estimate doesn't list it (0104). */
   offEstimateReason: string | null;
   createdAt: string;
+  workClass: WorkClass;
 };
 
 export type EstimateQuickPick = {
@@ -312,7 +315,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     supabase
       .from("labour_logs")
       .select(
-        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id",
+        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id, work_class",
         { count: "exact" },
       )
       .eq("plot_id", plotId)
@@ -330,11 +333,12 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       declined_reason: string | null;
       off_estimate_reason: string | null;
       created_at: string;
+      work_class: string;
     }>((from, to) =>
       supabase
         .from("issue_requests")
         .select(
-          "id, work_item_id, item_id, quantity, note, status, declined_reason, off_estimate_reason, created_at",
+          "id, work_item_id, item_id, quantity, note, status, declined_reason, off_estimate_reason, created_at, work_class",
         )
         .eq("plot_id", plotId)
         .order("created_at", { ascending: false })
@@ -480,6 +484,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       note: log.note,
       billId: log.bill_id,
       billReference: log.bill_id ? (billRefs.get(log.bill_id) ?? null) : null,
+      workClass: workClassOf(log.work_class) ?? "standard",
     })),
     labourTotal: logsPage.count ?? logs.length,
     requests: requestRows.map((request) => ({
@@ -493,6 +498,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       declinedReason: request.declined_reason,
       offEstimateReason: request.off_estimate_reason,
       createdAt: request.created_at,
+      workClass: workClassOf(request.work_class) ?? "standard",
     })),
     quickPicks,
     drawings,

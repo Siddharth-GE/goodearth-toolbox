@@ -15,6 +15,18 @@ The founder's decisions (2026-10-22):
 
 **Approved by the founder 2026-10-22.** Work on `feature/os-updates` in its own worktree (`../toolbox-os`); one pull request per wave. Ticks below are the live board.
 
+**The founder waived Fable's reviews for this build** (2026-10-22: "skip fable review you review and merge"). Opus reviewed the full diff and the four drafts, with a second unanchored read of the app code. The six bugs it found were fixed before #119 and #120 were merged into `staging`.
+
+### Next session, in order — after "read CLAUDE.md"
+
+1. **Masters import.** It waits for the founder's word: "run the import". In `..\toolbox-os` on `staging`, dry-run it again, and the counts should still be 246 kept, 24 switched off and 444 new:
+   `npx tsx scripts/import-masters-workbook.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/1.xlsx"`
+   Then run the same command with `--commit`. Then tell the founder to send the works list to SketchUp again, and to re-tag models that use old codes.
+2. **Apply `0133`–`0136`.** They wait for the founder's explicit word to write them to staging's database, which an automatic check refused without it. They are on `feature/os-updates-3`, reviewed by Opus with Fable waived. First `git merge origin/staging` on that branch. Then `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, `npm run db:types:staging`, and `db:check-views` and `db:check-policies`. In the same commit: `SECURITY.md` _Money stays confined_ goes from eleven money views to thirteen and names `villa_cost_facts` and `work_order_line_billing_facts`; STATUS's migrations line becomes `0094`–`0136`; the contract table gains Inventory reading `site_receipt_confirmations(_lines)` and the Estimator and Bills reading `villa_cost_facts`.
+3. **Build the screens** under "Built after the review" in that branch's `plan.md`, one commit each: 0133's two, then the checklists (save `Tb\3.xls` as `.xlsx` first), then site receipt, then Budget vs actual and stage billing. Then the small leftovers: the Inventory issues "Items" toggle, and a way to correct an issue's work class beside Retag work.
+4. **One pull request into `staging`** for steps 2 and 3, merged after CI. The founder vets on staging.
+5. **Later:** the cramped Design board (`TODO.md`); `Tb\later.xlsx` (steel and tile takeoffs), parked.
+
 ## What already exists — remind the founder, build nothing
 
 | Ask                                                                                     | Status            | Where                                                                                                                                                                                                           |
@@ -74,7 +86,8 @@ Everything else below is new.
 ## Wave 2 — the small fixes `[Sonnet builds, Opus vets each commit]`
 
 - [x] [Opus] Built with no migration, on `feature/os-updates` with Wave 1: 2 (stage links on the pull page), 7 (the Reporter dataset; the Inventory Items toggle is still to do), 9 (the order picker searches in the browser, not yet on the server), 10 (label "Contractor or supplier"; the Contractors page keeps its name), 11 (its own search form, since the page's toolbar owns `q`).
-- [ ] [Opus] 1, 3, 4, 5, 6, 8 on `feature/os-updates-2`: their migration changes guard and definer functions in Indents, Estimator, Supervisors and Bills, so it reaches `db:apply` only after a Fable review (`MODELS.md`).
+- [x] [Opus] 1, 3, 5, 6 on `feature/os-updates-2` with `0132`: columns and invoker guards only (no view, definer, policy or money), so applied to staging after a dry run and `scripts/trials/small-fixes.sql`, run as a supervisor and a store-keeper and proven to fail with the request guard broken.
+- [ ] [Fable] 4 and 8 need `0133`: `send_labour_logs_to_bill()` is a definer and the charges are money. Drafted for review; nothing applied.
 
 One migration, `0132_small_fixes.sql` `[Opus drafts; Fable reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
 

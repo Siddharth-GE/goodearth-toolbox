@@ -33,6 +33,8 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   const [toSite, setToSite] = useState(false);
   const [workItemId, setWorkItemId] = useState("");
   const [challanNo, setChallanNo] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => todayInIndia());
   const [note, setNote] = useState("");
   const { pending: saving, error, run } = useActionRunner();
@@ -92,6 +94,8 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
         toSite,
         workItemId: toSite ? workItemId : null,
         challanNo: challanNo || null,
+        invoiceNo: invoiceNo || null,
+        invoiceDate: invoiceDate || null,
         receivedAt: receivedAt || null,
         note: note || null,
         lines: pickedEntries.map(([poLineId, quantity]) => ({ poLineId, quantity })),
@@ -195,6 +199,28 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
               onChange={(event) => setChallanNo(event.target.value)}
               placeholder="As written on the vendor's paper"
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="invoice-no">Supplier&apos;s invoice no. (if it came)</Label>
+              <Input
+                id="invoice-no"
+                value={invoiceNo}
+                onChange={(event) => setInvoiceNo(event.target.value)}
+                placeholder="The bill records it from here"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invoice-date">Invoice date</Label>
+              <Input
+                id="invoice-date"
+                type="date"
+                value={invoiceDate}
+                onChange={(event) => setInvoiceDate(event.target.value)}
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">

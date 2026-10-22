@@ -1,6 +1,7 @@
 "use client";
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { WorkClassField } from "@/components/masters/work-class-field";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -138,6 +139,8 @@ export function LabourLogDialog({
           ))}
         </Select>
       </div>
+
+      <WorkClassField defaultValue={log?.workClass ?? "standard"} />
 
       <div className="space-y-1.5">
         <Label htmlFor="kind">How is this paid?</Label>

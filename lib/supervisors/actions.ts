@@ -11,6 +11,7 @@ import {
   type LabourKind,
   type LabourShape,
 } from "@/lib/supervisors/labour";
+import { WORK_CLASS_LABEL, type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { revalidatePath } from "next/cache";
 
 const GRANT = "/supervisors";
@@ -31,6 +32,7 @@ type LabourFields = LabourShape & {
   contractor_id: string;
   log_date: string;
   note: string | null;
+  work_class: WorkClass;
 };
 
 /** The form as a row (0104). A measured log takes the work's unit from the rate book (money-free work_unit_facts), never from the phone. */
@@ -44,11 +46,14 @@ async function readLabourFields(
   const logDate = text(formData, "log_date");
   const kind = text(formData, "kind") || "nmr";
   const note = text(formData, "note");
+  const workClass = workClassOf(text(formData, "work_class"));
 
   if (!plotId) return { error: "Pick the villa." };
   if (!workItemId) return { error: "Pick the work the labour was on." };
   if (!contractorId) return { error: "Pick the contractor." };
   if (!logDate) return { error: "Pick the date." };
+  if (!workClass)
+    return { error: "Say whether this was standard work, additional work or rework." };
   if (note.length > NOTE_LIMIT) {
     return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
   }
@@ -86,11 +91,12 @@ async function readLabourFields(
     contractor_id: contractorId,
     log_date: logDate,
     note: note || null,
+    work_class: workClass,
   };
 }
 
-const sameDayMessage = (kind: LabourKind) =>
-  `That day already has a ${LABOUR_KIND_LABEL[kind].toLowerCase()} entry for this contractor and work — edit that one instead.`;
+const sameDayMessage = (kind: LabourKind, workClass: WorkClass) =>
+  `That day already has a ${LABOUR_KIND_LABEL[kind].toLowerCase()} entry for this contractor and work, as ${WORK_CLASS_LABEL[workClass].toLowerCase()} — edit that one instead.`;
 
 const BILLED_MESSAGE = "This log is on a bill now, so it can't be changed or deleted.";
 
@@ -107,7 +113,7 @@ export async function recordLabourLog(
     .from("labour_logs")
     .insert({ ...fields, created_by: user.id, updated_by: user.id });
   if (error) {
-    if (error.code === "23505") return { error: sameDayMessage(fields.kind) };
+    if (error.code === "23505") return { error: sameDayMessage(fields.kind, fields.work_class) };
     console.error("recordLabourLog failed:", error);
     return {
       error: error.message.includes("contractor")
@@ -145,11 +151,12 @@ export async function updateLabourLog(
       uom: fields.uom,
       description: fields.description,
       note: fields.note,
+      work_class: fields.work_class,
       updated_by: user.id,
     })
     .eq("id", id);
   if (error) {
-    if (error.code === "23505") return { error: sameDayMessage(fields.kind) };
+    if (error.code === "23505") return { error: sameDayMessage(fields.kind, fields.work_class) };
     if (error.message.includes("bill")) return { error: BILLED_MESSAGE };
     console.error("updateLabourLog failed:", error);
     return { error: "Could not save the change. Try again." };
@@ -185,9 +192,12 @@ export async function createIssueRequest(
   const itemId = text(formData, "item_id");
   const quantityRaw = text(formData, "quantity").replace(/[,\s]/g, "");
   const note = text(formData, "note");
+  const workClass = workClassOf(text(formData, "work_class"));
 
   if (!plotId) return { error: "Pick the villa." };
   if (!workItemId) return { error: "Say which work the material is for." };
+  if (!workClass)
+    return { error: "Say whether it is for standard work, additional work or rework." };
   if (!itemId) return { error: "Pick the material." };
   const quantity = Number(quantityRaw);
   if (!quantityRaw || Number.isNaN(quantity) || quantity <= 0) {
@@ -247,6 +257,7 @@ export async function createIssueRequest(
     quantity,
     note: note || null,
     off_estimate_reason: offEstimate ? reason : null,
+    work_class: workClass,
     created_by: user.id,
     updated_by: user.id,
   });

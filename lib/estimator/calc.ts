@@ -492,12 +492,13 @@ export function groupLineCosts(
     .map((group) => ({ ...group, totals: computeEstimateTotals(group.lineCosts) }));
 }
 
-/** One measurement row: a blank box is null and means "not used". */
+/** One measurement row: a blank box is null and means "not used". A deduction (an opening) is taken off the total. */
 export type MeasurementInput = {
   nos: number | null;
   length: number | null;
   breadth: number | null;
   depth: number | null;
+  deduct?: boolean;
 };
 
 /** Nos × Length × Breadth × Depth, blank boxes skipped ("12 × 3.0" is 36). A row with nothing measures 0;
@@ -510,9 +511,11 @@ export function measurementQuantity(row: MeasurementInput): number {
   return roundQuantity(boxes.reduce((product, value) => product * value, 1));
 }
 
-/** The sheet's total, rounded to six decimals so float dust (4 × 3 × 0.15 = 1.7999999999999998) never reaches the database. */
+/** The sheet's total, deductions taken off, rounded to six decimals so float dust (4 × 3 × 0.15 = 1.7999999999999998) never reaches the database. */
 export function sheetTotal(rows: MeasurementInput[]): number {
-  return roundQuantity(rows.reduce((sum, row) => sum + measurementQuantity(row), 0));
+  return roundQuantity(
+    rows.reduce((sum, row) => sum + (row.deduct ? -1 : 1) * measurementQuantity(row), 0),
+  );
 }
 
 function roundQuantity(value: number): number {

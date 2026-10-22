@@ -52,6 +52,7 @@ export type IndentDetail = {
   work_item_id: string | null;
   required_by: string | null;
   note: string | null;
+  is_urgent: boolean;
   rejection_note: string | null;
   project_id: string;
   project_name: string;
@@ -112,7 +113,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, work_item_id, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
+        "id, reference, status, stage, work_item_id, required_by, note, is_urgent, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
       )
       .eq("id", indentId)
       .maybeSingle(),
@@ -340,6 +341,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     work_item_id: indent.work_item_id,
     required_by: indent.required_by,
     note: indent.note,
+    is_urgent: indent.is_urgent,
     rejection_note: indent.rejection_note,
     project_id: indent.project_id,
     project_name: (indent.projects as { name: string } | null)?.name ?? "—",

@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -126,6 +127,11 @@ export function MeasurementSheetDialog({
                         Model
                       </Badge>
                     )}
+                    {row.deduct && (
+                      <Badge variant="warning" className="ml-2">
+                        Deducted
+                      </Badge>
+                    )}
                   </TableCell>
                   {BOXES.map((box) => (
                     <TableCell key={box.key} className="text-right font-mono text-sm">
@@ -133,6 +139,7 @@ export function MeasurementSheetDialog({
                     </TableCell>
                   ))}
                   <TableCell className="text-foreground text-right font-mono text-sm">
+                    {row.deduct ? "−" : ""}
                     {formatQuantity(measurementQuantity(row))}
                   </TableCell>
                 </TableRow>
@@ -162,7 +169,8 @@ export function MeasurementSheetDialog({
         )}
 
         <p className="text-muted text-xs">
-          Blank means not used: 12 in Nos alone is 12; 1 × 4 × 3 × 0.15 is 1.8.
+          Blank means not used: 12 in Nos alone is 12; 1 × 4 × 3 × 0.15 is 1.8. Tick Deduct for a
+          door, window or other opening: it is measured like any row and taken off the total.
           {workUom ? ` Enter sizes so the result comes out in ${workUom}` : " Enter sizes"} — the
           app does not convert units.
           {!readOnly && measured && " Removing the last row keeps the total as a typed quantity."}
@@ -188,24 +196,27 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
     length: show(row.length),
     breadth: show(row.breadth),
     depth: show(row.depth),
+    deduct: row.deduct,
   };
   const [values, setValues] = useState(initial);
   const { pending, error, run } = useActionRunner();
 
-  const save = async () => {
+  const save = async (next = values) => {
     const fields: MeasurementFields = {
-      description: values.description.trim() || null,
-      nos: parseNumber(values.nos),
-      length: parseNumber(values.length),
-      breadth: parseNumber(values.breadth),
-      depth: parseNumber(values.depth),
+      description: next.description.trim() || null,
+      nos: parseNumber(next.nos),
+      length: parseNumber(next.length),
+      breadth: parseNumber(next.breadth),
+      depth: parseNumber(next.depth),
+      deduct: next.deduct,
     };
     const unchanged =
       fields.description === row.description &&
       fields.nos === row.nos &&
       fields.length === row.length &&
       fields.breadth === row.breadth &&
-      fields.depth === row.depth;
+      fields.depth === row.depth &&
+      fields.deduct === row.deduct;
     if (unchanged) return;
     const result = await run(() => updateLineMeasurement(row.id, fields));
     if (result?.error) {
@@ -233,11 +244,23 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
           placeholder="What it is — front wall, footing F1…"
           value={values.description}
           onChange={(event) => setValues({ ...values, description: event.target.value })}
-          onBlur={save}
+          onBlur={() => save()}
           onKeyDown={onKeyDown}
           disabled={pending}
           className="h-9 min-w-48 flex-1 text-sm"
         />
+        <label className="text-muted flex items-center gap-1.5 text-xs">
+          <Checkbox
+            checked={values.deduct}
+            disabled={pending}
+            onChange={(event) => {
+              const next = { ...values, deduct: event.target.checked };
+              setValues(next);
+              void save(next);
+            }}
+          />
+          Deduct
+        </label>
         <RowActionButton
           label="Duplicate"
           pendingLabel="Duplicating…"
@@ -257,7 +280,7 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
               value={values[box.key]}
               inputMode="decimal"
               onChange={(event) => setValues({ ...values, [box.key]: event.target.value })}
-              onBlur={save}
+              onBlur={() => save()}
               onKeyDown={onKeyDown}
               disabled={pending}
               className="h-9 text-right text-sm"
@@ -266,7 +289,7 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
         ))}
       </div>
       <p className="text-muted text-right text-sm">
-        ={" "}
+        {values.deduct ? "− " : "= "}
         <span className="text-foreground font-mono">
           {Number.isFinite(live) ? formatQuantity(live) : "—"}
         </span>
@@ -374,7 +397,11 @@ function AddMeasurementForm({ lineId }: { lineId: string }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <label className="text-foreground mr-auto flex items-center gap-2 text-sm">
+          <Checkbox name="deduct" value="1" />
+          Deduct (a door, window or other opening)
+        </label>
         <FormMessage error={state?.error} />
         <Button type="submit" disabled={pending}>
           {pending ? "Adding…" : "Add row"}

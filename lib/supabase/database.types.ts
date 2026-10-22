@@ -4489,6 +4489,7 @@ export type Database = {
           description: string | null
           from_model: boolean
           id: string
+          is_deduction: boolean
           length: number | null
           line_id: string
           model_refs: string[] | null
@@ -4505,6 +4506,7 @@ export type Database = {
           description?: string | null
           from_model?: boolean
           id?: string
+          is_deduction?: boolean
           length?: number | null
           line_id: string
           model_refs?: string[] | null
@@ -4521,6 +4523,7 @@ export type Database = {
           description?: string | null
           from_model?: boolean
           id?: string
+          is_deduction?: boolean
           length?: number | null
           line_id?: string
           model_refs?: string[] | null
@@ -5617,6 +5620,8 @@ export type Database = {
           created_by: string | null
           grn_no: number
           id: string
+          invoice_date: string | null
+          invoice_no: string | null
           note: string | null
           plot_id: string | null
           po_id: string
@@ -5636,6 +5641,8 @@ export type Database = {
           created_by?: string | null
           grn_no: number
           id?: string
+          invoice_date?: string | null
+          invoice_no?: string | null
           note?: string | null
           plot_id?: string | null
           po_id: string
@@ -5655,6 +5662,8 @@ export type Database = {
           created_by?: string | null
           grn_no?: number
           id?: string
+          invoice_date?: string | null
+          invoice_no?: string | null
           note?: string | null
           plot_id?: string | null
           po_id?: string
@@ -6072,6 +6081,7 @@ export type Database = {
           created_by: string | null
           id: string
           indent_no: number
+          is_urgent: boolean
           note: string | null
           plot_id: string | null
           project_id: string
@@ -6094,6 +6104,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           indent_no: number
+          is_urgent?: boolean
           note?: string | null
           plot_id?: string | null
           project_id: string
@@ -6116,6 +6127,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           indent_no?: number
+          is_urgent?: boolean
           note?: string | null
           plot_id?: string | null
           project_id?: string
@@ -6235,6 +6247,7 @@ export type Database = {
           status: string
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string
         }
         Insert: {
@@ -6251,6 +6264,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id: string
         }
         Update: {
@@ -6267,6 +6281,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string
         }
         Relationships: [
@@ -6890,6 +6905,7 @@ export type Database = {
           uom: string | null
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string
         }
         Insert: {
@@ -6910,6 +6926,7 @@ export type Database = {
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id: string
         }
         Update: {
@@ -6930,6 +6947,7 @@ export type Database = {
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string
         }
         Relationships: [
@@ -9030,6 +9048,7 @@ export type Database = {
           to_store_id: string | null
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string | null
         }
         Insert: {
@@ -9046,6 +9065,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string | null
         }
         Update: {
@@ -9062,6 +9082,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string | null
         }
         Relationships: [

@@ -22,7 +22,9 @@ export default async function IndentsPage() {
           {
             label: "Awaiting approval",
             value: counts.awaitingApproval,
-            hint: "submitted from site",
+            hint: counts.urgentAwaiting
+              ? `${counts.urgentAwaiting} marked urgent`
+              : "submitted from site",
           },
           { label: "Drafts", value: counts.drafts, hint: "still being put together" },
           { label: "Approved this month", value: counts.approvedThisMonth, hint: "cleared to buy" },

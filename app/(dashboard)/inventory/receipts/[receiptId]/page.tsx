@@ -37,6 +37,14 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
 
       <section className="border-border bg-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-4">
         <Field label="Challan no." value={receipt.challan_no ?? "—"} />
+        <Field
+          label="Supplier's invoice"
+          value={
+            receipt.invoice_no
+              ? `${receipt.invoice_no}${receipt.invoice_date ? ` · ${formatDate(receipt.invoice_date)}` : ""}`
+              : "—"
+          }
+        />
         <Field label="Received on" value={formatDate(receipt.received_at)} />
         <Field label="Went to" value={receipt.destination} />
         {receipt.to_site && (

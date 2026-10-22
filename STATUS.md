@@ -57,7 +57,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 
 | Tool                 | Reads from outside itself                                                                                                                                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bills                | `po_facts`, `po_billing_totals`, `po_line_billing_facts`, `work_labour_rate_facts`, `labour_logs` (Send to Bill)                                                                                                 |
+| Bills                | `po_facts`, `po_billing_totals`, `po_line_billing_facts`, `work_labour_rate_facts`, `labour_logs` (Send to Bill), `goods_receipts` (the supplier's invoice a delivery carried, 0132)                             |
 | Budgets              | `selections`, `selection_lines`, `spaces`, `space_views` (the quote, through `lib/design-views/`)                                                                                                                |
 | Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                                                                           |
 | Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                                                            |

@@ -17,6 +17,7 @@ import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries"
 import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
+import { WORK_CLASS_LABEL, isWorkClass } from "@/lib/masters/work-classes";
 import { notFound } from "next/navigation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {
@@ -84,6 +85,9 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           <div className="min-w-0 sm:col-span-2">
             <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               For the work{issue.work_category ? ` · ${issue.work_category}` : ""}
+              {isWorkClass(issue.work_class) && issue.work_class !== "standard"
+                ? ` · ${WORK_CLASS_LABEL[issue.work_class]}`
+                : ""}
             </p>
             <div className="mt-1">
               <RetagWork issueId={issue.id} workItemId={issue.work_item_id} works={works} />

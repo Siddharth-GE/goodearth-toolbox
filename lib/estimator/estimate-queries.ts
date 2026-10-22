@@ -275,6 +275,8 @@ export type MeasurementRow = {
   sortOrder: number;
   /** Set by a SketchUp import (0118): change it in the model, not on the sheet. */
   fromModel: boolean;
+  /** Taken off the total (0132). */
+  deduct: boolean;
 };
 
 /** line_id → its rows in sheet order. A line present here is MEASURED: its quantity is the sheet total. */
@@ -304,10 +306,13 @@ export async function getEstimateMeasurements(
     depth: number | null;
     sort_order: number;
     from_model: boolean;
+    is_deduction: boolean;
   }>((from, to) =>
     supabase
       .from("estimator_estimate_line_measurements")
-      .select("id, line_id, description, nos, length, breadth, depth, sort_order, from_model")
+      .select(
+        "id, line_id, description, nos, length, breadth, depth, sort_order, from_model, is_deduction",
+      )
       .in(
         "line_id",
         lines.map((line) => line.id),
@@ -329,6 +334,7 @@ export async function getEstimateMeasurements(
       depth: row.depth,
       sortOrder: row.sort_order,
       fromModel: row.from_model,
+      deduct: row.is_deduction,
     });
     byLine.set(row.line_id, bucket);
   }
