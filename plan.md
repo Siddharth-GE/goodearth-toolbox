@@ -73,6 +73,9 @@ Everything else below is new.
 
 ## Wave 2 — the small fixes `[Sonnet builds, Opus vets each commit]`
 
+- [x] [Opus] Built with no migration, on `feature/os-updates` with Wave 1: 2 (stage links on the pull page), 7 (the Reporter dataset; the Inventory Items toggle is still to do), 9 (the order picker searches in the browser, not yet on the server), 10 (label "Contractor or supplier"; the Contractors page keeps its name), 11 (its own search form, since the page's toolbar owns `q`).
+- [ ] [Opus] 1, 3, 4, 5, 6, 8 on `feature/os-updates-2`: their migration changes guard and definer functions in Indents, Estimator, Supervisors and Bills, so it reaches `db:apply` only after a Fable review (`MODELS.md`).
+
 One migration, `0132_small_fixes.sql` `[Opus drafts; Fable reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
 
 1. **Urgent indents** (E&P 1). `indents.is_urgent boolean default false`. A tick on the indent form, a red "Urgent" badge on the list, the approver's list sorted urgent-first, the welcome count. Editable while draft only (`indents_guard` tuple). The push notification text is unchanged.
