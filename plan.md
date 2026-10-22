@@ -65,6 +65,23 @@ Supervisors' own tables, RLS `/supervisors` on every verb, write revokes and an 
 
 Pure rules tested (`programme.ts`, health, readiness). `0137` dry-run with a trial as a supervisor and as the probe; the labour trigger trial (first log starts the stage, a second does not move it, a done stage stays done). Every new select run at staging. Phone screenshots at 390×844 of the villa page, the runner and the board before each merge. The founder vets each phase on staging.
 
+## The schedule — an idea to design next session, not yet a plan
+
+The founder, 2026-10-22: "will need a schedule thing as well, but something that's powerful and adjusts itself". The shape to design (Fable's kind of question — judgment, not typing):
+
+- **Durations come from the work, then from experience.** A stage's length starts from the estimate's quantity and a crew's output per day (a rate in the rate book's spirit, per work group), and is replaced by what the last villas actually took (the median of real start-to-finish days from `site_stages`), so the schedule gets truer every villa.
+- **Stages chain.** Each stage starts when the stages it depends on finish (the work-group order by default, a few real dependencies — curing before deshuttering, slab before the floor above). Only the first date of a villa is typed; the rest follow.
+- **It adjusts itself.** When a stage starts late, runs long, waits, or finishes early, every later date on that villa moves, and the forecast handover date with it. Planned dates the supervisor fixed by hand stay fixed and show as "behind" instead of moving.
+- **It looks across villas.** Contractors and crews booked on overlapping stages show as clashes; material for stages starting in the next two weeks feeds the look-ahead and Indents.
+- **Questions:** what is a crew's output per day for each stage, and who knows it today? Calendar days or working days (Sundays, monsoon)? Does Client Relations' handover date follow the forecast? Relay's project stages (weeks per stage, per project) — replaced, or kept as the project-level view above it?
+
+## Next session — start here, after "read CLAUDE.md"
+
+1. **The founder vets #122 on staging** (the OS updates checklist in the "Next session, in order" list of the OS section below). Anything broken is fixed first, before anything new.
+2. **Masters import**, on the founder's word "run the import" (the OS section's step 1: dry run, then `--commit`, then the SketchUp re-send).
+3. **Settle the open questions below**, then plan the schedule (the section above) — one short Fable session if the founder wants it — and fold it into this plan as its own phase.
+4. **Then build phase A**, one pull request, the founder vetting each phase on staging.
+
 ## Open questions for the founder
 
 1. **Is a stage the work group** (`SS.01 Block work up to GF lintel`)? Recommended. The alternative is Client Relations' nine coarse build stages.
@@ -99,9 +116,8 @@ The founder's decisions (2026-10-22):
    `npx tsx scripts/import-masters-workbook.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/1.xlsx"`
    Then run the same command with `--commit`. Then tell the founder to send the works list to SketchUp again, and to re-tag models that use old codes.
 2. ~~Apply `0133`–`0136`~~ — **done 2026-10-22** on staging's database, on the founder's word: dry-run with every trial first, then applied; types regenerated; `db:check`, `db:check-views` (13 money views) and `db:check-policies` pass; SECURITY.md and STATUS.md updated.
-3. ~~Build the screens~~ — **done 2026-10-22**, one commit each: Send to Bill without a work order; additional charges on POs and bills; site checklists (`Tb.xls` saved as `3.xlsx`); site receipt; Budget against actual (the Estimator's screens moved into a `(tool)` route group so the page can admit `/bills`); stage billing; the Inventory Items view and work-class correction. **Waiting for the founder's word:** loading the checklists into staging — `npx tsx scripts/import-checklists.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/3.xlsx" --commit` (dry run: 11 templates, 238 checks); the automatic check refused it without that word.
-   Checklists loaded on staging 2026-10-22 on the founder's word (11 templates, 238 checks). Fable waived; Opus re-reviewed the whole diff with a second, unanchored read before #122. It found four bugs, fixed before merge: a half-saved site confirmation read as complete; stage billing took bills that name no stage as ₹0; "left" on the budget page leaned the wrong way when spending was unpriced; charges past two decimals broke the paisa match.
-4. **One pull request into `staging`** for steps 2 and 3, merged after CI. The founder vets on staging.
+3. ~~Build the screens~~ — **done 2026-10-22**, one commit each: Send to Bill without a work order; additional charges on POs and bills; site checklists (`Tb\3.xls` saved as `Tb\3.xlsx`, loaded on staging on the founder's word: 11 templates, 238 checks); site receipt; Budget against actual (the Estimator's screens moved into a `(tool)` route group so the page can admit `/bills`); stage billing; the Inventory Items view and work-class correction.
+4. ~~One pull request into `staging`~~ — **merged as #122, 2026-10-22**, after CI. Fable waived; Opus re-reviewed with a second, unanchored read, which found four bugs fixed before merge: a half-saved site confirmation read as complete; stage billing took bills that name no stage as ₹0; "left" on the budget page leaned the wrong way when spending was unpriced; charges past two decimals broke the paisa match. **The founder vets on staging.**
 5. **Later:** the cramped Design board (`TODO.md`); `Tb\later.xlsx` (steel and tile takeoffs), parked.
 
 ## What already exists — remind the founder, build nothing
