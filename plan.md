@@ -31,6 +31,11 @@ Everything else below is new.
 
 ## Wave 1 — Masters: the works list and GST on items `[Opus orchestrates]`
 
+- [x] [Opus] `0131` applied to staging; importer, readers and tests; Masters works by family, items GST, pickers, PO GST; docs. Commits 18cbe59, a97c126.
+- [ ] [Founder] Read the importer's dry run (246 of 270 works kept, 24 switched off, 444 new; no vendor or material changes), then `--commit` on staging.
+- [ ] [Founder] After the import: send the works list to SketchUp again, and re-tag any model using old codes (FD.14 is now FD.03.03).
+- Found in the sheet, for the founder: the Finishes remarks sit one row low (fixed in code); FD.04.06 "Plinth Beam" and its works sit under FD.04 Pile Foundation; Engineering Consultation for villas (ENC.1–3) has no place in the new sheet and is switched off.
+
 ### Migration `0131_works_families_and_item_gst.sql` `[Opus drafts, Fable reviews — touches Masters' open tables, no RLS change]`
 
 - `work_categories.family text` — the sheet's Stage column: `Site Mobilisation`, `Infrastructure - Civil`, `Infrastructure - MEP`, `Buildings`, `Maintenance`. CHECK on those five. Backfill existing categories as `Buildings`.
