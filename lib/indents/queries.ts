@@ -23,6 +23,7 @@ export type IndentListRow = {
   status: IndentStatus;
   stage: string | null;
   required_by: string | null;
+  is_urgent: boolean;
   created_at: string;
   project_name: string;
   unit_name: string | null;
@@ -48,7 +49,7 @@ export async function getWelcomeCounts() {
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  const [submitted, drafts, approved] = await Promise.all([
+  const [submitted, drafts, approved, urgent] = await Promise.all([
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "draft"),
     supabase
@@ -56,14 +57,24 @@ export async function getWelcomeCounts() {
       .select("id", { count: "exact", head: true })
       .eq("status", "approved")
       .gte("created_at", since),
+    supabase
+      .from("indents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted")
+      .eq("is_urgent", true),
   ]);
 
-  assertRead("indents", "the welcome counts", submitted.error ?? drafts.error ?? approved.error);
+  assertRead(
+    "indents",
+    "the welcome counts",
+    submitted.error ?? drafts.error ?? approved.error ?? urgent.error,
+  );
 
   return {
     awaitingApproval: submitted.count ?? 0,
     drafts: drafts.count ?? 0,
     approvedThisMonth: approved.count ?? 0,
+    urgentAwaiting: urgent.count ?? 0,
   };
 }
 
@@ -108,10 +119,12 @@ export async function listIndents({
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
+        "id, reference, status, stage, required_by, is_urgent, created_at, projects(name), units(name), indent_lines(count)",
         { count: "exact" },
       ),
   )
+    // Urgent first in every list: the approver's emergencies, and site's own.
+    .order("is_urgent", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
@@ -134,6 +147,7 @@ export async function listIndents({
       status: row.status as IndentStatus,
       stage: row.stage,
       required_by: row.required_by,
+      is_urgent: row.is_urgent,
       created_at: row.created_at,
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
       unit_name: (row.units as { name: string } | null)?.name ?? null,

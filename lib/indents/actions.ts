@@ -37,6 +37,8 @@ export type CreateIndentInput = {
   workItemId: string | null;
   requiredBy: string | null;
   note: string | null;
+  /** An emergency request: sorted first for the approver (0132). */
+  isUrgent: boolean;
 };
 
 export async function createIndent(input: CreateIndentInput): Promise<ActionState> {
@@ -78,11 +80,15 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
-  // create_indent()'s signature predates works (additive-only), so the work rides a second write; a failure leaves a visible, fixable draft.
-  if (input.workItemId) {
+  // create_indent()'s signature predates works and the urgent mark (additive-only), so they ride a second write; a failure leaves a visible, fixable draft.
+  if (input.workItemId || input.isUrgent) {
     const { error: workError } = await supabase
       .from("indents")
-      .update({ work_item_id: input.workItemId, updated_by: user.id })
+      .update({
+        work_item_id: input.workItemId || null,
+        is_urgent: input.isUrgent,
+        updated_by: user.id,
+      })
       .eq("id", indentId);
     if (workError) console.error("createIndent work update failed:", workError);
   }
@@ -456,6 +462,7 @@ export async function updateIndentHeader(
     workItemId: string | null;
     requiredBy: string | null;
     note: string | null;
+    isUrgent: boolean;
   },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
@@ -468,6 +475,7 @@ export async function updateIndentHeader(
       work_item_id: input.workItemId || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
+      is_urgent: input.isUrgent,
       updated_by: user.id,
     })
     .eq("id", indentId);

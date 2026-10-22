@@ -140,6 +140,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         works={works}
         requiredBy={indent.required_by}
         note={indent.note}
+        isUrgent={indent.is_urgent}
         editable={editable}
       />
 
