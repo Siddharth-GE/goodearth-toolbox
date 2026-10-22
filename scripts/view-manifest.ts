@@ -372,6 +372,28 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: true,
     why: "A material bill pre-fills from its PO's lines (0106), and a /bills-only user cannot read purchase_order_lines. The second sanctioned window between POs and bills, beside po_billing_totals, for the same two tools that already see both sides' money.",
   },
+  villa_cost_facts: {
+    columns: ["plot_id", "unit_id", "work_item_id", "kind", "amount", "unpriced"],
+    guards: ["/bills", "/estimator", "/reporter"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "Budget against actual per villa (0136, founder 2026-10-22): the official estimate, what POs and work orders committed, and what was issued, delivered and billed, before GST. Gated to the estimator and the billing team, who see these figures already, and Reporter. The one place estimate money leaves the Estimator.",
+  },
+  work_order_line_billing_facts: {
+    columns: [
+      "labour_contract_line_id",
+      "contract_id",
+      "work_item_id",
+      "line_value",
+      "billed_value",
+    ],
+    guards: ["/bills", "/reporter"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "Stage billing (0136): each work order line's value and what bills have named against it, so a Superstructure or MEP order is paid stage by stage. Bills' own money, for Bills and Reporter only.",
+  },
   batch_on_hand: {
     columns: ["receipt_line_id", "store_id", "item_id", "received_at", "quantity"],
     guards: [],
