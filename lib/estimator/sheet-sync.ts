@@ -12,7 +12,7 @@ export async function syncLineQty(
 ): Promise<string | undefined> {
   const { data: rows, error: readError } = await supabase
     .from("estimator_estimate_line_measurements")
-    .select("nos, length, breadth, depth")
+    .select("nos, length, breadth, depth, is_deduction")
     .eq("line_id", lineId);
   if (readError) {
     console.error("syncLineQty (read) failed:", readError);
@@ -20,9 +20,9 @@ export async function syncLineQty(
   }
   if (!rows || rows.length === 0) return undefined;
 
-  const total = sheetTotal(rows);
+  const total = sheetTotal(rows.map((row) => ({ ...row, deduct: row.is_deduction })));
   if (!(total > 0)) {
-    return "The measurements add up to nothing — check the rows.";
+    return "The deductions take the measurements to nothing or less — check the rows.";
   }
 
   const { error } = await supabase
