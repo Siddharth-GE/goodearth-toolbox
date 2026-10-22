@@ -1,7 +1,6 @@
 "use server";
 
 // Type-only import, never re-exported from a "use server" file (check:actions enforces it).
-import { WORK_CLASS_LABEL, type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { text } from "@/lib/form-data";
@@ -12,6 +11,7 @@ import {
   type LabourKind,
   type LabourShape,
 } from "@/lib/supervisors/labour";
+import { WORK_CLASS_LABEL, type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { revalidatePath } from "next/cache";
 
 const GRANT = "/supervisors";
