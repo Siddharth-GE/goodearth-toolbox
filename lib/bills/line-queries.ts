@@ -161,3 +161,37 @@ export async function countLabourEntriesOnBill(billId: string): Promise<number> 
   }
   return count ?? 0;
 }
+
+export type DeliveryInvoice = { invoiceNo: string; invoiceDate: string | null; grn: string };
+
+/** The supplier's invoices this PO's deliveries carried (0132), less any already on one of its bills. Read from the open stock table. */
+export async function getPoInvoicesForBill(poId: string): Promise<DeliveryInvoice[]> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const [receipts, billed] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id, reference, invoice_no, invoice_date")
+        .eq("po_id", poId)
+        .not("invoice_no", "is", null)
+        .order("received_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase.from("bills").select("id, invoice_no").eq("po_id", poId).order("id").range(from, to),
+    ),
+  ]);
+  const used = new Set(billed.map((bill) => bill.invoice_no.trim().toLowerCase()));
+  const seen = new Set<string>();
+  const invoices: DeliveryInvoice[] = [];
+  for (const receipt of receipts) {
+    const invoiceNo = (receipt.invoice_no ?? "").trim();
+    const key = invoiceNo.toLowerCase();
+    if (!invoiceNo || used.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    invoices.push({ invoiceNo, invoiceDate: receipt.invoice_date, grn: receipt.reference ?? "—" });
+  }
+  return invoices;
+}

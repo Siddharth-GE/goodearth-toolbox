@@ -10,6 +10,7 @@ import { SearchSelect, type SearchOption } from "@/components/ui/search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createBillWithLines } from "@/lib/bills/line-actions";
+import type { DeliveryInvoice } from "@/lib/bills/line-queries";
 import {
   billLinesProblem,
   lineMoneyOf,
@@ -49,6 +50,8 @@ export function BillForm({
     lines: BillLineDraft[];
     poLines?: PoLineForBill[];
     workLines?: WorkOrderLineForBill[];
+    /** The supplier invoices this PO's deliveries carried, not yet billed (0132). */
+    invoices: DeliveryInvoice[];
   };
   gstRates: number[];
   uoms: string[];
@@ -58,8 +61,10 @@ export function BillForm({
   const [nmrVendorId, setNmrVendorId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [scope, setScope] = useState("");
-  const [invoiceNo, setInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
+  // One unbilled invoice from the deliveries fills itself in; several are offered below the box.
+  const onlyInvoice = prefill.invoices.length === 1 ? prefill.invoices[0] : null;
+  const [invoiceNo, setInvoiceNo] = useState(onlyInvoice?.invoiceNo ?? "");
+  const [invoiceDate, setInvoiceDate] = useState(onlyInvoice?.invoiceDate ?? "");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<EditorLine[]>(() =>
     prefill.lines.map((draft) => toEditorLine(draft)),
@@ -318,6 +323,24 @@ export function BillForm({
               placeholder={kind === "nmr" ? "e.g. NMR week 32" : "As printed on the bill"}
               autoComplete="off"
             />
+            {kind === "po" && prefill.invoices.length > 0 && (
+              <p className="text-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <span>From the deliveries:</span>
+                {prefill.invoices.map((invoice) => (
+                  <button
+                    key={invoice.invoiceNo}
+                    type="button"
+                    className="text-accent font-medium hover:underline"
+                    onClick={() => {
+                      setInvoiceNo(invoice.invoiceNo);
+                      if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate);
+                    }}
+                  >
+                    {invoice.invoiceNo} ({invoice.grn})
+                  </button>
+                ))}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="bill-invoice-date">

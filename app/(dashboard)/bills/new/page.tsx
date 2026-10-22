@@ -1,5 +1,9 @@
 import { PageTitle } from "@/components/ui/page-title";
-import { getPoLinesForBill, getWorkOrderLinesForBill } from "@/lib/bills/line-queries";
+import {
+  getPoInvoicesForBill,
+  getPoLinesForBill,
+  getWorkOrderLinesForBill,
+} from "@/lib/bills/line-queries";
 import { linesFromPo, linesFromWorkOrder, type BillLineDraft } from "@/lib/bills/lines";
 import { getBillFormOptions } from "@/lib/bills/queries";
 import { idParam } from "@/lib/list-params";
@@ -34,12 +38,13 @@ export default async function NewBillPage({
   const poId = kind === "po" ? idParam(raw.po) : undefined;
   const contractId = kind === "contract" ? idParam(raw.contract) : undefined;
 
-  const [options, gstRates, uoms, poLines, workLines] = await Promise.all([
+  const [options, gstRates, uoms, poLines, workLines, invoices] = await Promise.all([
     getBillFormOptions(),
     listActiveGstRates(),
     listActiveUomNames(),
     poId ? getPoLinesForBill(poId) : Promise.resolve(undefined),
     contractId ? getWorkOrderLinesForBill(contractId) : Promise.resolve(undefined),
+    poId ? getPoInvoicesForBill(poId) : Promise.resolve([]),
   ]);
   const lines = poLines
     ? linesFromPo(poLines)
@@ -63,7 +68,7 @@ export default async function NewBillPage({
         key={`${kind}-${vendorId}-${anchorId}`}
         options={options}
         initial={{ kind, vendorId, anchorId }}
-        prefill={{ lines, poLines, workLines }}
+        prefill={{ lines, poLines, workLines, invoices }}
         gstRates={gstRates.map((rate) => rate.rate)}
         uoms={uoms}
       />
