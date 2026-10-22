@@ -74,7 +74,8 @@ Everything else below is new.
 ## Wave 2 — the small fixes `[Sonnet builds, Opus vets each commit]`
 
 - [x] [Opus] Built with no migration, on `feature/os-updates` with Wave 1: 2 (stage links on the pull page), 7 (the Reporter dataset; the Inventory Items toggle is still to do), 9 (the order picker searches in the browser, not yet on the server), 10 (label "Contractor or supplier"; the Contractors page keeps its name), 11 (its own search form, since the page's toolbar owns `q`).
-- [ ] [Opus] 1, 3, 4, 5, 6, 8 on `feature/os-updates-2`: their migration changes guard and definer functions in Indents, Estimator, Supervisors and Bills, so it reaches `db:apply` only after a Fable review (`MODELS.md`).
+- [x] [Opus] 1, 3, 5, 6 on `feature/os-updates-2` with `0132`: columns and invoker guards only (no view, definer, policy or money), so applied to staging after a dry run and `scripts/trials/small-fixes.sql`, run as a supervisor and a store-keeper and proven to fail with the request guard broken.
+- [ ] [Fable] 4 and 8 need `0133`: `send_labour_logs_to_bill()` is a definer and the charges are money. Drafted for review; nothing applied.
 
 One migration, `0132_small_fixes.sql` `[Opus drafts; Fable reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
 
