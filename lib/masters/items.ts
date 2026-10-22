@@ -17,6 +17,8 @@ export type ItemRow = {
   placement: Placement | null;
   default_uom: string;
   indicative_price: number | null;
+  /** Entered by hand; a PO line offers it first (0131). Null: nobody has entered it. */
+  gst_pct: number | null;
   image_url: string | null;
   thumb_url: string | null;
   source_url: string | null;

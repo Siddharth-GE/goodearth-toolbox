@@ -10,6 +10,9 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { NavTabs } from "@/components/ui/tabs";
+import { WORK_FAMILIES, isWorkFamily } from "@/lib/masters/work-families";
+import { PACKAGE } from "@/lib/masters/works-workbook";
 import {
   getWorksTree,
   type WorkCategoryRow,
@@ -24,10 +27,24 @@ import {
   WorksToggle,
 } from "./_components/works-forms";
 
-export default async function WorksPage() {
-  const tree = await getWorksTree();
-  const categories = tree.map((entry) => entry.category);
-  const groups = tree.flatMap((entry) => entry.groups.map((g) => g.group));
+export default async function WorksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ family?: string }>;
+}) {
+  const { family: asked } = await searchParams;
+  const family = asked && isWorkFamily(asked) ? asked : "Buildings";
+  const everything = await getWorksTree();
+  const tree = everything.filter((entry) => entry.category.family === family);
+  const categories = everything.map((entry) => entry.category);
+  const groups = everything.flatMap((entry) => entry.groups.map((g) => g.group));
+  const workCount = (f: string) =>
+    everything
+      .filter((entry) => entry.category.family === f)
+      .reduce(
+        (n, e) => n + e.directItems.length + e.groups.reduce((m, g) => m + g.items.length, 0),
+        0,
+      );
 
   return (
     <div className="space-y-4">
@@ -35,13 +52,18 @@ export default async function WorksPage() {
         <div className="max-w-2xl">
           <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
           <p className="text-muted mt-1 text-sm">
-            The labour works the Estimator will price and schedule, in the site team&apos;s own
-            codes. This is a separate list from Construction stages, which indents and budgets pick
-            from. Deactivating stops new picks without touching history.
+            Every work on the estate, in the site team&apos;s own codes: site mobilisation,
+            infrastructure, the buildings and maintenance. A &ldquo;{PACKAGE}&rdquo; work is a
+            stage&apos;s share of the rate per square foot, which an estimate measures. This is a
+            separate list from Construction stages, which indents and budgets pick from.
+            Deactivating stops new picks without touching history.
           </p>
         </div>
         <div className="flex gap-2">
-          <WorkCategoryFormDialog trigger={<Button variant="secondary">New Category</Button>} />
+          <WorkCategoryFormDialog
+            defaultFamily={family}
+            trigger={<Button variant="secondary">New Category</Button>}
+          />
           <WorkGroupFormDialog
             categories={categories}
             trigger={<Button variant="secondary">New Group</Button>}
@@ -50,10 +72,19 @@ export default async function WorksPage() {
         </div>
       </div>
 
+      <NavTabs
+        active={family}
+        tabs={WORK_FAMILIES.map((f) => ({
+          key: f,
+          href: `/masters/works?family=${encodeURIComponent(f)}`,
+          label: `${f} · ${workCount(f)}`,
+        }))}
+      />
+
       {tree.length === 0 ? (
         <EmptyState
           icon={Hammer}
-          title="No works yet"
+          title={`No ${family} works yet`}
           description="Add the first category, then its works."
         />
       ) : (
@@ -226,7 +257,16 @@ function WorkItemTableRow({
   return (
     <TableRow>
       <TableCell className="text-muted text-sm">{item.code}</TableCell>
-      <TableCell className="text-foreground text-sm">{item.name}</TableCell>
+      <TableCell className="text-foreground text-sm">
+        {item.name.endsWith(` — ${PACKAGE}`) ? (
+          <span className="flex flex-wrap items-center gap-2">
+            {item.name.slice(0, -` — ${PACKAGE}`.length)}
+            <Badge variant="info">Package per sqft</Badge>
+          </span>
+        ) : (
+          item.name
+        )}
+      </TableCell>
       <TableCell>
         <Badge variant={item.is_active ? "success" : "neutral"}>
           {item.is_active ? "Active" : "Inactive"}

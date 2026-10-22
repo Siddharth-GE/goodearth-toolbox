@@ -3,7 +3,7 @@ import { PageTitle } from "@/components/ui/page-title";
 import { getReceivePool } from "@/lib/inventory/receipts-queries";
 import { PackageCheck } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { ReceiveBasket } from "../../_components/receive-basket";
 
 export default async function ReceivePage({ params }: { params: Promise<{ poId: string }> }) {
@@ -14,7 +14,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ poId: 
     listWorkCategories(),
   ]);
   if (!pool) notFound();
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({

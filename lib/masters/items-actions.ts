@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isItemKind, type ItemKind, type Placement } from "./constants";
+import { listActiveGstRates } from "./gst-rates";
 import { isActiveUom } from "./uoms";
 
 function readItemForm(formData: FormData) {
@@ -21,7 +22,20 @@ function readItemForm(formData: FormData) {
     indicative_price: formData.get("indicative_price")
       ? Number(formData.get("indicative_price"))
       : null,
+    gst_pct: rawText(formData, "gst_pct") === "" ? null : Number(rawText(formData, "gst_pct")),
   };
+}
+
+/** A GST % is one of the active rates the PO picker offers, or left blank; blank is never 0%. */
+async function gstProblem(
+  gst: number | null,
+  current: number | null = null,
+): Promise<string | null> {
+  if (gst === null || gst === current) return null;
+  const rates = await listActiveGstRates();
+  return rates.some((r) => Number(r.rate) === gst)
+    ? null
+    : "Choose a GST rate from the list, or leave it blank.";
 }
 
 export async function createItem(_state: ActionState, formData: FormData): Promise<ActionState> {
@@ -32,6 +46,8 @@ export async function createItem(_state: ActionState, formData: FormData): Promi
   if (!isItemKind(input.kind)) return { error: "Choose catalogue or material." };
   if (!input.category_id) return { error: "Choose a category." };
   if (!(await isActiveUom(input.default_uom))) return { error: "Choose a unit of measure." };
+  const gst = await gstProblem(input.gst_pct);
+  if (gst) return { error: gst };
 
   const supabase = await createClient();
   const { error } = await supabase.from("items").insert(input);
@@ -57,6 +73,8 @@ export async function updateItem(
   if (!isItemKind(input.kind)) return { error: "Choose catalogue or material." };
   if (!input.category_id) return { error: "Choose a category." };
   if (!(await isActiveUom(input.default_uom))) return { error: "Choose a unit of measure." };
+  const gst = await gstProblem(input.gst_pct, Number(rawText(formData, "gst_pct_was")) || null);
+  if (gst) return { error: gst };
 
   const supabase = await createClient();
   const { error } = await supabase

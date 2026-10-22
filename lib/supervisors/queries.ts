@@ -3,7 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/drawings/queries";
 import { listVendors } from "@/lib/masters/vendors";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
@@ -530,7 +530,9 @@ export async function listWorkOptions(): Promise<WorkOption[]> {
         .range(from, to),
     ),
   ]);
-  const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const categoryNameById = new Map(
+    categories.map((category) => [category.id, workCategoryLabel(category)]),
+  );
   const unitByWork = new Map(units.map((unit) => [unit.work_item_id, unit.uom]));
   return workItems
     .filter((work) => work.is_active)

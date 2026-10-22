@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
 import { notFound } from "next/navigation";
@@ -33,7 +33,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
     issue.plot_id && issue.work_item_id
       ? await getOverIssueRows(issue.plot_id, issue.work_item_id)
       : [];
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({

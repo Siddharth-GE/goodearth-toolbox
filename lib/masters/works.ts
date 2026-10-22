@@ -11,6 +11,8 @@ export type WorkCategoryRow = {
   id: string;
   code: string;
   name: string;
+  /** Site Mobilisation, Infrastructure - Civil / MEP, Buildings or Maintenance (0131). */
+  family: string;
   sort_order: number;
   is_active: boolean;
 };
@@ -34,12 +36,16 @@ export type WorkItemRow = {
   is_active: boolean;
 };
 
+/** A category as pickers show it: two families both have a Landscape. */
+export const workCategoryLabel = (category: { family: string; name: string }) =>
+  `${category.family} · ${category.name}`;
+
 export async function listWorkCategories(): Promise<WorkCategoryRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>
     supabase
       .from("work_categories")
-      .select("id, code, name, sort_order, is_active")
+      .select("id, code, name, family, sort_order, is_active")
       .order("sort_order")
       .order("code")
       .order("id")

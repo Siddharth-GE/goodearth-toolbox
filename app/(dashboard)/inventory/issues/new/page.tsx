@@ -5,7 +5,7 @@ import { formatQuantity } from "@/lib/format";
 import type { Batch } from "@/lib/inventory/batches";
 import { getIssueFormOptions } from "@/lib/inventory/issues-queries";
 import { getSiteRequest } from "@/lib/inventory/requests-queries";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { listStoreBatches, listStoreHoldings } from "@/lib/inventory/stock-queries";
 import { PackageMinus } from "lucide-react";
 import Link from "next/link";
@@ -29,7 +29,7 @@ export default async function NewIssuePage({
   const chosen = options.stores.find((s) => s.id === store) ?? null;
   const openRequest = request?.status === "requested" ? request : null;
   const requestParam = openRequest ? `&request=${openRequest.id}` : "";
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({

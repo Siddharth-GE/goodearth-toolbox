@@ -4,7 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
@@ -246,7 +246,7 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
     listWorkItems(),
     listWorkCategories(),
   ]);
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),

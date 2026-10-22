@@ -8,7 +8,7 @@ import { getDefaultTerms } from "@/lib/masters/terms";
 import { listUnits } from "@/lib/masters/units";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { listVendors } from "@/lib/masters/vendors";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
@@ -293,7 +293,9 @@ export async function getWorkOrderFormOptions(
     getDefaultTerms("work_order"),
   ]);
 
-  const categoryName = new Map(categories.map((category) => [category.id, category.name]));
+  const categoryName = new Map(
+    categories.map((category) => [category.id, workCategoryLabel(category)]),
+  );
   const rateByWork = new Map(rates.map((rate) => [rate.work_item_id, rate]));
   const linesByTemplate = new Map<string, WorkOrderTemplate["lines"]>();
   for (const line of templateLines) {

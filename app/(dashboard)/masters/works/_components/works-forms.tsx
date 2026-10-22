@@ -7,6 +7,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { WORK_FAMILIES } from "@/lib/masters/work-families";
 import type { WorkCategoryRow, WorkGroupRow, WorkItemRow } from "@/lib/masters/works";
 import {
   addWorkCategory,
@@ -24,9 +25,11 @@ import { useState } from "react";
 
 export function WorkCategoryFormDialog({
   category,
+  defaultFamily,
   trigger,
 }: {
   category?: WorkCategoryRow;
+  defaultFamily?: string;
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!category;
@@ -59,6 +62,21 @@ export function WorkCategoryFormDialog({
           autoComplete="off"
           placeholder="e.g. Foundation"
         />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="family">Part of</Label>
+        <Select
+          id="family"
+          name="family"
+          defaultValue={category?.family ?? defaultFamily ?? "Buildings"}
+          required
+        >
+          {WORK_FAMILIES.map((family) => (
+            <option key={family} value={family}>
+              {family}
+            </option>
+          ))}
+        </Select>
       </div>
       {isEdit && (
         <label className="text-foreground flex items-center gap-2 text-sm">

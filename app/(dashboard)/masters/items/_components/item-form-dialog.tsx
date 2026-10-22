@@ -13,11 +13,13 @@ export function ItemFormDialog({
   categories,
   brands,
   uoms,
+  gstRates,
   item,
 }: {
   categories: ItemCategoryRow[];
   brands: BrandRow[];
   uoms: string[];
+  gstRates: number[];
   item?: ItemRow;
 }) {
   const isEdit = !!item;
@@ -110,6 +112,22 @@ export function ItemFormDialog({
           Per {item?.default_uom ?? "unit"}, before GST. It rises by itself when a PO is issued at a
           higher rate; lower it here by hand if it should come down.
         </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="gst_pct">GST</Label>
+        <input type="hidden" name="gst_pct_was" value={item?.gst_pct ?? ""} />
+        <Select id="gst_pct" name="gst_pct" defaultValue={item?.gst_pct ?? ""}>
+          <option value="">Not entered</option>
+          {item?.gst_pct != null && !gstRates.includes(item.gst_pct) && (
+            <option value={item.gst_pct}>{item.gst_pct}% (no longer on the list)</option>
+          )}
+          {gstRates.map((rate) => (
+            <option key={rate} value={rate}>
+              {rate}%
+            </option>
+          ))}
+        </Select>
+        <p className="text-muted text-xs">A purchase order offers this GST first for the item.</p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="code">Code (optional)</Label>

@@ -287,6 +287,8 @@ export type IndentOrderLine = {
   already_ordered: number;
   left: number;
   note: string | null;
+  /** Masters' GST for the item (0131), offered before any vendor's last one. */
+  item_gst_pct: number | null;
   suggestion: VendorSuggestion | null;
 };
 
@@ -325,7 +327,9 @@ export async function getIndentForOrdering(indentId: string): Promise<IndentForO
   const lines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
-      .select("id, item_id, quantity, uom, note, items(name, code, thumb_url, brands(name))")
+      .select(
+        "id, item_id, quantity, uom, note, items(name, code, thumb_url, gst_pct, brands(name))",
+      )
       .eq("indent_id", indentId)
       .order("created_at")
       .order("id")
@@ -388,6 +392,7 @@ export async function getIndentForOrdering(indentId: string): Promise<IndentForO
       name: string;
       code: string | null;
       thumb_url: string | null;
+      gst_pct: number | null;
       brands: { name: string } | null;
     } | null;
     const already = orderedByLine.get(line.id) ?? 0;
@@ -403,6 +408,7 @@ export async function getIndentForOrdering(indentId: string): Promise<IndentForO
       already_ordered: already,
       left: leftToBuy(line.quantity, already),
       note: line.note,
+      item_gst_pct: item?.gst_pct ?? null,
       suggestion: history.lastVendor.get(line.item_id) ?? null,
     };
   });

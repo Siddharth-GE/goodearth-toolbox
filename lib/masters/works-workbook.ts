@@ -1,15 +1,10 @@
 // Pure half of the works import (scripts/import-masters-workbook.ts): the estate's works sheets read by their shape,
 // and today's works matched to the new rows. A matched work keeps its id; nothing is deleted, only switched off.
 import { type Cell, type SheetRow, looseKey } from "./masters-workbook";
+import { WORK_FAMILIES, type WorkFamily } from "./work-families";
 
-export const FAMILIES = [
-  "Site Mobilisation",
-  "Infrastructure - Civil",
-  "Infrastructure - MEP",
-  "Buildings",
-  "Maintenance",
-] as const;
-export type Family = (typeof FAMILIES)[number];
+export const FAMILIES = WORK_FAMILIES;
+export type Family = WorkFamily;
 
 export type EstateCategory = { code: string; name: string; family: Family; sort_order: number };
 export type EstateGroup = { code: string; category: string; name: string; sort_order: number };
