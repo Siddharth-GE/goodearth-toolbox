@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## OS process updates — building now
 
-The operations team's 18 requests, the new masters workbook and the site checklists: `plan.md`, top section.
+The operations team's 18 requests: `plan.md`, top section. Waves 1 and 2 are on staging (#119, #120). **Next session starts at "Next session, in order" there**: the masters import, then applying `0133`–`0136` and building their screens.
 
 ## Native apps on iPhone and Android — next build
 

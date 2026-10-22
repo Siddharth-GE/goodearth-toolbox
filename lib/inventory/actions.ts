@@ -117,26 +117,6 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   }
   if (!receiptId) return { error: "Could not record this delivery. Try again." };
 
-  // create_goods_receipt predates the invoice (additive-only), so it rides a second write.
-  const invoiceNo = input.invoiceNo?.trim() || null;
-  if (invoiceNo || input.invoiceDate) {
-    const { error: invoiceError } = await supabase
-      .from("goods_receipts")
-      .update({
-        invoice_no: invoiceNo,
-        invoice_date: input.invoiceDate || null,
-        updated_by: user.id,
-      })
-      .eq("id", receiptId);
-    if (invoiceError) {
-      console.error("recordGoodsReceipt invoice failed:", invoiceError);
-      revalidatePath("/inventory", "layout");
-      return {
-        error: "The delivery was recorded without its invoice number. Try entering it again.",
-      };
-    }
-  }
-
   // One line at a time: the over-receipt guard raises per line, and a batch insert would fail wholesale.
   // A refusal part-way leaves a short note; recording a second receipt for the rest is the recovery.
   let added = 0;
@@ -163,6 +143,28 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
       };
     }
     added++;
+  }
+
+  // create_goods_receipt predates the invoice (additive-only), so it rides a second write once the lines are in.
+  const invoiceNo = input.invoiceNo?.trim() || null;
+  if (invoiceNo || input.invoiceDate) {
+    const { error: invoiceError } = await supabase
+      .from("goods_receipts")
+      .update({
+        invoice_no: invoiceNo,
+        invoice_date: input.invoiceDate || null,
+        updated_by: user.id,
+      })
+      .eq("id", receiptId);
+    if (invoiceError) {
+      console.error("recordGoodsReceipt invoice failed:", invoiceError);
+      revalidatePath("/inventory", "layout");
+      revalidatePath(`/purchase-orders/${input.poId}`);
+      return {
+        error:
+          "The delivery is recorded with all its lines, but its invoice number could not be saved — type it on the bill instead.",
+      };
+    }
   }
 
   revalidatePath("/inventory", "layout");
@@ -345,6 +347,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   }
 
   // create_stock_issue predates the class (additive-only), so it rides a second write, as an indent's work does.
+  let classMissed = false;
   if (input.plotId && workClass !== "standard") {
     const { error: classError } = await supabase
       .from("stock_issues")
@@ -352,10 +355,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       .eq("id", issueId);
     if (classError) {
       console.error("recordStockIssue work class failed:", classError);
-      revalidatePath("/inventory", "layout");
-      return {
-        error: `Issued, but it was saved as standard work rather than ${WORK_CLASS_LABEL[workClass].toLowerCase()} — set it on the issue note.`,
-      };
+      classMissed = true;
     }
   }
 
@@ -373,6 +373,11 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   }
 
   revalidatePath("/inventory", "layout");
+  if (classMissed) {
+    return {
+      error: `The issue is recorded, but as standard work: saving it as ${WORK_CLASS_LABEL[workClass].toLowerCase()} failed. Ask an admin to correct it.`,
+    };
+  }
   redirect(`/inventory/issues/${issueId}`);
 }
 
