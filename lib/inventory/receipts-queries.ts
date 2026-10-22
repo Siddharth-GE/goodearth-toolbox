@@ -74,19 +74,43 @@ export type ReceivablePoPage = {
 /** Issued POs goods can still arrive against. A PO leaves by completing itself (0023), so empty means nothing outstanding. */
 export async function listReceivablePos({
   page = 1,
-}: { page?: number } = {}): Promise<ReceivablePoPage> {
+  q,
+  projectId,
+}: { page?: number; q?: string; projectId?: string } = {}): Promise<ReceivablePoPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  const { data, count, error } = await supabase
+  // A vendor-name search becomes vendor ids, so one or() covers the PO number and the vendor.
+  let vendorIds: string[] = [];
+  if (q) {
+    const { data: matched, error: vendorError } = await supabase
+      .from("vendors")
+      .select("id")
+      .ilike("name", `%${q}%`)
+      .limit(200);
+    if (vendorError) {
+      console.error("listReceivablePos vendor search failed:", vendorError);
+      throw new Error("Could not search the purchase orders.", { cause: vendorError });
+    }
+    vendorIds = (matched ?? []).map((row) => row.id);
+  }
+
+  let query = supabase
     .from("po_facts")
     .select("id, project_id, plot_id, unit_id, vendor_id, reference, expected_by, issued_at", {
       count: "exact",
     })
-    .eq("status", "issued")
+    .eq("status", "issued");
+  if (projectId) query = query.eq("project_id", projectId);
+  if (q) {
+    const clauses = [`reference.ilike.*${q}*`];
+    if (vendorIds.length) clauses.push(`vendor_id.in.(${vendorIds.join(",")})`);
+    query = query.or(clauses.join(","));
+  }
+  const { data, count, error } = await query
     .order("issued_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);

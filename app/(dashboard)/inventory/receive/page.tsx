@@ -1,4 +1,8 @@
+import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
@@ -29,6 +33,8 @@ export default async function InventoryPage({
     store?: string;
     from?: string;
     to?: string;
+    poq?: string;
+    poproject?: string;
   }>;
 }) {
   const raw = await searchParams;
@@ -39,10 +45,12 @@ export default async function InventoryPage({
   const q = searchParam(raw.q);
   const from = dateParam(raw.from);
   const to = dateParam(raw.to);
+  const poq = searchParam(raw.poq);
+  const poProject = idParam(raw.poproject);
 
   const [{ orders, total, page: currentPage, pageCount, pageSize }, deliveries, filterOptions] =
     await Promise.all([
-      listReceivablePos({ page: awaitingPage }),
+      listReceivablePos({ page: awaitingPage, q: poq, projectId: poProject }),
       listGoodsReceipts({
         page: deliveriesPage,
         projectId: project,
@@ -67,6 +75,8 @@ export default async function InventoryPage({
     if (q) params.set("q", q);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    if (poq) params.set("poq", poq);
+    if (poProject) params.set("poproject", poProject);
     const query = params.toString();
     return query ? `/inventory/receive?${query}` : "/inventory/receive";
   };
@@ -86,12 +96,55 @@ export default async function InventoryPage({
           Awaiting delivery
         </h2>
 
+        {(total > 0 || poq || poProject) && (
+          <form action="/inventory/receive" className="flex flex-wrap items-end gap-2">
+            <div className="w-full space-y-1.5 sm:w-64">
+              <Label htmlFor="poq">Find a purchase order</Label>
+              <Input
+                id="poq"
+                name="poq"
+                type="search"
+                defaultValue={poq ?? ""}
+                placeholder="PO number or vendor…"
+                autoComplete="off"
+              />
+            </div>
+            <div className="w-full space-y-1.5 sm:w-48">
+              <Label htmlFor="poproject">Project</Label>
+              <Select id="poproject" name="poproject" defaultValue={poProject ?? ""}>
+                <option value="">All projects</option>
+                {filterOptions.projects.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button type="submit" variant="secondary">
+              Find
+            </Button>
+            {(poq || poProject) && (
+              <LinkButton href="/inventory/receive" variant="ghost">
+                Clear
+              </LinkButton>
+            )}
+          </form>
+        )}
+
         {orders.length === 0 ? (
-          <EmptyState
-            icon={PackageCheck}
-            title="Nothing is on its way"
-            description="Issued purchase orders appear here until every line has been received."
-          />
+          poq || poProject ? (
+            <EmptyState
+              icon={PackageCheck}
+              title="No purchase order matches"
+              description="Try another PO number or vendor, or clear the search."
+            />
+          ) : (
+            <EmptyState
+              icon={PackageCheck}
+              title="Nothing is on its way"
+              description="Issued purchase orders appear here until every line has been received."
+            />
+          )
         ) : (
           <>
             <Table>
@@ -157,7 +210,11 @@ export default async function InventoryPage({
           <ListToolbar
             action="/inventory/receive"
             values={{ q, from, to, project, store }}
-            keep={{ page: awaitingPage > 1 ? String(awaitingPage) : undefined }}
+            keep={{
+              page: awaitingPage > 1 ? String(awaitingPage) : undefined,
+              poq,
+              poproject: poProject,
+            }}
             search={{ placeholder: "Delivery note or challan no.…" }}
             dates={{ label: "Received" }}
             filters={[
