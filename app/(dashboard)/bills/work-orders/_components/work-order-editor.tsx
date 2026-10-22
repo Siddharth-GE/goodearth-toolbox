@@ -22,6 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { createWorkOrder, saveWorkOrder } from "@/lib/bills/work-order-actions";
 import type { WorkOrderFormOptions } from "@/lib/bills/work-order-queries";
 import {
+  packageLines,
+  packageStages,
   workOrderLineAmount,
   workOrderProblem,
   workOrderTotal,
@@ -87,7 +89,10 @@ export function WorkOrderEditor({
     initial.lines.length ? initial.lines.map(keyed) : [blankLine()],
   );
   const [saved, setSaved] = useState(false);
+  const [packageStage, setPackageStage] = useState("");
+  const [packageSqft, setPackageSqft] = useState("");
   const { pending: saving, error, run } = useActionRunner();
+  const stages = useMemo(() => packageStages(options.works), [options.works]);
 
   const workOptions = useMemo(
     () =>
@@ -148,6 +153,31 @@ export function WorkOrderEditor({
         : [blankLine()],
     );
     if (template.terms) setTerms(template.terms);
+  };
+
+  const sqft = parseNumber(packageSqft);
+  const addPackages = () => {
+    if (!packageStage || sqft === null || !(sqft > 0)) return;
+    const added = packageLines(
+      options.works,
+      packageStage,
+      sqft,
+      lines.map((line) => line.workItemId),
+    ).map((line) =>
+      keyed({
+        workItemId: line.workItemId,
+        description: line.description,
+        isLumpSum: false,
+        quantity: String(line.quantity),
+        uom: line.uom ?? "",
+        rate: line.rate === null ? "" : String(line.rate),
+      }),
+    );
+    // A blank first row gives way to the packages.
+    setLines((current) => [
+      ...current.filter((line) => line.workItemId || line.description.trim() || line.rate),
+      ...added,
+    ]);
   };
 
   const inputs = lines.map(asInput);
@@ -266,6 +296,52 @@ export function WorkOrderEditor({
           </Select>
         )}
       </div>
+
+      {stages.length > 0 && (
+        <div className="border-border bg-surface flex flex-wrap items-end gap-3 rounded-2xl border p-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="wo-package-stage">Paid by stage</Label>
+            <Select
+              id="wo-package-stage"
+              value={packageStage}
+              onChange={(event) => setPackageStage(event.target.value)}
+              className="h-9 w-auto"
+            >
+              <option value="">Pick the stage…</option>
+              {stages.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wo-package-sqft">Villa&apos;s built-up sqft</Label>
+            <Input
+              id="wo-package-sqft"
+              type="number"
+              step="any"
+              min="0"
+              value={packageSqft}
+              onChange={(event) => setPackageSqft(event.target.value)}
+              className="h-9 w-32"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={addPackages}
+            disabled={!packageStage || sqft === null || !(sqft > 0)}
+          >
+            <Plus className="size-4" />
+            Add every package work
+          </Button>
+          <p className="text-muted w-full text-xs">
+            One line per package of the stage at the rate book&apos;s rate per sqft, so each bill
+            pays a stage and the order shows what is left of each.
+          </p>
+        </div>
+      )}
 
       <Table>
         <TableHead>

@@ -1,7 +1,9 @@
 import { Heading } from "@/components/ui/heading";
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
+import { ChargesBox } from "@/components/ui/charges-box";
 import { PageTitle } from "@/components/ui/page-title";
+import { updateBillCharges } from "@/lib/bills/line-actions";
 import {
   countLabourEntriesOnBill,
   getBillLines,
@@ -69,6 +71,12 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       ])
     : [[], [], undefined, undefined];
 
+  const charges = {
+    amount: bill.charges_amount,
+    gst_pct: bill.charges_gst_pct,
+    note: bill.charges_note,
+  };
+
   const anchorLabel =
     bill.kind === "nmr"
       ? "for daily wages (NMR)"
@@ -100,6 +108,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               <FileDown className="size-4" />
               Print
             </LinkButton>
+            {bill.villa_unit_id && (
+              <LinkButton
+                href={`/estimator/villas/${bill.villa_unit_id}/budget`}
+                variant="secondary"
+                size="sm"
+              >
+                Villa budget
+              </LinkButton>
+            )}
             <BillStatusBadge status={bill.status} />
             <ActionButtons
               billId={bill.id}
@@ -266,6 +283,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               workLines={workLines}
               allowOther={bill.kind !== "po"}
               locked={fromLabour > 0}
+              charges={charges}
             />
           </>
         ) : itemised ? (
@@ -276,6 +294,16 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           </p>
         )}
       </div>
+
+      {/* The header re-sums charges only from lines, so a bill without lines has no box. */}
+      {itemised && (
+        <ChargesBox
+          charges={charges}
+          gstRates={gstRates.map((rate) => rate.rate)}
+          editable={editable}
+          save={updateBillCharges.bind(null, bill.id)}
+        />
+      )}
     </div>
   );
 }

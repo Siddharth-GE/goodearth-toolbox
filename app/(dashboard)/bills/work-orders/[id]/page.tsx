@@ -30,6 +30,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const editable = canEditContract(order.status);
   const options = editable ? await getWorkOrderFormOptions(order.vendor_id) : null;
   const billed = order.billed_total;
+  // A bill on the order that names no stage (before 0136, or Send to Bill's piece-work) leaves each stage's share unknown.
+  const stageBilled = order.lines.some((line) => line.billed === null)
+    ? null
+    : order.lines.reduce((sum, line) => sum + (line.billed ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -111,10 +115,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
                   <TableHeaderCell className="text-right">Rate</TableHeaderCell>
                   <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Billed by stage</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Left</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {order.lines.map((line) => {
+                  const lineBilled = line.billed;
                   const amount = workOrderLineAmount({
                     workItemId: line.work_item_id,
                     description: line.description,
@@ -144,6 +151,20 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                       <TableCell className="text-right font-mono">
                         {formatMoney(amount, { paise: amount !== null && amount % 1 !== 0 })}
                       </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {lineBilled === null
+                          ? "unknown"
+                          : lineBilled > 0
+                            ? formatMoney(lineBilled, { paise: true })
+                            : "—"}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono ${amount !== null && lineBilled !== null && lineBilled > amount + 0.005 ? "text-danger" : ""}`}
+                      >
+                        {amount === null || lineBilled === null
+                          ? "unknown"
+                          : formatMoney(amount - lineBilled, { paise: true })}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -155,6 +176,14 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                     {formatMoney(order.contract_value, {
                       paise: order.contract_value % 1 !== 0,
                     })}
+                  </TableTotalCell>
+                  <TableTotalCell className="text-right font-mono">
+                    {stageBilled === null ? "unknown" : formatMoney(stageBilled, { paise: true })}
+                  </TableTotalCell>
+                  <TableTotalCell className="text-right font-mono">
+                    {stageBilled === null
+                      ? "unknown"
+                      : formatMoney(order.contract_value - stageBilled, { paise: true })}
                   </TableTotalCell>
                 </TableRow>
               </TableFoot>

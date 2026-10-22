@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { pendingOnBill, rollUpBill } from "./math";
+import { pendingOnBill, rollUpBill, summaryRows } from "./math";
 
 test("2 cum at ₹4,000 is ₹8,000 — the team's example", () => {
   assert.equal(rollUpBill([{ quantity: 2, rate: 4000, gst_pct: 0 }]).total, 8000);
@@ -35,4 +35,26 @@ test("pending: ₹1.5 lakh billed, ₹1 lakh paid leaves ₹50,000 — the team'
   assert.equal(pendingOnBill(150000, 100000, 0), 50000);
   assert.equal(pendingOnBill(150000, 100000, 50000), 0);
   assert.equal(pendingOnBill(150000, 160000, 0), 0, "never negative");
+});
+
+test("additional charges join taxable and GST to the paisa, as bill_lines_roll_up does", () => {
+  const lines = [{ quantity: 10, rate: 1200, gst_pct: 18 }];
+  const totals = rollUpBill(lines, { amount: 500, gst_pct: 18, note: "Loading" });
+  assert.equal(totals.taxable, 12500);
+  assert.equal(totals.gst, 2160 + 90);
+  assert.equal(totals.total, 12500 + 2250);
+  assert.deepEqual(
+    summaryRows(totals).map((row) => [row.label, row.amount]),
+    [
+      ["Lines", 12000],
+      ["Additional charges — Loading", 500],
+      ["Taxable value", 12500],
+      ["GST", 2250],
+    ],
+  );
+  assert.equal(rollUpBill(lines, { amount: 0.1, gst_pct: 18 }).gst, 2160.02);
+  assert.deepEqual(
+    summaryRows(rollUpBill(lines)).map((row) => row.label),
+    ["Taxable value", "GST"],
+  );
 });

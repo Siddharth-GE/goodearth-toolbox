@@ -17,8 +17,11 @@ import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries"
 import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
-import { WORK_CLASS_LABEL, isWorkClass } from "@/lib/masters/work-classes";
+import { isWorkClass } from "@/lib/masters/work-classes";
+import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
+import { ChangeWorkClass } from "../../_components/change-work-class";
+import { SiteConfirmationNote } from "../../_components/site-confirmation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
@@ -28,6 +31,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
     listWorkCategories(),
   ]);
   if (!issue) notFound();
+  const confirmation = issue.is_transfer ? null : await getSiteConfirmation("issue", issue.id);
 
   // Flag, never refuse: derived fresh, so a resubmitted estimate that covers the material clears the banner.
   const overRows =
@@ -85,12 +89,13 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           <div className="min-w-0 sm:col-span-2">
             <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               For the work{issue.work_category ? ` · ${issue.work_category}` : ""}
-              {isWorkClass(issue.work_class) && issue.work_class !== "standard"
-                ? ` · ${WORK_CLASS_LABEL[issue.work_class]}`
-                : ""}
             </p>
-            <div className="mt-1">
+            <div className="mt-1 space-y-2">
               <RetagWork issueId={issue.id} workItemId={issue.work_item_id} works={works} />
+              <ChangeWorkClass
+                issueId={issue.id}
+                workClass={isWorkClass(issue.work_class) ? issue.work_class : "standard"}
+              />
             </div>
           </div>
         )}
@@ -113,6 +118,10 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           </div>
         )}
       </section>
+
+      {!issue.is_transfer && (
+        <SiteConfirmationNote confirmation={confirmation} lines={issue.lines} />
+      )}
 
       {issue.is_transfer && (
         <p className="text-muted text-sm">

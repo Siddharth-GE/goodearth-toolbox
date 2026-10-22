@@ -266,6 +266,10 @@ export type PoDetail = {
   expected_by: string | null;
   terms: string | null;
   note: string | null;
+  /** 0133: freight, loading and the like, at their own GST %. */
+  charges_amount: number | null;
+  charges_gst_pct: number | null;
+  charges_note: string | null;
   deletion_note: string | null;
   created_by: string | null;
   created_at: string;
@@ -289,7 +293,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     supabase
       .from("purchase_orders")
       .select(
-        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, deletion_note, created_by, created_at, issued_by, issued_at, deletion_requested_by, deletion_requested_at, cancelled_by, cancelled_at, projects(name), plots(name), units(name), vendors(name, gst_state), stores(name)",
+        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, charges_amount, charges_gst_pct, charges_note, deletion_note, created_by, created_at, issued_by, issued_at, deletion_requested_by, deletion_requested_at, cancelled_by, cancelled_at, projects(name), plots(name), units(name), vendors(name, gst_state), stores(name)",
       )
       .eq("id", poId)
       .maybeSingle(),
@@ -404,6 +408,9 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     expected_by: po.expected_by,
     terms: po.terms,
     note: po.note,
+    charges_amount: po.charges_amount,
+    charges_gst_pct: po.charges_gst_pct,
+    charges_note: po.charges_note,
     deletion_note: po.deletion_note,
     created_by: po.created_by,
     created_at: po.created_at,

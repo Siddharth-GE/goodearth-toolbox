@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  packageLines,
+  packageStages,
   workOrderLineAmount,
   workOrderLineProblem,
   workOrderProblem,
@@ -60,4 +62,40 @@ test("an order needs a contractor, a project, a description and works worth some
     workOrderProblem({ ...order, lines: [{ ...lump, rate: 0 }] }) ?? "",
     /more than zero/,
   );
+});
+
+test("a stage's packages are its works priced per sqft; one line each for the villa's sqft", () => {
+  const works = [
+    {
+      id: "p1",
+      name: "Block work to GF lintel — package per sqft",
+      category: "Superstructure",
+      uom: "sqft",
+      labour_rate: 27.6,
+    },
+    { id: "p2", name: "Attic", category: "Superstructure", uom: "sqft", labour_rate: 18.4 },
+    { id: "s1", name: "Block work", category: "Superstructure", uom: "cum", labour_rate: 900 },
+    { id: "s2", name: "Unpriced", category: "Superstructure", uom: "sqft", labour_rate: null },
+    {
+      id: "m1",
+      name: "Conduits — package per sqft",
+      category: "MEP",
+      uom: "sqft",
+      labour_rate: 12,
+    },
+    { id: "f1", name: "Footing", category: "Foundation", uom: "cum", labour_rate: 4000 },
+  ];
+  assert.deepEqual(packageStages(works), ["MEP", "Superstructure"]);
+  const lines = packageLines(works, "Superstructure", 1800, ["p2"]);
+  assert.deepEqual(lines, [
+    {
+      workItemId: "p1",
+      description: "Block work to GF lintel — package per sqft",
+      isLumpSum: false,
+      quantity: 1800,
+      uom: "sqft",
+      rate: 27.6,
+    },
+  ]);
+  assert.equal(workOrderTotal(lines), 49680);
 });

@@ -1,7 +1,7 @@
 import { countVillasOverEstimate, getWelcomeCounts } from "@/lib/estimator/estimate-queries";
 import { countIndentLinesWaiting } from "@/lib/estimator/indent-queries";
 
-import { ToolWelcome } from "../_components/tool-welcome";
+import { ToolWelcome } from "../../_components/tool-welcome";
 
 // No PageTitle here: the layout renders the title and nav. Counts only, never rupees.
 export default async function EstimatorPage() {

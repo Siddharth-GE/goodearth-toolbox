@@ -31,8 +31,9 @@ import {
 } from "@/lib/purchase-orders/math";
 import type { PoLineRow } from "@/lib/purchase-orders/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
+import type { DocumentCharges } from "@/lib/line-money";
 import { PackageOpen, Trash2 } from "lucide-react";
-import { useState, useTransition, type KeyboardEvent } from "react";
+import { useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 
 // The uom is not editable: the over-ordering guard compares quantities in the indent line's unit.
 // `interState` (vendor's GST state vs the company's) picks CGST + SGST or IGST.
@@ -51,12 +52,17 @@ export function LineGrid({
   editable,
   interState,
   gstRates,
+  charges,
+  chargesBox,
 }: {
   poId: string;
   lines: PoLineRow[];
   editable: boolean;
   interState: boolean;
   gstRates: number[];
+  charges: DocumentCharges;
+  /** Sits beside the totals it feeds. */
+  chargesBox: ReactNode;
 }) {
   const [money, setMoney] = useState<Record<string, PoLineMoney>>(() =>
     Object.fromEntries(lines.map((line) => [line.id, moneyOf(line)])),
@@ -68,6 +74,7 @@ export function LineGrid({
   const totals = rollUpPo(
     lines.map((line) => money[line.id] ?? moneyOf(line)),
     interState,
+    charges,
   );
   // Nothing can be billed against a draft, so its grid has no Invoiced column.
   const showInvoiced = !editable;
@@ -133,24 +140,27 @@ export function LineGrid({
             </TableBody>
           </Table>
 
-          <div className="border-border bg-surface ml-auto w-full max-w-sm space-y-1 rounded-2xl border p-4">
-            {summaryRows(totals, interState).map((row) => (
-              <TotalRow key={row.label} label={row.label} value={formatMoney(row.amount)} />
-            ))}
-            <div className="border-border flex items-center justify-between border-t pt-2">
-              <span className="text-foreground text-sm font-semibold">Grand total</span>
-              <span className="text-foreground text-sm font-semibold tabular-nums">
-                {formatMoney(totals.grand)}
-              </span>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="w-full lg:max-w-xl">{chargesBox}</div>
+            <div className="border-border bg-surface ml-auto w-full max-w-sm space-y-1 rounded-2xl border p-4">
+              {summaryRows(totals, interState).map((row) => (
+                <TotalRow key={row.label} label={row.label} value={formatMoney(row.amount)} />
+              ))}
+              <div className="border-border flex items-center justify-between border-t pt-2">
+                <span className="text-foreground text-sm font-semibold">Grand total</span>
+                <span className="text-foreground text-sm font-semibold tabular-nums">
+                  {formatMoney(totals.grand)}
+                </span>
+              </div>
+              {totals.pendingCount > 0 && (
+                <p className="text-warning text-xs font-medium">
+                  {/* One string: split across JSX lines, the space before "a rate" was dropped. */}
+                  {`${formatCount(totals.pendingCount)} ${
+                    totals.pendingCount === 1 ? "line still needs" : "lines still need"
+                  } a rate and GST — they're not in these totals.`}
+                </p>
+              )}
             </div>
-            {totals.pendingCount > 0 && (
-              <p className="text-warning text-xs font-medium">
-                {/* One string: split across JSX lines, the space before "a rate" was dropped. */}
-                {`${formatCount(totals.pendingCount)} ${
-                  totals.pendingCount === 1 ? "line still needs" : "lines still need"
-                } a rate and GST — they're not in these totals.`}
-              </p>
-            )}
           </div>
         </>
       )}

@@ -25,6 +25,12 @@ import {
 } from "@/lib/supervisors/queries";
 import { ExternalLink, FileText } from "lucide-react";
 import { notFound } from "next/navigation";
+import { listChecklistTemplates, listVillaChecklists } from "@/lib/supervisors/checklist-queries";
+import Link from "next/link";
+import { listVillaDeliveries } from "@/lib/supervisors/site-receipt-queries";
+import { isShort } from "@/lib/supervisors/site-receipt";
+import { StartChecklistDialog } from "./_components/checklist-forms";
+import { ConfirmDeliveryDialog } from "./_components/delivery-forms";
 import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
@@ -32,13 +38,17 @@ import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request
 // One villa, one page: labour, material requests and drawn-vs-estimate. Phone-first: stacked cards, tables scroll inside their cards.
 export default async function VillaPage({ params }: { params: Promise<{ plotId: string }> }) {
   const { plotId } = await params;
-  const [villa, contractors, works, categories, brands] = await Promise.all([
-    getVillaDetail(plotId),
-    listContractors(),
-    listWorkOptions(),
-    listItemCategories(),
-    listBrands(),
-  ]);
+  const [villa, contractors, works, categories, brands, checklists, templates, deliveries] =
+    await Promise.all([
+      getVillaDetail(plotId),
+      listContractors(),
+      listWorkOptions(),
+      listItemCategories(),
+      listBrands(),
+      listVillaChecklists(plotId),
+      listChecklistTemplates(),
+      listVillaDeliveries(plotId),
+    ]);
   if (!villa) notFound();
 
   const pickerCategories = categories.map(({ id, name }) => ({ id, name }));
@@ -251,6 +261,113 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     <WithdrawRequestButton requestId={request.id} />
                   )}
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section
+        title="Deliveries to this villa"
+        note={
+          deliveries.length
+            ? `${deliveries.filter((delivery) => !delivery.confirmedAt).length} waiting for you to confirm.`
+            : undefined
+        }
+      >
+        {deliveries.length === 0 ? (
+          <p className="text-muted text-sm">
+            Nothing has been issued or delivered to this villa yet.
+          </p>
+        ) : (
+          <ul className="divide-border divide-y">
+            {deliveries.map((delivery) => {
+              const short = delivery.lines.filter(isShort);
+              return (
+                <li key={`${delivery.kind}-${delivery.id}`} className="space-y-1 py-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-foreground text-sm font-medium">
+                        {`${delivery.reference} · ${delivery.kind === "issue" ? "from the store" : "straight to site"}`}
+                      </p>
+                      <p className="text-muted text-xs">
+                        {`${formatDate(delivery.on)} · ${delivery.lines.length} ${delivery.lines.length === 1 ? "item" : "items"}${delivery.label ? ` · ${delivery.label}` : ""}`}
+                      </p>
+                    </div>
+                    {delivery.confirmedAt ? (
+                      <Badge variant={short.length ? "warning" : "success"}>
+                        {short.length ? "Short" : "Arrived"}
+                      </Badge>
+                    ) : delivery.lines.length > 0 ? (
+                      <ConfirmDeliveryDialog delivery={delivery} />
+                    ) : null}
+                  </div>
+                  {delivery.confirmedAt && (
+                    <p className="text-muted text-xs">
+                      {`Confirmed ${formatDate(delivery.confirmedAt)}${delivery.confirmedByName ? ` by ${delivery.confirmedByName}` : ""}`}
+                      {short.length > 0 &&
+                        ` — ${short.map((line) => `${line.itemName}: ${formatQuantity(line.received)} of ${formatQuantity(line.sent)} ${line.uom}`).join("; ")}`}
+                      {delivery.note ? ` · ${delivery.note}` : ""}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
+
+      <Section
+        title="Checklists"
+        note={
+          checklists.length
+            ? `${checklists.filter((checklist) => checklist.status === "open").length} open, ${checklists.filter((checklist) => checklist.status === "signed_off").length} signed off.`
+            : undefined
+        }
+        aside={
+          <StartChecklistDialog
+            plotId={plotId}
+            templates={templates
+              .filter((template) => template.isActive)
+              .map((template) => ({
+                id: template.id,
+                name: template.name,
+                itemCount: template.items.filter((item) => item.isActive).length,
+              }))
+              .filter((template) => template.itemCount > 0)}
+          />
+        }
+      >
+        {checklists.length === 0 ? (
+          <p className="text-muted text-sm">
+            No checklists yet — Start a checklist before an inspection, and tick each check on site.
+          </p>
+        ) : (
+          <ul className="divide-border divide-y">
+            {checklists.map((checklist) => (
+              <li key={checklist.id}>
+                <Link
+                  href={`/supervisors/villas/${plotId}/checklists/${checklist.id}`}
+                  className="hover:bg-foreground/[0.03] -mx-2 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5"
+                >
+                  <div>
+                    <p className="text-foreground text-sm font-medium">
+                      {checklist.templateName}
+                      {checklist.location ? ` · ${checklist.location}` : ""}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {checklist.status === "signed_off"
+                        ? `Signed off ${formatDate(checklist.signedOffAt)}`
+                        : `Started ${formatDate(checklist.startedOn)} · ${checklist.answered} of ${checklist.total} checked`}
+                      {checklist.failed > 0 ? ` · ${checklist.failed} failed` : ""}
+                    </p>
+                  </div>
+                  {checklist.status === "signed_off" ? (
+                    <Badge variant={checklist.failed > 0 ? "warning" : "success"}>Signed off</Badge>
+                  ) : (
+                    <Badge variant="info">Open</Badge>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>

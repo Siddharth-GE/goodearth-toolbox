@@ -1,6 +1,8 @@
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
+import { ChargesBox } from "@/components/ui/charges-box";
 import { PageTitle } from "@/components/ui/page-title";
+import { updatePoCharges } from "@/lib/purchase-orders/actions";
 import { formatDate } from "@/lib/format";
 import { idParam } from "@/lib/list-params";
 import { DEFAULT_COMPANY_STATE, gstRegime } from "@/lib/line-money";
@@ -60,6 +62,11 @@ export default async function PurchaseOrderPage({
   const regime = gstRegime(po.vendor_gst_state, company?.state);
   const companyState = company?.state || DEFAULT_COMPANY_STATE;
   const activeRates = gstRates.map((rate) => rate.rate);
+  const charges = {
+    amount: po.charges_amount,
+    gst_pct: po.charges_gst_pct,
+    note: po.charges_note,
+  };
   const fullyPriced = isFullyPriced(
     po.lines.map((line) => ({ quantity: line.quantity, rate: line.rate, gst_pct: line.gst_pct })),
   );
@@ -231,6 +238,15 @@ export default async function PurchaseOrderPage({
         editable={editable}
         interState={regime.interState}
         gstRates={activeRates}
+        charges={charges}
+        chargesBox={
+          <ChargesBox
+            charges={charges}
+            gstRates={activeRates}
+            editable={editable}
+            save={updatePoCharges.bind(null, po.id)}
+          />
+        }
       />
 
       <ReceiptsSection receipts={receipts} />

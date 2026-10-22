@@ -21,7 +21,8 @@ import {
   type PoLineForBill,
   type WorkOrderLineForBill,
 } from "@/lib/bills/lines";
-import { billLineMoney, rollUpBill } from "@/lib/bills/math";
+import { billLineMoney, rollUpBill, summaryRows } from "@/lib/bills/math";
+import type { DocumentCharges } from "@/lib/line-money";
 import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatMoney } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
@@ -75,6 +76,7 @@ const blankOther = (): BillLineDraft => ({
   poLineId: null,
   itemId: null,
   labourLogId: null,
+  labourContractLineId: null,
   workItemId: null,
   description: "",
   uom: null,
@@ -95,6 +97,7 @@ export function BillLinesEditor({
   workLines,
   allowOther,
   lockedQuantities = false,
+  charges,
 }: {
   lines: EditorLine[];
   onChange: (lines: EditorLine[]) => void;
@@ -106,9 +109,11 @@ export function BillLinesEditor({
   allowOther: boolean;
   /** A bill made from labour entries: lines and quantities come from them. */
   lockedQuantities?: boolean;
+  /** The bill's additional charges, so the preview matches what the header will store. */
+  charges?: DocumentCharges;
 }) {
   const drafts = draftsOf(lines);
-  const totals = rollUpBill(drafts.map(lineMoneyOf));
+  const totals = rollUpBill(drafts.map(lineMoneyOf), charges);
 
   const update = (key: string, patch: Partial<EditorLine>) =>
     onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -326,9 +331,9 @@ export function BillLinesEditor({
         )}
 
         <div className="border-border bg-surface w-full max-w-xs space-y-1 rounded-2xl border p-4">
-          <Total label="Taxable" value={totals.taxable} />
-          <Total label="GST" value={totals.gst} />
-          {totals.other > 0 && <Total label="Other charges" value={totals.other} />}
+          {summaryRows(totals).map((row) => (
+            <Total key={row.label} label={row.label} value={row.amount} />
+          ))}
           <div className="border-border flex items-center justify-between border-t pt-2">
             <span className="text-foreground text-sm font-semibold">Total</span>
             <span className="text-foreground text-sm font-semibold tabular-nums">

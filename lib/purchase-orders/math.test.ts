@@ -161,3 +161,36 @@ test("a line's discount and charges are checked before the database refuses them
   assert.match(lineChargesProblem({ ...line, other_charges: -5 }) ?? "", /negative/);
   assert.match(lineChargesProblem({ ...line, other_charges: Number.NaN }) ?? "", /negative/);
 });
+
+test("additional charges join the taxable value and are taxed at their own slab", () => {
+  const charges = { amount: 1000, gst_pct: 18, note: "Freight" };
+  const totals = rollUpPo([priced, zeroGst], false, charges);
+  assert.equal(totals.taxable, 2900 + 1000);
+  assert.equal(totals.gst, 450 + 180);
+  assert.equal(totals.grand, 3900 + 630);
+  const rows = summaryRows(totals, false);
+  assert.deepEqual(
+    rows.map((row) => row.label),
+    [
+      "Subtotal",
+      "Additional charges — Freight",
+      "Taxable value",
+      "CGST 9%",
+      "SGST 9%",
+      "GST total",
+    ],
+  );
+  assert.equal(rows[0].amount, 2900);
+  assert.equal(rows[3].amount, 315);
+
+  // A slab only the charges use gets its own rows; no charges leaves the PO as it was.
+  const igst = summaryRows(rollUpPo([zeroGst], true, { amount: 500, gst_pct: 5 }), true);
+  assert.deepEqual(
+    igst.map((row) => row.label),
+    ["Subtotal", "Additional charges", "Taxable value", "IGST 5%", "GST total"],
+  );
+  assert.deepEqual(
+    rollUpPo([priced], false, { amount: null, gst_pct: null }),
+    rollUpPo([priced], false),
+  );
+});

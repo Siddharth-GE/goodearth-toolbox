@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { gstRegime, lineMoney, roundPaise, splitGst } from "./line-money";
+import { documentChargesProblem, gstRegime, lineMoney, roundPaise, splitGst } from "./line-money";
 
 test("quantity × rate, the team's example", () => {
   const money = lineMoney({ quantity: 2, rate: 4000, gst_pct: 0 });
@@ -61,4 +61,16 @@ test("roundPaise: half a paisa goes away from zero, as written in decimal", () =
   assert.equal(roundPaise(-0.004), 0);
   assert.ok(!Object.is(roundPaise(-0.004), -0), "never a negative zero");
   assert.equal(roundPaise(7980), 7980);
+});
+
+test("additional charges: none at all, or an amount with its GST %", () => {
+  assert.equal(documentChargesProblem({ amount: null, gst_pct: null }), undefined);
+  assert.equal(documentChargesProblem({ amount: 1500, gst_pct: 18 }), undefined);
+  assert.equal(documentChargesProblem({ amount: 1500, gst_pct: 0 }), undefined);
+  assert.match(documentChargesProblem({ amount: 1500, gst_pct: null }) ?? "", /GST/);
+  assert.match(documentChargesProblem({ amount: null, gst_pct: 18 }) ?? "", /more than zero/);
+  assert.match(documentChargesProblem({ amount: 0, gst_pct: 18 }) ?? "", /more than zero/);
+  assert.match(documentChargesProblem({ amount: 100, gst_pct: 101 }) ?? "", /GST/);
+  assert.match(documentChargesProblem({ amount: 100.005, gst_pct: 18 }) ?? "", /two decimals/);
+  assert.equal(documentChargesProblem({ amount: 1234.56, gst_pct: 18 }), undefined);
 });

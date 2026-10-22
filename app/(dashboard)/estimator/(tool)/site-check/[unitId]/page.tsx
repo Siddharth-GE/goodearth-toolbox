@@ -82,13 +82,18 @@ export default async function VillaSiteCheckPage({
         backHref="/estimator/site-check"
         backLabel="Site check"
         actions={
-          <LinkButton
-            href={`/estimator/estimates/${official.estimateId}`}
-            variant="secondary"
-            size="sm"
-          >
-            Open the official estimate
-          </LinkButton>
+          <>
+            <LinkButton href={`/estimator/villas/${unitId}/budget`} variant="secondary" size="sm">
+              Budget against actual
+            </LinkButton>
+            <LinkButton
+              href={`/estimator/estimates/${official.estimateId}`}
+              variant="secondary"
+              size="sm"
+            >
+              Open the official estimate
+            </LinkButton>
+          </>
         }
       />
 

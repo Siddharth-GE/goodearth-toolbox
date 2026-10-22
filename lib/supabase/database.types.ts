@@ -270,6 +270,7 @@ export type Database = {
           gst_pct: number
           id: string
           item_id: string | null
+          labour_contract_line_id: string | null
           labour_log_id: string | null
           line_kind: string
           note: string | null
@@ -292,6 +293,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           item_id?: string | null
+          labour_contract_line_id?: string | null
           labour_log_id?: string | null
           line_kind: string
           note?: string | null
@@ -314,6 +316,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           item_id?: string | null
+          labour_contract_line_id?: string | null
           labour_log_id?: string | null
           line_kind?: string
           note?: string | null
@@ -362,6 +365,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_labour_contract_line_id_fkey"
+            columns: ["labour_contract_line_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contract_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_labour_contract_line_id_fkey"
+            columns: ["labour_contract_line_id"]
+            isOneToOne: false
+            referencedRelation: "work_order_line_billing_facts"
+            referencedColumns: ["labour_contract_line_id"]
           },
           {
             foreignKeyName: "bill_lines_labour_log_id_fkey"
@@ -504,6 +521,9 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bill_no: number
+          charges_amount: number | null
+          charges_gst_pct: number | null
+          charges_note: string | null
           created_at: string
           created_by: string | null
           gst_amount: number
@@ -535,6 +555,9 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bill_no: number
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           gst_amount: number
@@ -566,6 +589,9 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bill_no?: number
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           gst_amount?: number
@@ -663,6 +689,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "bills_updated_by_fkey"
@@ -2328,6 +2361,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       business_plan_targets: {
@@ -2653,6 +2693,124 @@ export type Database = {
           },
         ]
       }
+      checklist_template_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          origin: string
+          review_note: string | null
+          sort_order: number
+          template_id: string
+          text: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          origin?: string
+          review_note?: string | null
+          sort_order?: number
+          template_id: string
+          text: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          origin?: string
+          review_note?: string | null
+          sort_order?: number
+          template_id?: string
+          text?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          work_refs: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          work_refs?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          work_refs?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_actions: {
         Row: {
           action: string
@@ -2878,6 +3036,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "client_engagements_updated_by_fkey"
@@ -3386,6 +3551,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "design_actions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "design_actions_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -3527,6 +3699,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "design_step_events_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       design_step_people: {
@@ -3639,6 +3818,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_steps_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "design_steps_updated_by_fkey"
@@ -4086,6 +4272,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
         ]
       }
@@ -5735,6 +5928,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "goods_receipts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "goods_receipts_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -5809,6 +6009,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_chat_spaces_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
         ]
       }
@@ -6192,6 +6399,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "indents_updated_by_fkey"
@@ -6871,6 +7085,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "labour_contracts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "labour_contracts_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -7436,6 +7657,9 @@ export type Database = {
         Row: {
           cancelled_at: string | null
           cancelled_by: string | null
+          charges_amount: number | null
+          charges_gst_pct: number | null
+          charges_note: string | null
           created_at: string
           created_by: string | null
           deletion_note: string | null
@@ -7463,6 +7687,9 @@ export type Database = {
         Insert: {
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           deletion_note?: string | null
@@ -7490,6 +7717,9 @@ export type Database = {
         Update: {
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           deletion_note?: string | null
@@ -7570,6 +7800,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "purchase_orders_updated_by_fkey"
@@ -8023,6 +8260,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "pusher_chains_updated_by_fkey"
@@ -8533,6 +8777,269 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "selections_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+        ]
+      }
+      site_checklist_items: {
+        Row: {
+          checklist_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          remarks: string | null
+          status: string
+          template_item_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          checklist_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remarks?: string | null
+          status?: string
+          template_item_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          checklist_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remarks?: string | null
+          status?: string
+          template_item_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "site_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_template_item_id_fkey"
+            columns: ["template_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_template_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_checklists: {
+        Row: {
+          attachment_path: string | null
+          created_at: string
+          created_by: string | null
+          drawing_revision: string | null
+          finished_on: string | null
+          id: string
+          inspected_on: string | null
+          location: string | null
+          note: string | null
+          plot_id: string
+          signed_off_at: string | null
+          signed_off_by: string | null
+          started_on: string
+          status: string
+          template_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          drawing_revision?: string | null
+          finished_on?: string | null
+          id?: string
+          inspected_on?: string | null
+          location?: string | null
+          note?: string | null
+          plot_id: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          started_on?: string
+          status?: string
+          template_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          drawing_revision?: string | null
+          finished_on?: string | null
+          id?: string
+          inspected_on?: string | null
+          location?: string | null
+          note?: string | null
+          plot_id?: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          started_on?: string
+          status?: string
+          template_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_checklists_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_signed_off_by_fkey"
+            columns: ["signed_off_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_receipt_confirmation_lines: {
+        Row: {
+          confirmation_id: string
+          id: string
+          issue_line_id: string | null
+          receipt_line_id: string | null
+          received_quantity: number
+        }
+        Insert: {
+          confirmation_id: string
+          id?: string
+          issue_line_id?: string | null
+          receipt_line_id?: string | null
+          received_quantity: number
+        }
+        Update: {
+          confirmation_id?: string
+          id?: string
+          issue_line_id?: string | null
+          receipt_line_id?: string | null
+          received_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_confirmation_id_fkey"
+            columns: ["confirmation_id"]
+            isOneToOne: false
+            referencedRelation: "site_receipt_confirmations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_issue_line_id_fkey"
+            columns: ["issue_line_id"]
+            isOneToOne: true
+            referencedRelation: "stock_issue_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_receipt_line_id_fkey"
+            columns: ["receipt_line_id"]
+            isOneToOne: true
+            referencedRelation: "goods_receipt_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_receipt_confirmations: {
+        Row: {
+          confirmed_at: string
+          confirmed_by: string
+          id: string
+          issue_id: string | null
+          note: string | null
+          receipt_id: string | null
+        }
+        Insert: {
+          confirmed_at?: string
+          confirmed_by: string
+          id?: string
+          issue_id?: string | null
+          note?: string | null
+          receipt_id?: string | null
+        }
+        Update: {
+          confirmed_at?: string
+          confirmed_by?: string
+          id?: string
+          issue_id?: string | null
+          note?: string | null
+          receipt_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_receipt_confirmations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmations_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "stock_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmations_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: true
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       space_types: {
@@ -8660,6 +9167,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
         ]
       }
@@ -9434,6 +9948,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transmittals_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       units: {
@@ -10118,6 +10639,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       batch_on_hand: {
@@ -10244,6 +10772,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "bills_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
@@ -10293,6 +10828,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "bills_vendor_id_fkey"
@@ -10451,6 +10993,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "selection_lines_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
@@ -10542,6 +11091,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "client_payment_milestones_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
@@ -10589,6 +11145,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "client_receipts_engagement_id_fkey"
@@ -10737,6 +11300,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "purchase_orders_vendor_id_fkey"
@@ -10939,6 +11509,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       stock_by_location: {
@@ -10955,6 +11532,17 @@ export type Database = {
           item_id: string | null
           quantity: number | null
           store_id: string | null
+        }
+        Relationships: []
+      }
+      villa_cost_facts: {
+        Row: {
+          amount: number | null
+          kind: string | null
+          plot_id: string | null
+          unit_id: string | null
+          unpriced: boolean | null
+          work_item_id: string | null
         }
         Relationships: []
       }
@@ -10986,6 +11574,31 @@ export type Database = {
             foreignKeyName: "estimator_work_info_work_item_id_fkey"
             columns: ["work_item_id"]
             isOneToOne: true
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_line_billing_facts: {
+        Row: {
+          billed_value: number | null
+          contract_id: string | null
+          labour_contract_line_id: string | null
+          line_value: number | null
+          work_item_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_contract_lines_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contract_lines_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
             referencedRelation: "work_items"
             referencedColumns: ["id"]
           },
