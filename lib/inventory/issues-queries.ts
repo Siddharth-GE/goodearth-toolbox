@@ -134,6 +134,7 @@ export type IssueDetail = {
   work_item_id: string | null;
   work_name: string | null;
   work_category: string | null;
+  work_class: string;
   issued_at: string;
   note: string | null;
   issued_by_name: string | null;
@@ -165,7 +166,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   const { data: issue, error: issueError } = await supabase
     .from("stock_issues")
     .select(
-      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
+      "id, reference, store_id, to_store_id, plot_id, work_item_id, work_class, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
     )
     .eq("id", issueId)
     .maybeSingle();
@@ -266,6 +267,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     work_category:
       (issue.work_items as { name: string; work_categories: { name: string } | null } | null)
         ?.work_categories?.name ?? null,
+    work_class: issue.work_class,
     issued_at: issue.issued_at,
     note: issue.note,
     issued_by_name: nameOf(issue.created_by),

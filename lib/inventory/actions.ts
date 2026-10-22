@@ -3,6 +3,7 @@
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
+import { WORK_CLASS_LABEL, workClassOf } from "@/lib/masters/work-classes";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -210,6 +211,8 @@ export type RecordIssueInput = {
   lines: IssueLineInput[];
   /** The supervisor's request to stamp fulfilled once the issue is recorded. */
   requestId?: string | null;
+  /** Standard work, additional work or rework, for an issue to a plot (0132). */
+  workClass?: string | null;
 };
 
 /** The negative-stock guard refuses any line taking a store below zero, under an advisory
@@ -227,6 +230,9 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (input.plotId && !input.workItemId) {
     return { error: "Say which work this material is for." };
   }
+  const workClass = workClassOf(input.workClass);
+  if (!workClass)
+    return { error: "Say whether it is for standard work, additional work or rework." };
   if (input.lines.length === 0) return { error: "Add at least one item." };
   if (input.lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
     return { error: "Quantities must be more than 0." };
@@ -313,6 +319,21 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       };
     }
     added++;
+  }
+
+  // create_stock_issue predates the class (additive-only), so it rides a second write, as an indent's work does.
+  if (input.plotId && workClass !== "standard") {
+    const { error: classError } = await supabase
+      .from("stock_issues")
+      .update({ work_class: workClass, updated_by: user.id })
+      .eq("id", issueId);
+    if (classError) {
+      console.error("recordStockIssue work class failed:", classError);
+      revalidatePath("/inventory", "layout");
+      return {
+        error: `Issued, but it was saved as standard work rather than ${WORK_CLASS_LABEL[workClass].toLowerCase()} — set it on the issue note.`,
+      };
+    }
   }
 
   // Stamping the supervisor's request is best-effort: if it fails the request stays queued.

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { requireTool } from "@/lib/auth/access";
 import type { Filterable } from "@/lib/list-params";
 import { listWorkItems } from "@/lib/masters/works";
@@ -32,6 +33,7 @@ export type SiteRequestRow = {
   status: "requested" | "fulfilled" | "declined";
   declinedReason: string | null;
   fulfilledIssueId: string | null;
+  workClass: WorkClass;
 };
 
 const ANSWERED_SHOWN = 20;
@@ -48,10 +50,11 @@ type RequestRecord = {
   fulfilled_issue_id: string | null;
   created_by: string | null;
   created_at: string;
+  work_class: string;
 };
 
 const REQUEST_COLUMNS =
-  "id, plot_id, work_item_id, item_id, quantity, note, status, declined_reason, fulfilled_issue_id, created_by, created_at";
+  "id, plot_id, work_item_id, item_id, quantity, note, status, declined_reason, fulfilled_issue_id, created_by, created_at, work_class";
 
 export type SiteRequestFilters = {
   plotId?: string;
@@ -203,6 +206,7 @@ async function shapeRequests(
     requesterName: (record.created_by && profiles.get(record.created_by)) || "—",
     createdAt: record.created_at,
     status: record.status as SiteRequestRow["status"],
+    workClass: workClassOf(record.work_class) ?? "standard",
     declinedReason: record.declined_reason,
     fulfilledIssueId: record.fulfilled_issue_id,
   }));

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { WORK_CLASS_LABEL, isWorkClass } from "@/lib/masters/work-classes";
 import { listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -48,7 +49,7 @@ export async function listUnbilledLabour(filters: UnbilledFilters = {}): Promise
       let query = supabase
         .from("labour_logs")
         .select(
-          "id, log_date, kind, plot_id, contractor_id, work_item_id, masons, helpers, others, quantity, uom, description, note, plots(name, project_id, projects(name), units!units_plot_id_fkey(name)), vendors(name)",
+          "id, log_date, kind, plot_id, contractor_id, work_item_id, work_class, masons, helpers, others, quantity, uom, description, note, plots(name, project_id, projects(name), units!units_plot_id_fkey(name)), vendors(name)",
         )
         .is("bill_id", null);
       if (filters.vendorId) query = query.eq("contractor_id", filters.vendorId);
@@ -82,7 +83,8 @@ export async function listUnbilledLabour(filters: UnbilledFilters = {}): Promise
         contractor_id: log.contractor_id,
         contractor_name: (log.vendors as { name: string } | null)?.name ?? "—",
         work_item_id: log.work_item_id,
-        work_label: workLabel.get(log.work_item_id) ?? "A retired work",
+        // Additional work and rework say so where the billing team reads the work (0132).
+        work_label: `${workLabel.get(log.work_item_id) ?? "A retired work"}${isWorkClass(log.work_class) && log.work_class !== "standard" ? ` · ${WORK_CLASS_LABEL[log.work_class]}` : ""}`,
         masons: log.masons,
         helpers: log.helpers,
         others: log.others,
