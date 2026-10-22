@@ -1,7 +1,8 @@
 // Pure. One villa's budget against actual from villa_cost_facts (0136), per work and per stage (the work's category).
 // Estimated: the official estimate, labour and material apart. Committed: issued POs bought for the villa and approved
 // work orders. Actual: material issued or delivered to site at its batch rates, and labour billed. Every figure before
-// GST. A part whose rate is unknown makes the figure partial — shown "+ unknown", never as if it were the whole.
+// GST. A part whose rate is unknown makes the figure partial, and says which way: the whole is more than shown, or
+// (for what is left, when spending is incomplete) less. Never as if it were the whole.
 
 export const COST_KINDS = [
   "estimated_labour",
@@ -22,8 +23,18 @@ export type CostFact = {
   unpriced: boolean;
 };
 
-/** A sum that may be missing a part: `partial` when any of it had no rate. */
-export type Amount = { amount: number; partial: boolean };
+/** Which way an unpriced part moves the true figure: more than shown, less, or either. */
+export type Partial = false | "more" | "less" | "both";
+
+/** A sum that may be missing a part. */
+export type Amount = { amount: number; partial: Partial };
+
+function combine(parts: Partial[]): Partial {
+  const kinds = new Set(parts.filter((part) => part !== false));
+  if (kinds.size === 0) return false;
+  if (kinds.has("both") || kinds.size > 1) return "both";
+  return [...kinds][0];
+}
 
 export type BudgetLine = {
   estimatedLabour: Amount | null;
@@ -47,7 +58,7 @@ export function addAmounts(...parts: (Amount | null)[]): Amount | null {
   if (present.length === 0) return null;
   return {
     amount: present.reduce((sum, part) => sum + part.amount, 0),
-    partial: present.some((part) => part.partial),
+    partial: combine(present.map((part) => part.partial)),
   };
 }
 
@@ -67,7 +78,8 @@ function lineOf(byKind: Map<string, Amount>): BudgetLine {
       ? null
       : {
           amount: (estimated?.amount ?? 0) - (actual?.amount ?? 0),
-          partial: Boolean(estimated?.partial || actual?.partial),
+          // Unpriced estimate leaves more; unpriced spending leaves less.
+          partial: combine([estimated?.partial ? "more" : false, actual?.partial ? "less" : false]),
         };
   return { estimatedLabour, estimatedMaterial, estimated, committed, actual, left };
 }
@@ -98,7 +110,7 @@ export function budgetReport(
     const kinds = byWork.get(key) ?? new Map<string, Amount>();
     const sum = addAmounts(kinds.get(fact.kind) ?? null, {
       amount: fact.amount,
-      partial: fact.unpriced,
+      partial: fact.unpriced ? "more" : false,
     });
     if (sum) kinds.set(fact.kind, sum);
     byWork.set(key, kinds);

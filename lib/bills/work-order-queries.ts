@@ -12,6 +12,7 @@ import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/mast
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import { orderHasUntaggedBilling } from "./line-queries";
 import { billedByContractTotals } from "./queries";
 import type { ContractStatus } from "./workflow";
 
@@ -126,8 +127,8 @@ export type WorkOrderLineRow = {
   quantity: number | null;
   uom: string | null;
   rate: number;
-  /** Billed against this line so far, before GST (work_order_line_billing_facts, 0136). */
-  billed: number;
+  /** Billed against this line so far, before GST (work_order_line_billing_facts, 0136); null when a bill on the order names no stage. */
+  billed: number | null;
 };
 
 export type WorkOrderDetail = WorkOrderRow & {
@@ -143,7 +144,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [{ data, error }, lines, billed, works, lineBilling] = await Promise.all([
+  const [{ data, error }, lines, billed, works, lineBilling, untagged] = await Promise.all([
     supabase.from("labour_contracts").select(CONTRACT_COLUMNS).eq("id", id).maybeSingle(),
     fetchAll((from, to) =>
       supabase
@@ -165,6 +166,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
         .order("labour_contract_line_id")
         .range(from, to),
     ),
+    orderHasUntaggedBilling(supabase, id),
   ]);
   if (error) {
     console.error("getWorkOrder failed:", error);
@@ -207,7 +209,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
       quantity: line.quantity,
       uom: line.uom,
       rate: line.rate,
-      billed: billedByLine.get(line.id) ?? 0,
+      billed: untagged ? null : (billedByLine.get(line.id) ?? 0),
     })),
     company,
   };

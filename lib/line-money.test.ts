@@ -71,4 +71,6 @@ test("additional charges: none at all, or an amount with its GST %", () => {
   assert.match(documentChargesProblem({ amount: null, gst_pct: 18 }) ?? "", /more than zero/);
   assert.match(documentChargesProblem({ amount: 0, gst_pct: 18 }) ?? "", /more than zero/);
   assert.match(documentChargesProblem({ amount: 100, gst_pct: 101 }) ?? "", /GST/);
+  assert.match(documentChargesProblem({ amount: 100.005, gst_pct: 18 }) ?? "", /two decimals/);
+  assert.equal(documentChargesProblem({ amount: 1234.56, gst_pct: 18 }), undefined);
 });

@@ -81,15 +81,22 @@ export default async function VillaBudgetPage({ params }: { params: Promise<{ un
           <Figure
             label="Left in the estimate"
             value={money(report.total.left)}
-            tone={report.total.left && report.total.left.amount < 0 ? "bad" : undefined}
+            tone={
+              report.total.left && report.total.left.amount < 0
+                ? "bad"
+                : mayBeOver(report.total.left)
+                  ? "warn"
+                  : undefined
+            }
           />
         </FigureBandCell>
       </FigureBand>
 
       <p className="text-muted text-sm">
         Every figure is before GST. Material counts when it reaches the villa, at the rate of the
-        batch it came from; &ldquo;+ unknown&rdquo; means part of it has no rate yet, so the whole
-        is more than shown.
+        batch it came from. &ldquo;+ unknown&rdquo; means part of it has no rate yet, so the whole
+        is more than shown; &ldquo;at most&rdquo; on what is left means spending is not all priced,
+        so less is left than shown.
       </p>
 
       {report.stages.length === 0 ? (
@@ -103,7 +110,7 @@ export default async function VillaBudgetPage({ params }: { params: Promise<{ un
             title={stage.label}
             note={`Estimated ${money(stage.estimated)} · actual ${money(stage.actual)}`}
             collapsible
-            defaultOpen={Boolean(stage.left && stage.left.amount < 0)}
+            defaultOpen={mayBeOver(stage.left)}
           >
             <div className="overflow-x-auto">
               <Table>
@@ -141,8 +148,15 @@ export default async function VillaBudgetPage({ params }: { params: Promise<{ un
 
 function money(value: Amount | null): string {
   if (value === null) return "—";
-  return value.partial ? `${formatMoney(value.amount)} + unknown` : formatMoney(value.amount);
+  if (value.partial === "more") return `${formatMoney(value.amount)} + unknown`;
+  if (value.partial === "less") return `at most ${formatMoney(value.amount)}`;
+  if (value.partial === "both") return `about ${formatMoney(value.amount)}, part unknown`;
+  return formatMoney(value.amount);
 }
+
+/** Over the estimate, or possibly over because spending is not fully priced. */
+const mayBeOver = (left: Amount | null) =>
+  left !== null && (left.amount < 0 || left.partial === "less" || left.partial === "both");
 
 function MoneyCells({ line, total = false }: { line: BudgetLine; total?: boolean }) {
   const Cell = total ? TableTotalCell : TableCell;

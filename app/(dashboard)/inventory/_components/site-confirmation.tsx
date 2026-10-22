@@ -10,10 +10,13 @@ export function SiteConfirmationNote({
   confirmation: SiteConfirmation | null;
   lines: { id: string; item_name: string; quantity: number; uom: string }[];
 }) {
-  if (!confirmation) {
+  // A header whose lines did not all save is unfinished, never "whole".
+  if (!confirmation || lines.some((line) => !confirmation.received.has(line.id))) {
     return (
       <p className="text-muted text-sm">
-        The site has not confirmed this yet — the supervisor does it on the villa page.
+        {confirmation
+          ? "The site started confirming this but did not finish — the supervisor presses Confirm again on the villa page."
+          : "The site has not confirmed this yet — the supervisor does it on the villa page."}
       </p>
     );
   }

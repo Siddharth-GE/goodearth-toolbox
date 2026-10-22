@@ -55,6 +55,8 @@ export function documentChargesProblem(charges: DocumentCharges): string | undef
   if (amount === null || !Number.isFinite(amount) || amount <= 0) {
     return "Additional charges must be more than zero — or clear them.";
   }
+  if (roundPaise(amount) !== amount)
+    return "Additional charges are in rupees and paise — two decimals at most.";
   if (pct === null || !Number.isFinite(pct) || pct < 0 || pct > 100) {
     return "Pick the GST % on the additional charges.";
   }

@@ -112,13 +112,41 @@ export async function getPoLinesForBill(poId: string): Promise<PoLineForBill[]> 
     .sort((a, b) => a.item_name.localeCompare(b.item_name));
 }
 
+/** Does any bill on this order have a line naming no stage (every bill before 0136, and Send to Bill's piece-work)?
+ * Then what each stage has billed is unknown, never zero. */
+export async function orderHasUntaggedBilling(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contractId: string,
+): Promise<boolean> {
+  const { data: bills, error } = await supabase
+    .from("bills")
+    .select("id")
+    .eq("labour_contract_id", contractId);
+  if (error) {
+    console.error("orderHasUntaggedBilling bills failed:", error);
+    throw new Error("Could not read the order's bills.", { cause: error });
+  }
+  const ids = (bills ?? []).map((bill) => bill.id);
+  if (ids.length === 0) return false;
+  const { count, error: linesError } = await supabase
+    .from("bill_lines")
+    .select("id", { count: "exact", head: true })
+    .in("bill_id", ids)
+    .is("labour_contract_line_id", null);
+  if (linesError) {
+    console.error("orderHasUntaggedBilling lines failed:", linesError);
+    throw new Error("Could not read the order's bill lines.", { cause: linesError });
+  }
+  return (count ?? 0) > 0;
+}
+
 export async function getWorkOrderLinesForBill(
   contractId: string,
 ): Promise<WorkOrderLineForBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
   // What each line has billed comes through work_order_line_billing_facts (0136), /bills or /reporter.
-  const [lines, billed] = await Promise.all([
+  const [lines, billed, untagged] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("labour_contract_lines")
@@ -137,11 +165,15 @@ export async function getWorkOrderLinesForBill(
         .order("labour_contract_line_id")
         .range(from, to),
     ),
+    orderHasUntaggedBilling(supabase, contractId),
   ]);
   const billedByLine = new Map(
     billed.map((row) => [row.labour_contract_line_id ?? "", row.billed_value ?? 0]),
   );
-  return lines.map((line) => ({ ...line, billed: billedByLine.get(line.id) ?? 0 }));
+  return lines.map((line) => ({
+    ...line,
+    billed: untagged ? null : (billedByLine.get(line.id) ?? 0),
+  }));
 }
 
 /** From the contractor's latest daily-wages bill that has lines; what Send to Bill suggests next. */

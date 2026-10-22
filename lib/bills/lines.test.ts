@@ -157,3 +157,21 @@ test("a daily-wages bill suggests the last bill's day rates", () => {
     { mason: 950, helper: 700, other: null },
   );
 });
+
+test("when a bill on the order names no stage, nothing is taken as billed — every line comes to enter", () => {
+  const [measured, lump] = linesFromWorkOrder([
+    workLine({ billed: null }),
+    workLine({
+      id: "wl2",
+      is_lump_sum: true,
+      quantity: null,
+      uom: null,
+      rate: 15000,
+      billed: null,
+    }),
+  ]);
+  assert.equal(leftOnWorkOrderLine(workLine({ billed: null })), null);
+  assert.equal(measured.quantity, null);
+  assert.equal(measured.labourContractLineId, "wl1");
+  assert.equal(lump.rate, 15000);
+});

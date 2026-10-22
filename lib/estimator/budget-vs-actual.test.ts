@@ -72,9 +72,23 @@ test("an unpriced part makes every sum it reaches partial — never a smaller wh
     stages,
   );
   const work = report.stages[0].works[0];
-  assert.deepEqual(work.actual, { amount: 12000, partial: true });
-  assert.deepEqual(work.left, { amount: 48000, partial: true });
-  assert.equal(report.total.actual?.partial, true);
+  assert.deepEqual(work.actual, { amount: 12000, partial: "more" });
+  // Spending not fully priced: the true amount left is less than shown.
+  assert.deepEqual(work.left, { amount: 48000, partial: "less" });
+  assert.equal(report.total.actual?.partial, "more");
+
+  const both = budgetReport(
+    [fact("fd2", "estimated_material", 60000, true), fact("fd2", "material_issued", 12000, true)],
+    works,
+    stages,
+  );
+  assert.equal(both.stages[0].works[0].left?.partial, "both");
+  const estimateOnly = budgetReport(
+    [fact("fd2", "estimated_material", 60000, true)],
+    works,
+    stages,
+  );
+  assert.equal(estimateOnly.stages[0].works[0].left?.partial, "more");
 });
 
 test("spending on no work, or a work gone from Masters, still shows", () => {
@@ -96,5 +110,12 @@ test("spending on no work, or a work gone from Masters, still shows", () => {
 
 test("adding nothing is nothing, not zero", () => {
   assert.equal(addAmounts(null, null), null);
-  assert.deepEqual(addAmounts(null, { amount: 5, partial: true }), { amount: 5, partial: true });
+  assert.deepEqual(addAmounts(null, { amount: 5, partial: "more" }), {
+    amount: 5,
+    partial: "more",
+  });
+  assert.equal(
+    addAmounts({ amount: 1, partial: "more" }, { amount: 1, partial: "less" })?.partial,
+    "both",
+  );
 });

@@ -179,5 +179,13 @@ export async function listVillaDeliveries(plotId: string): Promise<VillaDelivery
       ...confirmationOf((row) => row.receipt_id === receipt.id),
     })),
   ];
-  return deliveries.sort((a, b) => b.on.localeCompare(a.on)).slice(0, RECENT);
+  // Confirmed only when every line landed: a header whose lines did not all save stays open, so Confirm finishes it.
+  return deliveries
+    .map((delivery) =>
+      delivery.lines.some((line) => line.received === null)
+        ? { ...delivery, confirmedAt: null, confirmedByName: null }
+        : delivery,
+    )
+    .sort((a, b) => b.on.localeCompare(a.on))
+    .slice(0, RECENT);
 }

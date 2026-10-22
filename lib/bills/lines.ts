@@ -136,24 +136,27 @@ export type WorkOrderLineForBill = {
   quantity: number | null;
   uom: string | null;
   rate: number;
-  /** Billed against this line so far, before GST (work_order_line_billing_facts, 0136). */
-  billed: number;
+  /** Billed against this line so far, before GST (work_order_line_billing_facts, 0136); null when a bill on the order names no stage. */
+  billed: number | null;
 };
 
 /** What is left of a work order line: its value (quantity × rate, a lump sum its amount) less what is billed. */
-export function leftOnWorkOrderLine(line: WorkOrderLineForBill): number {
+export function leftOnWorkOrderLine(line: WorkOrderLineForBill): number | null {
+  if (line.billed === null) return null;
   const value = roundPaise((line.is_lump_sum ? 1 : (line.quantity ?? 0)) * line.rate);
   return Math.max(0, roundPaise(value - line.billed));
 }
 
 /** Each line not yet fully billed, at what is left of it: a measured work as the quantity left at its rate, a lump sum
- * (a stage) as the amount left. Each names its line, so the bill pays that stage (0136). Over-billing warns, never blocks. */
+ * (a stage) as the amount left. Each names its line, so the bill pays that stage (0136). When what is billed is unknown,
+ * every line comes with its quantity to enter and a lump sum at its full amount. Over-billing warns, never blocks. */
 export function linesFromWorkOrder(workLines: WorkOrderLineForBill[]): BillLineDraft[] {
   return workLines
-    .filter((line) => leftOnWorkOrderLine(line) > 0)
+    .filter((line) => (leftOnWorkOrderLine(line) ?? 1) > 0)
     .map((line) => {
-      const left = leftOnWorkOrderLine(line);
-      const measured = !line.is_lump_sum && line.rate > 0;
+      const known = leftOnWorkOrderLine(line);
+      const left = known ?? (line.is_lump_sum ? line.rate : 0);
+      const measured = known !== null && !line.is_lump_sum && line.rate > 0;
       return {
         kind: line.is_lump_sum ? ("pw_lump" as const) : ("pw_qty" as const),
         poLineId: null,
