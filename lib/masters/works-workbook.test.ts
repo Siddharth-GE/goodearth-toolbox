@@ -343,6 +343,10 @@ test("two of today's works for one new row: the one in use keeps it; a hand rema
     () => matchWorks([], SMALL, bridge, [{ code: "X.1", name: "Gone", becomes: null }]),
     /no longer in Masters/,
   );
+  const rerun = matchWorks([db("SS.01.01", "SS", "Curing")], SMALL, bridge, [
+    { code: "SS.7", name: "First Floor Lintel Beam Works", becomes: "SS.01.01" },
+  ]);
+  assert.equal(rerun.matches[0].newCode, "SS.01.01");
   assert.throws(
     () =>
       matchWorks([db("X.1", "SS", "Gone")], SMALL, bridge, [

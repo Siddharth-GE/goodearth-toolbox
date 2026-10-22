@@ -77,8 +77,8 @@ The founder, 2026-10-22: "will need a schedule thing as well, but something that
 
 ## Next session — start here, after "read CLAUDE.md"
 
-1. **The founder vets #122 on staging** (the OS updates checklist in the "Next session, in order" list of the OS section below). Anything broken is fixed first, before anything new.
-2. **Masters import**, on the founder's word "run the import" (the OS section's step 1: dry run, then `--commit`, then the SketchUp re-send).
+1. ~~The founder vets #122 on staging~~ — "all good so far", 2026-10-22.
+2. ~~Masters import~~ — **done 2026-10-22** on the founder's word: 690 works active (246 of the old kept their ids), 132 groups, 24 categories in five families; a re-run finds nothing to do. **The founder still re-sends the works list to SketchUp.**
 3. **Settle the open questions below**, then plan the schedule (the section above) — one short Fable session if the founder wants it — and fold it into this plan as its own phase.
 4. **Then build phase A**, one pull request, the founder vetting each phase on staging.
 
@@ -112,7 +112,7 @@ The founder's decisions (2026-10-22):
 
 ### Next session, in order — after "read CLAUDE.md"
 
-1. **Masters import.** It waits for the founder's word: "run the import". In `..\toolbox-os` on `staging`, dry-run it again, and the counts should still be 246 kept, 24 switched off and 444 new:
+1. ~~**Masters import.**~~ **Done 2026-10-22.** The command, for a re-run (it should find nothing to do):
    `npx tsx scripts/import-masters-workbook.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/1.xlsx"`
    Then run the same command with `--commit`. Then tell the founder to send the works list to SketchUp again, and to re-tag models that use old codes.
 2. ~~Apply `0133`–`0136`~~ — **done 2026-10-22** on staging's database, on the founder's word: dry-run with every trial first, then applied; types regenerated; `db:check`, `db:check-views` (13 money views) and `db:check-policies` pass; SECURITY.md and STATUS.md updated.
@@ -137,7 +137,7 @@ Everything else below is new.
 ## Wave 1 — Masters: the works list and GST on items `[Opus orchestrates]`
 
 - [x] [Opus] `0131` applied to staging; importer, readers and tests; Masters works by family, items GST, pickers, PO GST; docs. Commits 18cbe59, a97c126.
-- [ ] [Founder] Read the importer's dry run (246 of 270 works kept, 24 switched off, 444 new; no vendor or material changes), then `--commit` on staging.
+- [x] [Opus] On the founder's word, `--commit` on staging 2026-10-22 (246 of 270 works kept, 24 off, 444 new; no vendor or material changes). Backup in `data/backups/`.
 - [ ] [Founder] After the import: send the works list to SketchUp again, and re-tag any model using old codes (FD.14 is now FD.03.03).
 - Found in the sheet, for the founder: the Finishes remarks sit one row low (fixed in code); FD.04.06 "Plinth Beam" and its works sit under FD.04 Pile Foundation; Engineering Consultation for villas (ENC.1–3) has no place in the new sheet and is switched off.
 
