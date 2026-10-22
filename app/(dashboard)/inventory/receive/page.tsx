@@ -98,6 +98,10 @@ export default async function InventoryPage({
 
         {(total > 0 || poq || poProject) && (
           <form action="/inventory/receive" className="flex flex-wrap items-end gap-2">
+            {/* The deliveries list's filters ride along, as its toolbar keeps these. */}
+            {Object.entries({ q, from, to, project, store }).map(([name, value]) =>
+              value ? <input key={name} type="hidden" name={name} value={value} /> : null,
+            )}
             <div className="w-full space-y-1.5 sm:w-64">
               <Label htmlFor="poq">Find a purchase order</Label>
               <Input

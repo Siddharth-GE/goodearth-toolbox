@@ -73,10 +73,20 @@ export async function updateItem(
   if (!isItemKind(input.kind)) return { error: "Choose catalogue or material." };
   if (!input.category_id) return { error: "Choose a category." };
   if (!(await isActiveUom(input.default_uom))) return { error: "Choose a unit of measure." };
-  const gst = await gstProblem(input.gst_pct, Number(rawText(formData, "gst_pct_was")) || null);
+  // The item's current GST is read here, never trusted from the form: a retired rate it already has may stay.
+  const supabase = await createClient();
+  const { data: current, error: currentError } = await supabase
+    .from("items")
+    .select("gst_pct")
+    .eq("id", id)
+    .maybeSingle();
+  if (currentError) {
+    console.error("updateItem current GST read failed:", currentError);
+    return { error: "Could not update item. Try again." };
+  }
+  const gst = await gstProblem(input.gst_pct, current?.gst_pct ?? null);
   if (gst) return { error: gst };
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("items")
     .update({ ...input, updated_by: user.id })
