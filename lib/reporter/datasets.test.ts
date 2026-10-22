@@ -59,12 +59,12 @@ test("distinct fields' columns are all present in the optionsSelect", () => {
   }
 });
 
-test("plots is never reached except through units_plot_id_fkey", () => {
+test("plots is only reached through a named plot_id key, never a bare embed", () => {
   for (const [key, dataset] of entries) {
-    if (dataset.select.includes("plots")) {
+    for (const match of dataset.select.matchAll(/\bplots(!\w+)?\(/g)) {
       assert.ok(
-        dataset.select.includes("plots!units_plot_id_fkey"),
-        `${key}: plots embedded without naming units_plot_id_fkey`,
+        match[1]?.endsWith("_plot_id_fkey"),
+        `${key}: plots embedded without naming a *_plot_id_fkey`,
       );
     }
   }

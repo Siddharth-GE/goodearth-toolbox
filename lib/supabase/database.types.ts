@@ -6577,6 +6577,7 @@ export type Database = {
           created_at: string
           default_uom: string
           description: string | null
+          gst_pct: number | null
           id: string
           image_url: string | null
           indicative_price: number | null
@@ -6598,6 +6599,7 @@ export type Database = {
           created_at?: string
           default_uom: string
           description?: string | null
+          gst_pct?: number | null
           id?: string
           image_url?: string | null
           indicative_price?: number | null
@@ -6619,6 +6621,7 @@ export type Database = {
           created_at?: string
           default_uom?: string
           description?: string | null
+          gst_pct?: number | null
           id?: string
           image_url?: string | null
           indicative_price?: number | null
@@ -9708,6 +9711,7 @@ export type Database = {
           code: string
           created_at: string
           created_by: string | null
+          family: string
           id: string
           is_active: boolean
           name: string
@@ -9719,6 +9723,7 @@ export type Database = {
           code: string
           created_at?: string
           created_by?: string | null
+          family?: string
           id?: string
           is_active?: boolean
           name: string
@@ -9730,6 +9735,7 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string | null
+          family?: string
           id?: string
           is_active?: boolean
           name?: string

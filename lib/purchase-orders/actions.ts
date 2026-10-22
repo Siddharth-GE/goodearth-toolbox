@@ -105,7 +105,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
 
   const [{ data: sources, error: sourcesError }, { data: existing, error: existingError }] =
     await Promise.all([
-      supabase.from("indent_lines").select("id, item_id, uom").in("id", sourceIds),
+      supabase.from("indent_lines").select("id, item_id, uom, items(gst_pct)").in("id", sourceIds),
       supabase
         .from("purchase_order_lines")
         .select("indent_line_id")
@@ -129,6 +129,8 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
       item_id: source.item_id,
       quantity: line.quantity,
       uom: source.uom,
+      // Masters' GST for the item, where someone has entered one; the rate stays the buyer's.
+      gst_pct: (source.items as { gst_pct: number | null } | null)?.gst_pct ?? null,
       indent_line_id: source.id,
       created_by: user.id,
       updated_by: user.id,

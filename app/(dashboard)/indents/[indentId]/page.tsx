@@ -8,7 +8,7 @@ import { approvalBlocker, canEditIndent, estimatorHold, stillToBuy } from "@/lib
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { Printer } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
@@ -42,7 +42,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
     })),
   );
   const blocker = approvalBlocker(hold);
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({

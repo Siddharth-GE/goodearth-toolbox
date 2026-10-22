@@ -1,5 +1,6 @@
 import "server-only";
 
+import { workCategoryLabel } from "@/lib/masters/works";
 import { requireTool } from "@/lib/auth/access";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -12,6 +13,7 @@ import {
   classifyBudgetChooser,
   type BudgetCandidate,
   type EstimatePullState as EstimateVerdict,
+  factsForStage,
   factsForWork,
   groupEstimatePull,
   type IssuedRevision,
@@ -348,6 +350,9 @@ export type EstimatePull = {
   work: { id: string; label: string } | null;
   indent_work: { id: string; label: string } | null;
   other_work_material_count: number;
+  /** The stages (work categories) the estimate has materials under, in Masters' order. */
+  stages: { id: string; label: string }[];
+  stage: { id: string; label: string } | null;
 };
 
 /** One row per item, with what is already requested against the villa's estimates. Null when the estimate has no materials. */
@@ -356,6 +361,7 @@ export async function getEstimatePull(
   indentId: string,
   indentWorkItemId: string | null,
   allWorks: boolean,
+  stageId: string | null = null,
 ): Promise<EstimatePull | null> {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -401,8 +407,41 @@ export async function getEstimatePull(
   if (usable.length === 0) return null;
   const head = usable[0];
 
-  const workItemId = allWorks ? null : indentWorkItemId;
-  const offered = factsForWork(usable, workItemId);
+  // Each estimated work's stage, for the stage choice.
+  const estimatedWorkIds = [
+    ...new Set(usable.map((fact) => fact.work_item_id).filter((id): id is string => !!id)),
+  ];
+  const [stageWorks, stageCategories] = await Promise.all([
+    estimatedWorkIds.length
+      ? fetchAll<{ id: string; category_id: string }>((from, to) =>
+          supabase
+            .from("work_items")
+            .select("id, category_id")
+            .in("id", estimatedWorkIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    fetchAll<{ id: string; name: string; family: string; sort_order: number }>((from, to) =>
+      supabase
+        .from("work_categories")
+        .select("id, name, family, sort_order")
+        .order("sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const categoryOfWork = new Map(stageWorks.map((work) => [work.id, work.category_id]));
+  const usedCategories = new Set(categoryOfWork.values());
+  const stages = stageCategories
+    .filter((category) => usedCategories.has(category.id))
+    .map((category) => ({ id: category.id, label: workCategoryLabel(category) }));
+  const stage = stageId ? (stages.find((s) => s.id === stageId) ?? null) : null;
+
+  const workItemId = allWorks || stage ? null : indentWorkItemId;
+  const offered = stage
+    ? factsForStage(usable, categoryOfWork, stage.id)
+    : factsForWork(usable, workItemId);
   const otherWorkItems = new Set(
     usable
       .filter((fact) => workItemId && fact.work_item_id !== workItemId)
@@ -525,5 +564,7 @@ export async function getEstimatePull(
     work: workLabel(workItemId),
     indent_work: workLabel(indentWorkItemId),
     other_work_material_count: otherWorkItems.size,
+    stages,
+    stage,
   };
 }

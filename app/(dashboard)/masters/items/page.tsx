@@ -16,6 +16,7 @@ import {
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listItems, type ItemKind } from "@/lib/masters/items";
+import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { Package } from "lucide-react";
 import { ItemFormDialog } from "./_components/item-form-dialog";
@@ -28,7 +29,7 @@ export default async function ItemsPage({
   searchParams: Promise<{ q?: string; kind?: string; category?: string; page?: string }>;
 }) {
   const { q, kind, category, page } = await searchParams;
-  const [result, categories, brands, uoms] = await Promise.all([
+  const [result, categories, brands, uoms, gstRows] = await Promise.all([
     listItems({
       search: q,
       kind: kind as ItemKind | undefined,
@@ -38,10 +39,12 @@ export default async function ItemsPage({
     listItemCategories(),
     listBrands(),
     listActiveUomNames(),
+    listActiveGstRates(),
   ]);
   const { items, total, page: currentPage, pageSize, pageCount } = result;
   // Newest PO rate rise per item (0103).
   const raises = await latestPriceRaises(items.map((item) => item.id));
+  const gstRates = gstRows.map((row) => Number(row.rate));
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";
   const brandName = (id: string | null) =>
@@ -99,7 +102,7 @@ export default async function ItemsPage({
             </LinkButton>
           )}
         </form>
-        <ItemFormDialog categories={categories} brands={brands} uoms={uoms} />
+        <ItemFormDialog categories={categories} brands={brands} uoms={uoms} gstRates={gstRates} />
       </div>
 
       {items.length === 0 ? (
@@ -119,6 +122,7 @@ export default async function ItemsPage({
                 <TableHeaderCell>Category</TableHeaderCell>
                 <TableHeaderCell>Brand</TableHeaderCell>
                 <TableHeaderCell>Price</TableHeaderCell>
+                <TableHeaderCell>GST</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
@@ -141,11 +145,15 @@ export default async function ItemsPage({
                     {item.indicative_price != null ? formatMoney(item.indicative_price) : "—"}
                     <PriceRaiseHint raise={raises.get(item.id)} />
                   </TableCell>
+                  <TableCell className="text-muted">
+                    {item.gst_pct != null ? `${item.gst_pct}%` : "—"}
+                  </TableCell>
                   <TableCell>
                     <ItemFormDialog
                       categories={categories}
                       brands={brands}
                       uoms={uoms}
+                      gstRates={gstRates}
                       item={item}
                     />
                   </TableCell>

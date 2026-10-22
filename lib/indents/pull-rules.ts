@@ -223,6 +223,17 @@ export function factsForWork<T extends { work_item_id: string | null }>(
   return workItemId ? facts.filter((fact) => fact.work_item_id === workItemId) : facts;
 }
 
+/** A stage (work category) offers the materials of every work in it. */
+export function factsForStage<T extends { work_item_id: string | null }>(
+  facts: T[],
+  categoryOfWork: Map<string, string>,
+  categoryId: string,
+): T[] {
+  return facts.filter(
+    (fact) => fact.work_item_id !== null && categoryOfWork.get(fact.work_item_id) === categoryId,
+  );
+}
+
 /** The date to warn with, or null. Equal is not "after": an estimate goes official in one transaction, one clock reading. */
 export function workingChangedSince(
   submittedAt: string | null,

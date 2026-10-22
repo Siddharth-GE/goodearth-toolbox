@@ -31,7 +31,7 @@ The `data/` files importers read are gitignored: real business data, some of it 
 
 - `import-catalogue-sheet.ts` — the design team's catalogue workbook: pasted pictures and product links onto existing items (matched by content, never by the sheet's code — `lib/masters/catalogue-sheet.ts`), rows not there as new items. `--project <ref> --xlsx <path>`
 - `fetch-catalogue-images.ts` — finds the vendor's photo for items with only a link, then thumbnails every item with a picture into Storage. `--project <ref>` (`--limit 10` to try a few)
-- `import-masters-workbook.ts` — the founder's final masters workbook: vendors and contractors (bank details into the gated `vendor_payment_details`), works and their labour rates, material categories, materials, stages; deletes what it no longer lists, and stops while any record still points at it. `--project <ref> --xlsx <path>`
+- `import-masters-workbook.ts` — the founder's masters workbook: vendors and contractors (bank details into the gated `vendor_payment_details`), material categories, materials and their GST %, the estate's works and their labour rates. Deletes nothing: works it no longer lists are switched off, everything else is left and named. `read-xlsx.ts` is its reader. `--project <ref> --xlsx <path>`
 - The first imports (material master, vendors, contractors, works, catalogue, the Saarang register, staff) are in git history; `import-masters-workbook.ts` superseded them.
 
 ## App checks

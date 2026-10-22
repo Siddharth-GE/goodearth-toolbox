@@ -4,12 +4,11 @@ import { test } from "node:test";
 import {
   type SheetRow,
   VENDOR_COLUMNS,
+  gstFromCell,
   looseKey,
   materialCategoriesFromSheet,
   materialsFromSheet,
-  stagesFromSheet,
   vendorsFromSheet,
-  worksFromSheet,
 } from "./masters-workbook";
 
 const sheet = (header: string[] | null, body: (string | undefined)[][]): SheetRow[] => [
@@ -136,165 +135,6 @@ test("loose keys agree across punctuation and case, not across word order", () =
   assert.notEqual(looseKey("Santhosh K"), looseKey("K Santhosh"));
 });
 
-const WORK_HEADER = ["Code", "Work Description", "Scope", "Unit", "Price"];
-
-const WORKS = sheet(WORK_HEADER, [
-  ["FD", "Foundation"],
-  ["FD.1", "FD - Total Station Marking"],
-  [undefined, "FD - Rubble Foundation"],
-  ["FD.3", "FD - Dry Rubble Masonry"],
-  ["FD.4", "FD - Excavation for Rubble Foundation"],
-  ["FD.6", "FD - Dry Rubble Masonry", undefined, "M3", "1000"],
-  ["FD.11", "FD - Isolated Foundation"],
-  ["FD.14", "FD - PCC for Isolated Footing", "Including Shuttering and Levelling", "M3", "4000"],
-  ["FD.18", "FD - Pile Foundation"],
-  ["FD.24", "FD - Plinth Beam"],
-  ["SS", "Superstructure", undefined, undefined, "230"],
-  ["SS.2", "SS - Block Work up to GF Lintel Bottom", undefined, "0.12", "27.6"],
-  ["SS.2a", "SS - 1-Side Plastered Wall Masonry"],
-  ["SS.3", "SS - Ground Floor Lintel Beam RCC Work", undefined, "0.08", "18.399999999999999"],
-  ["SS.7b", "SS - 1-Side Plastered Wall Masonry"],
-  ["PF", "Pre-Finishes"],
-  ["PF", "PF - Plastering"],
-  ["PF.1", "PF - Plastering of Projections", undefined, "Rft", "125"],
-  ["PF.2", "PF - Bull Marking", undefined, "Lumpsum"],
-  ["PF.3", "PF - Joinery Frame Fixing", undefined, "Per Pali", "600"],
-  ["PF.16", "PF - Screed", undefined, "Sqft", "16"],
-  ["PF.2", "PF - Roof Fabrication"],
-  ["PF.2h", "PF - Moiner Sheet Laying for Roof Fabrication", undefined, "Sqft", "8"],
-  ["PF.2k", "PF - Stair Fabrication"],
-  ["F", "Finishes"],
-  ["F.1", "F - Internal Finishing Works"],
-  ["F.1.1", "F - Polishing Works"],
-  ["F.1.7", "F - Floor Tiling"],
-  ["F.1.8", "F - Floor Tiling", "Tile Laying (2x2, 2x4, 2x6) - Floor", "Sqft", "22"],
-  ["F.1.29", "PF - Joinery Frame Making - Door", undefined, "Pali", "600"],
-  ["F.1.38", "F - Joinery Shutter Making - Double Door", undefined, "Nos", "5500"],
-  ["F.1.40", "F - Joinery Shutter Making - Double Door", undefined, "Nos", "8000"],
-  ["F.2", "F - External Finishes"],
-  ["F.2.10", "F - Wooden Column"],
-  ["LP", "Landscape & Parking"],
-  ["LP.2", "LP - Pathway Stone Paving Works", undefined, "SFT", "75"],
-  ["MEP", "MEP", undefined, undefined, "135"],
-  ["MEP.11", "Snagging", undefined, "0.05", "6.75"],
-  [undefined, "MEP - Electrical Connection Checking"],
-]);
-
-const works = worksFromSheet(WORKS);
-const item = (code: string) => {
-  const found = works.items.find((i) => i.code === code);
-  assert.ok(found, `${code} should be a work`);
-  return found;
-};
-
-test("category rows become the categories, prefixes come off the names", () => {
-  assert.deepEqual(
-    works.categories.map((c) => `${c.code} ${c.name}`),
-    [
-      "FD Foundation",
-      "SS Superstructure",
-      "PF Pre-Finishes",
-      "F Finishes",
-      "LP Landscape & Parking",
-      "MEP MEP",
-    ],
-  );
-  assert.equal(item("FD.1").name, "Total Station Marking");
-  assert.equal(item("FD.1").group, null);
-});
-
-test("the headings are the groups, each with a code of its own", () => {
-  assert.deepEqual(
-    works.groups.map((g) => `${g.code} ${g.name}`),
-    [
-      "FD.3 Rubble Foundation",
-      "FD.11 Isolated Foundation",
-      "FD.18 Pile Foundation",
-      "FD.24 Plinth Beam",
-      "PF.0 Plastering",
-      "PF.20 Roof Fabrication",
-      "F.1 Internal Finishing Works",
-      "F.2 External Finishes",
-    ],
-  );
-  assert.equal(item("FD.4").group, "FD.3");
-  assert.equal(item("FD.14").group, "FD.11");
-  assert.equal(item("PF.1").group, "PF.0");
-  assert.equal(item("F.1.8").group, "F.1");
-  assert.equal(item("F.2.10").group, "F.2");
-});
-
-test("Roof Fabrication's PF.2 clash: Bull Marking keeps PF.2, the roof works become PF.20a…", () => {
-  assert.equal(item("PF.2").name, "Bull Marking");
-  assert.equal(item("PF.20h").name, "Monier Sheet Laying for Roof Fabrication");
-  assert.equal(item("PF.20h").group, "PF.20");
-  assert.ok(!works.items.some((i) => i.code === "PF.2h"));
-});
-
-test("a group stops where its kind of work stops", () => {
-  assert.equal(item("PF.16").group, null); // Screed is not Plastering
-  assert.equal(item("PF.20k").group, null); // Stair Fabrication is not Roof Fabrication
-});
-
-test("headings and repeats listed as works are left out, with a reason", () => {
-  for (const code of ["FD.3", "F.1.1", "F.1.7"]) {
-    assert.ok(!works.items.some((i) => i.code === code), `${code} should not be a work`);
-    assert.ok(works.notes.some((n) => n.includes(`${code} "`)));
-  }
-});
-
-test("the uncoded row under Snagging becomes MEP.11b", () => {
-  assert.equal(item("MEP.11b").name, "Electrical Connection Checking");
-});
-
-test("scope joins the name, and the floor separates the sheet's repeated names", () => {
-  assert.equal(item("F.1.8").name, "Floor Tiling — Tile Laying (2x2, 2x4, 2x6) - Floor");
-  assert.equal(item("FD.14").name, "PCC for Isolated Footing — Including Shuttering and Levelling");
-  assert.equal(item("SS.2a").name, "1-Side Plastered Wall Masonry - GF");
-  assert.equal(item("SS.7b").name, "1-Side Plastered Wall Masonry - FF");
-  assert.equal(item("F.1.29").name, "Joinery Frame Making - Door");
-});
-
-test("the rate book: units mapped, the SS and MEP shares read as a rate per sqft", () => {
-  assert.deepEqual([item("FD.6").uom, item("FD.6").labour_rate], ["cum", 1000]);
-  assert.deepEqual([item("PF.1").uom, item("PF.1").labour_rate], ["rft", 125]);
-  assert.deepEqual([item("PF.2").uom, item("PF.2").labour_rate], ["lumpsum", null]);
-  assert.deepEqual([item("PF.3").uom, item("F.1.29").uom], ["pali", "pali"]);
-  assert.deepEqual([item("LP.2").uom, item("LP.2").labour_rate], ["sqft", 75]);
-  assert.deepEqual([item("SS.2").uom, item("SS.2").labour_rate], ["sqft", 27.6]);
-  assert.deepEqual([item("SS.3").uom, item("SS.3").labour_rate], ["sqft", 18.4]);
-  assert.deepEqual([item("SS.2a").uom, item("SS.2a").labour_rate], [null, null]);
-  assert.ok(works.notes.some((n) => n.startsWith("SS:")));
-});
-
-test("the same name twice under one heading is kept and pointed out", () => {
-  assert.ok(works.notes.some((n) => n.includes("F.1.38 and F.1.40")));
-});
-
-test("a work with no code, an unknown unit or a reused code stops the run", () => {
-  const withRow = (row: (string | undefined)[]) =>
-    sheet(WORK_HEADER, [...WORKS.slice(1).map((r) => r.cells), row]);
-  assert.throws(() => worksFromSheet(withRow([undefined, "MEP - Earthing"])), /no code/);
-  assert.throws(
-    () => worksFromSheet(withRow(["MEP.12", "MEP - Earthing", undefined, "Bucket", "5"])),
-    /unknown unit/,
-  );
-  assert.throws(
-    () => worksFromSheet(withRow(["MEP.11", "MEP - Earthing"])),
-    /MEP.11 is used twice/,
-  );
-});
-
-test("a fix whose row has gone from the sheet stops the run", () => {
-  const without = sheet(
-    WORK_HEADER,
-    WORKS.slice(1)
-      .map((r) => r.cells)
-      .filter((cells) => cells[1] !== "PF - Roof Fabrication"),
-  );
-  assert.throws(() => worksFromSheet(without), /no longer has PF.2/);
-});
-
 const CATEGORIES = materialCategoriesFromSheet(
   sheet(null, [
     ["CAR", "Carpentry"],
@@ -380,10 +220,14 @@ test("materials: the same name and unit twice is kept and pointed out", () => {
   assert.ok(notes.some((n) => n.includes("PLD/80 and PLD/81")));
 });
 
-test("stages, in the sheet's order, each once", () => {
-  assert.deepEqual(
-    stagesFromSheet(sheet(null, [["Engineering Consultation"], ["Foundation "], [undefined]])),
-    ["Engineering Consultation", "Foundation"],
+test("GST: 18%, 18 and Excel's 0.18 are one rate; a blank cell is no figure", () => {
+  assert.equal(gstFromCell("18%", "r"), 18);
+  assert.equal(gstFromCell("18", "r"), 18);
+  assert.equal(gstFromCell("0.18", "r"), 18);
+  assert.equal(gstFromCell("0", "r"), 0);
+  assert.equal(gstFromCell(undefined, "r"), null);
+  assert.throws(
+    () => gstFromCell("eighteen", "Material row 4"),
+    /Material row 4: "eighteen" is not a GST rate/,
   );
-  assert.throws(() => stagesFromSheet(sheet(null, [["MEP"], ["mep"]])), /twice/);
 });

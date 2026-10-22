@@ -5,6 +5,7 @@ import {
   classifyBudgetChooser,
   classifyDesignDrift,
   classifyEstimatePull,
+  factsForStage,
   factsForWork,
   groupEstimatePull,
   requestedByItem,
@@ -295,4 +296,23 @@ test("the working estimate's notice shows only for a change after the official c
   );
   assert.equal(workingChangedSince(official, null), null, "the villa has no working estimate");
   assert.equal(workingChangedSince(null, "2026-10-05T09:30:00+00:00"), null);
+});
+
+test("a stage offers every work in it; a fact with no work belongs to no stage", () => {
+  const facts = [
+    { work_item_id: "footing", item_id: "cement" },
+    { work_item_id: "plinth", item_id: "steel" },
+    { work_item_id: "slab", item_id: "sand" },
+    { work_item_id: null, item_id: "jelly" },
+  ];
+  const stageOf = new Map([
+    ["footing", "foundation"],
+    ["plinth", "foundation"],
+    ["slab", "superstructure"],
+  ]);
+  assert.deepEqual(
+    factsForStage(facts, stageOf, "foundation").map((fact) => fact.item_id),
+    ["cement", "steel"],
+  );
+  assert.equal(factsForStage(facts, stageOf, "finishes").length, 0);
 });

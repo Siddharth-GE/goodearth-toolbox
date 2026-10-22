@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import { mondayOf } from "./ledger";
 import { roundPaise } from "@/lib/line-money";
 
-// Rules live in the database: bill_settlement_guard (money only against an approved bill, never past its total; an advance only from the same contractor and never past what is left), the paid-in-full trigger, and the cash-request guards.
+// Rules live in the database: bill_settlement_guard (money only against an approved bill, never past its total; an advance, to a contractor or a supplier, only from the same vendor's bills and never past what is left), the paid-in-full trigger, and the cash-request guards.
 // Money is append-only. Each guard's refusal is written for a person, so it is passed on as is.
 
 const done = (): ActionState => {
@@ -94,7 +94,7 @@ export async function recordAdvance(input: {
   cashRequestItemId?: string | null;
 }): Promise<ActionState> {
   const user = await requireTool("/bills");
-  if (!input.vendorId) return { error: "Pick the contractor." };
+  if (!input.vendorId) return { error: "Pick the contractor or supplier." };
   if (!input.projectId) return { error: "Pick the project." };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { error: "The amount must be more than zero." };
@@ -173,7 +173,7 @@ export async function addAdvanceToCashRequest(
   },
 ): Promise<ActionState> {
   const user = await requireTool("/bills");
-  if (!input.vendorId) return { error: "Pick the contractor." };
+  if (!input.vendorId) return { error: "Pick the contractor or supplier." };
   if (!input.projectId) return { error: "Pick the project." };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { error: "The advance must be more than zero." };

@@ -12,6 +12,7 @@ import { budgetReportLines } from "./datasets/budget-report-lines";
 import { crmMilestones } from "./datasets/crm-milestones";
 import { crmReceipts } from "./datasets/crm-receipts";
 import { goodsReceiptLines } from "./datasets/goods-receipt-lines";
+import { stockIssueLines } from "./datasets/stock-issue-lines";
 import { stock } from "./datasets/stock";
 import { selectionLines } from "./datasets/selection-lines";
 import { relayChains } from "./datasets/relay-chains";
@@ -28,6 +29,7 @@ export const DATASETS: Record<string, DatasetDef> = {
   crm_milestones: crmMilestones,
   crm_receipts: crmReceipts,
   goods_receipt_lines: goodsReceiptLines,
+  stock_issue_lines: stockIssueLines,
   stock,
   selection_lines: selectionLines,
   relay_chains: relayChains,

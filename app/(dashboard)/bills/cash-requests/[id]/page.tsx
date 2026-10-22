@@ -109,9 +109,10 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
             <Heading>Add an advance</Heading>
             <AddAdvance
               requestId={request.id}
-              contractors={vendors
-                .filter((vendor) => vendor.is_contractor)
-                .map(({ id, name }) => ({ id, name }))}
+              contractors={[
+                ...vendors.filter((vendor) => vendor.is_contractor),
+                ...vendors.filter((vendor) => !vendor.is_contractor),
+              ].map(({ id, name }) => ({ id, name }))}
               projects={options.projects.map(({ id, name }) => ({ id, name }))}
               workOrders={workOrders.map((order) => ({
                 id: order.id,

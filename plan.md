@@ -1,3 +1,145 @@
+# OS process updates — the build plan
+
+## Context
+
+The operations team sent "Requested OS Process Updates" (18 asks across Estimates & Procurement, Supervisor, Commercial, Work Master), a revised masters workbook (`Tb\1.xlsx`), the site checklists workbook (`Tb\3.xls`), and three notes on what the current Masters is missing (SS/MEP not divided into groups; Infra, Maintenance and Mobilisation works absent; no GST column on items). `Tb\later.xlsx` (steel reinforcement abstracts, tile quantities per plot) is named "later" and is **parked** — not in this plan.
+
+Staging's database is becoming production (`TODO.md`), so **nothing here deletes a master or a record**: works are added, re-parented, re-coded or deactivated, never removed. Every migration is additive, applied to staging only (`0131`+), vetted by the founder on `staging.goodearthkannur.org`, then shipped on their word.
+
+The founder's decisions (2026-10-22):
+
+1. **Villa works adopt the Infrastructure sheet's new numbering** (`FD.02.04`, `SS.01.02`). That sheet's "Buildings" section is the master for villa works; the "Villas - Work" sheet is not read.
+2. **Each SS/MEP group gets one package work** carrying the ₹/sqft; sub-works are unpriced site-tracking works.
+3. **Order: Masters first**, then the small screen fixes, then the three builds.
+4. **Budget vs actual is visible to `/estimator` and `/bills` holders** (plus `/reporter`), through a money view gated in its own WHERE.
+
+**Approved by the founder 2026-10-22.** Work on `feature/os-updates` in its own worktree (`../toolbox-os`); one pull request per wave. Ticks below are the live board.
+
+## What already exists — remind the founder, build nothing
+
+| Ask                                                                                     | Status            | Where                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E&P 1 Material requests linked to approved estimates, separate approval for unbudgeted  | **Done** (`0113`) | A line the estimate doesn't cover needs a reason and the estimator's yes in Site check before the approver can approve. Only an "Urgent" mark is missing (Wave 2).                                              |
+| E&P 2 Duplicate rows in the Estimator                                                   | **Done**          | Measurement sheet: **Duplicate** on a row, **Copy rows to another work**. A work can appear once per estimate by design (`unique (estimate_id, work_item_id)`).                                                 |
+| E&P 3 Indents from the estimate for a stage                                             | **Partly**        | Pull is per work, with "Show every work". A stage (category) filter is Wave 2.                                                                                                                                  |
+| E&P 4 Consolidated POs, traceable per indent                                            | **Done**          | A General PO gathers several villas' approved indents; every PO line keeps `indent_line_id`; the indent shows "still to buy".                                                                                   |
+| E&P 6 Highest PO rate as budgeting rate; actuals at purchase rate; budget versions kept | **Done**          | `0103` raises `items.indicative_price` on a dearer PO, never lowers; `0108` batches carry the PO rate so issues are valued at what was paid; official estimates are numbered and superseded, never overwritten. |
+| Commercial 3 Additional charges separate from the rate                                  | **Partly**        | Per-line "Other charges" (after GST) exist on PO and bill lines and print. A document-level charge with its own GST is Wave 2.                                                                                  |
+| Commercial 5 Advances to suppliers                                                      | **UI only**       | The database already allows any vendor; only the picker filters to contractors. Wave 2.                                                                                                                         |
+
+Everything else below is new.
+
+## Wave 1 — Masters: the works list and GST on items `[Opus orchestrates]`
+
+- [x] [Opus] `0131` applied to staging; importer, readers and tests; Masters works by family, items GST, pickers, PO GST; docs. Commits 18cbe59, a97c126.
+- [ ] [Founder] Read the importer's dry run (246 of 270 works kept, 24 switched off, 444 new; no vendor or material changes), then `--commit` on staging.
+- [ ] [Founder] After the import: send the works list to SketchUp again, and re-tag any model using old codes (FD.14 is now FD.03.03).
+- Found in the sheet, for the founder: the Finishes remarks sit one row low (fixed in code); FD.04.06 "Plinth Beam" and its works sit under FD.04 Pile Foundation; Engineering Consultation for villas (ENC.1–3) has no place in the new sheet and is switched off.
+
+### Migration `0131_works_families_and_item_gst.sql` `[Opus drafts, Fable reviews — touches Masters' open tables, no RLS change]`
+
+- `work_categories.family text` — the sheet's Stage column: `Site Mobilisation`, `Infrastructure - Civil`, `Infrastructure - MEP`, `Buildings`, `Maintenance`. CHECK on those five. Backfill existing categories as `Buildings`.
+- `items.gst_pct numeric null check (gst_pct >= 0 and gst_pct <= 100)` — null means "not entered". Validated against active `gst_rates` in the action, no FK (the PO line copies the number the same way).
+- Re-run safe, ends in asserts. Types regenerated (`npm run db:types:staging`) and committed with it.
+
+### Importer rewrite `[Opus — the matching; Sonnet — the sheet reading]`
+
+`scripts/import-masters-workbook.ts` + `lib/masters/masters-workbook.ts` (pure, tested). The workbook layout changed, so:
+
+- **Sheets read:** `Vendor & Contractor Names` (unchanged), `Material Master` (now with `GST %` in column G — read it when present; `18%` or `18`), `Material Category`, `Infrastructure - Work ` (note the trailing space — match sheet names trimmed), `Mobilisation - Works`, `Maintenance - Works`. The `Stages` sheet is gone — **construction stages are no longer touched by the importer**; the `Villas - Work` and `Project IDs` sheets are not read.
+- **Row classification in the works sheets** is structural, replacing the old code-pattern rules: column A = family (carried down), column C filled = a heading (a category when its code is blank, a group when it has a code), column D filled = a work. A category's code is its children's prefix (`FM` from `FM.01`); for `Buildings - Foundation` style rows the stage itself is the category (`FD`, name `Foundation`). `Mobilisation - Works` → category `SM`, family `Site Mobilisation`, ungrouped works `SM.1`–`SM.12`. `Maintenance - Works` → category `MAIN` "Maintenance", family `Maintenance`, its section rows become groups coded `MAIN-1`…`MAIN-10`, works `MAIN.1`–`MAIN.50`.
+- **Package works:** a group heading whose Unit column is a percentage and whose rate is filled (every SS and MEP group) also yields a work coded `<group>.00` (`SS.01.00`), named after the heading, `uom = 'sqft'`, `labour_rate` = the sheet's rate, `model_measure = 'manual'`. The percentage itself is not stored (the rate is already the share).
+- **Matching old rows to new (the hard part):** codes changed wholesale, so match each existing work to a new row by **category + loose name** (`looseKey`, with `2-Side`/`Two-Sided` and `&`/`and` normalised), a hand table `WORK_REMAPS` in `masters-workbook.ts` for the rest (old code → new code), matched on code AND name like the existing fix tables so a sheet edit fails loudly. Today's priced SS/MEP heading works (`SS.3` "Ground Floor Lintel Beam RCC Work" 18.4 …) map to the new package works. A matched work keeps its **id** (every FK — estimates, logs, issues, drawings, work orders — follows) and takes the new code, name, group and sort order. Codes are swapped through temporary values inside the one transaction (old `SS.3` is a sub-work's new code).
+- **Never delete.** An old work with no match is **deactivated** and listed; so is an old group or category no longer named. `SS.2A` (under ENC), `SS.AS`, `SS.A` — the hand-added leftovers — are matched or deactivated like any other. The `blockers()` stop and the count assertion are replaced by: asserts that every active work in the database is in the sheet, every sheet work exists, and no row was deleted.
+- **Rate book:** written as today (`estimator_work_info` upsert) for rows with a unit; a rate the sheet no longer gives is **left alone** (not deleted) and listed. The `model_measure` backfill is re-keyed to the new codes (`FD.03.04` base and sides; `FD.03.05`, `FD.04.04`, `FD.04.11`–`FD.04.14` and every sqft package work manual).
+- **Materials:** as today, plus `gst_pct` from column G **only when the cell is filled** — blank keeps what Masters holds (the founder enters GST by hand). Deletion of a material no longer listed stays as today (the sheet is the same 1,118).
+- **Dry run prints the whole tree** — family → category → group → work, with `=` kept, `~` renamed/re-coded (old → new), `+` new, `−` deactivated, and a "could not match" list. **The founder reads the dry run before `--commit`.** Backup to `data/backups/` first, as today.
+
+### Screens `[Sonnet]`
+
+- **Masters → Works:** group by family, then category, then group; a family switch at the top; package works marked. Edit forms gain the family on a category.
+- **Masters → Items (materials):** a GST % column and field (a select over active `gst_rates`, blank allowed). `lib/masters/items.ts` / `items-actions.ts` (two-file rule).
+- **Every work picker** (Indents, Supervisors, Inventory issue/receipt, Estimator add-works, Bills work orders, Design Management sets): `<optgroup>` per category already; add the family as a prefix on the category label (`Buildings · Foundation`). The list grows from 270 to ~780 works, so the pickers that are plain `<select>`s stay; nothing new.
+- **Purchase Orders → From an indent:** GST suggestion order becomes **the item's `gst_pct` when set, else the last PO's**; the pool-line grid defaults GST from the item too (`lib/purchase-orders/from-indent.ts`, `line-grid.tsx`).
+- **Estimator:** "Download works list for SketchUp" carries the new codes; the From-the-model page's refusal message says to re-send the list (`estimator/PLAN.md` decision 12 updated). The Goodearth QS plugin (outside this repo) matches on code, so the founder re-sends the works list once after the import.
+
+### Docs
+
+`masters/PLAN.md` (the workbook section rewritten: what each sheet gives, the never-delete rule, families, package works, GST), `estimator/PLAN.md` (package works, re-send the list), `STATUS.md` Masters line, `TODO.md` item 3 ("rebuild the rate book's materials") stays.
+
+### Verification
+
+`npm test` (new tests for the row classifier, package works, name matching, GST cell), dry run against staging and read the tree, `--commit`, then open Masters → Works (families, SS/MEP groups with package works), Masters → Items (set a GST, see it), Estimator → Rate book (SS packages priced), one existing estimate (lines still named right), Supervisors villa page (labour log work picker), Indents new (work picker). Re-send the works list to SketchUp and import a takeoff once.
+
+## Wave 2 — the small fixes `[Sonnet builds, Opus vets each commit]`
+
+- [x] [Opus] Built with no migration, on `feature/os-updates` with Wave 1: 2 (stage links on the pull page), 7 (the Reporter dataset; the Inventory Items toggle is still to do), 9 (the order picker searches in the browser, not yet on the server), 10 (label "Contractor or supplier"; the Contractors page keeps its name), 11 (its own search form, since the page's toolbar owns `q`).
+- [ ] [Opus] 1, 3, 4, 5, 6, 8 on `feature/os-updates-2`: their migration changes guard and definer functions in Indents, Estimator, Supervisors and Bills, so it reaches `db:apply` only after a Fable review (`MODELS.md`).
+
+One migration, `0132_small_fixes.sql` `[Opus drafts; Fable reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
+
+1. **Urgent indents** (E&P 1). `indents.is_urgent boolean default false`. A tick on the indent form, a red "Urgent" badge on the list, the approver's list sorted urgent-first, the welcome count. Editable while draft only (`indents_guard` tuple). The push notification text is unchanged.
+2. **Indent pull by stage** (E&P 3). On `/indents/[id]/pull-estimate`, a **Stage** select (work categories present on the official estimate) beside "Show every work"; `factsForWork` gains a category filter in `lib/indents/pull-rules.ts` (tested). No migration.
+3. **Deduction rows** (E&P 7). `estimator_estimate_line_measurements.is_deduction boolean default false`; the four `> 0` checks stay — a deduction is a positive row subtracted, so "2 × 1.2 × 2.1, deduct" reads plainly and prints with a minus. `measurementQuantity` / `sheetTotal` in `calc.ts` subtract deductions (tested); `syncLineQty` still refuses a total not above zero; model rows are never deductions (`0118`'s import never sets it); the copy function `estimator_copy_estimate_contents` must carry the column (assert it, as `0118` did for `from_model`). A "Deduct" tick on the row form and a −/opening label in the sheet. `estimator/PLAN.md` decision 6 updated ("additions only" goes).
+4. **Piece-work without a work order** (Supervisor 1). `send_labour_logs_to_bill()` accepts a null work order for piece-work: the bill is then kind `nmr` with the contractor as vendor, lines priced from the rate book's `work_labour_rate_facts` as the suggestion (no order line to suggest from). Send to Bill's picker becomes optional with the sentence "No work order — billed as a direct labour bill." `lib/bills/labour-billing.ts` tests cover both. Fable reviews the function (it is a definer that checks `/bills`).
+5. **Work classification** (Supervisor 4). `work_class text not null default 'standard' check in ('standard','additional','rework')` on `labour_logs` (added to `labour_logs_one_per_day` and the billed guard's tuple), `stock_issues` (header, beside the work — one issue, one work, one class), and `issue_requests` (so the supervisor's request carries it and Fulfil pre-fills it). Three-way segmented control on the labour form, the request form and the issue form; shown on the villa page's labour list, the issue note, Send to Bill's rows and the bill line description. `0104`'s `labour_logs_shape_matches_kind` untouched.
+6. **Invoice number from the GRN** (Commercial 1). `goods_receipts.invoice_no text`, `invoice_date date` (nullable; challan stays). The receive form asks for them. The bill form, once a PO is picked, lists that PO's receipts' invoice numbers and dates (not yet on an approved bill) and pre-fills when there is exactly one. Bills reads `goods_receipts` directly — a new read in STATUS.md's contract row for Bills. Shown on the receipt page.
+7. **Material issue report by location** (Commercial 2). A Reporter dataset `stock_issue_lines`: project, issue no, date, from store, to (plot or store), work, work class, item, code, quantity, unit — money-free, built on the open stock tables (`lib/reporter/datasets.ts`, `datasets/types.ts`). Plus an **Items** toggle on `/inventory/issues` that lists lines instead of headers under the same filters (plot, store, dates).
+8. **Document-level additional charges** (Commercial 3). `purchase_orders.charges_amount numeric`, `charges_gst_pct numeric`, `charges_note text`; the same three on `bills`. `lib/purchase-orders/math.ts` and `lib/bills/math.ts` add "Additional charges" and their GST as their own `summaryRows` entries (tested); `bill_lines_roll_up` adds them to the header totals; PO and bill prints show them under the lines; `po_billing_totals` includes them. The PO page and bill page get a small "Additional charges" box (amount, GST %, what for). The per-line "Other" column stays. `purchase-orders/PLAN.md` rule 5 and `bills/PLAN.md` rule 3 updated.
+9. **Bill entry PO-first** (Commercial 4). On `/bills/new`, for PO and work-order bills the **Against** picker comes first (every billable PO/order, searchable by number and vendor, moved to a server-side search like `/api/catalogue` — closes the open item in `bills/PLAN.md`), the vendor fills from it and shows read-only. NMR keeps the vendor picker. `create_bill()` already takes the vendor from the anchor; no migration.
+10. **Advances to any vendor** (Commercial 5). The advance form's picker lists every active vendor, contractors first, labelled "Vendor"; messages say "Pick the vendor"; `/bills/contractors` becomes "Advances" in its heading and lists every vendor with an advance. Recovery already works against any of that vendor's bills. No migration.
+11. **Receive screen PO filter** (Commercial 6). The "Awaiting delivery" list gets the page's existing `ListToolbar` (search on PO number and vendor, project, villa) through `listReceivablePos` in `lib/inventory/receipts-queries.ts`. No migration.
+
+Verification per fix: the probe account (single grant) presses the one button; trial SQL for 4 and 5 under `set local role authenticated` (BUGCATCHER #19). Founder's checklist in the final message of each commit.
+
+## Wave 3 — the three builds
+
+### 3a. Site checklists `[Fable designs here; Opus the tables; Sonnet the screens]`
+
+Supervisors-owned. Migration `0133_site_checklists.sql`.
+
+- `checklist_templates` (name, work_refs text, note, sort_order, is_active) and `checklist_template_items` (template_id, sort_order, text, origin `source|added|review`, review_note). Loaded by `scripts/import-checklists.ts` from the workbook saved as `.xlsx` (the repo's reader is xlsx-only; the founder saves `3.xls` as `.xlsx` once): the ten checklists (Blockwork 21 items … Roof Slab Electrical 33), and **Concrete grade check** as an eleventh whose items are its works, each answered with the grade in Remarks. Templates are Masters-like reference data but live with Supervisors (they are the site's); editable in **Supervisors → Checklists** by `/supervisors` holders; reads open to signed-in (`session_is_verified()` floor).
+- `site_checklists` (plot_id, template_id, location text, drawing_revision text, started_on, finished_on, inspected_on, status `open|signed_off`, checked_by, signed_off_by/at, attachment_path) and `site_checklist_items` (checklist_id, template_item_id, status `not_checked|pass|fail|na`, remarks). RLS `/supervisors` on every verb, draft-only guard once signed off. One attachment through `lib/uploads/` (the phone camera exists) into a private bucket, for the test certificate the concrete-grade sheet asks for.
+- Phone screens on the villa page: a **Checklists** section — start one (pick template, location/floor), tick items (Pass / Fail / N/A, remark), review notes shown in amber as hints, sign off. A print later if asked.
+- `supervisors/PLAN.md` gains the section; STATUS.md the line.
+
+### 3b. Site confirms what the store issued `[Fable designs here; Opus the function; Sonnet the screens]`
+
+Migration `0134_site_receipt.sql`. Inventory's tables, written by Supervisors through one definer — a new cross-tool write for `SECURITY.md`'s list.
+
+- `stock_issues.site_confirmed_at`, `site_confirmed_by`, `site_note`; `stock_issue_lines.received_quantity numeric null` (null = not yet confirmed; shortage = quantity − received). Same three header columns and per-line `received_quantity` on `goods_receipts(_lines)` for direct-to-site deliveries.
+- `confirm_site_receipt(p_issue_id or p_receipt_id, p_lines jsonb, p_note)`: definer, checks `has_app('/supervisors')`, the destination is a plot, not already confirmed; writes only those columns; a shortage line needs a note. Execute revoked from `public, anon`. `stock_issues_guard` / `goods_receipts_guard` admit exactly these columns moving under the function's transaction-local flag (the `0113` pattern). Trial as the probe with `/supervisors` only.
+- Supervisors villa page: **Deliveries to this villa** — issues and direct deliveries not yet confirmed, each opening a confirm form (quantities pre-filled, editable; a shortage asks why). Inventory's issue note and receipt page show "Confirmed by … on …" or the shortage in amber. Stock stays what was issued (quantities, never money); the shortage is a note for the store-keeper and accounts, not a movement — an adjustment stays Inventory's.
+- STATUS.md: Supervisors' row adds the write; `SECURITY.md` cross-tool list; `inventory/PLAN.md` and `supervisors/PLAN.md`.
+
+### 3c. Budget vs actual, and stage payments `[Fable designs here and reviews the view; Opus builds the view and the page; Sonnet the work-order shortcut]`
+
+Migration `0135_villa_cost_facts.sql` — **a money view**, `money: true` in `scripts/view-manifest.ts`, gated in its own WHERE to `has_app('/estimator') or has_app('/bills') or has_app('/reporter')`, writes revoked. `SECURITY.md` _Money stays confined_ records that the Estimator now reads committed and actual money through this one view, by the founder's decision 2026-10-22.
+
+- `villa_cost_facts`: one row per (unit/plot, work category, work item, kind): kind `po_committed` (issued/completed PO lines of the villa's indents: taxable value, from `purchase_order_lines` through `indent_lines.indent_id → indents.work_item_id`, general POs attributed through the indent's villa), `material_issued` (issue lines to the plot valued at their batch rates from `goods_receipt_line_rates`; "no batch" lines carry null, shown as unknown), `wo_committed` (approved work-order lines by work), `labour_billed` (bill lines by work: work-order bills per line, NMR bill lines by the log's work), `po_billed` (material bill lines by the PO line's indent work). Every figure before GST. Null never zero (BUGCATCHER #13).
+- **Estimator → villa → Budget vs actual** (`/estimator/villas/[unitId]/budget`): per category and per work: Estimated (the official estimate's frozen `estimator_estimate_line_costs`, labour and material apart), Committed (PO + work orders), Actual (material issued, labour billed), variance; a totals row; the official's number and date at the top; "unknown" where a figure cannot be known. `lib/estimator/budget-vs-actual.ts` pure and tested. Also reachable from Bills (a link on a villa's bills list) since `/bills` sees the view — the page's `requireTool` accepts either grant (the one page in the Estimator that does; written down in `estimator/PLAN.md`).
+- **Stage-based payments for Superstructure and MEP:** a work order's lines are already work + unit + quantity + rate, so the SS/MEP package works (Wave 1) are the stages. Build: (i) on the work-order form, **"Add every package work of a category"** — picks Superstructure or MEP, adds one line per package work at the rate book's rate with the villa's built-up sqft typed once (or read from the official estimate's package lines when present); (ii) `bill_lines.labour_contract_line_id` (nullable FK) so a bill names which stage line it bills, a `work_order_line_billing_facts` view (money, `/bills` or `/reporter`) of value and billed so far per line, the work-order page showing billed/remaining per stage, and `linesFromWorkOrder` pre-filling each line at value − billed so far (over-billing still warns, never blocks). `bills/PLAN.md` rule 6 and `SECURITY.md`'s window list updated.
+
+## Migrations and numbering
+
+Next free number on every remote branch is `0131` (`origin/staging` and `origin/feature/native-apps` end at `0130`). `0131` Wave 1, `0132` Wave 2, `0133`–`0135` Wave 3 — each applied to staging first with `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, dry-run with a trial as the probe where a guard or definer changes (`0132` items 4–5, `0134`, `0135`). Types committed with each. `db:check-views` and `db:check-policies` on every pull request.
+
+## Branch and sessions
+
+`feature/os-updates` off `staging`, in its own worktree (another session may switch branches). One pull request per wave into `staging`; the founder vets each on `staging.goodearthkannur.org` before the next wave's PR. Fable's approval pass at each merge unless the founder waives it in so many words.
+
+## Verification (end to end, after each wave)
+
+- CI green (`gh run list`), then **open the pages** on the preview as the probe (single grant), not as admin.
+- Wave 1: Masters → Works shows five families; Superstructure has 11 groups each with a package work priced in ₹/sqft; Items shows a GST column; Estimator → Rate book lists packages; an old estimate's lines keep their names; SketchUp list re-sent and a takeoff imported.
+- Wave 2: raise an urgent indent and see it first in the approver's list; pull an estimate for one stage; add a deduction row and see the total fall; send piece-work logs to bill with no work order; log labour as Rework and see it on Send to Bill; record a GRN with an invoice number and see it offered on the bill; Reporter's new dataset filtered to one plot; a PO with ₹1,500 freight at 18% printing right; the bill form picking the PO first; an advance to a supplier recovered from their material bill; the receive screen searched by PO number.
+- Wave 3: start a Blockwork checklist on a phone, fail one item with a remark, attach a photo, sign off; confirm a store issue short by two bags and see the shortage on the issue note; open a villa's Budget vs actual as an estimator and as a bills holder, and read the unknown cases aloud; a Superstructure work order with 11 stage lines, two bills against two stages, the order showing billed and remaining.
+
+## Parked
+
+- `later.xlsx` (steel abstracts per plot, tile quantities): a reinforcement takeoff sheet in the Estimator, when the founder asks.
+- A checklist print; checklists for Infra works; per-supervisor villa scoping (`TODO.md` open question).
+
 # Native apps on iPhone and Android
 
 **Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2, A4, B and D's camera are on staging (#112, #113, #115, #116); C (push) is built on `feature/native-apps`. **Next, unless the founder says otherwise: the iPhone (A3)**, once Apple's enrolment is through. Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\kaadal-toolbox\toolbox-native`, beside the main folder), brought level with `staging` first; each piece ends in a pull request, merged only on the founder's word. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).

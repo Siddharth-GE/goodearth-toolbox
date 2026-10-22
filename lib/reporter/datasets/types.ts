@@ -24,6 +24,7 @@ export const KNOWN_SOURCES = [
   "crm_milestone_facts",
   "crm_receipt_facts",
   "goods_receipt_lines",
+  "stock_issue_lines",
   "stock_by_location",
   "selection_lines",
   "pusher_chain_state",
