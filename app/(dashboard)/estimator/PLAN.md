@@ -59,4 +59,4 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 
 ## Later, if asked
 
-A villa comparison grid (villas down, works across, to catch a mistyped measurement); a work-done record (measurement book) — the only honest basis for checking material against progress and paying labour by measured work; estimate against actual on the money side (POs, bills); an estimate PDF and a rate analysis print, both rendering `groupLineCosts` / `computeLine`; "where does the cement go" usage filters; Excel paste; wastage and contingency; deduction rows; tidying the 172-work list (a Masters job).
+A villa comparison grid (villas down, works across, to catch a mistyped measurement); a work-done record (measurement book) — the only honest basis for checking material against progress and paying labour by measured work; estimate against actual on the money side (POs, bills); an estimate PDF and a rate analysis print, both rendering `groupLineCosts` / `computeLine`; "where does the cement go" usage filters; Excel paste; wastage and contingency; tidying the 172-work list (a Masters job).
