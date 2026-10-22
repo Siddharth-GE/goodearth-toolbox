@@ -108,6 +108,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               <FileDown className="size-4" />
               Print
             </LinkButton>
+            {bill.villa_unit_id && (
+              <LinkButton
+                href={`/estimator/villas/${bill.villa_unit_id}/budget`}
+                variant="secondary"
+                size="sm"
+              >
+                Villa budget
+              </LinkButton>
+            )}
             <BillStatusBadge status={bill.status} />
             <ActionButtons
               billId={bill.id}

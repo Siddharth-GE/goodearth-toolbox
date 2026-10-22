@@ -201,6 +201,8 @@ export type BillDetail = {
   id: string;
   reference: string;
   status: BillStatus;
+  /** The villa the bill is for, as a unit, for Budget against actual (0136); null for a general bill. */
+  villa_unit_id: string | null;
   kind: BillKind;
   project_id: string;
   project_name: string;
@@ -243,7 +245,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const { data: bill, error: billError } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, kind, project_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
+      "id, reference, status, kind, project_id, plot_id, unit_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
     )
     .eq("id", billId)
     .maybeSingle();
@@ -274,10 +276,24 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
+  // A plot's villa is its unit (1:1 since 0029): the budget page is per unit.
+  let villaUnitId = bill.unit_id;
+  if (!villaUnitId && bill.plot_id) {
+    const { data: unit, error: unitError } = await supabase
+      .from("units")
+      .select("id")
+      .eq("plot_id", bill.plot_id)
+      .limit(1)
+      .maybeSingle();
+    if (unitError) console.error("getBill villa lookup failed:", unitError);
+    villaUnitId = unit?.id ?? null;
+  }
+
   return {
     id: bill.id,
     reference: bill.reference ?? "—",
     status: bill.status as BillStatus,
+    villa_unit_id: villaUnitId,
     kind: bill.kind as BillKind,
     project_id: bill.project_id,
     project_name: (bill.projects as { name: string } | null)?.name ?? "—",
