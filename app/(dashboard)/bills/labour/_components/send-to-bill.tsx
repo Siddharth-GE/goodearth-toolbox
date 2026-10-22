@@ -137,11 +137,9 @@ export function SendToBill({
           (overrideValue !== null && !overrideNote.trim()
             ? "Say why the total differs from heads × rates."
             : undefined))
-        : !workOrderId
-          ? "Piece-work is billed against the contractor's approved work order — pick one."
-          : Object.values(pieceRateValues).some((rate) => rate === null)
-            ? "Give a rate for every piece-work entry."
-            : undefined) ??
+        : Object.values(pieceRateValues).some((rate) => rate === null)
+          ? "Give a rate for every piece-work entry."
+          : undefined) ??
     (!reference.trim()
       ? "Type the muster roll or bill reference."
       : !billDate
@@ -154,7 +152,7 @@ export function SendToBill({
       sendLabourToBill({
         logIds: chosen.map((entry) => entry.id),
         kind: isDaily ? "nmr" : "pw",
-        labourContractId: isDaily ? null : workOrderId,
+        labourContractId: isDaily ? null : workOrderId || null,
         billReference: reference,
         billDate,
         dayRates: isDaily ? rates : null,
@@ -301,17 +299,16 @@ export function SendToBill({
                   setPieceRates({});
                 }}
               >
-                <option value="">Pick the work order…</option>
+                <option value="">No work order</option>
                 {workOrders.map((order) => (
                   <option key={order.id} value={order.id}>
                     {`${order.reference ?? "No number"} · ${order.description}`}
                   </option>
                 ))}
               </Select>
-              {workOrders.length === 0 && (
-                <p className="text-warning text-xs font-medium">
-                  This contractor has no approved work order on this project. Make one under Bills →
-                  Work orders, get it approved, then come back.
+              {!workOrderId && (
+                <p className="text-muted text-xs">
+                  No work order — billed as a direct labour bill. Rates come from the rate book.
                 </p>
               )}
             </div>
