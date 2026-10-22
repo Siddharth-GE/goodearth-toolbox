@@ -2,6 +2,7 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
+import { idParam } from "@/lib/list-params";
 import { getIndentHeader } from "@/lib/indents/detail-queries";
 import { getEstimatePull } from "@/lib/indents/pull-queries";
 import { canEditIndent } from "@/lib/indents/workflow";
@@ -10,23 +11,29 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EstimatePullBasket } from "../_components/estimate-pull-basket";
 
-// Reads the official estimate (0077 snapshot) through the money-free estimate_takeoff_facts; `?all=1` shows every work.
+// Reads the official estimate (0077 snapshot) through the money-free estimate_takeoff_facts; `?all=1` shows every work, `?stage=<category>` one stage.
 export default async function EstimatePullPage({
   params,
   searchParams,
 }: {
   params: Promise<{ indentId: string }>;
-  searchParams: Promise<{ all?: string }>;
+  searchParams: Promise<{ all?: string; stage?: string }>;
 }) {
   const { indentId } = await params;
-  const { all } = await searchParams;
+  const { all, stage: stageParam } = await searchParams;
   const indent = await getIndentHeader(indentId);
   if (!indent) notFound();
   if (!canEditIndent(indent.status)) redirect(`/indents/${indentId}`);
 
   const allWorks = all === "1";
   const pull = indent.unit_id
-    ? await getEstimatePull(indent.unit_id, indentId, indent.work_item_id, allWorks)
+    ? await getEstimatePull(
+        indent.unit_id,
+        indentId,
+        indent.work_item_id,
+        allWorks,
+        idParam(stageParam) ?? null,
+      )
     : null;
   const href = `/indents/${indentId}/pull-estimate`;
 
@@ -38,7 +45,7 @@ export default async function EstimatePullPage({
         backLabel={indent.reference}
         description={
           pull
-            ? `${pull.unit_name} · ${pull.work ? pull.work.label : "every work"}. Quantities stay editable; nothing is added until you press Add.`
+            ? `${pull.unit_name} · ${pull.stage ? pull.stage.label : pull.work ? pull.work.label : "every work"}. Quantities stay editable; nothing is added until you press Add.`
             : undefined
         }
       />
@@ -73,25 +80,64 @@ export default async function EstimatePullPage({
             </p>
           )}
 
-          {pull.work
-            ? pull.other_work_material_count > 0 && (
-                <p className="text-muted text-sm">
-                  Showing {pull.work.label} only.{" "}
-                  <Link href={`${href}?all=1`} className="text-accent font-medium hover:underline">
-                    Show every work on this villa
-                  </Link>{" "}
-                  ({pull.other_work_material_count} more{" "}
-                  {pull.other_work_material_count === 1 ? "material" : "materials"})
-                </p>
-              )
-            : pull.indent_work && (
-                <p className="text-muted text-sm">
-                  Showing every work.{" "}
-                  <Link href={href} className="text-accent font-medium hover:underline">
-                    Back to {pull.indent_work.label} only
+          {pull.stages.length > 1 && (
+            <p className="text-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span>By stage:</span>
+              {pull.stages.map((stage) =>
+                stage.id === pull.stage?.id ? (
+                  <span key={stage.id} className="text-foreground font-medium">
+                    {stage.label}
+                  </span>
+                ) : (
+                  <Link
+                    key={stage.id}
+                    href={`${href}?stage=${stage.id}`}
+                    className="text-accent font-medium hover:underline"
+                  >
+                    {stage.label}
                   </Link>
-                </p>
+                ),
               )}
+            </p>
+          )}
+
+          {pull.stage ? (
+            <p className="text-muted text-sm">
+              Showing {pull.stage.label} only.{" "}
+              <Link href={`${href}?all=1`} className="text-accent font-medium hover:underline">
+                Show every work on this villa
+              </Link>
+              {pull.indent_work && (
+                <>
+                  {" "}
+                  or{" "}
+                  <Link href={href} className="text-accent font-medium hover:underline">
+                    back to {pull.indent_work.label} only
+                  </Link>
+                </>
+              )}
+            </p>
+          ) : pull.work ? (
+            pull.other_work_material_count > 0 && (
+              <p className="text-muted text-sm">
+                Showing {pull.work.label} only.{" "}
+                <Link href={`${href}?all=1`} className="text-accent font-medium hover:underline">
+                  Show every work on this villa
+                </Link>{" "}
+                ({pull.other_work_material_count} more{" "}
+                {pull.other_work_material_count === 1 ? "material" : "materials"})
+              </p>
+            )
+          ) : (
+            pull.indent_work && (
+              <p className="text-muted text-sm">
+                Showing every work.{" "}
+                <Link href={href} className="text-accent font-medium hover:underline">
+                  Back to {pull.indent_work.label} only
+                </Link>
+              </p>
+            )
+          )}
 
           {pull.unlinked_count > 0 && (
             <p className="text-warning text-sm">
