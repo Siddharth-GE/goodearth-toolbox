@@ -22,7 +22,12 @@ export async function syncLineQty(
 
   const total = sheetTotal(rows.map((row) => ({ ...row, deduct: row.is_deduction })));
   if (!(total > 0)) {
-    return "The deductions take the measurements to nothing or less — check the rows.";
+    const { error: clearError } = await supabase
+      .from("estimator_estimate_lines")
+      .update({ qty: null, updated_by: userId })
+      .eq("id", lineId);
+    if (clearError) console.error("syncLineQty (clear) failed:", clearError);
+    return "The deductions take the measurements to nothing or less, so this work is back to “to measure” until the rows add up.";
   }
 
   const { error } = await supabase
