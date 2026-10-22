@@ -6,6 +6,7 @@ import { saveBillLines } from "@/lib/bills/line-actions";
 import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLinesProblem, type PoLineForBill, type WorkOrderLineForBill } from "@/lib/bills/lines";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import type { DocumentCharges } from "@/lib/line-money";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -44,6 +45,7 @@ export function BillLinesPanel({
   workLines,
   allowOther,
   locked,
+  charges,
 }: {
   billId: string;
   lines: BillLineRow[];
@@ -53,6 +55,7 @@ export function BillLinesPanel({
   workLines?: WorkOrderLineForBill[];
   allowOther: boolean;
   locked: boolean;
+  charges: DocumentCharges;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<EditorLine[]>(() => lines.map(toEditor));
@@ -76,6 +79,7 @@ export function BillLinesPanel({
         workLines={workLines}
         allowOther={allowOther}
         lockedQuantities={locked}
+        charges={charges}
       />
       <div className="flex flex-wrap items-center justify-end gap-3">
         {!error && problem && <p className="text-muted text-xs">{problem}</p>}

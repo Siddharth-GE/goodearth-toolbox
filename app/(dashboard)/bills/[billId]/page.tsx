@@ -1,7 +1,9 @@
 import { Heading } from "@/components/ui/heading";
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
+import { ChargesBox } from "@/components/ui/charges-box";
 import { PageTitle } from "@/components/ui/page-title";
+import { updateBillCharges } from "@/lib/bills/line-actions";
 import {
   countLabourEntriesOnBill,
   getBillLines,
@@ -68,6 +70,12 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           : Promise.resolve(undefined),
       ])
     : [[], [], undefined, undefined];
+
+  const charges = {
+    amount: bill.charges_amount,
+    gst_pct: bill.charges_gst_pct,
+    note: bill.charges_note,
+  };
 
   const anchorLabel =
     bill.kind === "nmr"
@@ -266,6 +274,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               workLines={workLines}
               allowOther={bill.kind !== "po"}
               locked={fromLabour > 0}
+              charges={charges}
             />
           </>
         ) : itemised ? (
@@ -276,6 +285,16 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           </p>
         )}
       </div>
+
+      {/* The header re-sums charges only from lines, so a bill without lines has no box. */}
+      {itemised && (
+        <ChargesBox
+          charges={charges}
+          gstRates={gstRates.map((rate) => rate.rate)}
+          editable={editable}
+          save={updateBillCharges.bind(null, bill.id)}
+        />
+      )}
     </div>
   );
 }

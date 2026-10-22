@@ -10,6 +10,7 @@ import {
   splitByVendor,
   type IndentPick,
 } from "@/lib/purchase-orders/from-indent";
+import { documentChargesProblem, type DocumentCharges } from "@/lib/line-money";
 import { lineChargesProblem } from "@/lib/purchase-orders/math";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -279,6 +280,30 @@ export async function updatePoHeader(
   if (error) {
     console.error("updatePoHeader failed:", error);
     return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
+  }
+  revalidatePath("/purchase-orders", "layout");
+  return undefined;
+}
+
+/** Freight, loading and the like (0133): editable while draft, as the rest of the header. */
+export async function updatePoCharges(poId: string, input: DocumentCharges): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+  const problem = documentChargesProblem(input);
+  if (problem) return { error: problem };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      charges_amount: input.amount,
+      charges_gst_pct: input.amount === null ? null : input.gst_pct,
+      charges_note: input.amount === null ? null : input.note?.trim() || null,
+      updated_by: user.id,
+    })
+    .eq("id", poId);
+  if (error) {
+    console.error("updatePoCharges failed:", error);
+    return guardError(error, "Could not save the charges. Try again.", PO_GUARD_PHRASES);
   }
   revalidatePath("/purchase-orders", "layout");
   return undefined;

@@ -41,6 +41,26 @@ export function lineMoney(line: LineMoneyInput): LineMoney | null {
   return { gross, discount, taxable, gst, other, total: taxable + gst + other };
 }
 
+/** Freight, loading and the like on the whole document (0133): taxable at its own GST %, never folded into a rate. */
+export type DocumentCharges = {
+  amount: number | null;
+  gst_pct: number | null;
+  note?: string | null;
+};
+
+/** The charges_shape CHECKs: none at all, or an amount above zero with a GST % from 0 to 100. */
+export function documentChargesProblem(charges: DocumentCharges): string | undefined {
+  const { amount, gst_pct: pct } = charges;
+  if (amount === null && pct === null) return undefined;
+  if (amount === null || !Number.isFinite(amount) || amount <= 0) {
+    return "Additional charges must be more than zero — or clear them.";
+  }
+  if (pct === null || !Number.isFinite(pct) || pct < 0 || pct > 100) {
+    return "Pick the GST % on the additional charges.";
+  }
+  return undefined;
+}
+
 /** Kerala, the company's default state (0101). */
 export const DEFAULT_COMPANY_STATE = "Kerala";
 

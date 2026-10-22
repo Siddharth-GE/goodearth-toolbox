@@ -220,6 +220,10 @@ export type BillDetail = {
   total_amount: number;
   /** 0106: an NMR bill's total differs from its lines, and why. */
   total_override_note: string | null;
+  /** 0133: freight, loading and the like, at their own GST %. */
+  charges_amount: number | null;
+  charges_gst_pct: number | null;
+  charges_note: string | null;
   note: string | null;
   rejection_note: string | null;
   payment_ref: string | null;
@@ -239,7 +243,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const { data: bill, error: billError } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, kind, project_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
+      "id, reference, status, kind, project_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
     )
     .eq("id", billId)
     .maybeSingle();
@@ -297,6 +301,9 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     gst_amount: bill.gst_amount ?? 0,
     total_amount: bill.total_amount ?? 0,
     total_override_note: bill.total_override_note,
+    charges_amount: bill.charges_amount,
+    charges_gst_pct: bill.charges_gst_pct,
+    charges_note: bill.charges_note,
     note: bill.note,
     rejection_note: bill.rejection_note,
     payment_ref: bill.payment_ref,

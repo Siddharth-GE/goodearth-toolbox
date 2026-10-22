@@ -133,7 +133,11 @@ export function PoDocument({ data }: { data: PoPdfData }) {
   const { po, vendor, company } = data;
   const regime = gstRegime(po.vendor_gst_state, company?.state);
   const companyState = company?.state || DEFAULT_COMPANY_STATE;
-  const totals = rollUpPo(po.lines.map(moneyOf), regime.interState);
+  const totals = rollUpPo(po.lines.map(moneyOf), regime.interState, {
+    amount: po.charges_amount,
+    gst_pct: po.charges_gst_pct,
+    note: po.charges_note,
+  });
   const isDraft = po.status === "draft";
   const showInvoiced = po.lines.some((line) => line.billed_quantity > 0);
 

@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 
 import { billLinesProblem, lineMoneyOf, type BillLineDraft } from "./lines";
 import { rollUpBill } from "./math";
-import { roundPaise } from "@/lib/line-money";
+import { documentChargesProblem, roundPaise, type DocumentCharges } from "@/lib/line-money";
 
 // Rules live in the database: bill_lines_guard (lines move only while the bill is recorded; a material names a line of the bill's own PO, 0111) and bill_lines_roll_up (header from lines, to the paisa).
 
@@ -149,7 +149,11 @@ export async function setBillTotalOverride(
   const user = await requireTool("/bills");
   const supabase = await createClient();
   const [{ data: bill, error: billError }, { data: lines, error: linesError }] = await Promise.all([
-    supabase.from("bills").select("kind, status").eq("id", billId).maybeSingle(),
+    supabase
+      .from("bills")
+      .select("kind, status, charges_amount, charges_gst_pct")
+      .eq("id", billId)
+      .maybeSingle(),
     supabase
       .from("bill_lines")
       .select("quantity, rate, gst_pct, discount_amount, other_charges")
@@ -165,7 +169,10 @@ export async function setBillTotalOverride(
 
   let update: { total_amount: number; total_override_note: string | null };
   if (input.total === null) {
-    const sum = rollUpBill((lines ?? []).map((line) => ({ ...line })));
+    const sum = rollUpBill(
+      (lines ?? []).map((line) => ({ ...line })),
+      { amount: bill.charges_amount, gst_pct: bill.charges_gst_pct },
+    );
     update = { total_amount: Math.max(sum.total, 0.01), total_override_note: null };
   } else {
     if (!Number.isFinite(input.total) || input.total <= 0) {
@@ -185,6 +192,33 @@ export async function setBillTotalOverride(
   if (error) {
     console.error("setBillTotalOverride failed:", error);
     return guardError(error, "Could not save the total. Try again.", LINE_GUARD_PHRASES);
+  }
+  revalidatePath("/bills", "layout");
+  return undefined;
+}
+
+/** Freight, loading and the like (0133). bills_charges_roll_up re-sums the header of a bill with lines; the guard freezes them once approved. */
+export async function updateBillCharges(
+  billId: string,
+  input: DocumentCharges,
+): Promise<ActionState> {
+  const user = await requireTool("/bills");
+  const problem = documentChargesProblem(input);
+  if (problem) return { error: problem };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("bills")
+    .update({
+      charges_amount: input.amount,
+      charges_gst_pct: input.amount === null ? null : input.gst_pct,
+      charges_note: input.amount === null ? null : input.note?.trim() || null,
+      updated_by: user.id,
+    })
+    .eq("id", billId);
+  if (error) {
+    console.error("updateBillCharges failed:", error);
+    return guardError(error, "Could not save the charges. Try again.", LINE_GUARD_PHRASES);
   }
   revalidatePath("/bills", "layout");
   return undefined;
