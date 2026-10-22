@@ -1,3 +1,79 @@
+# Supervisors, rebuilt — the site board (proposed 2026-10-22, waiting for the founder's approval)
+
+## Why
+
+The founder, 2026-10-22: the Supervisors screens are "clunky as hell". Give it the feel of Design Management and Client Relations, show what stage or work is being done now and what is next, so supervisors can plan labour and material, and make the checklists turn up as part of the stage being worked.
+
+Today a villa page is one long scroll of tables (drawings, labour, requests, deliveries, checklists, materials), and nothing says where the villa is. Design Management and Client Relations feel good because each villa is **a card on a board with a rail showing where it stands**, a page that opens on **what is happening now and what is next**, and **taps that save at once with Undo** instead of forms. Supervisors gets the same, built for a phone at site.
+
+Branch `feature/site-board` off `staging`, worktree `..\toolbox-os`. One pull request per phase; the founder vets each on staging.
+
+## The model — a villa moves through stages
+
+- **A stage is a work group** — `SS.01 Block work up to GF lintel`, `FD.02 Dry rubble`… — in the order of its category, then the group (`work_groups.sort_order`). Groups are what the rate book prices per sqft and what stage billing pays, so the site, the estimate and the bills speak about the same stage. (Coarser than this are Client Relations' nine build stages; finer are single works.)
+- **A villa's programme is the stages its official estimate covers** (the groups of the works on `estimate_takeoff_facts`, plus any stage someone adds by hand). No official estimate yet: the full list for the villa's type of work, every stage "not started".
+- **Each stage on a villa has a status**: not started → working → done, with **waiting** (for material, labour, an inspection or the client, and a note) as a side state; planned start and finish; the contractor on it; and when it really started and finished. **The first labour logged on a stage starts it by itself**; done is a tap.
+- **Now** is every stage working or waiting; **next** is the first stages not started, in order. Derived on every read, never stored as the villa's position (the Design Management rule).
+- **Health**, first match wins: waiting more than 3 days · past its planned finish · no labour on a working stage for 5 days · a checklist with a failed check · a delivery not confirmed for 2 days · on track.
+- **One supervisor per villa** ("who runs it") for a Mine / Everyone switch. Everyone still sees every villa (founder, 2026-08-20) — this is a filter, not a permission.
+- **Checklists belong to stages**: each checklist template is linked to the work groups it inspects (pre-filled from its old work codes, edited under Supervisors → Checklists). A working stage shows its checklist; marking a stage done with its checklist unsigned asks once, "Done without signing off the Blockwork checklist?" — a nudge, never a block (site work never waits), unless the founder decides otherwise.
+
+## Migration `0137_site_programme.sql` `[Opus drafts, Fable reviews unless waived]`
+
+Supervisors' own tables, RLS `/supervisors` on every verb, write revokes and an assert at the end; no money anywhere.
+
+- `site_villas` (plot_id pk, supervisor_id → profiles, note).
+- `site_stages` (plot_id, work_group_id, unique together; status `not_started|working|waiting|done`, waiting_on `material|labour|inspection|client|other`, waiting_note, planned_start, planned_finish, started_on, finished_on, contractor_id → vendors (contractor only, the labour-log guard's rule), sort_order override). A guard: done needs started_on and finished_on; finished_on not before started_on.
+- `site_stage_events` — the history, written by a trigger on `site_stages` (who, when, from → to, note), append-only, no client insert (the Design Management pattern).
+- `labour_logs` insert trigger: the first log on a stage of a villa starts it (`working`, `started_on` = the log date) if it is not started. Trigger-only definer, execute revoked, Supervisors writing Supervisors.
+- `checklist_template_groups` (template_id, work_group_id) — the link.
+- View `estimate_work_facts` (unit_id, work_item_id, quantity, uom) — the official estimate's work quantities, **money-free**, guards `/estimator`, `/indents`, `/inventory`, `/supervisors`, writes revoked, manifest row. Lets the site plan "1,800 sqft of block work, 640 done".
+
+## Phases — one pull request each
+
+### A. The engine and the villa page `[Opus — migration, rules; Sonnet — screens]`
+
+- `lib/supervisors/programme.ts`, pure and tested: a villa's stages in order, now / next, health, days in stage, how much of a stage's work is logged (piece-work quantities against `estimate_work_facts`).
+- **The villa page, rebuilt phone-first**, top to bottom:
+  1. **Header card** (the Design Management header): plot number large in mono, villa name, health pill, the **stage rail** (one segment per stage, coloured by status, the working one marked), the supervisor's face.
+  2. **Now** — a card per working or waiting stage: its name, day count, the contractor, "640 of 1,800 sqft logged". Four big buttons: **Log labour** (opens pre-filled with this stage's works and its contractor), **Request material** (pre-filled from this stage's estimate list), **Checklist** (a progress ring, "12 of 21"), **Done** / **Waiting**. Status chips save on tap with Undo.
+  3. **Next up** — the next one or two stages: planned dates (tap to set), the contractor (tap to pick), and **materials readiness**: each material the estimate needs for it, how much is already drawn, how much the stores hold (`stock_by_location`, open to every signed-in person), with **Request what's left** (one request per material, the off-estimate rule unchanged).
+  4. **Deliveries to confirm** (only when there are any) — the existing confirm sheet.
+  5. **Programme** — every stage as a row: status chip, planned and actual dates, its checklist's state; tap to open a stage sheet (dates, contractor, waiting note, history).
+  6. Collapsed below: labour log, requests, materials work by work, drawings, history.
+- Labour and request dialogs become bottom sheets with chips (work class, contractor, the stage's works first) instead of long selects.
+
+### B. Checklists that feel quick `[Sonnet, Opus vets]`
+
+- **The checklist runner**: one check per screen on a phone — the check in large type, its "to confirm" note, three big buttons (✓ Pass, ✕ Fail, N/A); Pass moves straight to the next; Fail and N/A open the remark with the keyboard up; a camera button attaches a photo to that check (`lib/native` camera on the app, the file picker on the web). A progress ring fills as it goes; "All clear ✓" on sign-off (respecting reduced motion). The list view stays for review.
+- `site_checklist_items` gains `photo_path` — in `0137`, so one migration.
+- Supervisors → Checklists: each template shows and edits the stages it inspects.
+
+### C. The site board `[Sonnet, Opus vets]`
+
+- `/supervisors/villas` becomes **the board**, as Design Management's: health chips with counts, Mine / Everyone, project filter; on a desktop one column per stage family (Foundation, Structure, MEP, Finishes, Handover) by each villa's current stage; on a phone a stacked card list grouped the same way.
+- **The villa card**: plot number, villa name, health pill, the stage rail, "Now: SS.01 Block work · day 6", "Next: SS.02 Lintel · from 28 Oct", open deliveries and requests as small counts, the supervisor's face.
+- `StageRail`, `HealthPill` and `SectionHead` move into `components/ui/` — this is their third copy (DESIGN.md).
+
+### D. Planning the week `[Opus — the reads; Sonnet — the screen]`
+
+- **`/supervisors/plan` — Look ahead**, across the supervisor's villas (Mine by default), in buckets: **Starting this week**, **Next two weeks**, **Waiting**, **Behind plan**. Each stage row: the villa, planned dates, contractor, and its material readiness — so a supervisor sees on Monday which crews to line up and what to request before the stage starts, and can request it from the row.
+- **Labour** on the same page: per contractor, the stages they are planned on in the next two weeks, so a clash shows ("Rafeeq Masonry on 3 villas from Monday").
+- The Supervisors welcome counts become: working stages, starting this week, waiting, deliveries to confirm.
+
+## Verification
+
+Pure rules tested (`programme.ts`, health, readiness). `0137` dry-run with a trial as a supervisor and as the probe; the labour trigger trial (first log starts the stage, a second does not move it, a done stage stays done). Every new select run at staging. Phone screenshots at 390×844 of the villa page, the runner and the board before each merge. The founder vets each phase on staging.
+
+## Open questions for the founder
+
+1. **Is a stage the work group** (`SS.01 Block work up to GF lintel`)? Recommended. The alternative is Client Relations' nine coarse build stages.
+2. **Run the masters import first?** The stages and checklist links read the new work codes and groups; without the import the programme shows today's old groups. Recommended: yes, before phase A.
+3. **Done without a signed checklist: nudge or block?** Recommended: nudge.
+4. **A supervisor per villa for Mine?** Recommended: yes, set on the villa header.
+5. **Fable's review of `0137`** — waived like the last build, or a Fable session?
+6. **Later, not in this plan:** Client Relations' build stage following the site's progress (a cross-tool write, its own decision).
+
 # OS process updates — the build plan
 
 ## Context
