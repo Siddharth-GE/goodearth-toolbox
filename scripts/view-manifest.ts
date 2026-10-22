@@ -200,7 +200,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "The one sanctioned money window between purchase orders and bills: ordered against billed, for the two tools that already see both. Not money-free — it is money behind a gate.",
+    why: "The one sanctioned money window between purchase orders and bills: ordered against billed, for the two tools that already see both. Not money-free — it is money behind a gate. Since 0133 the ordered total counts the PO's own additional charges and their GST, as a bill's total counts its own.",
   },
   bill_money_facts: {
     columns: [
