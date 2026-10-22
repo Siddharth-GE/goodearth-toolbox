@@ -30,4 +30,4 @@ The accounts-facing record of what Goodearth owes and has paid. A bill is one of
 
 ## Open
 
-The PO-anchor picker in the record form ships every issued/completed PO in the payload. Move it to server-side search (the `/api/catalogue` pattern) once the PO list makes that noticeable.
+The record form picks the order first and takes its vendor from it (founder, 2026-10-22), searching every issued or completed PO, or approved work order, in the browser — the whole list rides in the payload. Move it to server-side search (the `/api/catalogue` pattern) once that list makes the page noticeably slow.
