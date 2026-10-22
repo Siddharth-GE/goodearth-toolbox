@@ -25,6 +25,9 @@ import {
 } from "@/lib/supervisors/queries";
 import { ExternalLink, FileText } from "lucide-react";
 import { notFound } from "next/navigation";
+import { listChecklistTemplates, listVillaChecklists } from "@/lib/supervisors/checklist-queries";
+import Link from "next/link";
+import { StartChecklistDialog } from "./_components/checklist-forms";
 import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
@@ -32,12 +35,14 @@ import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request
 // One villa, one page: labour, material requests and drawn-vs-estimate. Phone-first: stacked cards, tables scroll inside their cards.
 export default async function VillaPage({ params }: { params: Promise<{ plotId: string }> }) {
   const { plotId } = await params;
-  const [villa, contractors, works, categories, brands] = await Promise.all([
+  const [villa, contractors, works, categories, brands, checklists, templates] = await Promise.all([
     getVillaDetail(plotId),
     listContractors(),
     listWorkOptions(),
     listItemCategories(),
     listBrands(),
+    listVillaChecklists(plotId),
+    listChecklistTemplates(),
   ]);
   if (!villa) notFound();
 
@@ -251,6 +256,63 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     <WithdrawRequestButton requestId={request.id} />
                   )}
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section
+        title="Checklists"
+        note={
+          checklists.length
+            ? `${checklists.filter((checklist) => checklist.status === "open").length} open, ${checklists.filter((checklist) => checklist.status === "signed_off").length} signed off.`
+            : undefined
+        }
+        aside={
+          <StartChecklistDialog
+            plotId={plotId}
+            templates={templates
+              .filter((template) => template.isActive)
+              .map((template) => ({
+                id: template.id,
+                name: template.name,
+                itemCount: template.items.filter((item) => item.isActive).length,
+              }))
+              .filter((template) => template.itemCount > 0)}
+          />
+        }
+      >
+        {checklists.length === 0 ? (
+          <p className="text-muted text-sm">
+            No checklists yet — Start a checklist before an inspection, and tick each check on site.
+          </p>
+        ) : (
+          <ul className="divide-border divide-y">
+            {checklists.map((checklist) => (
+              <li key={checklist.id}>
+                <Link
+                  href={`/supervisors/villas/${plotId}/checklists/${checklist.id}`}
+                  className="hover:bg-foreground/[0.03] -mx-2 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5"
+                >
+                  <div>
+                    <p className="text-foreground text-sm font-medium">
+                      {checklist.templateName}
+                      {checklist.location ? ` · ${checklist.location}` : ""}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {checklist.status === "signed_off"
+                        ? `Signed off ${formatDate(checklist.signedOffAt)}`
+                        : `Started ${formatDate(checklist.startedOn)} · ${checklist.answered} of ${checklist.total} checked`}
+                      {checklist.failed > 0 ? ` · ${checklist.failed} failed` : ""}
+                    </p>
+                  </div>
+                  {checklist.status === "signed_off" ? (
+                    <Badge variant={checklist.failed > 0 ? "warning" : "success"}>Signed off</Badge>
+                  ) : (
+                    <Badge variant="info">Open</Badge>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>
