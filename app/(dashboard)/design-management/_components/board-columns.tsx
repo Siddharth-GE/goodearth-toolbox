@@ -4,7 +4,7 @@ import type { VillaCard } from "@/lib/design-management/board-queries";
 import { SectionHead } from "./board-parts";
 import { LotCard } from "./lot-card";
 
-/** One column per board stage; on a phone they stack so nothing scrolls sideways. */
+/** One column per board stage, each wide enough for a card; a wide screen scrolls the board sideways rather than squeeze eight stages. On a phone they stack. */
 export function BoardColumns({
   stages,
   cards,
@@ -15,7 +15,7 @@ export function BoardColumns({
   today: string;
 }) {
   return (
-    <div className="space-y-2 lg:grid lg:auto-cols-[minmax(0,1fr)] lg:grid-flow-col lg:gap-3 lg:space-y-0">
+    <div className="space-y-2 lg:grid lg:auto-cols-[minmax(14rem,1fr)] lg:grid-flow-col lg:gap-3 lg:space-y-0 lg:overflow-x-auto lg:pb-2">
       {stages.map((stage, index) => {
         const here = cards.filter((card) => card.place.index === index);
         return (
