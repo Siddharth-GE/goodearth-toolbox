@@ -95,7 +95,7 @@ export function ConfirmDeliveryDialog({ delivery }: { delivery: VillaDelivery })
                   className="h-11 w-24"
                   aria-label={`Arrived of ${line.itemName}`}
                 />
-                <span className="text-muted text-xs">{line.uom}</span>
+                <span className="text-muted w-10 text-xs">{line.uom}</span>
               </div>
             </li>
           ))}
