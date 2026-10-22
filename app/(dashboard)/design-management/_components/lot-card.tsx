@@ -112,19 +112,20 @@ export function LotCard({ card, today }: { card: VillaCard; today: string }) {
 
         <div className="space-y-1.5">
           <StageRail rail={card.rail} />
-          <p className="text-muted flex flex-wrap justify-between gap-x-2 text-xs">
-            <b className="text-foreground/80 truncate font-medium">
+          {/* Stage and status on their own lines, each cut short rather than running past the card. */}
+          <div className="min-w-0 text-xs">
+            <p className="text-foreground/80 truncate font-medium">
               {card.place.complete ? "Design complete" : (card.placeName ?? "Not started")}
-            </b>
+            </p>
             {!card.place.complete && current ? (
-              <span className="shrink-0">
+              <p className="text-muted truncate">
                 {current.label}
                 {card.daysInStage !== null && card.currentStatus !== "done"
                   ? ` · ${card.daysInStage === 0 ? "since today" : `${card.daysInStage} day${card.daysInStage === 1 ? "" : "s"}`}`
                   : ""}
-              </span>
+              </p>
             ) : null}
-          </p>
+          </div>
         </div>
 
         {card.revising.length > 0 ? (

@@ -83,7 +83,6 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 
 ## Next builds — the founder picks
 
-- **Design Management board, cramped columns** (founder, 2026-10-22, screenshot): eight stage columns squeeze each card, so "No buyer yet" wraps, "Working · since today" runs past the card edge, and the action date and owner name are cut off. Fix the layout, for example wider columns with sideways scrolling or only the stages in use.
 - **Client Relations' design checks from the board.** The design board now knows "client confirmed design", "permit" and "working drawing". This is a cross-tool read, so it needs its contract-table row.
 - **Set aside on 2026-10-08:** subprojects, a works schedule (not a Gantt), and drawing requests.
 - **The Google Chat door, round three:** three candidates in `lib/google-chat/PLAN.md`.
