@@ -3,7 +3,7 @@
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
-import { WORK_CLASS_LABEL, workClassOf } from "@/lib/masters/work-classes";
+import { WORK_CLASS_LABEL, isWorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -458,6 +458,37 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
   if (error) {
     console.error("recordStockAdjustment failed:", error);
     return guardError(error, "Could not save that adjustment. Try again.", INVENTORY_GUARD_PHRASES);
+  }
+
+  revalidatePath("/inventory", "layout");
+  return undefined;
+}
+
+/** Corrects what a plot issue was for (0132): standard work, additional work or rework. A label fix, like retagging the work. */
+export async function setIssueWorkClass(issueId: string, value: string): Promise<ActionState> {
+  const user = await requireTool("/inventory");
+  if (!isWorkClass(value)) return { error: "Pick standard work, additional work or rework." };
+
+  const supabase = await createClient();
+  const { data: issue, error: readError } = await supabase
+    .from("stock_issues")
+    .select("id, plot_id")
+    .eq("id", issueId)
+    .maybeSingle();
+  if (readError) {
+    console.error("setIssueWorkClass read failed:", readError);
+    return { error: "Could not save. Try again." };
+  }
+  if (!issue) return { error: "That issue no longer exists." };
+  if (!issue.plot_id) return { error: "A transfer between stores serves no work." };
+
+  const { error } = await supabase
+    .from("stock_issues")
+    .update({ work_class: value, updated_by: user.id })
+    .eq("id", issueId);
+  if (error) {
+    console.error("setIssueWorkClass failed:", error);
+    return guardError(error, "Could not save. Try again.", INVENTORY_GUARD_PHRASES);
   }
 
   revalidatePath("/inventory", "layout");

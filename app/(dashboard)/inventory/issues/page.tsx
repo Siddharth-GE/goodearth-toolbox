@@ -11,8 +11,9 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatCount, formatDate } from "@/lib/format";
-import { listStockIssues } from "@/lib/inventory/issues-queries";
+import { NavTabs } from "@/components/ui/tabs";
+import { formatCount, formatDate, formatQuantity } from "@/lib/format";
+import { listIssueItems, listStockIssues } from "@/lib/inventory/issues-queries";
 import { getInventoryFilterOptions } from "@/lib/inventory/queries";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { PackageMinus } from "lucide-react";
@@ -30,6 +31,7 @@ export default async function IssuesPage({
     plot?: string;
     from?: string;
     to?: string;
+    view?: string;
   }>;
 }) {
   const raw = await searchParams;
@@ -39,6 +41,7 @@ export default async function IssuesPage({
   const q = searchParam(raw.q);
   const from = dateParam(raw.from);
   const to = dateParam(raw.to);
+  const itemsView = raw.view === "items";
 
   const [{ issues, total, page: currentPage, pageCount, pageSize }, filterOptions] =
     await Promise.all([
@@ -54,10 +57,13 @@ export default async function IssuesPage({
       getInventoryFilterOptions(),
     ]);
 
+  const items = itemsView ? await listIssueItems(issues.map((issue) => issue.id)) : [];
+  const issueById = new Map(issues.map((issue) => [issue.id, issue]));
   const filtered = Boolean(project || store || plot || q || from || to);
 
-  const hrefForPage = (target: number) => {
+  const hrefFor = (target: number, view: boolean) => {
     const params = new URLSearchParams();
+    if (view) params.set("view", "items");
     if (project) params.set("project", project);
     if (store) params.set("store", store);
     if (plot) params.set("plot", plot);
@@ -68,6 +74,7 @@ export default async function IssuesPage({
     const query = params.toString();
     return query ? `/inventory/issues?${query}` : "/inventory/issues";
   };
+  const hrefForPage = (target: number) => hrefFor(target, itemsView);
 
   return (
     <div className="space-y-4">
@@ -79,9 +86,18 @@ export default async function IssuesPage({
 
       <InventoryNav active="issues" />
 
+      <NavTabs
+        tabs={[
+          { key: "issues", href: hrefFor(1, false), label: "Issues" },
+          { key: "items", href: hrefFor(1, true), label: "Items" },
+        ]}
+        active={itemsView ? "items" : "issues"}
+      />
+
       <ListToolbar
         action="/inventory/issues"
         values={{ q, from, to, project, store, plot }}
+        keep={{ view: itemsView ? "items" : undefined }}
         search={{ placeholder: "Issue number…" }}
         dates={{ label: "Issued" }}
         filters={[
@@ -121,39 +137,85 @@ export default async function IssuesPage({
         />
       ) : (
         <>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Reference</TableHeaderCell>
-                <TableHeaderCell>Out of</TableHeaderCell>
-                <TableHeaderCell>To</TableHeaderCell>
-                <TableHeaderCell>Work</TableHeaderCell>
-                <TableHeaderCell>Date</TableHeaderCell>
-                <TableHeaderCell>Lines</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {issues.map((issue) => (
-                <TableRow key={issue.id}>
-                  <TableCell className="text-foreground font-medium">{issue.reference}</TableCell>
-                  <TableCell>{issue.store_name}</TableCell>
-                  <TableCell className="text-muted">{issue.destination}</TableCell>
-                  <TableCell className="text-muted">{issue.work_name ?? "—"}</TableCell>
-                  <TableCell className="text-muted">{formatDate(issue.issued_at)}</TableCell>
-                  <TableCell>{formatCount(issue.line_count)}</TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/inventory/issues/${issue.id}`}
-                      className="text-accent text-sm font-medium hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </TableCell>
+          {itemsView ? (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Item</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
+                  <TableHeaderCell>Issue</TableHeaderCell>
+                  <TableHeaderCell>To</TableHeaderCell>
+                  <TableHeaderCell>Work</TableHeaderCell>
+                  <TableHeaderCell>Date</TableHeaderCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {items.map((line) => {
+                  const issue = issueById.get(line.issue_id);
+                  return (
+                    <TableRow key={line.id}>
+                      <TableCell>
+                        <span className="text-foreground font-medium">{line.item_name}</span>
+                        {line.item_code && (
+                          <div className="text-muted text-xs">{line.item_code}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {`${formatQuantity(line.quantity)} ${line.uom}`}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/inventory/issues/${line.issue_id}`}
+                          className="text-accent text-sm font-medium hover:underline"
+                        >
+                          {issue?.reference ?? "Open"}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted">{issue?.destination ?? "—"}</TableCell>
+                      <TableCell className="text-muted">{issue?.work_name ?? "—"}</TableCell>
+                      <TableCell className="text-muted">
+                        {issue ? formatDate(issue.issued_at) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Reference</TableHeaderCell>
+                  <TableHeaderCell>Out of</TableHeaderCell>
+                  <TableHeaderCell>To</TableHeaderCell>
+                  <TableHeaderCell>Work</TableHeaderCell>
+                  <TableHeaderCell>Date</TableHeaderCell>
+                  <TableHeaderCell>Lines</TableHeaderCell>
+                  <TableHeaderCell></TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {issues.map((issue) => (
+                  <TableRow key={issue.id}>
+                    <TableCell className="text-foreground font-medium">{issue.reference}</TableCell>
+                    <TableCell>{issue.store_name}</TableCell>
+                    <TableCell className="text-muted">{issue.destination}</TableCell>
+                    <TableCell className="text-muted">{issue.work_name ?? "—"}</TableCell>
+                    <TableCell className="text-muted">{formatDate(issue.issued_at)}</TableCell>
+                    <TableCell>{formatCount(issue.line_count)}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/inventory/issues/${issue.id}`}
+                        className="text-accent text-sm font-medium hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
 
           <Pagination
             page={currentPage}
