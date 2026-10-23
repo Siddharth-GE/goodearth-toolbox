@@ -48,6 +48,7 @@ import { ConfirmDeliveryDialog } from "./_components/delivery-forms";
 import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import {
+  controlData,
   NextCard,
   NowCard,
   ProgrammeList,
@@ -57,6 +58,7 @@ import {
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
 import { FirstPlanControl, VillaStartControl } from "./_components/schedule-controls";
 import { ScheduleStrip } from "./_components/schedule-strip";
+import { ArrangeStagesDialog } from "./_components/stage-controls";
 
 const TABS = [
   { key: "work", label: "Work" },
@@ -276,12 +278,19 @@ export default async function VillaPage({
                 <ScheduleStrip stages={programme.stages} today={programme.today} />
               </Card>
             </section>
-            {programme.stages.length > 0 && (
+            {programme.stages.length + programme.leftOff.length > 0 && (
               <section className="space-y-2">
                 <SectionHead
                   title="Every stage"
                   count={programme.stages.length}
                   hint="Tap a family to open it, a stage for its status, contractor, days and dates"
+                  aside={
+                    <ArrangeStagesDialog
+                      plotId={plotId}
+                      stages={programme.stages.map((stage) => controlData(plotId, stage))}
+                      leftOff={programme.leftOff}
+                    />
+                  }
                 />
                 <ProgrammeList
                   plotId={plotId}

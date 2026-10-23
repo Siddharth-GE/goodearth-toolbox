@@ -592,6 +592,102 @@ function StageVillaOrder({
   );
 }
 
+/**
+ * Every stage of this villa in one list, each with what it follows here, to change its order or leave it off — and the stages
+ * left off, to bring back. Only this villa changes.
+ */
+export function ArrangeStagesDialog({
+  plotId,
+  stages,
+  leftOff,
+}: {
+  plotId: string;
+  stages: StageControlData[];
+  leftOff: { id: string; code: string; name: string }[];
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const codeOf = new Map(stages.map((stage) => [stage.groupId, stage.code]));
+  const followsLine = (stage: StageControlData) => {
+    const { own, sequenceLabel, sequenceLink, inSequence } = stage.follows;
+    if (own) {
+      return `${own.link === "alongside" ? "Alongside" : "After"} ${codeOf.get(own.followsGroupId) ?? "another stage"} · this villa only`;
+    }
+    if (!inSequence) return "After the stage before it";
+    return sequenceLabel
+      ? `${sequenceLink === "alongside" ? "Alongside" : "After"} ${sequenceLabel.split(" ")[0]}`
+      : "First";
+  };
+  return (
+    <Dialog onOpenChange={(open) => !open && setEditing(null)}>
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm">
+          Arrange stages
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>This villa&apos;s stages</DialogTitle>
+          <DialogDescription>
+            Change what a stage follows on this villa, or leave it off. Other villas keep the
+            sequence.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="divide-border -mx-1 divide-y">
+          {stages.map((stage) => (
+            <li key={stage.groupId} className="px-1 py-2">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground truncate text-sm font-medium">
+                    <span className="text-muted font-mono text-xs">{stage.code}</span> {stage.name}
+                  </p>
+                  <p
+                    className={`truncate text-xs ${stage.follows.own ? "text-accent" : "text-muted"}`}
+                  >
+                    {`${followsLine(stage)} · ${STAGE_STATUS_LABEL[stage.snapshot.status]}`}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditing(editing === stage.groupId ? null : stage.groupId)}
+                >
+                  {editing === stage.groupId ? "Close" : "Change"}
+                </Button>
+              </div>
+              {editing === stage.groupId ? (
+                <StageVillaOrder
+                  stage={stage}
+                  otherStages={stages
+                    .filter((other) => other.groupId !== stage.groupId)
+                    .map((other) => ({ id: other.groupId, label: `${other.code} ${other.name}` }))}
+                  onLeftOff={() => setEditing(null)}
+                />
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {leftOff.length > 0 ? (
+          <div className="space-y-1">
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              Not needed on this villa
+            </p>
+            <ul className="divide-border divide-y">
+              {leftOff.map((stage) => (
+                <li key={stage.id} className="flex items-center gap-2 py-1.5">
+                  <span className="text-muted min-w-0 flex-1 truncate text-sm">
+                    <span className="font-mono text-xs">{stage.code}</span> {stage.name}
+                  </span>
+                  <BringBackButton plotId={plotId} groupId={stage.id} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Puts a stage left off this villa back in its programme. */
 export function BringBackButton({ plotId, groupId }: { plotId: string; groupId: string }) {
   const { pending, error, run } = useActionRunner();
