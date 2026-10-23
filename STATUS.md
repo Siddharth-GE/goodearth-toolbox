@@ -78,4 +78,6 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Birdwing Stays       | nothing outside the shared surfaces (`companies` for the letterhead)                                                                                                                                                                                                                                       |
 | Birdwing Books       | `birdwing_occupancy_facts` (rooms and guests per day, counts only)                                                                                                                                                                                                                                         |
 
+**A cancelled indent** (`indents.status = 'cancelled'`, `0143`) counts nowhere: every reader of `indents` or `indent_lines` that counts or sums leaves it out (POs and the Estimator's queue read only approved or submitted ones); Reporter shows it with its status.
+
 **Nothing reads** Financial Management, Dexter, the Birdwing tools' or the Estimator's own tables — Birdwing only through `birdwing_occupancy_facts` and `0117`'s three facts views; the Estimator only through its views: the rate-free `estimate_takeoff_facts`, `estimate_work_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated).

@@ -26,6 +26,9 @@ const INDENT_GUARD_PHRASES = [
   "official estimate",
   "outside the estimate",
   "estimator",
+  // 0143: cancelling.
+  "cancel",
+  "Cancel",
 ] as const;
 
 const REASON_LIMIT = 500;
@@ -646,6 +649,34 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 
   revalidatePath("/indents", "layout");
   redirect("/indents/list");
+}
+
+// indents_guard (0143) refuses while a live PO orders from it, stamps who and when, and makes it final.
+export async function cancelIndent(indentId: string, reason: string): Promise<ActionState> {
+  await requireTool("/indents");
+
+  const why = reason.trim();
+  if (!why) return { error: "Say why this indent is cancelled." };
+  if (why.length > REASON_LIMIT) {
+    return { error: `Keep the reason under ${REASON_LIMIT} characters.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("indents")
+    .update({ status: "cancelled", cancel_reason: why })
+    .eq("id", indentId);
+  if (error) {
+    console.error("cancelIndent failed:", error);
+    // The guard locks the indent's lines against a PO being written to them at the same moment.
+    if (error.code === "40P01") {
+      return { error: "A purchase order was being made from this indent just then. Try again." };
+    }
+    return guardError(error, "Could not cancel this indent. Try again.", INDENT_GUARD_PHRASES);
+  }
+
+  revalidatePath("/indents", "layout");
+  return undefined;
 }
 
 export type EstimatePullInput = {

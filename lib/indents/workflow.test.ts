@@ -4,10 +4,10 @@ import { test } from "node:test";
 import {
   approvalBlocker,
   canDecide,
-  canDelete,
   canEditIndent,
   canSubmit,
   estimatorHold,
+  indentRemoval,
   stillToBuy,
   waitsForEstimator,
 } from "./workflow";
@@ -38,10 +38,19 @@ test("only a named approver or an admin decides, and only when submitted", () =>
   assert.equal(canDecide("approved", admin), false);
 });
 
-test("only a draft can be deleted", () => {
-  assert.equal(canDelete("draft"), true);
-  assert.equal(canDelete("submitted"), false);
-  assert.equal(canDelete("approved"), false);
+test("a draft deletes, a sent indent cancels until a live PO orders from it", () => {
+  assert.deepEqual(indentRemoval("draft", []), { kind: "delete" });
+  assert.deepEqual(indentRemoval("submitted", []), { kind: "cancel" });
+  assert.deepEqual(indentRemoval("approved", []), { kind: "cancel" });
+  assert.deepEqual(indentRemoval("approved", ["PO/S/001"]), {
+    kind: "blocked",
+    why: "PO/S/001 orders from it — cancel that purchase order first.",
+  });
+  assert.deepEqual(indentRemoval("approved", ["PO/S/001", "PO/S/002"]), {
+    kind: "blocked",
+    why: "PO/S/001 and PO/S/002 order from it — cancel those purchase orders first.",
+  });
+  assert.equal(indentRemoval("cancelled", []), null);
 });
 
 test("still to buy is requested less ordered, never below zero", () => {

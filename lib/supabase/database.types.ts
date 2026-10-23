@@ -6379,6 +6379,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -6402,6 +6405,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -6425,6 +6431,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -6449,6 +6458,13 @@ export type Database = {
           {
             foreignKeyName: "indents_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_cancelled_by_fkey"
+            columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -12365,6 +12381,10 @@ export type Database = {
       }
       delete_draft_transmittal: {
         Args: { p_transmittal_id: string }
+        Returns: undefined
+      }
+      delete_pricing_budget: {
+        Args: { p_budget_id: string }
         Returns: undefined
       }
       delete_recorded_bill: { Args: { p_bill_id: string }; Returns: undefined }

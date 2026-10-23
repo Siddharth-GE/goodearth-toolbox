@@ -106,7 +106,8 @@ export async function listIndents({
   // created_at is a timestamp, so the "to" day runs up to the day after it.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
-    if (status) next = next.eq("status", status);
+    // Cancelled indents show only when asked for by name.
+    next = status ? next.eq("status", status) : next.neq("status", "cancelled");
     if (projectId) next = next.eq("project_id", projectId);
     if (workItemId) next = next.eq("work_item_id", workItemId);
     if (from) next = next.gte("created_at", istDayStart(from));

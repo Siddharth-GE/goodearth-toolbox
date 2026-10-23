@@ -25,6 +25,7 @@ const STATUS_LABEL: Record<IndentDetail["status"], string> = {
   draft: "DRAFT — not yet submitted",
   submitted: "Submitted, awaiting approval",
   approved: "Approved",
+  cancelled: "CANCELLED — not to be bought",
 };
 
 const columns: Column<IndentLineRow>[] = [
@@ -104,7 +105,13 @@ export function IndentDocument({ data }: { data: IndentPdfData }) {
               label: "Required by",
               value: indent.required_by ? formatDate(indent.required_by) : "—",
             },
-            { label: "Status", value: STATUS_LABEL[indent.status] },
+            {
+              label: "Status",
+              value:
+                indent.status === "cancelled" && indent.cancel_reason
+                  ? `${STATUS_LABEL.cancelled}: ${indent.cancel_reason}`
+                  : STATUS_LABEL[indent.status],
+            },
             { label: "Lines", value: String(indent.line_count) },
             { label: "Work", value: data.work_label ?? "—" },
             { label: "Submitted by", value: indent.submitted_by_name ?? "—" },
@@ -121,7 +128,9 @@ export function IndentDocument({ data }: { data: IndentPdfData }) {
 
         <NotesBlock notes={[{ label: "Note", text: indent.note }]} />
 
-        {!isDraft && <Signatures labels={["Requested by", "Approved by", "Received by stores"]} />}
+        {!isDraft && indent.status !== "cancelled" && (
+          <Signatures labels={["Requested by", "Approved by", "Received by stores"]} />
+        )}
       </DocumentPage>
     </Document>
   );

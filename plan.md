@@ -18,13 +18,11 @@ The founder's asks, in this order, each its own pull request into `staging` and 
    - [x] **Review**: the founder said "apply" (2026-10-23), taken as waiving Fable for `0142`; an independent Opus review stood in and found 15 points, all fixed: `truncate` (safeupdate refuses an unqualified delete through the app), `projects_is_test_guard` (a Masters holder could mark a real project test), the rate restore only while nothing moved it, audit triggers kept on, locks taken at once with `nowait`, guards re-enabled by name, set-null keys not walked, transmittal counters, file and Relay-link refusals, a `danger` button variant, plain refusal wording. The trial now counts every table before the seed and after the delete, and runs under the 8-second limits.
    - [x] `0142` applied to staging, types regenerated (they matched), the test project made: 2 estimates, 8 indents, 3 POs, 3 deliveries, 4 issues, 2 bills, 3 drawings.
    - [x] Merged as #133 on the founder's "merge everything", 2026-10-23.
-4. [ ] **Delete or Cancel, across every tool** — the plan below, drafted by Opus from a survey of every tool (2026-10-23). **Fable reviews the design (A) before any migration**; the founder answers the questions first.
+4. [ ] **Delete or Cancel, across every tool** — the plan below. The founder vetted pieces 1–3 on staging, took every recommendation under _Settled_, and waived Fable's review of the design (2026-10-23: "all looks good, do what you've recommended, waive the fable review"). An independent Opus review stands in on each pull request.
 
 ## Next session — start here, after "check CLAUDE.md"
 
-1. **Ask the founder how pieces 1–3 looked on staging** (each PR's checklist: #130–#133). Anything broken is fixed first. Remind them: delete the test project before the switch to production.
-2. **Ask the founder the four questions under Piece 4 → Questions**, then take the design (A) to Fable — or the founder waives it in so many words.
-3. Build B–F, one pull request each, vetted on staging.
+1. Build the next unticked step of Piece 4's build order, one pull request each, vetted on staging. Remind the founder: delete the test project before the switch to production.
 
 ## Piece 4 — Delete or Cancel, across every tool
 
@@ -37,27 +35,28 @@ The founder's asks, in this order, each its own pull request into `staging` and 
 - **No delete or cancel at all:** goods receipts, stock issues, adjustments (append-only stock — `0023`), work orders, cash requests, client actions and engagements, design actions, site stages, Birdwing stays, every core master (projects, plots, units, clients, vendors, items, stores, companies, terms).
 - **Append-only money, by design:** `bill_payments`, `contractor_advances`, `advance_recoveries` (`0107`). **Money rows deletable with nothing but the grant:** `client_receipts`, `funding_movements`, `birdwing_receipts`, `birdwing_cross_charges` — inconsistent with the rest.
 
-### The design `[Fable reviews before any migration]`
+### The design `[Fable waived by the founder, 2026-10-23]`
 
 - **A. One shape for every cancel** `[Opus drafts, Fable reviews]`: `cancelled_at`, `cancelled_by`, `cancel_reason` on each document that can be cancelled (POs keep their request-and-approve flow; its `deletion_note` is the reason); a status `cancelled` where the table has a status, else the three columns alone. A guard per table: cancel only from the states that allow it, reason required, cancelled is final. **Every fact view and every count leaves cancelled rows out** — the money views first, checked by `db:check-views`. One delete per table stays as today (the draft states); nothing gains a cascade.
 - **The button**: one shared `DeleteOrCancel` (`components/ui/`): it asks the server what the record holds; with nothing depending it says "Delete" and deletes; otherwise it says what depends ("2 deliveries and a bill") and offers "Cancel" with a reason. Lists get a **Show cancelled** filter. Pure helper (`lib/…/cancel.ts`, tested) for the wording.
-- **Stock and payments are never cancelled — they are reversed** (founder to confirm): a delivery entered by mistake is undone by a return entry (an adjustment out, with the reason, pointing at it); an issue by a return to store; a payment by a negative payment with a reason. The ledger stays true; the screen shows the pair as "reversed".
+- **Stock and payments are never cancelled — they are reversed**: a delivery entered by mistake is undone by a return entry (an adjustment out, with the reason, pointing at it); an issue by a return to store; a payment by a negative payment with a reason. The ledger stays true; the screen shows the pair as "reversed".
 - **Masters retire**: Delete when nothing uses it (a vendor added by mistake), else **Retire** (`is_active = false`, hidden from pickers, kept on old records) — the facility pattern, everywhere.
 
 ### Build order — one pull request each
 
-- **B. Operations documents** `[Opus — guards and views; Sonnet — screens]`: indents (submitted/approved with no PO → cancel), POs (the existing flow, in the shared button), budgets and selections (wire the existing draft deletes; issued → superseded already), estimates, work orders (cancel when no bill), cash requests (draft → delete, submitted → cancel), bills (recorded → delete as today; approved → cancel only with no payment).
+- [x] **B1. The shared button, indents, budgets and selections** `[Opus]` (`0143`, applied to staging; an independent Opus review stood in for Fable and its six points were fixed before applying): `DeleteOrCancel` and its wording helper; indents cancel from submitted or approved while no live PO orders from them, and every reader of indent quantities (the budget and estimate pulls, POs, the Estimator, Selections' impact, Overview, Reporter) leaves a cancelled one out; Indents' list gets **Show cancelled**; budgets in pricing and draft selections get their Delete (one function each, lines first, refused once an indent or a budget hangs off them).
+- [ ] **B2. Estimates and Bills' documents** `[Opus]`: an official estimate withdrawn while no indent anchors on it; work orders (pending → delete; approved with no bill → cancel); cash requests (draft → delete, submitted → cancel); bills (recorded → delete as today; approved → cancel only with no payment, by an approver or admin, leaving every money view); POs' existing flow moved into the shared button.
 - **C. Stock reversals** `[Fable designs here — batches and rates; Opus builds]`: return-to-vendor for a delivery, return-to-store for an issue, through `allocate_batches`; Supervisors' site confirmation of a reversed issue.
 - **D. Payments** `[Opus; Fable reviews]`: reversal rows for payments, advances and recoveries; the four freely deletable money rows become cancel-with-reason.
 - **E. The rest** `[Sonnet, Opus vets]`: client actions and design actions (delete while untouched, else cancel), Birdwing stays (already cancel — the shared button), Relay (finish with a note — the shared button), saved reports, decks (delete as today).
 - **F. Masters retire** `[Sonnet, Opus vets]`: Delete when unused, else Retire, on every master; pickers hide retired ones.
 
-### Questions for the founder
+### Settled by the founder (2026-10-23)
 
-1. **Who may cancel?** Recommendation: whoever may edit the record, except money documents (POs, bills, payments), which need an approver or admin — as POs already do.
-2. **Is a reason always required?** Recommendation: yes for cancel and reverse, never for a plain delete of an unused draft.
-3. **Who sees cancelled records?** Recommendation: everyone with the tool, under "Show cancelled"; never in totals.
-4. **Stock and payments: reverse, never cancel** (above) — agreed?
+1. **Who may cancel:** whoever may edit the record, except money documents (POs, bills, payments), which need an approver or admin — as POs already do.
+2. **A reason is required** to cancel or reverse, never to delete an unused draft.
+3. **Cancelled records** are seen by everyone with the tool, under "Show cancelled", and never counted in totals.
+4. **Stock and payments are reversed, never cancelled.**
 
 # Supervisors, rebuilt — the site board and its schedule (proposed 2026-10-22, schedule settled 2026-10-23, waiting for the founder's approval)
 
