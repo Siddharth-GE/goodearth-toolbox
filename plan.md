@@ -74,6 +74,8 @@ Settled with the founder 2026-10-23. Dates are worked out on every read, never s
 - `/supervisors/villas` becomes **the board**, as Design Management's: health chips with counts, Mine / Everyone, project filter; on a desktop one column per stage family (Foundation, Structure, MEP, Finishes, Handover) by each villa's current stage; on a phone a stacked card list grouped the same way.
 - **The villa card**: plot number, villa name, health pill, the stage rail, "Now: SS.01 Block work · day 6", "Next: SS.02 Lintel · from 28 Oct", the forecast handover and its slip, open deliveries and requests as small counts, the supervisor's face.
 - `StageRail`, `HealthPill` and `SectionHead` move into `components/ui/` — this is their third copy (DESIGN.md).
+- [x] [Opus] Built 2026-10-23 on `feature/site-board-d`, code only. Columns are the work categories in the order the sequence reaches them (the plan's five families are not in the data; the categories are). The shared rail, pill and head were already in `components/ui/` from phase A; Design Management and Client Relations move onto them when next touched. The board's reads run at staging; cards seen at 390 wide through a probe. Fable waived as for B.
+- [ ] [Founder] Vet phase D on staging.
 
 ### E. Planning the week `[Opus — the reads; Sonnet — the screen]`
 

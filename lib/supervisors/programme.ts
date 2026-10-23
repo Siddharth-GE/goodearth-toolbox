@@ -214,7 +214,9 @@ export function villaHealth(input: {
   const idle = stages
     .filter((stage) => stage.status === "working" && stage.record?.startedOn)
     .map((stage) => {
-      const last = input.lastLabourByGroup.get(stage.id) ?? stage.record!.startedOn!;
+      const logged = input.lastLabourByGroup.get(stage.id);
+      const started = stage.record!.startedOn!;
+      const last = logged && logged > started ? logged : started;
       return { stage, days: daysBetween(last, today) };
     })
     .filter((entry) => entry.days >= HEALTH_RULES.idleDays)

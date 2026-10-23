@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { isShort, siteReceiptProblem } from "./site-receipt";
+import { awaitsConfirmation, isShort, siteReceiptProblem } from "./site-receipt";
 
 test("every line answered, never more than sent, and a shortage says why", () => {
   const full = [
@@ -31,4 +31,15 @@ test("short means less arrived than was sent", () => {
   assert.equal(isShort({ sent: 10, received: 9.5 }), true);
   assert.equal(isShort({ sent: 10, received: 10 }), false);
   assert.equal(isShort({ sent: 10, received: null }), false);
+});
+
+test("a delivery waits for the site until a confirmation reaches every line", () => {
+  assert.equal(awaitsConfirmation({ confirmed: false, lines: [{ received: null }] }), true);
+  assert.equal(
+    awaitsConfirmation({ confirmed: true, lines: [{ received: 5 }, { received: null }] }),
+    true,
+  );
+  assert.equal(awaitsConfirmation({ confirmed: true, lines: [{ received: 5 }] }), false);
+  // Nothing on it, nothing to confirm.
+  assert.equal(awaitsConfirmation({ confirmed: false, lines: [] }), false);
 });
