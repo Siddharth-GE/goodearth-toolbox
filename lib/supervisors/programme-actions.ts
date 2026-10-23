@@ -22,6 +22,8 @@ export type StageSnapshot = {
   waitingNote: string | null;
   startedOn: string | null;
   finishedOn: string | null;
+  /** When it entered its status; Undo sends it back, and the database takes it only if its history agrees (0138). */
+  statusChangedAt: string | null;
 };
 
 function refresh(plotId: string) {
@@ -168,6 +170,7 @@ export async function restoreStage(input: {
       waiting_note: snapshot.waitingNote,
       started_on: snapshot.startedOn,
       finished_on: snapshot.finishedOn,
+      ...(snapshot.statusChangedAt ? { status_changed_at: snapshot.statusChangedAt } : {}),
     },
     "restoreStage",
   );

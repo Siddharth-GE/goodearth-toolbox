@@ -56,6 +56,7 @@ export function controlData(plotId: string, stage: StageView): StageControlData 
       waitingNote: stage.record?.waitingNote ?? null,
       startedOn: stage.record?.startedOn ?? null,
       finishedOn: stage.record?.finishedOn ?? null,
+      statusChangedAt: stage.record?.statusChangedAt ?? null,
     },
     contractorId: stage.record?.contractorId ?? null,
     checklists: stage.checklists.map((entry) => ({
