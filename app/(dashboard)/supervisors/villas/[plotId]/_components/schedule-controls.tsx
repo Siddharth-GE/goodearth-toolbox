@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { setFirstPlan, setVillaStart } from "@/lib/supervisors/programme-actions";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState } from "react";
 
 /** The one typed date of the schedule: the day the villa's first stage starts. */
 export function VillaStartControl({ plotId, startOn }: { plotId: string; startOn: string | null }) {
@@ -94,27 +94,6 @@ export function FirstPlanControl({
         }
         onConfirm={(note) => setFirstPlan({ plotId, note })}
       />
-    </div>
-  );
-}
-
-/** The date strip's sideways scroll, opened on today rather than on the villa's first day. */
-export function ScrollToToday({
-  left,
-  className,
-  children,
-}: {
-  left: number;
-  className?: string;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.scrollLeft = Math.max(left - 40, 0);
-  }, [left]);
-  return (
-    <div ref={ref} className={className}>
-      {children}
     </div>
   );
 }
