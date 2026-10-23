@@ -104,6 +104,8 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 
 - **The Supervisors board reads every official estimate line** (`lib/supervisors/board-queries.ts`) to know which stages each villa has. Fine at today's handful of estimates; at ~100 villas it is ~80 sequential pages, so give it a small view of distinct (unit, work group) before then — with its revokes, and a Fable review.
 
+- **Look ahead reads each villa with something starting in full** (`getVillaDetail`, for material readiness). Fine for a supervisor's own villas; on Everyone at ~40 villas it is hundreds of reads, so give readiness its own narrow read of the estimate's materials and what was issued, for the villas involved, before then.
+
 ## Open questions for the founder
 
 - Should a supervisor see only their own plots? Today every supervisor sees every villa, and the same answer decides who sees which villa's drawings. The mechanism exists since `0122` (a `scoped` tool with team leads); Supervisors would first need to record which supervisor is on which villa.

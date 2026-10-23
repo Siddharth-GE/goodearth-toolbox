@@ -1,16 +1,18 @@
 import "server-only";
 
+import { listVendors } from "@/lib/masters/vendors";
 import { listWorkItems } from "@/lib/masters/works";
 import { readSiteVillas, type SiteVilla } from "./board-queries";
 import {
   contractorLoads,
   lookAhead,
+  stagesAhead,
   type BehindVilla,
   type ContractorLoad,
   type PlannedStage,
 } from "./look-ahead";
 import { storeStock } from "./programme-queries";
-import { getVillaDetail, listContractors, type VillaDetail } from "./queries";
+import { getVillaDetail, type VillaDetail } from "./queries";
 import { stageReadiness, type Readiness } from "./readiness";
 
 /** The look ahead (plan.md phase E) and the welcome counts: every villa's forecast from the board's read, with the material
@@ -37,27 +39,29 @@ export type LookAhead = {
 };
 
 function planned(villa: SiteVilla): PlannedStage[] {
-  return villa.stages.map((stage) => ({
-    plotId: villa.card.plotId,
-    plotName: villa.card.plotName,
-    villaName: villa.card.villaName,
-    groupId: stage.id,
-    code: stage.code,
-    name: stage.name,
-    status: stage.status,
-    startedOn: stage.record?.startedOn ?? null,
-    start: stage.forecast.start,
-    finish: stage.forecast.finish,
-    days: stage.forecast.days,
-    contractorId: stage.record?.contractorId ?? null,
-    waitingOn: stage.record?.waitingOn ?? null,
-  }));
+  return stagesAhead(
+    villa.stages.map((stage) => ({
+      plotId: villa.card.plotId,
+      plotName: villa.card.plotName,
+      villaName: villa.card.villaName,
+      groupId: stage.id,
+      code: stage.code,
+      name: stage.name,
+      status: stage.status,
+      startedOn: stage.record?.startedOn ?? null,
+      start: stage.forecast.start,
+      finish: stage.forecast.finish,
+      days: stage.forecast.days,
+      contractorId: stage.record?.contractorId ?? null,
+      waitingOn: stage.record?.waitingOn ?? null,
+    })),
+  );
 }
 
 export async function getLookAhead(params: { who?: string }): Promise<LookAhead> {
   const [{ user, today, villas }, contractors, works] = await Promise.all([
     readSiteVillas(),
-    listContractors(),
+    listVendors(),
     listWorkItems(),
   ]);
   const runsAny = villas.some((villa) => villa.card.supervisor?.id === user.id);
@@ -85,7 +89,7 @@ export async function getLookAhead(params: { who?: string }): Promise<LookAhead>
   }
   const stock = await storeStock([...itemIds]);
 
-  const contractorName = new Map(contractors.map((contractor) => [contractor.id, contractor.name]));
+  const contractorName = new Map(contractors.map((vendor) => [vendor.id, vendor.name]));
   const row = (stage: PlannedStage, withReadiness: boolean): LookAheadRow => {
     const workIds = worksOf(stage.groupId);
     const detail = details.get(stage.plotId);

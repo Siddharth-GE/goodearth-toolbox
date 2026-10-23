@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { contractorLoads, lookAhead, type PlannedStage } from "./look-ahead";
+import { contractorLoads, lookAhead, stagesAhead, type PlannedStage } from "./look-ahead";
 
 const TODAY = "2026-11-02";
 
@@ -115,4 +115,49 @@ test("a stage still running from before today counts from today", () => {
     TODAY,
   );
   assert.equal(load.from, TODAY);
+});
+
+test("a stage waiting before it began is in Waiting only", () => {
+  const { thisWeek, waiting } = lookAhead(
+    [stage("W", { status: "waiting", waitingOn: "material", start: "2026-11-02" })],
+    TODAY,
+  );
+  assert.equal(thisWeek.length, 0);
+  assert.equal(waiting.length, 1);
+});
+
+test("an untouched stage before the furthest begun one is left out, as on Next up", () => {
+  const ahead = stagesAhead([
+    stage("A", { status: "done", startedOn: "2026-10-01", start: "2026-10-01" }),
+    stage("B", { start: TODAY }),
+    stage("C", { status: "working", startedOn: "2026-10-20", start: "2026-10-20" }),
+    stage("D", { start: "2026-11-05" }),
+  ]);
+  assert.deepEqual(
+    ahead.map((entry) => entry.code),
+    ["A", "C", "D"],
+  );
+});
+
+test("a running stage with no days still clashes with the contractor's next villa", () => {
+  const [load] = contractorLoads(
+    [
+      stage("A", {
+        contractorId: "rafeeq",
+        status: "working",
+        startedOn: "2026-10-20",
+        start: "2026-10-20",
+      }),
+      stage("B", {
+        plotId: "p2",
+        plotName: "9",
+        contractorId: "rafeeq",
+        start: "2026-11-03",
+        finish: "2026-11-06",
+      }),
+    ],
+    TODAY,
+  );
+  assert.equal(load.villas, 2);
+  assert.equal(load.clash, true);
 });

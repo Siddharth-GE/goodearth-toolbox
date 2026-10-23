@@ -34,13 +34,21 @@ export type BehindVilla = {
 const byStart = (a: PlannedStage, b: PlannedStage) =>
   (a.start ?? "").localeCompare(b.start ?? "") || a.plotName.localeCompare(b.plotName);
 
+/**
+ * One villa's stages as the look ahead sees them: an untouched stage before the furthest one begun is left out, as the
+ * villa page's Next up leaves it out — nobody marked it, and the forecast would start it today, every day.
+ */
+export function stagesAhead(stages: PlannedStage[]): PlannedStage[] {
+  const furthest = stages.findLastIndex((stage) => stage.status !== "not_started");
+  return stages.filter((stage, index) => stage.status !== "not_started" || index > furthest);
+}
+
 /** Stages not begun, by when the forecast starts them: within 7 days, then the 14 after. Waiting stages on their own. */
 export function lookAhead(stages: PlannedStage[], today: string) {
   const weekEnd = addDays(today, THIS_WEEK_DAYS - 1);
   const aheadEnd = addDays(today, AHEAD_DAYS - 1);
-  const upcoming = stages.filter(
-    (stage) => stage.status !== "done" && !stage.startedOn && stage.start !== null,
-  );
+  // Waiting before it began is in Waiting (and in Now on its villa), not here.
+  const upcoming = stages.filter((stage) => stage.status === "not_started" && stage.start !== null);
   return {
     thisWeek: upcoming.filter((stage) => stage.start! <= weekEnd).sort(byStart),
     nextTwoWeeks: upcoming
@@ -60,16 +68,20 @@ export type ContractorLoad = {
   clash: boolean;
 };
 
-/** Each contractor's stages running in the next three weeks; a clash is two villas' stages overlapping in time. */
+/**
+ * Each contractor's stages running in the next three weeks; a clash is two villas' stages overlapping in time. A stage with no
+ * days has no finish, so it is taken to run to the end of the three weeks — a clash shown rather than one missed.
+ */
 export function contractorLoads(stages: PlannedStage[], today: string): ContractorLoad[] {
   const aheadEnd = addDays(today, AHEAD_DAYS - 1);
+  const end = (stage: PlannedStage) => stage.finish ?? aheadEnd;
   const live = stages.filter(
     (stage) =>
       stage.contractorId &&
       stage.status !== "done" &&
       stage.start !== null &&
       stage.start <= aheadEnd &&
-      (stage.finish ?? stage.start) >= today,
+      end(stage) >= today,
   );
   const byContractor = new Map<string, PlannedStage[]>();
   for (const stage of live) {
@@ -83,12 +95,7 @@ export function contractorLoads(stages: PlannedStage[], today: string): Contract
       const clash = sorted.some((a, index) =>
         sorted
           .slice(index + 1)
-          .some(
-            (b) =>
-              a.plotId !== b.plotId &&
-              a.start! <= (b.finish ?? b.start!) &&
-              b.start! <= (a.finish ?? a.start!),
-          ),
+          .some((b) => a.plotId !== b.plotId && a.start! <= end(b) && b.start! <= end(a)),
       );
       const first = sorted[0].start!;
       return {
