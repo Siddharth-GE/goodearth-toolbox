@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -13,6 +14,7 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import { deleteStockIssue } from "@/lib/inventory/actions";
 import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries";
 import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { BatchDraws } from "../../_components/batch-draws";
@@ -56,9 +58,29 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
         backHref="/inventory/issues"
         backLabel="Issues"
         actions={
-          <Badge variant={issue.is_transfer ? "info" : "warning"}>
-            {issue.is_transfer ? "Transfer" : "To site"}
-          </Badge>
+          <>
+            <Badge variant={issue.is_transfer ? "info" : "warning"}>
+              {issue.is_transfer ? "Transfer" : "To site"}
+            </Badge>
+            <DeleteOrCancel
+              noun={issue.is_transfer ? "transfer" : "issue"}
+              verb="Delete"
+              removal={
+                confirmation
+                  ? {
+                      kind: "blocked",
+                      why: "The site has confirmed it — correct it with an adjustment instead.",
+                    }
+                  : { kind: "cancel" }
+              }
+              cancelNote={
+                issue.is_transfer
+                  ? "Only while all of it is still in the receiving store. It goes back to the batches it came from, and your reason is kept on record."
+                  : "Only while the site hasn't confirmed it. It goes back to the batches it came from, a site request it filled opens again, and your reason is kept on record."
+              }
+              onCancel={deleteStockIssue.bind(null, issue.id)}
+            />
+          </>
         }
       />
 
