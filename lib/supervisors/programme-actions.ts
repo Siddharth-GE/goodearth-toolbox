@@ -222,6 +222,7 @@ export async function setStagePlan(input: {
   days: string;
   pinnedStart: string;
 }): Promise<ActionState> {
+  await requireTool(GRANT);
   const daysText = input.days.trim();
   const days = daysText ? Number(daysText) : null;
   if (days !== null && (!Number.isInteger(days) || days < 1 || days > 999)) {
@@ -286,6 +287,7 @@ export async function setVillaStart(input: {
   plotId: string;
   startOn: string;
 }): Promise<ActionState> {
+  await requireTool(GRANT);
   const startOn = input.startOn.trim();
   if (startOn && !DATE.test(startOn)) return { error: "Pick the date from the calendar." };
   return writeVilla(

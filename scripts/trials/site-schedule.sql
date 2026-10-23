@@ -71,7 +71,7 @@ begin
   exception when raise_exception then
     if sqlerrm like 'TRIAL%' then raise; end if;
   end;
-  update site_sequence set follows_group_id = (select follows_group_id from site_sequence where work_group_id = g2)
+  update site_sequence set (follows_group_id, link) = (select follows_group_id, link from site_sequence where work_group_id = g2)
    where follows_group_id = g2;
   delete from site_sequence where work_group_id = g2;
   get diagnostics n = row_count;

@@ -157,7 +157,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
     fetchAll((from, to) =>
       supabase
         .from("site_stages")
-        .select("plot_id, work_group_id, started_on, finished_on")
+        .select("plot_id, work_group_id, started_on, finished_on, status_changed_at")
         .eq("status", "done")
         .order("id")
         .range(from, to),
@@ -172,6 +172,8 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
             .select("estimate_id, unit_id, quantity")
             .eq("work_item_id", sizeWorkId)
             .order("estimate_id")
+            .order("unit_id")
+            .order("quantity")
             .range(from, to),
         )
       : Promise.resolve([]),
@@ -258,6 +260,9 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
   const samplesByGroup = new Map<string, { days: number; sqft: number | null }[]>();
   for (const row of finished) {
     if (!row.started_on || !row.finished_on) continue;
+    // A catch-up Done tap with nothing logged dates the stage to that one day: not a length to learn from.
+    if (row.started_on === row.finished_on && row.finished_on === dayInIndia(row.status_changed_at))
+      continue;
     const unit = unitOfPlot.get(row.plot_id);
     const samples = samplesByGroup.get(row.work_group_id) ?? [];
     samples.push({

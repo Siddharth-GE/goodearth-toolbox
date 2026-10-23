@@ -49,6 +49,15 @@ export async function updateSequenceStage(input: {
   if (input.followsGroupId === input.groupId) return { error: "A stage can't follow itself." };
 
   const supabase = await createClient();
+  if (input.followsGroupId) {
+    const { data: followed, error: followedError } = await supabase
+      .from("site_sequence")
+      .select("id")
+      .eq("work_group_id", input.followsGroupId)
+      .maybeSingle();
+    if (followedError) return saveFailed("updateSequenceStage read", followedError);
+    if (!followed) return { error: "That stage was taken out of the sequence — pick another." };
+  }
   const { data, error } = await supabase
     .from("site_sequence")
     .update({
@@ -141,14 +150,15 @@ export async function removeSequenceStage(input: { groupId: string }): Promise<A
   const supabase = await createClient();
   const { data: row, error } = await supabase
     .from("site_sequence")
-    .select("follows_group_id")
+    .select("follows_group_id, link")
     .eq("work_group_id", input.groupId)
     .maybeSingle();
   if (error) return saveFailed("removeSequenceStage read", error);
   if (!row) return undefined;
   const { error: repointError } = await supabase
     .from("site_sequence")
-    .update({ follows_group_id: row.follows_group_id, updated_by: user.id })
+    // Where it would have started: its followers take its place in the chain, after or alongside as it was.
+    .update({ follows_group_id: row.follows_group_id, link: row.link, updated_by: user.id })
     .eq("follows_group_id", input.groupId);
   if (repointError) return saveFailed("removeSequenceStage repoint", repointError);
   const { error: deleteError } = await supabase

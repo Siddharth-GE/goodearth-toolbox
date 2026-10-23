@@ -15,7 +15,7 @@ export default async function SequencePage() {
         backLabel="Supervisors"
         actions={<AddStage missing={sequence.missing} />}
       />
-      <TypicalSize sqft={sequence.typicalSqft} />
+      <TypicalSize key={sequence.typicalSqft ?? ""} sqft={sequence.typicalSqft} />
       {sequence.rows.length === 0 ? (
         <p className="text-muted text-sm">
           No stages in the sequence yet. Add stage puts the first one in.

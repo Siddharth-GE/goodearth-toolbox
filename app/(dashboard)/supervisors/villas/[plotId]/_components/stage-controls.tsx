@@ -400,7 +400,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
       <p className="text-muted text-xs">{usedDays}</p>
       {plan.pinnedBehind && plan.pinnedStart ? (
         <p className="text-warning text-xs">
-          {`Pinned to start ${formatShortDate(plan.pinnedStart)}, but the stages before it run until ${formatShortDate(plan.start)}.`}
+          {`Pinned to start ${formatShortDate(plan.pinnedStart)}, but it can't start before ${formatShortDate(plan.start)}.`}
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3">

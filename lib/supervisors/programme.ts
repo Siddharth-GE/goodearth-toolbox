@@ -63,7 +63,8 @@ export type ProgrammeStage = GroupInfo & {
 
 /**
  * The villa's stages: the sequence's stages its official estimate covers (every one when it has no
- * official estimate), any other stage the estimate covers, and any stage something already happened on.
+ * official estimate), any other stage the estimate covers, and any stage something already happened on
+ * (begun, or given a contractor).
  * Sequence order first, the rest by the works list's order.
  */
 export function buildProgramme(input: {
@@ -83,7 +84,11 @@ export function buildProgramme(input: {
       ids.add(entry.groupId);
   }
   for (const id of input.estimateGroupIds ?? []) ids.add(id);
-  for (const record of input.records) ids.add(record.groupId);
+  // A row only holding days or a first plan does not keep a stage the estimate dropped.
+  for (const record of input.records) {
+    if (record.status !== "not_started" || record.startedOn || record.contractorId)
+      ids.add(record.groupId);
+  }
 
   return [...ids]
     .flatMap((id) => {

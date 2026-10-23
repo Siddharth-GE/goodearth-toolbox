@@ -221,3 +221,15 @@ test("progress sets piece-work against the estimate in the estimate's unit, neve
     { workItemId: "w2", label: "SS.01.03 Curing", logged: 12, estimated: null, uom: "nos" },
   ]);
 });
+
+test("a stage row holding only days or a first plan does not keep a stage in the programme", () => {
+  const planned = programme([
+    record("LP.01", { status: "not_started", startedOn: null, contractorId: null }),
+  ]).filter((stage) => stage.id === "LP.01");
+  // With no official estimate every sequence stage is listed; LP.01 is not in the sequence.
+  assert.equal(planned.length, 0);
+  const hired = programme([
+    record("LP.01", { status: "not_started", startedOn: null, contractorId: "c1" }),
+  ]).filter((stage) => stage.id === "LP.01");
+  assert.equal(hired.length, 1);
+});

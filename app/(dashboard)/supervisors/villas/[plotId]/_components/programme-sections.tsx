@@ -541,6 +541,7 @@ export function ProgrammeList({
                     {[
                       STAGE_STATUS_LABEL[stage.status],
                       dates,
+                      stage.forecast.slip ? describeSlip(stage.forecast.slip) : null,
                       stage.contractorName,
                       checklist
                         ? checklist.status === "signed_off"

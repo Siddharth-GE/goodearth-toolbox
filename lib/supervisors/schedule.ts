@@ -53,7 +53,7 @@ export type StageForecast = {
   start: string | null;
   /** The last day of the stage, inclusive. */
   finish: string | null;
-  /** A pinned start the chain before it has overtaken: the stage starts later than pinned. */
+  /** A stage not started that will start later than its pinned start: the chain overtook it, or the day passed. */
   pinnedBehind: boolean;
   /** Days the forecast finish sits after the first plan's (negative: ahead). Null without a first plan. */
   slip: number | null;
@@ -221,7 +221,6 @@ export function forecastVilla(input: {
       learnedFrom: null,
     };
     const notStarted = stage.status !== "done" && !stage.startedOn;
-    const chain = notStarted && stage.pinnedStart ? chainStart(stage) : null;
     const working = stage.status !== "done" && stage.startedOn !== null;
     const planned =
       working && chosen.days
@@ -235,7 +234,7 @@ export function forecastVilla(input: {
       ...chosen,
       start,
       finish,
-      pinnedBehind: Boolean(chain && stage.pinnedStart && chain > stage.pinnedStart),
+      pinnedBehind: Boolean(notStarted && stage.pinnedStart && start && start > stage.pinnedStart),
       slip:
         input.baselined && stage.baselineFinish && finish
           ? daysBetween(stage.baselineFinish, finish)
@@ -247,11 +246,12 @@ export function forecastVilla(input: {
   const finishes = forecasts.map((stage) => stage.finish);
   const handover =
     finishes.length > 0 && finishes.every(Boolean) ? (finishes as string[]).reduce(later) : null;
-  const baselineFinishes = stages.map((stage) => stage.baselineFinish);
+  // A stage that joined after the first plan has none; the plan's handover is the last finish it held.
+  const baselineFinishes = stages.flatMap((stage) =>
+    stage.baselineFinish ? [stage.baselineFinish] : [],
+  );
   const baselineHandover =
-    input.baselined && baselineFinishes.length > 0 && baselineFinishes.every(Boolean)
-      ? (baselineFinishes as string[]).reduce(later)
-      : null;
+    input.baselined && baselineFinishes.length > 0 ? baselineFinishes.reduce(later) : null;
 
   return {
     stages: forecasts,

@@ -315,3 +315,23 @@ test("learned days need three finished villas: per sqft when sizes are known, pl
     { days: 13, villas: 4 },
   );
 });
+
+test("a pinned start already past says so; the first plan's handover ignores a stage that joined later", () => {
+  const passed = forecast({
+    stages: [stage("A", { pinnedStart: "2026-10-20" })],
+    sequence: [rule("A", null)],
+    days: { A: 2 },
+    startOn: "2026-10-15",
+  });
+  assert.equal(byId(passed, "A").start, TODAY);
+  assert.equal(byId(passed, "A").pinnedBehind, true);
+
+  const joined = forecast({
+    stages: [stage("A", { baselineStart: "2026-11-02", baselineFinish: "2026-11-03" }), stage("Z")],
+    sequence: [rule("A", null)],
+    days: { A: 2, Z: 3 },
+    baselined: true,
+  });
+  assert.equal(joined.baselineHandover, "2026-11-03");
+  assert.equal(joined.slip, 3);
+});
