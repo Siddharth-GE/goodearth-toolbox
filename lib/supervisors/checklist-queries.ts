@@ -166,7 +166,8 @@ export type ChecklistItemRow = {
   reviewNote: string | null;
   status: CheckStatus;
   remarks: string | null;
-  hasPhoto: boolean;
+  /** The stored photo's name, used to version its link; null without one. */
+  photo: string | null;
 };
 
 export type ChecklistDetail = {
@@ -186,9 +187,13 @@ export type ChecklistDetail = {
   signedOffAt: string | null;
   signedOffByName: string | null;
   createdByName: string | null;
-  hasAttachment: boolean;
+  /** The stored attachment's name, used to version its link; null without one. */
+  attachment: string | null;
   items: ChecklistItemRow[];
 };
+
+// A replacement is a new path; its name in the link keeps a browser from showing the old file from its cache.
+const fileName = (path: string | null) => (path ? path.slice(path.lastIndexOf("/") + 1) : null);
 
 export async function getChecklist(checklistId: string): Promise<ChecklistDetail | null> {
   await requireTool(GRANT);
@@ -249,7 +254,7 @@ export async function getChecklist(checklistId: string): Promise<ChecklistDetail
     signedOffAt: checklist.signed_off_at,
     signedOffByName: nameOf(checklist.signed_off_by),
     createdByName: nameOf(checklist.created_by),
-    hasAttachment: checklist.attachment_path !== null,
+    attachment: fileName(checklist.attachment_path),
     items: items
       .map((item) => {
         const source = item.checklist_template_items as {
@@ -266,7 +271,7 @@ export async function getChecklist(checklistId: string): Promise<ChecklistDetail
           reviewNote: source?.review_note ?? null,
           status: checkStatusOf(item.status) ?? "not_checked",
           remarks: item.remarks,
-          hasPhoto: item.photo_path !== null,
+          photo: fileName(item.photo_path),
         };
       })
       .sort((a, b) => a.sortOrder - b.sortOrder),

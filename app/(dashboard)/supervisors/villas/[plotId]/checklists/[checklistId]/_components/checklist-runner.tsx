@@ -81,7 +81,10 @@ export function ChecklistRunner({
   const [index, setIndex] = useState(firstOpen === -1 ? items.length : firstOpen);
   const [asking, setAsking] = useState<"fail" | "na" | null>(null);
   const [remark, setRemark] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // A photo still uploading holds the screen, so its refusal is never lost by moving on.
+  const [uploading, setUploading] = useState(false);
+  const busy = saving || uploading;
   const [error, setError] = useState<string>();
 
   const current = items.map((item) => answers[item.id]);
@@ -107,10 +110,10 @@ export function ChecklistRunner({
 
   const save = async (next: Answer) => {
     if (!item) return;
-    setBusy(true);
+    setSaving(true);
     setError(undefined);
     const result = await answerChecklistItem(item.id, next);
-    setBusy(false);
+    setSaving(false);
     if (result?.error) return setError(result.error);
     const saved = { ...answers, [item.id]: next };
     setAnswers(saved);
@@ -118,6 +121,7 @@ export function ChecklistRunner({
   };
 
   const ask = (status: "fail" | "na") => {
+    if (asking === status) return;
     setAsking(status);
     setRemark(answer?.status === status ? (answer.remarks ?? "") : "");
     setError(undefined);
@@ -265,11 +269,12 @@ export function ChecklistRunner({
           <UploadButton
             photo
             action={uploadChecklistItemPhoto.bind(null, item.id)}
-            label={item.hasPhoto ? "Retake photo" : "Photo"}
+            label={item.photo ? "Retake photo" : "Photo"}
+            onBusyChange={setUploading}
           />
-          {item.hasPhoto ? (
+          {item.photo ? (
             <a
-              href={`/supervisors/checklists/photos/${item.id}`}
+              href={`/supervisors/checklists/photos/${item.id}?v=${item.photo}`}
               target="_blank"
               rel="noreferrer"
               className="text-accent inline-flex min-h-9 items-center gap-1 text-sm font-medium"

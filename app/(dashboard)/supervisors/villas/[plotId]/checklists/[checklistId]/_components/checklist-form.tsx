@@ -79,9 +79,9 @@ export function ChecklistForm({ checklist }: { checklist: ChecklistDetail }) {
 
       <Section title="Attachment" note="A test certificate or a photo — one file, PDF or picture.">
         <div className="flex flex-wrap items-center gap-3">
-          {checklist.hasAttachment ? (
+          {checklist.attachment ? (
             <a
-              href={`/supervisors/checklists/files/${checklist.id}`}
+              href={`/supervisors/checklists/files/${checklist.id}?v=${checklist.attachment}`}
               target="_blank"
               rel="noreferrer"
               className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium"
@@ -95,7 +95,7 @@ export function ChecklistForm({ checklist }: { checklist: ChecklistDetail }) {
           {open && (
             <UploadButton
               action={uploadChecklistFile.bind(null, checklist.id)}
-              label={checklist.hasAttachment ? "Replace" : "Attach a file"}
+              label={checklist.attachment ? "Replace" : "Attach a file"}
             />
           )}
         </div>
@@ -288,9 +288,9 @@ function ItemRow({
         <span className="text-muted mr-1.5 tabular-nums">{number}.</span>
         {item.text}
       </p>
-      {item.hasPhoto && (
+      {item.photo && (
         <a
-          href={`/supervisors/checklists/photos/${item.id}`}
+          href={`/supervisors/checklists/photos/${item.id}?v=${item.photo}`}
           target="_blank"
           rel="noreferrer"
           className="text-accent inline-flex items-center gap-1 text-xs font-medium"

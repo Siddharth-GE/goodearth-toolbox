@@ -106,7 +106,7 @@ export function TemplateList({
                 <StagesDialog
                   templateId={template.id}
                   name={template.name}
-                  linked={linked}
+                  linkedIds={stagesByTemplate[template.id] ?? []}
                   stages={stages}
                 />
                 <TemplateDialog template={template} />
@@ -137,12 +137,13 @@ export function TemplateList({
 function StagesDialog({
   templateId,
   name,
-  linked,
+  linkedIds,
   stages,
 }: {
   templateId: string;
   name: string;
-  linked: Stage[];
+  /** Every linked stage, a switched-off one included, so saving never drops it unseen. */
+  linkedIds: string[];
   stages: Stage[];
 }) {
   const [open, setOpen] = useState(false);
@@ -156,7 +157,7 @@ function StagesDialog({
       open={open}
       onOpenChange={(next) => {
         if (next) {
-          setChosen(linked.map((stage) => stage.id));
+          setChosen(linkedIds);
           setAdding("");
           clearError();
         }

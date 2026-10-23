@@ -19,14 +19,17 @@ export function UploadButton({
   size = "sm",
   photo = false,
   className,
+  onBusyChange,
 }: {
   action: (formData: FormData) => Promise<ActionState>;
   fields?: Record<string, string>;
   label?: string;
   size?: "sm" | "md";
-  /** A picture only, the camera first on a phone. */
+  /** A picture only: a phone offers its camera beside the gallery. */
   photo?: boolean;
   className?: string;
+  /** Told when an upload starts and ends, so a screen can hold still meanwhile. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -35,6 +38,7 @@ export function UploadButton({
 
   const choose = async (file: File) => {
     setBusy(true);
+    onBusyChange?.(true);
     setError(undefined);
     try {
       let prepared: { blob: Blob; name: string; type: string };
@@ -52,6 +56,7 @@ export function UploadButton({
       else router.refresh();
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -62,7 +67,6 @@ export function UploadButton({
         ref={inputRef}
         type="file"
         accept={photo ? "image/*" : "application/pdf,image/*"}
-        capture={photo ? "environment" : undefined}
         className="sr-only"
         tabIndex={-1}
         onChange={(event) => {
