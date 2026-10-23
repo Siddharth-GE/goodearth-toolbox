@@ -83,17 +83,20 @@ Settled with the founder 2026-10-23. Dates are worked out on every read, never s
 - **Labour** on the same page: per contractor, the stages they are planned on in the next two weeks, so a clash shows ("Rafeeq Masonry on 3 villas from Monday").
 - The Supervisors welcome counts become: working stages, starting this week, waiting, deliveries to confirm.
 
+- [x] [Opus] Built 2026-10-23 on `feature/look-ahead`, code only. Buckets: this week is today and the six days after, the next two weeks the fourteen after that; a stage already begun is in Now on its villa, not here. **Behind the first plan** lists villas, not stages — every stage after a late one slips with it, so per-stage rows would only repeat the villa. Contractors are shown over the same three weeks as the buckets (the plan said two). A clash is two villas' stages for one contractor overlapping in time; a stage with no days counts as running to the end of the three weeks. An untouched stage before the furthest begun one is left out, as Next up leaves it out. Material readiness reuses the villa page's own read for each villa with something starting; Request opens the villa's request sheet narrowed to the stage. Rules in `lib/supervisors/look-ahead.ts`, tested. Fable waived as for B.
+- [ ] [Founder] Vet phase E on staging.
+
 ## Verification
 
 Pure rules tested (`programme.ts`, `schedule.ts`, health, readiness). `0137` dry-run with a trial as a supervisor and as the probe; the labour trigger trial (first log starts the stage, a second does not move it, a done stage stays done); the sequence cycle refused. Every new select run at staging. Phone screenshots at 390×844 of the villa page, the schedule strip, the runner and the board before each merge. The founder vets each phase on staging.
 
 ## Next session — start here, after "read CLAUDE.md"
 
-Done 2026-10-22/23: #122 vetted, the masters import, the questions settled, the schedule designed, and **phase A merged into `staging` as #123** (`0137`, `0138` on staging's database).
+Done 2026-10-22/23: #122 vetted, the masters import, the questions settled, and **phases A–D merged into `staging`** (#123 programme, #124 schedule, #125 checklist runner, #126 board); phase E (look ahead) is its own pull request.
 
-1. **Ask the founder how phase A looked on staging** (their checklist: open a Saarang villa in Supervisors on a phone — the header and stage rail, Now, Next up, the Programme; tap Working / Waiting / Done and Undo; Log labour from a stage; open a stage from the Programme). Anything broken is fixed first. Still theirs: re-send the works list to SketchUp; typical days per stage from the site team.
-2. **Phase B is on staging** (its pull request). The founder's checklist: Supervisors → Sequence — type typical days for the first few stages and the typical villa size; open a villa, set its start date in Schedule; the strip fills, Next up shows dates, the header shows the handover; open a stage and give it its own days or a "not before" date; Set the first plan, then set it again (it asks why).
-3. Then C (checklist runner), D (the board), E (look ahead), one pull request each.
+1. **Ask the founder how A–E looked on staging**, phase by phase, from the Verification checklists in each phase's pull request. Anything broken is fixed first.
+2. Still theirs: typical days per stage from the site team (Supervisors → Sequence) and each villa's start date; re-send the works list to SketchUp.
+3. When this plan is vetted, what lasts is already in `app/(dashboard)/supervisors/PLAN.md`; this section goes.
 
 ## Settled by the founder, 2026-10-23
 

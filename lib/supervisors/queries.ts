@@ -26,51 +26,6 @@ const GRANT = "/supervisors";
 const fail = (context: string, error: { message: string }): never =>
   readFailed("supervisors", context, error);
 
-export async function getWelcomeCounts(): Promise<{
-  villas: number;
-  workersThisWeek: number;
-  openRequests: number;
-  contractors: number;
-}> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  const since = weekAgo.toISOString().slice(0, 10);
-
-  const [villas, weekLogs, openRequests, contractors] = await Promise.all([
-    supabase.from("units").select("id", { count: "exact", head: true }),
-    fetchAll<{ masons: number; helpers: number; others: number }>((from, to) =>
-      supabase
-        .from("labour_logs")
-        .select("masons, helpers, others")
-        .gte("log_date", since)
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("issue_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "requested"),
-    supabase
-      .from("vendors")
-      .select("id", { count: "exact", head: true })
-      .eq("is_contractor", true)
-      .eq("is_active", true),
-  ]);
-
-  const failed = villas.error ?? openRequests.error ?? contractors.error;
-  if (failed) fail("the welcome counts", failed);
-
-  return {
-    villas: villas.count ?? 0,
-    workersThisWeek: weekLogs.reduce((sum, log) => sum + log.masons + log.helpers + log.others, 0),
-    openRequests: openRequests.count ?? 0,
-    contractors: contractors.count ?? 0,
-  };
-}
-
 export type VillaWorkGroup = {
   workItemId: string;
   workLabel: string;

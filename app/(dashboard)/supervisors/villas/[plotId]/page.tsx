@@ -35,6 +35,7 @@ import { getVillaProgramme, storeStock } from "@/lib/supervisors/programme-queri
 import Link from "next/link";
 import { listVillaDeliveries, type VillaDelivery } from "@/lib/supervisors/site-receipt-queries";
 import { isShort } from "@/lib/supervisors/site-receipt";
+import { stageReadiness } from "@/lib/supervisors/readiness";
 import { firstPlanBlocker } from "@/lib/supervisors/schedule";
 import { StartChecklistDialog } from "./_components/checklist-forms";
 import { ConfirmDeliveryDialog } from "./_components/delivery-forms";
@@ -46,7 +47,6 @@ import {
   ProgrammeList,
   StageHistory,
   VillaHeader,
-  stageReadiness,
 } from "./_components/programme-sections";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
 import { FirstPlanControl, VillaStartControl } from "./_components/schedule-controls";
@@ -90,9 +90,11 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
   const nextItemIds = [
     ...new Set(
       programme.next.flatMap((stage) =>
-        stageReadiness(stage, villa, new Map()).flatMap((row) =>
-          row.pick ? [row.pick.itemId] : [],
-        ),
+        stageReadiness(
+          stage.works.map((work) => work.id),
+          villa,
+          new Map(),
+        ).flatMap((row) => (row.pick ? [row.pick.itemId] : [])),
       ),
     ),
   ];
@@ -179,7 +181,11 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                 key={stage.id}
                 plotId={plotId}
                 stage={stage}
-                readiness={stageReadiness(stage, villa, stock)}
+                readiness={stageReadiness(
+                  stage.works.map((work) => work.id),
+                  villa,
+                  stock,
+                )}
                 works={works}
                 contractors={contractors}
                 villa={villa}
