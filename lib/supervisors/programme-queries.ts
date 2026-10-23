@@ -108,8 +108,36 @@ export type VillaProgramme = {
 
 const HISTORY_SHOWN = 40;
 
-/** What both the page and "Set the first plan" need: the villa's stages in order, with their forecast. */
-async function readProgramme(supabase: Client, plotId: string, unitId: string | null) {
+export type StageRow = {
+  id: string;
+  work_group_id: string;
+  status: string;
+  status_changed_at: string;
+  waiting_on: string | null;
+  waiting_note: string | null;
+  started_on: string | null;
+  finished_on: string | null;
+  contractor_id: string | null;
+  days: number | null;
+  pinned_start: string | null;
+  baseline_start: string | null;
+  baseline_finish: string | null;
+};
+
+export type SiteVillaRow = {
+  supervisor_id: string | null;
+  start_on: string | null;
+  baselined_at: string | null;
+} | null;
+
+export type EstimateRow = {
+  work_item_id: string | null;
+  quantity: number | null;
+  uom: string | null;
+};
+
+/** What every villa's programme is worked out from: the works lists, the sequence, and what finished villas teach. */
+export async function readShared(supabase: Client) {
   const today = todayInIndia();
   const [categories, groups, works] = await Promise.all([
     listWorkCategories(),
@@ -118,7 +146,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
   ]);
   const sizeWorkId = works.find((work) => work.code === SIZE_WORK_CODE)?.id ?? null;
 
-  const [sequence, records, site, settings, estimate, finished, units, sizes] = await Promise.all([
+  const [sequence, settings, finished, units, sizes] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("site_sequence")
@@ -127,32 +155,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
         .order("id")
         .range(from, to),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("site_stages")
-        .select(
-          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish",
-        )
-        .eq("plot_id", plotId)
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("site_villas")
-      .select("supervisor_id, start_on, baselined_at")
-      .eq("plot_id", plotId)
-      .maybeSingle(),
     supabase.from("site_schedule_settings").select("typical_sqft").maybeSingle(),
-    unitId
-      ? fetchAll((from, to) =>
-          supabase
-            .from("estimate_work_facts")
-            .select("work_item_id, quantity, uom")
-            .eq("unit_id", unitId)
-            .order("work_item_id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
     // Every villa's finished stages: what the schedule learns its days from.
     fetchAll((from, to) =>
       supabase
@@ -178,7 +181,6 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
         )
       : Promise.resolve([]),
   ]);
-  if (site.error) fail("the villa's schedule", site.error);
   if (settings.error) fail("the schedule settings", settings.error);
 
   const categoryById = new Map(categories.map((category) => [category.id, category]));
@@ -196,52 +198,6 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
     ];
   });
 
-  const groupOfWork = new Map(works.map((work) => [work.id, work.group_id]));
-  const estimateRows = estimate.flatMap((row) =>
-    row.work_item_id && row.quantity !== null
-      ? [{ workItemId: row.work_item_id, quantity: row.quantity, uom: row.uom }]
-      : [],
-  );
-  const estimateGroupIds = unitId
-    ? new Set(
-        estimate.flatMap((row) => {
-          const group = row.work_item_id ? groupOfWork.get(row.work_item_id) : null;
-          return group ? [group] : [];
-        }),
-      )
-    : null;
-
-  const stageRecords: StageRecord[] = records.map((record) => ({
-    id: record.id,
-    groupId: record.work_group_id,
-    status: isStageStatus(record.status) ? record.status : "not_started",
-    statusChangedAt: record.status_changed_at,
-    waitingOn: record.waiting_on && isWaitingOn(record.waiting_on) ? record.waiting_on : null,
-    waitingNote: record.waiting_note,
-    startedOn: record.started_on,
-    finishedOn: record.finished_on,
-    contractorId: record.contractor_id,
-  }));
-  const planByGroup = new Map<string, StagePlan>(
-    records.map((record) => [
-      record.work_group_id,
-      {
-        ownDays: record.days,
-        pinnedStart: record.pinned_start,
-        baselineStart: record.baseline_start,
-        baselineFinish: record.baseline_finish,
-      },
-    ]),
-  );
-
-  const programme = buildProgramme({
-    groups: groupInfos,
-    sequence: sequence.map((entry) => ({ groupId: entry.work_group_id, position: entry.position })),
-    // A villa whose official estimate names no grouped work is planned like one with none.
-    estimateGroupIds: estimateGroupIds && estimateGroupIds.size > 0 ? estimateGroupIds : null,
-    records: stageRecords,
-  });
-
   // A villa's size: its official estimate's block-work quantity, the largest when a unit has more than one official copy.
   const sizeByUnit = new Map<string, number>();
   const perEstimate = new Map<string, { unitId: string; sqft: number }>();
@@ -255,7 +211,6 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
     if (sqft > 0) sizeByUnit.set(unit, Math.max(sizeByUnit.get(unit) ?? 0, sqft));
   }
   const unitOfPlot = new Map(units.map((unit) => [unit.plot_id, unit.id]));
-  const villaSqft = unitId ? (sizeByUnit.get(unitId) ?? null) : null;
 
   const samplesByGroup = new Map<string, { days: number; sqft: number | null }[]>();
   for (const row of finished) {
@@ -279,23 +234,99 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
     waitDays: entry.wait_days,
     typicalDays: entry.typical_days,
   }));
-  const typicalByGroup = new Map(sequenceRules.map((rule) => [rule.groupId, rule.typicalDays]));
-  const typicalSqft = settings.data?.typical_sqft ?? null;
+
+  return {
+    today,
+    works,
+    groupInfos,
+    groupOfWork: new Map(works.map((work) => [work.id, work.group_id])),
+    sequencePositions: sequence.map((entry) => ({
+      groupId: entry.work_group_id,
+      position: entry.position,
+    })),
+    sequenceRules,
+    typicalByGroup: new Map(sequenceRules.map((rule) => [rule.groupId, rule.typicalDays])),
+    typicalSqft: settings.data?.typical_sqft ?? null,
+    samplesByGroup,
+    sizeByUnit,
+  };
+}
+
+export type Shared = Awaited<ReturnType<typeof readShared>>;
+
+/** One villa's stages in order, with their forecast, from what readShared holds and the villa's own rows. */
+export function planVilla(
+  shared: Shared,
+  input: {
+    unitId: string | null;
+    records: StageRow[];
+    site: SiteVillaRow;
+    estimate: EstimateRow[];
+  },
+) {
+  const { today, groupOfWork } = shared;
+  const { unitId } = input;
+  const estimateRows = input.estimate.flatMap((row) =>
+    row.work_item_id && row.quantity !== null
+      ? [{ workItemId: row.work_item_id, quantity: row.quantity, uom: row.uom }]
+      : [],
+  );
+  const estimateGroupIds = unitId
+    ? new Set(
+        input.estimate.flatMap((row) => {
+          const group = row.work_item_id ? groupOfWork.get(row.work_item_id) : null;
+          return group ? [group] : [];
+        }),
+      )
+    : null;
+
+  const stageRecords: StageRecord[] = input.records.map((record) => ({
+    id: record.id,
+    groupId: record.work_group_id,
+    status: isStageStatus(record.status) ? record.status : "not_started",
+    statusChangedAt: record.status_changed_at,
+    waitingOn: record.waiting_on && isWaitingOn(record.waiting_on) ? record.waiting_on : null,
+    waitingNote: record.waiting_note,
+    startedOn: record.started_on,
+    finishedOn: record.finished_on,
+    contractorId: record.contractor_id,
+  }));
+  const planByGroup = new Map<string, StagePlan>(
+    input.records.map((record) => [
+      record.work_group_id,
+      {
+        ownDays: record.days,
+        pinnedStart: record.pinned_start,
+        baselineStart: record.baseline_start,
+        baselineFinish: record.baseline_finish,
+      },
+    ]),
+  );
+
+  const programme = buildProgramme({
+    groups: shared.groupInfos,
+    sequence: shared.sequencePositions,
+    // A villa whose official estimate names no grouped work is planned like one with none.
+    estimateGroupIds: estimateGroupIds && estimateGroupIds.size > 0 ? estimateGroupIds : null,
+    records: stageRecords,
+  });
+
+  const villaSqft = unitId ? (shared.sizeByUnit.get(unitId) ?? null) : null;
   const daysByGroup = new Map(
     programme.map((stage) => [
       stage.id,
       stageDays({
         own: planByGroup.get(stage.id)?.ownDays ?? null,
-        learned: learnedDays(samplesByGroup.get(stage.id) ?? [], villaSqft),
-        typicalDays: typicalByGroup.get(stage.id) ?? null,
+        learned: learnedDays(shared.samplesByGroup.get(stage.id) ?? [], villaSqft),
+        typicalDays: shared.typicalByGroup.get(stage.id) ?? null,
         villaSqft,
-        typicalSqft,
+        typicalSqft: shared.typicalSqft,
       }),
     ]),
   );
 
-  const startOn = site.data?.start_on ?? null;
-  const baselinedAt = site.data?.baselined_at ?? null;
+  const startOn = input.site?.start_on ?? null;
+  const baselinedAt = input.site?.baselined_at ?? null;
   const scheduleStages: ScheduleStage[] = programme.map((stage) => {
     const plan = planByGroup.get(stage.id);
     return {
@@ -311,7 +342,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
   });
   const schedule = forecastVilla({
     stages: scheduleStages,
-    sequence: sequenceRules,
+    sequence: shared.sequenceRules,
     startOn,
     today,
     daysByGroup,
@@ -320,18 +351,52 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
 
   return {
     today,
-    works,
-    groupInfos,
+    works: shared.works,
+    groupInfos: shared.groupInfos,
     groupOfWork,
     estimateRows,
     programme,
     planByGroup,
     schedule,
-    supervisorId: site.data?.supervisor_id ?? null,
+    supervisorId: input.site?.supervisor_id ?? null,
     startOn,
     baselinedAt,
     villaSqft,
   };
+}
+
+/** What both the page and "Set the first plan" need: the villa's stages in order, with their forecast. */
+async function readProgramme(supabase: Client, plotId: string, unitId: string | null) {
+  const [shared, records, site, estimate] = await Promise.all([
+    readShared(supabase),
+    fetchAll((from, to) =>
+      supabase
+        .from("site_stages")
+        .select(
+          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish",
+        )
+        .eq("plot_id", plotId)
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("site_villas")
+      .select("supervisor_id, start_on, baselined_at")
+      .eq("plot_id", plotId)
+      .maybeSingle(),
+    unitId
+      ? fetchAll((from, to) =>
+          supabase
+            .from("estimate_work_facts")
+            .select("work_item_id, quantity, uom")
+            .eq("unit_id", unitId)
+            .order("work_item_id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  if (site.error) fail("the villa's schedule", site.error);
+  return planVilla(shared, { unitId, records, site: site.data, estimate });
 }
 
 const NO_PLAN: StagePlan = {

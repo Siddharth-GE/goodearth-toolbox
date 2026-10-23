@@ -71,47 +71,6 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
-export type VillaRow = {
-  plotId: string;
-  unitId: string;
-  villaName: string;
-  plotName: string;
-  projectName: string;
-};
-
-export async function listVillas(): Promise<VillaRow[]> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const [units, plots, projects] = await Promise.all([
-    fetchAll<{ id: string; project_id: string; plot_id: string; name: string }>((from, to) =>
-      supabase
-        .from("units")
-        .select("id, project_id, plot_id, name")
-        .order("name")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("plots").select("id, name").order("id").range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("projects").select("id, name").order("id").range(from, to),
-    ),
-  ]);
-
-  const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-
-  return units.map((unit) => ({
-    plotId: unit.plot_id,
-    unitId: unit.id,
-    villaName: unit.name,
-    plotName: plotNames.get(unit.plot_id) ?? "—",
-    projectName: projectNames.get(unit.project_id) ?? "—",
-  }));
-}
-
 export type VillaWorkGroup = {
   workItemId: string;
   workLabel: string;
