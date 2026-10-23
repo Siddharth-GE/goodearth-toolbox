@@ -12,12 +12,8 @@ import {
   type StageStatus,
 } from "@/lib/supervisors/programme";
 import type { StageEvent, StageView, VillaProgramme } from "@/lib/supervisors/programme-queries";
-import type {
-  ContractorOption,
-  EstimateQuickPick,
-  VillaDetail,
-  WorkOption,
-} from "@/lib/supervisors/queries";
+import type { ContractorOption, VillaDetail, WorkOption } from "@/lib/supervisors/queries";
+import type { Readiness } from "@/lib/supervisors/readiness";
 import { cn } from "@/lib/utils";
 import { ChevronRight, ClipboardCheck, HardHat, Package } from "lucide-react";
 import { StartChecklistDialog } from "./checklist-forms";
@@ -334,54 +330,6 @@ export function NowCard({
       <StageStatusChips stage={controlData(plotId, stage)} />
     </Card>
   );
-}
-
-type Readiness = {
-  key: string;
-  materialName: string;
-  uom: string;
-  estimated: number;
-  drawn: number | null;
-  pick: EstimateQuickPick | null;
-  held: number | null;
-  left: number | null;
-};
-
-/** Each material the estimate needs for a stage: drawn so far, what the stores hold, and what is left to ask for. */
-export function stageReadiness(
-  stage: StageView,
-  villa: VillaDetail,
-  stock: Map<string, number>,
-): Readiness[] {
-  const workIds = new Set(stage.works.map((work) => work.id));
-  return villa.workGroups
-    .filter((group) => workIds.has(group.workItemId))
-    .flatMap((group) =>
-      group.rows.map((row) => {
-        const pick =
-          villa.quickPicks.find(
-            (entry) =>
-              entry.workItemId === row.workItemId && entry.materialName === row.materialName,
-          ) ?? null;
-        const sameUnit =
-          pick !== null && pick.itemUom.trim().toLowerCase() === row.uom.trim().toLowerCase();
-        // Rounded so a request never pre-fills 7.099999999999999.
-        const left =
-          Math.round(
-            (row.issued !== null ? Math.max(row.estimated - row.issued, 0) : row.estimated) * 1000,
-          ) / 1000;
-        return {
-          key: `${row.workItemId}-${row.materialName}`,
-          materialName: row.materialName,
-          uom: row.uom,
-          estimated: row.estimated,
-          drawn: row.issued,
-          pick,
-          held: pick ? (stock.get(pick.itemId) ?? 0) : null,
-          left: sameUnit ? left : null,
-        };
-      }),
-    );
 }
 
 /** A stage coming up: who will do it, and whether its material is ready. */

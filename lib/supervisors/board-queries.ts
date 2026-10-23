@@ -86,12 +86,8 @@ export const BOARD_HEALTH: HealthKind[] = [
 const isHealth = (value: string | undefined): value is HealthKind =>
   (BOARD_HEALTH as string[]).includes(value ?? "");
 
-export async function getSiteBoard(params: {
-  q?: string;
-  project?: string;
-  who?: string;
-  health?: string;
-}): Promise<SiteBoard> {
+/** Every villa worked out once, for the board, the look ahead and the welcome counts. */
+export async function readSiteVillas() {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
 
@@ -355,7 +351,7 @@ export async function getSiteBoard(params: {
     if (name && !categories.includes(name)) categories.push(name);
   }
 
-  const all: BoardCard[] = units.map((unit) => {
+  const villas = units.map((unit) => {
     const records = (stagesByPlot.get(unit.plot_id) ?? []) as (StageRow & { plot_id: string })[];
     const site = villaByPlot.get(unit.plot_id);
     const plan = planVilla(shared, {
@@ -393,7 +389,7 @@ export async function getSiteBoard(params: {
             NOT_STARTED_COLUMN);
     const first = now[0];
     const supervisorId = site?.supervisor_id ?? null;
-    return {
+    const card: BoardCard = {
       plotId: unit.plot_id,
       plotName: plotNames.get(unit.plot_id) ?? "—",
       villaName: unit.name,
@@ -426,7 +422,22 @@ export async function getSiteBoard(params: {
       supervisor: supervisorId ? { id: supervisorId, name: names.get(supervisorId) ?? "—" } : null,
       column,
     };
+    return { card, unitId: unit.id, stages, baselined: plan.baselinedAt !== null };
   });
+
+  return { user, today, villas, categories };
+}
+
+export type SiteVilla = Awaited<ReturnType<typeof readSiteVillas>>["villas"][number];
+
+export async function getSiteBoard(params: {
+  q?: string;
+  project?: string;
+  who?: string;
+  health?: string;
+}): Promise<SiteBoard> {
+  const { user, today, villas, categories } = await readSiteVillas();
+  const all = villas.map((villa) => villa.card);
 
   const runsAny = all.some((card) => card.supervisor?.id === user.id);
   const who = params.who === "mine" || params.who === "all" ? params.who : runsAny ? "mine" : "all";
