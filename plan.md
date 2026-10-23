@@ -11,13 +11,53 @@ The founder's asks, in this order, each its own pull request into `staging` and 
    - [x] **Plot 2 went to Baveli's P2** (plot codes repeat across projects; the script now takes `--plots-in`). Put right 2026-10-23 by the Operations clear below and a re-load into Saarang.
    - [x] **Operations cleared** on the founder's word, 2026-10-23 (`scripts/clear-operations.ts`, backup `data/backups/2026-10-23T12-14-42-633Z-…-clear-operations`): every record in Indents, POs, Inventory, Bills, Budgets, Selections, estimates and Supervisors; setup, the rate book and other tools kept; numbering restarts. Then the workbook re-loaded for Saarang: 13 villas, 198 stages; Baveli P2 is empty again.
    - [x] Review fixes: labour on a stage left off brings it back (`0141`, on staging); every stage left off can be brought back; a chain of villa choices orders the same every time; the dialog keeps "to fill in" unless its days changed; a villa's own order works on a stage the sequence does not name; refused numbers say why on the phone; the two scroll bars follow by position.
-3. [ ] **A test project, the whole chain buzzing** `[Opus designs; Fable reviews the wipe unless waived]` — a project marked as test data (never Baveli, which is real), one villa with a big official estimate, indents, POs, deliveries into several stores, issues, labour, stages, checklists, and Design Management with dummy links and released drawings. One red **Delete the test project** button in Settings, admin only, that can touch only rows under a test project. Staging becomes production, so the flag is the safety: nothing unflagged is reachable.
+3. [x] **A test project, the whole chain buzzing** `[Opus designs; Fable reviews the wipe unless waived]` — a project marked as test data (never Baveli, which is real), one villa with a big official estimate, indents, POs, deliveries into several stores, issues, labour, stages, checklists, and Design Management with dummy links and released drawings. One red **Delete the test project** button in Settings, admin only, that can touch only rows under a test project. Staging becomes production, so the flag is the safety: nothing unflagged is reachable.
    - [x] `0142` drafted: `projects.is_test`, `delete_test_project()` (admin, test-marked only, refuses tangled rows and setup, guards set aside per table, FKs still checked). Rehearsed with `scripts/trials/test-project-delete.sql` after the seed: refuses staff, Saarang and a real PO holding a test indent line; deletes ~550 rows in 44 tables; nothing outside moves; no guard left off.
    - [x] `scripts/seed-test-project.sql` + `.ts`: Test project / Test plot 1 / Test villa 1, two test stores, an official estimate of 48 works with materials, 8 approved indents, 3 POs, 3 deliveries (one straight to site), 4 issues from requests plus one open, a site confirmation one short, 12 labour entries, stages done/working/waiting, a half-done checklist, 3 released drawings with dummy WorkDrive links, a transmittal, a work order, a PO bill and a wages bill, the villa on the design board. Rehearsed clean; not yet made.
    - [x] Settings → **Test project**: the project with its counts and the red **Delete the test project**.
    - [x] **Review**: the founder said "apply" (2026-10-23), taken as waiving Fable for `0142`; an independent Opus review stood in and found 15 points, all fixed: `truncate` (safeupdate refuses an unqualified delete through the app), `projects_is_test_guard` (a Masters holder could mark a real project test), the rate restore only while nothing moved it, audit triggers kept on, locks taken at once with `nowait`, guards re-enabled by name, set-null keys not walked, transmittal counters, file and Relay-link refusals, a `danger` button variant, plain refusal wording. The trial now counts every table before the seed and after the delete, and runs under the 8-second limits.
    - [x] `0142` applied to staging, types regenerated (they matched), the test project made: 2 estimates, 8 indents, 3 POs, 3 deliveries, 4 issues, 2 bills, 3 drawings.
-4. [ ] **Delete or Cancel, across every tool** `[Fable plans; Opus and Sonnet build]` — founder's rule: a record nothing uses yet really deletes; one something depends on offers **Cancel** instead (hidden from lists and counts, kept, with a reason), and the message says what depends on it. Needs a survey of every tool's records first; RLS delete policies make it Fable's.
+   - [x] Merged as #133 on the founder's "merge everything", 2026-10-23.
+4. [ ] **Delete or Cancel, across every tool** — the plan below, drafted by Opus from a survey of every tool (2026-10-23). **Fable reviews the design (A) before any migration**; the founder answers the questions first.
+
+## Next session — start here, after "check CLAUDE.md"
+
+1. **Ask the founder how pieces 1–3 looked on staging** (each PR's checklist: #130–#133). Anything broken is fixed first. Remind them: delete the test project before the switch to production.
+2. **Ask the founder the four questions under Piece 4 → Questions**, then take the design (A) to Fable — or the founder waives it in so many words.
+3. Build B–F, one pull request each, vetted on staging.
+
+## Piece 4 — Delete or Cancel, across every tool
+
+**The founder's rule** (2026-10-23): "deletes are necessary across the board, it can be a simple hide or whatever but it needs to go". Settled with them: **a record nothing uses yet really deletes; a record something depends on offers Cancel instead** — hidden from lists, counts and totals, kept with who, when and why, and the message says what depends on it. Everything stays in the audit log either way.
+
+### Where things stand (the survey)
+
+- **Already the pattern, in part:** POs (draft deletes; issued → request deletion with a note → admin approves → `cancelled`, refused once goods arrive — `0021`, `0023`); Birdwing stays and invoices (cancel with a reason — `0115`); facilities ("delete if unused, else deactivate" — `deleteFacility`); masters, work orders, templates, design stages and departments (`is_active`).
+- **Delete only while a draft:** indents, estimates, revisions, transmittals, recorded bills, open checklists, requested issue requests, queued Relay chains, unbilled labour. Budgets in pricing and draft selections have the policy but **no button**.
+- **No delete or cancel at all:** goods receipts, stock issues, adjustments (append-only stock — `0023`), work orders, cash requests, client actions and engagements, design actions, site stages, Birdwing stays, every core master (projects, plots, units, clients, vendors, items, stores, companies, terms).
+- **Append-only money, by design:** `bill_payments`, `contractor_advances`, `advance_recoveries` (`0107`). **Money rows deletable with nothing but the grant:** `client_receipts`, `funding_movements`, `birdwing_receipts`, `birdwing_cross_charges` — inconsistent with the rest.
+
+### The design `[Fable reviews before any migration]`
+
+- **A. One shape for every cancel** `[Opus drafts, Fable reviews]`: `cancelled_at`, `cancelled_by`, `cancel_reason` on each document that can be cancelled (POs keep their request-and-approve flow; its `deletion_note` is the reason); a status `cancelled` where the table has a status, else the three columns alone. A guard per table: cancel only from the states that allow it, reason required, cancelled is final. **Every fact view and every count leaves cancelled rows out** — the money views first, checked by `db:check-views`. One delete per table stays as today (the draft states); nothing gains a cascade.
+- **The button**: one shared `DeleteOrCancel` (`components/ui/`): it asks the server what the record holds; with nothing depending it says "Delete" and deletes; otherwise it says what depends ("2 deliveries and a bill") and offers "Cancel" with a reason. Lists get a **Show cancelled** filter. Pure helper (`lib/…/cancel.ts`, tested) for the wording.
+- **Stock and payments are never cancelled — they are reversed** (founder to confirm): a delivery entered by mistake is undone by a return entry (an adjustment out, with the reason, pointing at it); an issue by a return to store; a payment by a negative payment with a reason. The ledger stays true; the screen shows the pair as "reversed".
+- **Masters retire**: Delete when nothing uses it (a vendor added by mistake), else **Retire** (`is_active = false`, hidden from pickers, kept on old records) — the facility pattern, everywhere.
+
+### Build order — one pull request each
+
+- **B. Operations documents** `[Opus — guards and views; Sonnet — screens]`: indents (submitted/approved with no PO → cancel), POs (the existing flow, in the shared button), budgets and selections (wire the existing draft deletes; issued → superseded already), estimates, work orders (cancel when no bill), cash requests (draft → delete, submitted → cancel), bills (recorded → delete as today; approved → cancel only with no payment).
+- **C. Stock reversals** `[Fable designs here — batches and rates; Opus builds]`: return-to-vendor for a delivery, return-to-store for an issue, through `allocate_batches`; Supervisors' site confirmation of a reversed issue.
+- **D. Payments** `[Opus; Fable reviews]`: reversal rows for payments, advances and recoveries; the four freely deletable money rows become cancel-with-reason.
+- **E. The rest** `[Sonnet, Opus vets]`: client actions and design actions (delete while untouched, else cancel), Birdwing stays (already cancel — the shared button), Relay (finish with a note — the shared button), saved reports, decks (delete as today).
+- **F. Masters retire** `[Sonnet, Opus vets]`: Delete when unused, else Retire, on every master; pickers hide retired ones.
+
+### Questions for the founder
+
+1. **Who may cancel?** Recommendation: whoever may edit the record, except money documents (POs, bills, payments), which need an approver or admin — as POs already do.
+2. **Is a reason always required?** Recommendation: yes for cancel and reverse, never for a plain delete of an unused draft.
+3. **Who sees cancelled records?** Recommendation: everyone with the tool, under "Show cancelled"; never in totals.
+4. **Stock and payments: reverse, never cancel** (above) — agreed?
 
 # Supervisors, rebuilt — the site board and its schedule (proposed 2026-10-22, schedule settled 2026-10-23, waiting for the founder's approval)
 
