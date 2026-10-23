@@ -159,6 +159,12 @@ test("health: first match wins, in the plan's order", () => {
     statusChangedAt: "2026-10-07T10:00:00Z",
   });
   assert.equal(health(programme([shortWait, idle])).kind, "idle");
+  // Past its planned finish comes after a long wait and before no labour.
+  const lateStage = programme([shortWait, idle]).find((stage) => stage.id === "SS.01")!;
+  const late = health(programme([shortWait, idle]), { late: { stage: lateStage, days: 4 } });
+  assert.equal(late.kind, "late");
+  assert.equal(late.label, "4 days past its finish");
+  assert.equal(health(both, { late: { stage: lateStage, days: 4 } }).kind, "waiting");
   assert.equal(
     health(programme([shortWait, idle]), { lastLabourByGroup: new Map([["SS.01", "2026-10-08"]]) })
       .kind,
@@ -214,4 +220,16 @@ test("progress sets piece-work against the estimate in the estimate's unit, neve
     },
     { workItemId: "w2", label: "SS.01.03 Curing", logged: 12, estimated: null, uom: "nos" },
   ]);
+});
+
+test("a stage row holding only days or a first plan does not keep a stage in the programme", () => {
+  const planned = programme([
+    record("LP.01", { status: "not_started", startedOn: null, contractorId: null }),
+  ]).filter((stage) => stage.id === "LP.01");
+  // With no official estimate every sequence stage is listed; LP.01 is not in the sequence.
+  assert.equal(planned.length, 0);
+  const hired = programme([
+    record("LP.01", { status: "not_started", startedOn: null, contractorId: "c1" }),
+  ]).filter((stage) => stage.id === "LP.01");
+  assert.equal(hired.length, 1);
 });

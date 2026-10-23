@@ -24,15 +24,29 @@ import {
   type WaitingOn,
   type WorkProgress,
 } from "./programme";
+import {
+  forecastVilla,
+  isSequenceLink,
+  learnedDays,
+  SIZE_WORK_CODE,
+  stageDays,
+  stageLength,
+  type ScheduleStage,
+  type SequenceRule,
+  type StageForecast,
+  type VillaSchedule,
+} from "./schedule";
 import type { VillaDelivery } from "./site-receipt-queries";
 
-/** A villa's programme (0137): Supervisors' own stage tables, read with the open works lists, the villa's labour and the money-free
- * estimate_work_facts. Checklists and deliveries come in from the page, which reads them for their own sections. */
+/** A villa's programme (0137) and its schedule: Supervisors' own stage tables, read with the open works lists, the villa's labour
+ * and the money-free estimate_work_facts. Checklists and deliveries come in from the page, which reads them for their own sections. */
 
 const GRANT = "/supervisors";
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("supervisors", context, error);
+
+type Client = Awaited<ReturnType<typeof createClient>>;
 
 export type StageChecklist = {
   templateId: string;
@@ -41,12 +55,22 @@ export type StageChecklist = {
   checklist: VillaChecklistRow | null;
 };
 
+export type StagePlan = {
+  /** This villa's own days and pinned start, as set on the stage sheet. */
+  ownDays: number | null;
+  pinnedStart: string | null;
+  baselineStart: string | null;
+  baselineFinish: string | null;
+};
+
 export type StageView = ProgrammeStage & {
   day: number | null;
   contractorName: string | null;
   works: { id: string; label: string }[];
   progress: WorkProgress[];
   checklists: StageChecklist[];
+  plan: StagePlan;
+  forecast: StageForecast;
 };
 
 export type StageEvent = {
@@ -63,12 +87,20 @@ export type StageEvent = {
 
 export type Person = { id: string; name: string };
 
+export type VillaScheduleView = Omit<VillaSchedule, "stages"> & {
+  startOn: string | null;
+  baselinedAt: string | null;
+  /** The villa's size from its official estimate, when it has one. */
+  villaSqft: number | null;
+};
+
 export type VillaProgramme = {
   supervisor: Person | null;
   stages: StageView[];
   now: StageView[];
   next: StageView[];
   health: Health;
+  schedule: VillaScheduleView;
   history: StageEvent[];
   people: Person[];
   today: string;
@@ -76,79 +108,78 @@ export type VillaProgramme = {
 
 const HISTORY_SHOWN = 40;
 
-export async function getVillaProgramme(input: {
-  plotId: string;
-  unitId: string | null;
-  checklists: VillaChecklistRow[];
-  templates: { id: string; name: string }[];
-  templateGroups: Map<string, string[]>;
-  deliveries: VillaDelivery[];
-  contractors: { id: string; name: string }[];
-}): Promise<VillaProgramme> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-  const { plotId, unitId } = input;
+/** What both the page and "Set the first plan" need: the villa's stages in order, with their forecast. */
+async function readProgramme(supabase: Client, plotId: string, unitId: string | null) {
   const today = todayInIndia();
+  const [categories, groups, works] = await Promise.all([
+    listWorkCategories(),
+    listWorkGroups(),
+    listWorkItems(),
+  ]);
+  const sizeWorkId = works.find((work) => work.code === SIZE_WORK_CODE)?.id ?? null;
 
-  const [categories, groups, works, sequence, records, site, logs, estimate, events, profiles] =
-    await Promise.all([
-      listWorkCategories(),
-      listWorkGroups(),
-      listWorkItems(),
-      fetchAll((from, to) =>
-        supabase
-          .from("site_sequence")
-          .select("work_group_id, position")
-          .order("position")
-          .order("id")
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("site_stages")
-          .select(
-            "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id",
-          )
-          .eq("plot_id", plotId)
-          .order("id")
-          .range(from, to),
-      ),
-      supabase.from("site_villas").select("supervisor_id").eq("plot_id", plotId).maybeSingle(),
-      fetchAll((from, to) =>
-        supabase
-          .from("labour_logs")
-          .select("work_item_id, log_date, kind, quantity, uom, work_class")
-          .eq("plot_id", plotId)
-          .order("id")
-          .range(from, to),
-      ),
-      unitId
-        ? fetchAll((from, to) =>
-            supabase
-              .from("estimate_work_facts")
-              .select("work_item_id, quantity, uom")
-              .eq("unit_id", unitId)
-              .order("work_item_id")
-              .range(from, to),
-          )
-        : Promise.resolve([]),
+  const [sequence, records, site, settings, estimate, finished, units, sizes] = await Promise.all([
+    fetchAll((from, to) =>
       supabase
-        .from("site_stage_events")
-        .select("id, at, work_group_id, kind, from_status, to_status, waiting_on, note, actor_id")
+        .from("site_sequence")
+        .select("work_group_id, position, follows_group_id, link, wait_days, typical_days")
+        .order("position")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("site_stages")
+        .select(
+          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish",
+        )
         .eq("plot_id", plotId)
-        .order("seq", { ascending: false })
-        .range(0, HISTORY_SHOWN - 1),
-      fetchAll((from, to) =>
-        supabase
-          .from("profiles")
-          .select("id, full_name, is_active")
-          .order("full_name")
-          .order("id")
-          .range(from, to),
-      ),
-    ]);
-  if (site.error) fail("the villa's supervisor", site.error);
-  if (events.error) fail("the stage history", events.error);
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("site_villas")
+      .select("supervisor_id, start_on, baselined_at")
+      .eq("plot_id", plotId)
+      .maybeSingle(),
+    supabase.from("site_schedule_settings").select("typical_sqft").maybeSingle(),
+    unitId
+      ? fetchAll((from, to) =>
+          supabase
+            .from("estimate_work_facts")
+            .select("work_item_id, quantity, uom")
+            .eq("unit_id", unitId)
+            .order("work_item_id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    // Every villa's finished stages: what the schedule learns its days from.
+    fetchAll((from, to) =>
+      supabase
+        .from("site_stages")
+        .select("plot_id, work_group_id, started_on, finished_on, status_changed_at")
+        .eq("status", "done")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase.from("units").select("id, plot_id").order("id").range(from, to),
+    ),
+    sizeWorkId
+      ? fetchAll((from, to) =>
+          supabase
+            .from("estimate_work_facts")
+            .select("estimate_id, unit_id, quantity")
+            .eq("work_item_id", sizeWorkId)
+            .order("estimate_id")
+            .order("unit_id")
+            .order("quantity")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  if (site.error) fail("the villa's schedule", site.error);
+  if (settings.error) fail("the schedule settings", settings.error);
 
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const groupInfos: GroupInfo[] = groups.flatMap((group) => {
@@ -164,7 +195,6 @@ export async function getVillaProgramme(input: {
       },
     ];
   });
-  const groupById = new Map(groupInfos.map((group) => [group.id, group]));
 
   const groupOfWork = new Map(works.map((work) => [work.id, work.group_id]));
   const estimateRows = estimate.flatMap((row) =>
@@ -192,6 +222,17 @@ export async function getVillaProgramme(input: {
     finishedOn: record.finished_on,
     contractorId: record.contractor_id,
   }));
+  const planByGroup = new Map<string, StagePlan>(
+    records.map((record) => [
+      record.work_group_id,
+      {
+        ownDays: record.days,
+        pinnedStart: record.pinned_start,
+        baselineStart: record.baseline_start,
+        baselineFinish: record.baseline_finish,
+      },
+    ]),
+  );
 
   const programme = buildProgramme({
     groups: groupInfos,
@@ -200,6 +241,150 @@ export async function getVillaProgramme(input: {
     estimateGroupIds: estimateGroupIds && estimateGroupIds.size > 0 ? estimateGroupIds : null,
     records: stageRecords,
   });
+
+  // A villa's size: its official estimate's block-work quantity, the largest when a unit has more than one official copy.
+  const sizeByUnit = new Map<string, number>();
+  const perEstimate = new Map<string, { unitId: string; sqft: number }>();
+  for (const row of sizes) {
+    if (!row.estimate_id || !row.unit_id || row.quantity === null) continue;
+    const entry = perEstimate.get(row.estimate_id) ?? { unitId: row.unit_id, sqft: 0 };
+    entry.sqft += row.quantity;
+    perEstimate.set(row.estimate_id, entry);
+  }
+  for (const { unitId: unit, sqft } of perEstimate.values()) {
+    if (sqft > 0) sizeByUnit.set(unit, Math.max(sizeByUnit.get(unit) ?? 0, sqft));
+  }
+  const unitOfPlot = new Map(units.map((unit) => [unit.plot_id, unit.id]));
+  const villaSqft = unitId ? (sizeByUnit.get(unitId) ?? null) : null;
+
+  const samplesByGroup = new Map<string, { days: number; sqft: number | null }[]>();
+  for (const row of finished) {
+    if (!row.started_on || !row.finished_on) continue;
+    // A catch-up Done tap with nothing logged dates the stage to that one day: not a length to learn from.
+    if (row.started_on === row.finished_on && row.finished_on === dayInIndia(row.status_changed_at))
+      continue;
+    const unit = unitOfPlot.get(row.plot_id);
+    const samples = samplesByGroup.get(row.work_group_id) ?? [];
+    samples.push({
+      days: stageLength(row.started_on, row.finished_on),
+      sqft: unit ? (sizeByUnit.get(unit) ?? null) : null,
+    });
+    samplesByGroup.set(row.work_group_id, samples);
+  }
+
+  const sequenceRules: SequenceRule[] = sequence.map((entry) => ({
+    groupId: entry.work_group_id,
+    followsGroupId: entry.follows_group_id,
+    link: isSequenceLink(entry.link) ? entry.link : "after",
+    waitDays: entry.wait_days,
+    typicalDays: entry.typical_days,
+  }));
+  const typicalByGroup = new Map(sequenceRules.map((rule) => [rule.groupId, rule.typicalDays]));
+  const typicalSqft = settings.data?.typical_sqft ?? null;
+  const daysByGroup = new Map(
+    programme.map((stage) => [
+      stage.id,
+      stageDays({
+        own: planByGroup.get(stage.id)?.ownDays ?? null,
+        learned: learnedDays(samplesByGroup.get(stage.id) ?? [], villaSqft),
+        typicalDays: typicalByGroup.get(stage.id) ?? null,
+        villaSqft,
+        typicalSqft,
+      }),
+    ]),
+  );
+
+  const startOn = site.data?.start_on ?? null;
+  const baselinedAt = site.data?.baselined_at ?? null;
+  const scheduleStages: ScheduleStage[] = programme.map((stage) => {
+    const plan = planByGroup.get(stage.id);
+    return {
+      groupId: stage.id,
+      status: stage.status,
+      startedOn: stage.record?.startedOn ?? null,
+      finishedOn: stage.record?.finishedOn ?? null,
+      days: plan?.ownDays ?? null,
+      pinnedStart: plan?.pinnedStart ?? null,
+      baselineStart: plan?.baselineStart ?? null,
+      baselineFinish: plan?.baselineFinish ?? null,
+    };
+  });
+  const schedule = forecastVilla({
+    stages: scheduleStages,
+    sequence: sequenceRules,
+    startOn,
+    today,
+    daysByGroup,
+    baselined: baselinedAt !== null,
+  });
+
+  return {
+    today,
+    works,
+    groupInfos,
+    groupOfWork,
+    estimateRows,
+    programme,
+    planByGroup,
+    schedule,
+    supervisorId: site.data?.supervisor_id ?? null,
+    startOn,
+    baselinedAt,
+    villaSqft,
+  };
+}
+
+const NO_PLAN: StagePlan = {
+  ownDays: null,
+  pinnedStart: null,
+  baselineStart: null,
+  baselineFinish: null,
+};
+
+export async function getVillaProgramme(input: {
+  plotId: string;
+  unitId: string | null;
+  checklists: VillaChecklistRow[];
+  templates: { id: string; name: string }[];
+  templateGroups: Map<string, string[]>;
+  deliveries: VillaDelivery[];
+  contractors: { id: string; name: string }[];
+}): Promise<VillaProgramme> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { plotId, unitId } = input;
+
+  const [base, logs, events, profiles] = await Promise.all([
+    readProgramme(supabase, plotId, unitId),
+    fetchAll((from, to) =>
+      supabase
+        .from("labour_logs")
+        .select("work_item_id, log_date, kind, quantity, uom, work_class")
+        .eq("plot_id", plotId)
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("site_stage_events")
+      .select("id, at, work_group_id, kind, from_status, to_status, waiting_on, note, actor_id")
+      .eq("plot_id", plotId)
+      // A stage row made only to hold a plan or days is not a change of status worth listing.
+      .or("from_status.not.is.null,to_status.is.null,to_status.neq.not_started")
+      .order("seq", { ascending: false })
+      .range(0, HISTORY_SHOWN - 1),
+    fetchAll((from, to) =>
+      supabase
+        .from("profiles")
+        .select("id, full_name, is_active")
+        .order("full_name")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  if (events.error) fail("the stage history", events.error);
+
+  const { today, works, groupOfWork, estimateRows, programme, schedule } = base;
+  const groupById = new Map(base.groupInfos.map((group) => [group.id, group]));
 
   const lastLabourByGroup = new Map<string, string>();
   for (const log of logs) {
@@ -224,7 +409,7 @@ export async function getVillaProgramme(input: {
     }
   }
 
-  const stages: StageView[] = programme.map((stage) => {
+  const stages: StageView[] = programme.map((stage, index) => {
     const stageWorks = works
       .filter((work) => work.group_id === stage.id && work.is_active)
       .map((work) => ({ id: work.id, label: `${work.code} · ${work.name}` }));
@@ -252,6 +437,8 @@ export async function getVillaProgramme(input: {
       works: stageWorks,
       progress: stageProgress(stageWorks, estimateRows, pieceWork),
       checklists,
+      plan: base.planByGroup.get(stage.id) ?? NO_PLAN,
+      forecast: schedule.stages[index],
     };
   });
 
@@ -263,9 +450,12 @@ export async function getVillaProgramme(input: {
     .filter((delivery) => !delivery.confirmedAt && delivery.lines.length > 0)
     .map((delivery) => dayInIndia(delivery.on))
     .sort();
+  const late = stages
+    .filter((stage) => stage.forecast.overdueDays)
+    .sort((a, b) => b.forecast.overdueDays! - a.forecast.overdueDays!)[0];
 
   const names = new Map(profiles.map((person) => [person.id, person.full_name ?? "—"]));
-  const supervisorId = site.data?.supervisor_id ?? null;
+  const { supervisorId } = base;
   const stageLabel = (groupId: string | null) => {
     const group = groupId ? groupById.get(groupId) : null;
     return group ? `${group.code} ${group.name}` : null;
@@ -280,9 +470,19 @@ export async function getVillaProgramme(input: {
       stages,
       lastLabourByGroup,
       failedOpenChecklists,
+      late: late ? { stage: late, days: late.forecast.overdueDays! } : null,
       oldestUnconfirmedDelivery: unconfirmed[0] ?? null,
       today,
     }),
+    schedule: {
+      handover: schedule.handover,
+      missingDays: schedule.missingDays,
+      baselineHandover: schedule.baselineHandover,
+      slip: schedule.slip,
+      startOn: base.startOn,
+      baselinedAt: base.baselinedAt,
+      villaSqft: base.villaSqft,
+    },
     history: (events.data ?? []).map((event) => ({
       id: event.id,
       at: event.at,
@@ -299,6 +499,24 @@ export async function getVillaProgramme(input: {
       .map((person) => ({ id: person.id, name: person.full_name ?? "—" })),
     today,
   };
+}
+
+/** Today's forecast for one villa, worked out on the server for "Set the first plan" — never taken from the phone. */
+export async function getVillaForecast(plotId: string): Promise<{
+  startOn: string | null;
+  baselinedAt: string | null;
+  schedule: VillaSchedule;
+}> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { data: unit, error } = await supabase
+    .from("units")
+    .select("id")
+    .eq("plot_id", plotId)
+    .maybeSingle();
+  if (error) fail("the villa", error);
+  const base = await readProgramme(supabase, plotId, unit?.id ?? null);
+  return { startOn: base.startOn, baselinedAt: base.baselinedAt, schedule: base.schedule };
 }
 
 /** What the stores hold of each item, summed across stores (stock_by_location, open to every signed-in person). */
