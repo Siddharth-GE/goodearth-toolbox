@@ -31,6 +31,7 @@ import {
   type StageSnapshot,
 } from "@/lib/supervisors/programme-actions";
 import {
+  dayInIndia,
   STAGE_STATUS_LABEL,
   WAITING_ON,
   WAITING_ON_LABEL,
@@ -306,12 +307,7 @@ export function StageSheet({
               The first labour logged on this stage starts it by itself.
             </p>
           )}
-          {snapshot.status !== "done" ? (
-            <StagePlanFields
-              key={`${stage.plan.ownDays}|${stage.plan.pinnedStart}`}
-              stage={stage}
-            />
-          ) : null}
+          {snapshot.status !== "done" ? <StagePlanFields stage={stage} /> : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -388,7 +384,19 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
   const notStarted = !stage.snapshot.startedOn;
   const [days, setDays] = useState(plan.ownDays ? String(plan.ownDays) : "");
   const [pinned, setPinned] = useState(plan.pinnedStart ?? "");
+  // The fields follow what the server holds once it changes, without remounting away the "Saved".
+  const held = `${plan.ownDays}|${plan.pinnedStart}`;
+  const [seen, setSeen] = useState(held);
+  if (seen !== held) {
+    setSeen(held);
+    setDays(plan.ownDays ? String(plan.ownDays) : "");
+    setPinned(plan.pinnedStart ?? "");
+  }
+  const lapsed = Boolean(
+    plan.pinnedStart && plan.pinnedStart < dayInIndia(new Date().toISOString()),
+  );
   const { pending, error, run } = useActionRunner();
+  const [saved, setSaved] = useState(false);
   const usedDays =
     plan.days === null
       ? "No days yet — set typical days under Sequence, or this villa's own here."
@@ -400,7 +408,9 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
       <p className="text-muted text-xs">{usedDays}</p>
       {plan.pinnedBehind && plan.pinnedStart ? (
         <p className="text-warning text-xs">
-          {`Pinned to start ${formatShortDate(plan.pinnedStart)}, but it can't start before ${formatShortDate(plan.start)}.`}
+          {lapsed && plan.start && plan.start === dayInIndia(new Date().toISOString())
+            ? `${formatShortDate(plan.pinnedStart)} has passed — save it to mark the stage started then, or tap Working.`
+            : `Set to start ${formatShortDate(plan.pinnedStart)}, but the stages before it run until ${formatShortDate(plan.start)}.`}
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3">
@@ -418,7 +428,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
         </div>
         {notStarted ? (
           <div className="space-y-1.5">
-            <Label htmlFor={`pinned-${stage.groupId}`}>Not before</Label>
+            <Label htmlFor={`pinned-${stage.groupId}`}>Starts on</Label>
             <Input
               id={`pinned-${stage.groupId}`}
               type="date"
@@ -428,7 +438,13 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
           </div>
         ) : null}
       </div>
-      <FormMessage error={error} />
+      {notStarted ? (
+        <p className="text-muted text-xs">
+          A day that has passed marks the stage started then. Leave it blank to follow the stages
+          before it.
+        </p>
+      ) : null}
+      <FormMessage error={error} success={saved && !pending ? "Saved" : undefined} />
       <Button
         variant="secondary"
         size="sm"
@@ -445,7 +461,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
               days,
               pinnedStart: pinned,
             }),
-          )
+          ).then((result) => setSaved(!result?.error))
         }
       >
         {pending ? "Saving…" : "Save the schedule"}

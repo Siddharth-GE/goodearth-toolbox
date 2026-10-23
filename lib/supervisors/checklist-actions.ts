@@ -208,7 +208,7 @@ export async function deleteChecklist(checklistId: string, plotId: string): Prom
   }
   if (!count) return { error: "A signed-off checklist is a record — it can't be deleted." };
   refresh();
-  redirect(`/supervisors/villas/${plotId}`);
+  redirect(`/supervisors/villas/${plotId}?tab=checklists`);
 }
 
 /** One file per checklist — a test certificate or a photo — in the private site-checklists bucket. A new one replaces it. */
