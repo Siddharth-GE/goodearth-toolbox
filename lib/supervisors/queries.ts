@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/drawings/queries";
+import { plotNumber } from "@/lib/masters/plot-number";
 import { listVendors } from "@/lib/masters/vendors";
 import { type WorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
@@ -169,6 +170,8 @@ export type VillaDetail = {
   unitId: string | null;
   villaName: string;
   plotName: string;
+  /** The large number on the header (lib/masters/plot-number). */
+  plotNumber: string;
   projectName: string;
   /** Null when no official estimate exists for the villa. */
   estimate: { reference: string; submittedAt: string } | null;
@@ -189,7 +192,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
 
   const { data: plot, error: plotError } = await supabase
     .from("plots")
-    .select("id, name, project_id, projects(name)")
+    .select("id, name, code, project_id, projects(name)")
     .eq("id", plotId)
     .maybeSingle();
   if (plotError) fail("the villa", plotError);
@@ -461,6 +464,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     unitId: unit?.id ?? null,
     villaName: unit?.name ?? plot.name,
     plotName: plot.name,
+    plotNumber: plotNumber(plot.code, plot.name),
     projectName: (plot.projects as { name: string } | null)?.name ?? "—",
     estimate: takeoffRows.length
       ? { reference: takeoffRows[0].reference, submittedAt: takeoffRows[0].submitted_at }

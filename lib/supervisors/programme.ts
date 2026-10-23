@@ -131,13 +131,14 @@ export type HealthKind =
 
 export type Health = { kind: HealthKind; label: string; detail: string | null };
 
-export const HEALTH_TONE: Record<HealthKind, "danger" | "warning" | "success" | "neutral"> = {
+/** The pill tones (components/ui/pill) a health reads in. */
+export const HEALTH_TONE: Record<HealthKind, "danger" | "warning" | "success" | "plain"> = {
   waiting: "danger",
   idle: "warning",
   failed_check: "danger",
   delivery: "warning",
   on_track: "success",
-  not_started: "neutral",
+  not_started: "plain",
   finished: "success",
 };
 
