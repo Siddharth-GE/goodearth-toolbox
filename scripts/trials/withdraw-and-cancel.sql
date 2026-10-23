@@ -1,9 +1,9 @@
--- Behaviour trial for 0144 — withdrawing an official estimate, deleting or cancelling a work order, deleting a draft
+-- Behaviour trial for 0144 and 0145 — withdrawing an official estimate, deleting or cancelling a work order, deleting a draft
 -- cash request. Runs inside the dry-run transaction; always rolled back, UNDER ROW-LEVEL SECURITY (BUGCATCHER #19), as
 -- the staff account holding one tool at a time.
 --
 --   npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv \
---     supabase/migrations/0144_*.sql --trial scripts/trials/withdraw-and-cancel.sql
+--     supabase/migrations/0144_*.sql supabase/migrations/0145_*.sql --trial scripts/trials/withdraw-and-cancel.sql
 do $trial$
 declare
   v_user uuid := (select id from auth.users where email = 'siddharth.cyriac.99@gmail.com');
@@ -111,9 +111,10 @@ begin
   values (v_contractor, v_project, v_unit, 'Trial pending', 500, 'pending_approval') returning id into v_pending;
   insert into labour_contract_lines (contract_id, work_item_id, description, is_lump_sum, rate)
   values (v_pending, v_work, 'Trial lump sum', true, 500);
+  set local role authenticated;
+  -- The share lock lets a /bills holder add an advance on an approved order.
   insert into contractor_advances (vendor_id, project_id, labour_contract_id, amount, payment_ref)
   values (v_contractor, v_project, v_order, 100, 'TRIAL-UTR') returning id into v_advance;
-  set local role authenticated;
 
   v_refused := false;
   begin

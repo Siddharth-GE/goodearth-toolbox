@@ -18,6 +18,7 @@ export function DeleteOrCancel({
   onCancel,
   deleteNote = "Nothing uses it yet, so it goes for good.",
   verb = "Cancel",
+  cancelNote = "It leaves every list and total, and stays on record with your reason. This can't be undone.",
 }: {
   /** As it reads after "this": "indent", "draft revision". */
   noun: string;
@@ -27,6 +28,7 @@ export function DeleteOrCancel({
   deleteNote?: string;
   /** What going is called once something depends on it: an official estimate is withdrawn. */
   verb?: "Cancel" | "Withdraw";
+  cancelNote?: string;
 }) {
   const doing = verb === "Withdraw" ? "Withdrawing…" : "Cancelling…";
   const done = verb === "Withdraw" ? "withdrawn" : "cancelled";
@@ -58,7 +60,7 @@ export function DeleteOrCancel({
           </Button>
         }
         title={`${verb} this ${noun}?`}
-        description="It leaves every list and total, and stays on record with your reason. This can't be undone."
+        description={cancelNote}
         confirmLabel={`${verb} ${noun}`}
         pendingLabel={doing}
         reason={{ label: `Why is it ${done}?`, placeholder: "Raised twice by mistake" }}

@@ -68,7 +68,8 @@ const columns: Column<WorkOrderLineRow>[] = [
 ];
 
 export function WorkOrderDocument({ order }: { order: WorkOrderDetail }) {
-  const isDraft = order.status !== "approved";
+  const isDraft = order.status === "pending_approval";
+  const cancelled = order.status === "cancelled";
   const reference = order.reference ?? "Work order";
 
   const meta: DocumentMeta = {
@@ -96,7 +97,14 @@ export function WorkOrderDocument({ order }: { order: WorkOrderDetail }) {
             { label: "Contractor", value: order.vendor_name },
             { label: "Covers", value: order.description },
             { label: "Date", value: formatDate(order.approved_at ?? order.created_at) },
-            { label: "Status", value: isDraft ? "DRAFT — awaiting approval" : "Approved" },
+            {
+              label: "Status",
+              value: cancelled
+                ? `CANCELLED — not to be worked or paid: ${order.cancel_reason ?? ""}`
+                : isDraft
+                  ? "DRAFT — awaiting approval"
+                  : "Approved",
+            },
             { label: "Project", value: order.project_name },
             { label: "Villa", value: order.place },
             { label: "Made by", value: order.created_by_name ?? "—" },
@@ -125,7 +133,7 @@ export function WorkOrderDocument({ order }: { order: WorkOrderDetail }) {
           </View>
         )}
 
-        {!isDraft && (
+        {!isDraft && !cancelled && (
           <Signatures
             labels={[
               `For ${order.company?.legal_name || order.company?.name || "Goodearth"}`,

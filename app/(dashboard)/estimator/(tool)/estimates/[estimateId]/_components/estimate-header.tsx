@@ -93,6 +93,7 @@ export function EstimateHeader({
             <DeleteOrCancel
               noun="official estimate"
               verb="Withdraw"
+              cancelNote={`${villaName} is left with no official estimate until the working one is made official again, so Supervisors plans its stages from the full stage list meanwhile. It stays on record with your reason. This can't be undone.`}
               removal={officialRemoval(estimate.status, estimate.drawingIndentRefs)}
               onCancel={withdrawEstimate.bind(null, estimate.id)}
             />

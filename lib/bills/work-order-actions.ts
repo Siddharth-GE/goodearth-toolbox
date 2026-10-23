@@ -114,7 +114,9 @@ export async function saveWorkOrder(id: string, input: WorkOrderSaveInput): Prom
   }
   if (!current) return { error: "That work order no longer exists." };
   if (current.status !== "pending_approval") {
-    return { error: "This work order is approved — its works and terms can no longer change." };
+    return {
+      error: `This work order is ${current.status === "cancelled" ? "cancelled" : "approved"} — its works and terms can no longer change.`,
+    };
   }
 
   const { data: oldLines, error: oldError } = await supabase
