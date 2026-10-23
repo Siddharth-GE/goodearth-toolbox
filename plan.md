@@ -34,7 +34,9 @@ Supervisors' own tables, RLS `/supervisors` on every verb, write revokes and an 
 
 ### A. The engine and the villa page `[Opus — migration, rules; Sonnet — screens]`
 
-- `lib/supervisors/programme.ts`, pure and tested: a villa's stages in order, now / next, health, days in stage, how much of a stage's work is logged (piece-work quantities against `estimate_work_facts`).
+- [x] [Opus] `0137` applied to staging 2026-10-23, types regenerated (aaf028b). Fable waived; Opus reviewed plus an independent read (no defects; its notes taken: an edit fires the labour trigger only when the work changes, seeds fill only empty tables). The labour trigger runs as the caller, not a definer — only `/supervisors` writes labour logs, and Bills' stamp moves only `bill_id`. Trial `scripts/trials/site-programme.sql`, proven against three broken copies. The backfill started 11 stages from existing labour.
+- [x] [Opus] `lib/supervisors/programme.ts`, pure and tested: a villa's stages in order, now / next, health, days in stage, how much of a stage's work is logged (piece-work quantities against `estimate_work_facts`).
+- [ ] [Opus] The villa page below, the stage actions, and the shared `StageRail` / `HealthPill` / `SectionHead` (their third copy; Design Management and Client Relations move onto them in phase D).
 - **The villa page, rebuilt phone-first**, top to bottom:
   1. **Header card** (the Design Management header): plot number large in mono, villa name, health pill, the **stage rail** (one segment per stage, coloured by status, the working one marked), the supervisor's face.
   2. **Now** — a card per working or waiting stage: its name, day count, the contractor, "640 of 1,800 sqft logged". Four big buttons: **Log labour** (opens pre-filled with this stage's works and its contractor), **Request material** (pre-filled from this stage's estimate list), **Checklist** (a progress ring, "12 of 21"), **Done** / **Waiting**. Status chips save on tap with Undo.

@@ -103,10 +103,10 @@ export function buildProgramme(input: {
 }
 
 /** Now: every stage working or waiting. Next: the first stages not started, in order. */
-export function nowAndNext(
-  stages: ProgrammeStage[],
+export function nowAndNext<T extends ProgrammeStage>(
+  stages: T[],
   nextCount = 2,
-): { now: ProgrammeStage[]; next: ProgrammeStage[] } {
+): { now: T[]; next: T[] } {
   return {
     now: stages.filter((stage) => stage.status === "working" || stage.status === "waiting"),
     next: stages.filter((stage) => stage.status === "not_started").slice(0, nextCount),
