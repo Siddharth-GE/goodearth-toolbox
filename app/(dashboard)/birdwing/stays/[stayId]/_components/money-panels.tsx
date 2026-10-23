@@ -1,36 +1,36 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { FormMessage } from "@/components/ui/form-message";
-import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
-import { addReceipt, addSettlement, deleteReceipt, deleteSettlement } from "@/lib/birdwing/actions";
+import { addReceipt, addSettlement, cancelReceipt, cancelSettlement } from "@/lib/birdwing/actions";
 import type { StayReceipt, StaySettlement } from "@/lib/birdwing/queries";
 import { MODE_LABELS, RECEIPT_MODES } from "@/lib/birdwing/shared";
 import { formatDate, formatMoney } from "@/lib/format";
-import { Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import { roundPaise } from "@/lib/line-money";
 
 const money = (value: number) => formatMoney(value, { paise: value % 1 !== 0 });
 
-/** Each receipt has a date, how it came and a reference, so it can be found in the bank. A wrong one is removed and re-entered (audit keeps both). */
+/** Each receipt has a date, how it came and a reference, so it can be found in the bank. A wrong one is cancelled with a reason and entered again (0148). */
 export function ReceiptsPanel({
   stayId,
   receipts,
   pending,
   today,
   canAdd,
+  canCancel,
 }: {
   stayId: string;
   receipts: StayReceipt[];
   pending: number;
   today: string;
   canAdd: boolean;
+  canCancel: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   return (
@@ -51,8 +51,12 @@ export function ReceiptsPanel({
           {receipts.map((receipt) => (
             <li key={receipt.id} className="flex items-start justify-between gap-3 py-2.5">
               <div className="min-w-0 text-sm">
-                <p className="text-foreground">
-                  <span className="font-mono font-medium">{money(receipt.amount)}</span>
+                <p className={receipt.cancelledAt ? "text-muted" : "text-foreground"}>
+                  <span
+                    className={`font-mono font-medium ${receipt.cancelledAt ? "line-through" : ""}`}
+                  >
+                    {money(receipt.amount)}
+                  </span>
                   <span className="text-muted">
                     {" "}
                     · {receipt.imported
@@ -66,22 +70,18 @@ export function ReceiptsPanel({
                     receipt.invoiceNumber && `against ${receipt.invoiceNumber}`,
                     receipt.note,
                     receipt.byName && `by ${receipt.byName}`,
+                    receipt.cancelledAt && `cancelled — ${receipt.cancelReason}`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
               </div>
-              <ConfirmDialog
-                trigger={
-                  <IconButton aria-label="Remove this receipt" tone="danger" size="sm">
-                    <Trash2 className="size-4" />
-                  </IconButton>
-                }
-                title="Remove this receipt?"
-                description={`${money(receipt.amount)} received ${formatDate(receipt.receivedOn)} comes off this stay. Enter it again if it was only wrong.`}
-                confirmLabel="Remove"
-                pendingLabel="Removing…"
-                onConfirm={() => deleteReceipt(receipt.id)}
+              <DeleteOrCancel
+                noun="receipt"
+                removal={canCancel && !receipt.cancelledAt ? { kind: "cancel" } : null}
+                cancelNote={`${money(receipt.amount)} received ${formatDate(receipt.receivedOn)} comes off this stay and every total, and stays listed here with your reason. Enter it again if it was only wrong.`}
+                reasonPlaceholder="Entered twice by mistake"
+                onCancel={cancelReceipt.bind(null, receipt.id)}
               />
             </li>
           ))}
@@ -189,6 +189,7 @@ export function SettlePanel({
   costCentres,
   defaultCostCentreId,
   defaultMonth,
+  canCancel,
 }: {
   stayId: string;
   internal: boolean;
@@ -197,6 +198,7 @@ export function SettlePanel({
   costCentres: { id: string; name: string }[];
   defaultCostCentreId: string | null;
   defaultMonth: string;
+  canCancel: boolean;
 }) {
   const [state, formAction, busy] = useActionState(addSettlement.bind(null, stayId), undefined);
   const [kind, setKind] = useState<"cross_charge" | "write_off">(
@@ -217,8 +219,12 @@ export function SettlePanel({
           {settlements.map((settlement) => (
             <li key={settlement.id} className="flex items-start justify-between gap-3 py-2.5">
               <div className="min-w-0 text-sm">
-                <p>
-                  <span className="font-mono font-medium">{money(settlement.amount)}</span>
+                <p className={settlement.cancelledAt ? "text-muted" : undefined}>
+                  <span
+                    className={`font-mono font-medium ${settlement.cancelledAt ? "line-through" : ""}`}
+                  >
+                    {money(settlement.amount)}
+                  </span>
                   <span className="text-muted">
                     {" "}
                     ·{" "}
@@ -234,22 +240,21 @@ export function SettlePanel({
                   </span>
                 </p>
                 <p className="text-muted text-xs">
-                  {[settlement.note, settlement.byName && `by ${settlement.byName}`]
+                  {[
+                    settlement.note,
+                    settlement.byName && `by ${settlement.byName}`,
+                    settlement.cancelledAt && `cancelled — ${settlement.cancelReason}`,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
               </div>
-              <ConfirmDialog
-                trigger={
-                  <IconButton aria-label="Undo this" tone="danger" size="sm">
-                    <Trash2 className="size-4" />
-                  </IconButton>
-                }
-                title="Undo this?"
-                description={`${money(settlement.amount)} goes back to pending on this stay.`}
-                confirmLabel="Undo"
-                pendingLabel="Undoing…"
-                onConfirm={() => deleteSettlement(settlement.id)}
+              <DeleteOrCancel
+                noun={settlement.kind === "write_off" ? "write-off" : "charge"}
+                removal={canCancel && !settlement.cancelledAt ? { kind: "cancel" } : null}
+                cancelNote={`${money(settlement.amount)} goes back to pending on this stay, and stays listed here with your reason.`}
+                reasonPlaceholder="Charged to the wrong cost centre"
+                onCancel={cancelSettlement.bind(null, settlement.id)}
               />
             </li>
           ))}

@@ -875,6 +875,9 @@ export type Database = {
       birdwing_cross_charges: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           charged_month: string
           cost_centre_id: string | null
           created_at: string
@@ -889,6 +892,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           charged_month: string
           cost_centre_id?: string | null
           created_at?: string
@@ -903,6 +909,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           charged_month?: string
           cost_centre_id?: string | null
           created_at?: string
@@ -916,6 +925,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "birdwing_cross_charges_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "birdwing_cross_charges_cost_centre_id_fkey"
             columns: ["cost_centre_id"]
@@ -950,7 +966,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       birdwing_expense_files: {
@@ -1481,6 +1497,9 @@ export type Database = {
       birdwing_receipts: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -1496,6 +1515,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1511,6 +1533,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1525,6 +1550,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "birdwing_receipts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "birdwing_receipts_created_by_fkey"
             columns: ["created_by"]
@@ -1559,7 +1591,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       birdwing_rooms: {
@@ -3198,6 +3230,9 @@ export type Database = {
       client_receipts: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           engagement_id: string
@@ -3212,6 +3247,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           engagement_id: string
@@ -3226,6 +3264,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           engagement_id?: string
@@ -3239,6 +3280,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_receipts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_receipts_created_by_fkey"
             columns: ["created_by"]
@@ -3273,7 +3321,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       clients: {
@@ -5735,6 +5783,9 @@ export type Database = {
       funding_movements: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           facility_id: string
@@ -5748,6 +5799,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           facility_id: string
@@ -5761,6 +5815,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           facility_id?: string
@@ -5773,6 +5830,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "funding_movements_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "funding_movements_created_by_fkey"
             columns: ["created_by"]
@@ -5793,7 +5857,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       goods_receipt_line_rates: {

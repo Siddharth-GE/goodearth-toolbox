@@ -4,6 +4,7 @@
 // exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 import { parseNumber, rawText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -215,15 +216,28 @@ export async function recordMovement(
   return undefined;
 }
 
-/** Remove a movement: a mistyped payment must be correctable; the audit trigger keeps the before-image. */
-export async function deleteMovement(movementId: string, facilityId: string): Promise<ActionState> {
+/** A mistyped movement is cancelled with a reason, never deleted (0148); the guard checks the admin or team lead. */
+export async function cancelMovement(
+  movementId: string,
+  facilityId: string,
+  reason: string,
+): Promise<ActionState> {
   await requireTool("/financial-management");
+  if (!reason.trim()) return { error: "Say why it is cancelled." };
   const supabase = await createClient();
 
-  const { error } = await supabase.from("funding_movements").delete().eq("id", movementId);
+  const { error } = await supabase
+    .from("funding_movements")
+    .update({ cancel_reason: reason.trim() })
+    .eq("id", movementId);
   if (error) {
-    console.error("deleteMovement failed:", error);
-    return { error: "Could not remove the movement. Try again." };
+    console.error("cancelMovement failed:", error);
+    return {
+      error: dbErrorMessage(error, "Could not cancel the movement. Try again.", [
+        "cancel",
+        "never edited",
+      ]),
+    };
   }
 
   revalidateFunding(facilityId);

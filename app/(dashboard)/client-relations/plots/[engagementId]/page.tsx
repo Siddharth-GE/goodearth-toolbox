@@ -245,7 +245,7 @@ export default async function PlotDetailPage({
 
         <div className="space-y-3">
           <SectionHead title="Collections" />
-          <CollectionsPanel engagement={engagement} />
+          <CollectionsPanel engagement={engagement} canCancel={basics.seesAll} />
         </div>
 
         <ContextCard

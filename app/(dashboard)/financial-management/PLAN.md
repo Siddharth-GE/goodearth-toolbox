@@ -13,7 +13,7 @@ The company's money picture in three screens, plus the one thing no other tool r
 1. **It reads views only — no table qual was widened.** `0058` restates `crm_milestone_facts`, `crm_receipt_facts` and `business_plan_target_facts` with a **three-way `WHERE`** and adds `bill_money_facts` (bill money without its notes — the column list is the boundary), and asserts exactly four views admit this tool. **Anyone redefining those three views must carry the three-way `WHERE` forward** — re-running `0056`/`0057` silently strips this tool.
 2. **Budget tables are skipped** — `budget_report_lines` would force widening quals and expose margin, and carries no dates. Remaining spend is `business_plan_target_facts.total_cost − actual_spend`.
 3. **Interest is monthly simple accrual, informational only** (`lib/financial-management/interest.ts`, pure): outstanding principal at month end × rate/1200 — no day-count, no compounding, one rate; a null rate is a dash, never zero. Real interest paid is what movements record; the screen shows computed against paid.
-4. **Movements are deletable** (the audit keeps the before-image); a facility with movements is deactivated, not deleted.
+4. **A movement is cancelled, never deleted or edited** (`0148`): an admin, with a reason; it stays listed, struck through, and leaves every balance. A facility with movements is deactivated, not deleted.
 5. **Nothing is re-recorded** — collections stay in Client Relations, bills in Bills, targets in Business Planning. It owns only `funding_facilities` and `funding_movements`.
 
 ## Things that will bite
