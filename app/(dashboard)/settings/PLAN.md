@@ -15,6 +15,10 @@ The headings in everyone's sidebar, on the home page and over the grant lists he
 - **Order is `sort_order`, renumbered 1…n on every move**; tools inside a team keep `lib/tools.ts` order (Operations reads in chain order).
 - **The sidebar's read never takes a page down** (`getToolArrangement`): a failed read is logged and every tool shows under Other. This screen uses the throwing form, because an empty list here would look like "no teams yet".
 
+## Test project
+
+- **One page, one red button** (`/settings/test-project`, `0142`): each project marked `is_test` with what it holds, and **Delete the test project**, which asks once and then calls `delete_test_project()` — the database decides what goes and refuses a real project or a tangled one (`SECURITY.md`). A test project is made only by `scripts/seed-test-project.ts`, never from the app.
+
 ## This is the permission system
 
 `user_apps` + `requireTool()` **is** access control for the whole platform; `visibleTools()` (the sidebar) is cosmetic. Two layers, both needed: the app gate at the top of every query and action, and RLS calling `has_app()` — what holds when the app layer has a bug.

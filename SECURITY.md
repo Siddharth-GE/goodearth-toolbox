@@ -122,7 +122,8 @@ Reads: STATUS.md's contract table, which IS the contract; the import rule is CLA
 - Issuing a PO raises Masters' `items.indicative_price` (`0103`) when the PO paid more — a trigger-only definer, execute revoked from every client role, never lowering; `item_price_changes` logs it, gated to `/masters` or `/purchase-orders`.
 - Selections proposes catalogue items: the "items proposable by selections app" INSERT policy admits `/selections` for `is_provisional` rows only, through the invoker function `create_item_request`; Masters approves or merges them later.
 
-**A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.** Redefining `pusher_chain_state`, the most-read view: `relay/PLAN.md` first.
+- **The test project's red button** (`0142`, Settings → Test project) deletes every row that hangs off one project through the foreign keys, across every tool — the one place deletion is cascaded. `delete_test_project()` is a definer that checks `is_admin()` and `projects.is_test` (set only by the database owner, through `scripts/seed-test-project.ts`; no policy or action writes it), refuses when a row it would delete also belongs to something staying or is setup (people, vendors, items, works, templates…), and sets the tools' own guards aside (`disable trigger user`) for those tables only, inside the one transaction, the foreign keys still checked. `scripts/trials/test-project-delete.sql` proves the refusals and that nothing outside the project moves.
+  **A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.** Redefining `pusher_chain_state`, the most-read view: `relay/PLAN.md` first.
 
 ## Reads
 

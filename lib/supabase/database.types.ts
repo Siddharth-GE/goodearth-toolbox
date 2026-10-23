@@ -7583,6 +7583,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          is_test: boolean
           location: string | null
           name: string
           project_type: string
@@ -7595,6 +7596,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_test?: boolean
           location?: string | null
           name: string
           project_type: string
@@ -7607,6 +7609,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_test?: boolean
           location?: string | null
           name?: string
           project_type?: string
@@ -12365,6 +12368,7 @@ export type Database = {
         Returns: undefined
       }
       delete_recorded_bill: { Args: { p_bill_id: string }; Returns: undefined }
+      delete_test_project: { Args: { p_project: string }; Returns: Json }
       design_pass_step: {
         Args: {
           p_from: string
