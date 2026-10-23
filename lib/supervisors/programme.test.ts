@@ -6,6 +6,7 @@ import {
   dayInIndia,
   dayOfStage,
   nowAndNext,
+  placeVillaOrder,
   stageProgress,
   villaHealth,
   type GroupInfo,
@@ -238,4 +239,35 @@ test("a stage row holding only days or a first plan does not keep a stage in the
     record("LP.01", { status: "not_started", startedOn: null, contractorId: "c1" }),
   ]).filter((stage) => stage.id === "LP.01");
   assert.equal(hired.length, 1);
+});
+
+test("a stage not needed is left off, even one the estimate covers", () => {
+  const stages = buildProgramme({
+    groups: GROUPS,
+    sequence: [
+      { groupId: "FD.01", position: 10 },
+      { groupId: "SS.01", position: 20 },
+      { groupId: "SS.02", position: 30 },
+    ],
+    estimateGroupIds: new Set(["FD.01", "SS.01", "SS.02"]),
+    records: [],
+    notNeeded: new Set(["SS.01"]),
+  });
+  assert.deepEqual(
+    stages.map((stage) => stage.id),
+    ["FD.01", "SS.02"],
+  );
+});
+
+test("placeVillaOrder moves a stage to just after the one it follows on this villa", () => {
+  const stages = ["A", "B", "C", "D"].map((id) => ({ id }));
+  assert.deepEqual(
+    placeVillaOrder(stages, new Map([["D", "A"]])).map((stage) => stage.id),
+    ["A", "D", "B", "C"],
+  );
+  // Following a stage the villa does not have leaves it where it was.
+  assert.deepEqual(
+    placeVillaOrder(stages, new Map([["B", "Z"]])).map((stage) => stage.id),
+    ["A", "B", "C", "D"],
+  );
 });

@@ -73,6 +73,8 @@ export function buildProgramme(input: {
   /** Null when the villa has no official estimate. */
   estimateGroupIds: Set<string> | null;
   records: StageRecord[];
+  /** Stages marked not needed on this villa: left out whatever else would bring them in. */
+  notNeeded?: Set<string>;
 }): ProgrammeStage[] {
   const groupById = new Map(input.groups.map((group) => [group.id, group]));
   const recordByGroup = new Map(input.records.map((record) => [record.groupId, record]));
@@ -89,6 +91,7 @@ export function buildProgramme(input: {
     if (record.status !== "not_started" || record.startedOn || record.contractorId)
       ids.add(record.groupId);
   }
+  for (const id of input.notNeeded ?? []) ids.delete(id);
 
   return [...ids]
     .flatMap((id) => {
@@ -105,6 +108,24 @@ export function buildProgramme(input: {
       if (pb !== undefined) return 1;
       return a.order - b.order;
     });
+}
+
+/**
+ * A villa that runs a stage in its own place: each such stage moves to just after the stage it follows here, so the list reads
+ * in this villa's order. A stage following one the villa does not have stays where the sequence put it.
+ */
+export function placeVillaOrder<T extends { id: string }>(
+  stages: T[],
+  follows: Map<string, string>,
+): T[] {
+  const ordered = [...stages];
+  for (const [groupId, followsGroupId] of follows) {
+    const from = ordered.findIndex((stage) => stage.id === groupId);
+    if (from < 0 || !ordered.some((stage) => stage.id === followsGroupId)) continue;
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(ordered.findIndex((stage) => stage.id === followsGroupId) + 1, 0, moved);
+  }
+  return ordered;
 }
 
 /**

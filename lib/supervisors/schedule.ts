@@ -30,6 +30,35 @@ export type SequenceRule = {
   typicalDays: number | null;
 };
 
+export type VillaFollows = { followsGroupId: string; link: SequenceLink };
+
+/** The sequence as this villa runs it: a stage it follows differently keeps its wait and typical days, follows its own. */
+export function villaRules(
+  rules: SequenceRule[],
+  follows: Map<string, VillaFollows>,
+): SequenceRule[] {
+  return rules.map((rule) => {
+    const own = follows.get(rule.groupId);
+    return own ? { ...rule, followsGroupId: own.followsGroupId, link: own.link } : rule;
+  });
+}
+
+/** Whether a stage following another would end up waiting on itself, through the rules as they stand. */
+export function followsInCircle(
+  rules: SequenceRule[],
+  groupId: string,
+  followsGroupId: string,
+): boolean {
+  const followsOf = new Map(rules.map((rule) => [rule.groupId, rule.followsGroupId]));
+  const seen = new Set<string>();
+  for (let at: string | null | undefined = followsGroupId; at; at = followsOf.get(at)) {
+    if (at === groupId) return true;
+    if (seen.has(at)) return false;
+    seen.add(at);
+  }
+  return false;
+}
+
 export type ScheduleStage = {
   groupId: string;
   status: StageStatus;

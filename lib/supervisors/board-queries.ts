@@ -124,7 +124,7 @@ export async function readSiteVillas() {
       supabase
         .from("site_stages")
         .select(
-          "id, plot_id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish",
+          "id, plot_id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
         )
         .order("id")
         .range(from, to),

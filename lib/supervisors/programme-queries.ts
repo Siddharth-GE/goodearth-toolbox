@@ -14,6 +14,7 @@ import {
   isStageStatus,
   isWaitingOn,
   nowAndNext,
+  placeVillaOrder,
   stageProgress,
   villaHealth,
   type GroupInfo,
@@ -32,9 +33,12 @@ import {
   stageDays,
   stageLength,
   type ScheduleStage,
+  type SequenceLink,
   type SequenceRule,
   type StageForecast,
+  type VillaFollows,
   type VillaSchedule,
+  villaRules,
 } from "./schedule";
 import type { VillaDelivery } from "./site-receipt-queries";
 
@@ -71,6 +75,12 @@ export type StageView = ProgrammeStage & {
   checklists: StageChecklist[];
   plan: StagePlan;
   forecast: StageForecast;
+  /** What it follows on this villa: its own choice, or the sequence's. */
+  follows: {
+    own: VillaFollows | null;
+    sequenceLabel: string | null;
+    sequenceLink: SequenceLink;
+  };
 };
 
 export type StageEvent = {
@@ -104,6 +114,8 @@ export type VillaProgramme = {
   history: StageEvent[];
   people: Person[];
   today: string;
+  /** Stages marked not needed on this villa, in sequence order. */
+  leftOff: { id: string; code: string; name: string }[];
 };
 
 const HISTORY_SHOWN = 40;
@@ -122,6 +134,9 @@ export type StageRow = {
   pinned_start: string | null;
   baseline_start: string | null;
   baseline_finish: string | null;
+  not_needed: boolean;
+  follows_group_id: string | null;
+  link: string | null;
 };
 
 export type SiteVillaRow = {
@@ -303,12 +318,32 @@ export function planVilla(
     ]),
   );
 
-  const programme = buildProgramme({
-    groups: shared.groupInfos,
-    sequence: shared.sequencePositions,
-    // A villa whose official estimate names no grouped work is planned like one with none.
-    estimateGroupIds: estimateGroupIds && estimateGroupIds.size > 0 ? estimateGroupIds : null,
-    records: stageRecords,
+  const notNeeded = new Set(
+    input.records.filter((record) => record.not_needed).map((record) => record.work_group_id),
+  );
+  const villaFollows = new Map<string, VillaFollows>(
+    input.records.flatMap((record) =>
+      record.follows_group_id && record.link && isSequenceLink(record.link)
+        ? [[record.work_group_id, { followsGroupId: record.follows_group_id, link: record.link }]]
+        : [],
+    ),
+  );
+  const rules = villaRules(shared.sequenceRules, villaFollows);
+  const programme = placeVillaOrder(
+    buildProgramme({
+      groups: shared.groupInfos,
+      sequence: shared.sequencePositions,
+      // A villa whose official estimate names no grouped work is planned like one with none.
+      estimateGroupIds: estimateGroupIds && estimateGroupIds.size > 0 ? estimateGroupIds : null,
+      records: stageRecords,
+      notNeeded,
+    }),
+    new Map([...villaFollows].map(([groupId, own]) => [groupId, own.followsGroupId])),
+  );
+  const groupById = new Map(shared.groupInfos.map((group) => [group.id, group]));
+  const leftOff = shared.sequencePositions.flatMap((entry) => {
+    const group = notNeeded.has(entry.groupId) ? groupById.get(entry.groupId) : undefined;
+    return group ? [group] : [];
   });
 
   const villaSqft = unitId ? (shared.sizeByUnit.get(unitId) ?? null) : null;
@@ -342,7 +377,7 @@ export function planVilla(
   });
   const schedule = forecastVilla({
     stages: scheduleStages,
-    sequence: shared.sequenceRules,
+    sequence: rules,
     startOn,
     today,
     daysByGroup,
@@ -358,6 +393,9 @@ export function planVilla(
     programme,
     planByGroup,
     schedule,
+    sharedRules: shared.sequenceRules,
+    villaFollows,
+    leftOff,
     supervisorId: input.site?.supervisor_id ?? null,
     startOn,
     baselinedAt,
@@ -373,7 +411,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
       supabase
         .from("site_stages")
         .select(
-          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish",
+          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
         )
         .eq("plot_id", plotId)
         .order("id")
@@ -476,6 +514,12 @@ export async function getVillaProgramme(input: {
     }
   }
 
+  const stageLabel = (groupId: string | null) => {
+    const group = groupId ? groupById.get(groupId) : null;
+    return group ? `${group.code} ${group.name}` : null;
+  };
+  const sequenceRule = new Map(base.sharedRules.map((rule) => [rule.groupId, rule]));
+
   const stages: StageView[] = programme.map((stage, index) => {
     const stageWorks = works
       .filter((work) => work.group_id === stage.id && work.is_active)
@@ -506,6 +550,11 @@ export async function getVillaProgramme(input: {
       checklists,
       plan: base.planByGroup.get(stage.id) ?? NO_PLAN,
       forecast: schedule.stages[index],
+      follows: {
+        own: base.villaFollows.get(stage.id) ?? null,
+        sequenceLabel: stageLabel(sequenceRule.get(stage.id)?.followsGroupId ?? null),
+        sequenceLink: sequenceRule.get(stage.id)?.link ?? "after",
+      },
     };
   });
 
@@ -523,10 +572,6 @@ export async function getVillaProgramme(input: {
 
   const names = new Map(profiles.map((person) => [person.id, person.full_name ?? "—"]));
   const { supervisorId } = base;
-  const stageLabel = (groupId: string | null) => {
-    const group = groupId ? groupById.get(groupId) : null;
-    return group ? `${group.code} ${group.name}` : null;
-  };
 
   return {
     supervisor: supervisorId ? { id: supervisorId, name: names.get(supervisorId) ?? "—" } : null,
@@ -565,6 +610,7 @@ export async function getVillaProgramme(input: {
       .filter((person) => person.is_active)
       .map((person) => ({ id: person.id, name: person.full_name ?? "—" })),
     today,
+    leftOff: base.leftOff.map(({ id, code, name }) => ({ id, code, name })),
   };
 }
 
@@ -584,6 +630,20 @@ export async function getVillaForecast(plotId: string): Promise<{
   if (error) fail("the villa", error);
   const base = await readProgramme(supabase, plotId, unit?.id ?? null);
   return { startOn: base.startOn, baselinedAt: base.baselinedAt, schedule: base.schedule };
+}
+
+/** The sequence as this villa runs it, for refusing an order that would wait on itself. */
+export async function getVillaRules(plotId: string): Promise<SequenceRule[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { data: unit, error } = await supabase
+    .from("units")
+    .select("id")
+    .eq("plot_id", plotId)
+    .maybeSingle();
+  if (error) fail("the villa", error);
+  const base = await readProgramme(supabase, plotId, unit?.id ?? null);
+  return villaRules(base.sharedRules, base.villaFollows);
 }
 
 /** What the stores hold of each item, summed across stores (stock_by_location, open to every signed-in person). */

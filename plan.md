@@ -3,10 +3,11 @@
 The founder's asks, in this order, each its own pull request into `staging` and vetted there:
 
 1. [x] **A shorter villa page** `[Opus]` — essentials first, the rest folded; the date strip by family, a scroll bar on top (`supervisors/PLAN.md`). No migration.
-2. [ ] **The site team's schedule workbook** (`Downloads\sched.xlsb`, ~70 activities a plot) `[Opus]`:
-   - each activity mapped to one of the 43 stages, its scheduled days rolled up into the stage's typical days — **the founder sees the mapping before anything is written**;
-   - typical and wait days typed straight into Supervisors → Sequence's list, no dialog per stage;
-   - the workbook's real plots (P-2, P-8, P-26, P-28, P-15, P-22-23, P-10, P-13, P-17, P-25, P-39, P-4) get their start date and their stages working or done from the actual dates (founder: "also load real plots"), dry run first.
+2. [x] **The site team's schedule workbook, and each villa bending the sequence** `[Opus]` (`0140`, applied to staging; rules in `supervisors/PLAN.md`):
+   - [x] each activity mapped to a stage, days rolled up; the app's order kept and stages with no line given 1 day marked to fill in (founder, 2026-10-23);
+   - [x] typical and wait days typed straight into Supervisors → Sequence's list;
+   - [x] per villa: "Not needed on this villa" and its own "Follows" (founder, mid-build: "some works are not needed in some houses, and some may need to be rearranged");
+   - [ ] **the load itself** — dry run read on 2026-10-23 (43 stage days, 4 waits, 13 plots' start, 11 supervisors, their progress); `--commit` waits for the founder's word. "Johny" (P-26, P-39) matches nobody on staging.
 3. [ ] **A test project, the whole chain buzzing** `[Opus designs; Fable reviews the wipe unless waived]` — a project marked as test data (never Baveli, which is real), one villa with a big official estimate, indents, POs, deliveries into several stores, issues, labour, stages, checklists, and Design Management with dummy links and released drawings. One red **Delete the test project** button in Settings, admin only, that can touch only rows under a test project. Staging becomes production, so the flag is the safety: nothing unflagged is reachable.
 4. [ ] **Delete or Cancel, across every tool** `[Fable plans; Opus and Sonnet build]` — founder's rule: a record nothing uses yet really deletes; one something depends on offers **Cancel** instead (hidden from lists and counts, kept, with a reason), and the message says what depends on it. Needs a survey of every tool's records first; RLS delete policies make it Fable's.
 

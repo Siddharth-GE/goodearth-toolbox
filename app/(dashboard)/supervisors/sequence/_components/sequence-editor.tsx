@@ -24,11 +24,13 @@ import {
   addSequenceStage,
   moveSequenceStage,
   removeSequenceStage,
+  setSequenceDays,
   setTypicalSqft,
   updateSequenceStage,
 } from "@/lib/supervisors/sequence-actions";
 import type { SequenceRow } from "@/lib/supervisors/sequence-queries";
 import { SEQUENCE_LINKS, SEQUENCE_LINK_LABEL, type SequenceLink } from "@/lib/supervisors/schedule";
+import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -38,16 +40,16 @@ function describe(row: SequenceRow): string {
       ? `${row.link === "alongside" ? "Alongside" : "After"} ${row.followsLabel?.split(" ")[0] ?? "a stage"}`
       : "First — starts on the villa's start date",
     row.waitDays > 0 ? `then ${row.waitDays} ${row.waitDays === 1 ? "day" : "days"} wait` : null,
-    row.typicalDays
-      ? `${row.typicalDays} ${row.typicalDays === 1 ? "day" : "days"}`
-      : "days not set",
+    row.typicalDays ? null : "days not set",
+    row.daysToConfirm ? "days to fill in" : null,
   ];
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Every stage in site order; a tap opens it, the arrows move it. */
+/** Every stage in site order, its days and wait typed straight in; a tap on the name opens the rest. */
 export function SequenceList({ rows }: { rows: SequenceRow[] }) {
   const unset = rows.filter((row) => !row.typicalDays).length;
+  const toFill = rows.filter((row) => row.daysToConfirm).length;
   return (
     <div className="space-y-2">
       {unset > 0 ? (
@@ -55,12 +57,24 @@ export function SequenceList({ rows }: { rows: SequenceRow[] }) {
           {`${unset} of ${rows.length} stages have no typical days yet. Until they do, a villa's dates stop at the first of them.`}
         </p>
       ) : null}
+      {toFill > 0 ? (
+        <p className="text-warning text-sm">
+          {`${toFill} stages carry 1 day as a stand-in, because the schedule workbook has no line for them. Type the real days into the amber boxes.`}
+        </p>
+      ) : null}
       <Card className="divide-border divide-y p-0">
+        <div className="text-muted flex items-center gap-2 px-4 py-2 text-[11px] font-medium tracking-[0.14em] uppercase">
+          <span className="flex-1">Stage</span>
+          <span className="w-16 text-center">Days</span>
+          <span className="w-16 text-center">Wait</span>
+        </div>
         {rows.map((row, index) => (
-          <div key={row.groupId} className="flex items-center gap-1 pr-2">
+          <div key={row.groupId} className="flex items-center gap-2 pr-3">
             <StageDialog
               row={row}
               rows={rows}
+              first={index === 0}
+              last={index === rows.length - 1}
               trigger={
                 <button
                   type="button"
@@ -80,10 +94,52 @@ export function SequenceList({ rows }: { rows: SequenceRow[] }) {
                 </button>
               }
             />
-            <MoveButtons row={row} first={index === 0} last={index === rows.length - 1} />
+            <DaysCell row={row} field="typical" />
+            <DaysCell row={row} field="wait" />
           </div>
         ))}
       </Card>
+    </div>
+  );
+}
+
+/** A number typed in the list, saved when the field is left or Enter is pressed. */
+function DaysCell({ row, field }: { row: SequenceRow; field: "typical" | "wait" }) {
+  const held =
+    field === "typical" ? (row.typicalDays ? String(row.typicalDays) : "") : String(row.waitDays);
+  const [value, setValue] = useState(held);
+  // Follows the saved number once it changes elsewhere (the dialog, another person).
+  const [seen, setSeen] = useState(held);
+  if (seen !== held) {
+    setSeen(held);
+    setValue(held);
+  }
+  const { pending, error, run } = useActionRunner();
+  const save = () => {
+    if (value.trim() === held) return;
+    void run(() => setSequenceDays({ groupId: row.groupId, field, value })).then((result) => {
+      if (result?.error) setValue(held);
+    });
+  };
+  const amber = field === "typical" && (row.daysToConfirm || !row.typicalDays);
+  return (
+    <div className="w-16 shrink-0">
+      <Input
+        type="number"
+        inputMode="numeric"
+        min={field === "typical" ? 1 : 0}
+        aria-label={`${row.code} ${field === "typical" ? "typical days" : "wait days"}`}
+        title={error}
+        value={value}
+        disabled={pending}
+        placeholder="—"
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        className={cn("h-10 px-2 text-center", amber && "border-warning text-warning")}
+      />
     </div>
   );
 }
@@ -118,10 +174,14 @@ function MoveButtons({ row, first, last }: { row: SequenceRow; first: boolean; l
 function StageDialog({
   row,
   rows,
+  first,
+  last,
   trigger,
 }: {
   row: SequenceRow;
   rows: SequenceRow[];
+  first: boolean;
+  last: boolean;
   trigger: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -248,6 +308,10 @@ function StageDialog({
                 return result;
               }}
             />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-muted text-xs">Move it in the list</p>
+            <MoveButtons row={row} first={first} last={last} />
           </div>
         </div>
       </DialogContent>
