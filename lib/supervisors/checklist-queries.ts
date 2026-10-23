@@ -166,6 +166,7 @@ export type ChecklistItemRow = {
   reviewNote: string | null;
   status: CheckStatus;
   remarks: string | null;
+  hasPhoto: boolean;
 };
 
 export type ChecklistDetail = {
@@ -204,7 +205,7 @@ export async function getChecklist(checklistId: string): Promise<ChecklistDetail
       supabase
         .from("site_checklist_items")
         .select(
-          "id, status, remarks, checklist_template_items(sort_order, text, origin, review_note)",
+          "id, status, remarks, photo_path, checklist_template_items(sort_order, text, origin, review_note)",
         )
         .eq("checklist_id", checklistId)
         .order("id")
@@ -265,6 +266,7 @@ export async function getChecklist(checklistId: string): Promise<ChecklistDetail
           reviewNote: source?.review_note ?? null,
           status: checkStatusOf(item.status) ?? "not_checked",
           remarks: item.remarks,
+          hasPhoto: item.photo_path !== null,
         };
       })
       .sort((a, b) => a.sortOrder - b.sortOrder),

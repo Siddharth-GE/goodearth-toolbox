@@ -66,6 +66,8 @@ Settled with the founder 2026-10-23. Dates are worked out on every read, never s
 - **The checklist runner**: one check per screen on a phone — the check in large type, its "to confirm" note, three big buttons (✓ Pass, ✕ Fail, N/A); Pass moves straight to the next; Fail and N/A open the remark with the keyboard up; a camera button attaches a photo to that check (`lib/native` camera on the app, the file picker on the web). A progress ring fills as it goes; "All clear ✓" on sign-off (respecting reduced motion). The list view stays for review.
 - `site_checklist_items` gains `photo_path` — in `0137`, so one migration.
 - Supervisors → Checklists: each template shows and edits the stages it inspects.
+- [x] [Opus] Built 2026-10-23 on `feature/checklist-runner`, code only (`photo_path` came with `0137`). An open checklist opens on the runner; `?view=list` is the list with the details. The photo button opens the camera through the file input (`capture`), which the phone app's WebView answers too. Writes tried under RLS as a `/supervisors`-only person and as the probe (`scripts/trials/checklist-runner.sql`, proven against a broken copy); the runner seen at 390 wide through a probe. Fable waived as for B.
+- [ ] [Founder] Vet phase C on staging.
 
 ### D. The site board `[Sonnet, Opus vets]`
 

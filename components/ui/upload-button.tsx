@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import type { ActionState } from "@/lib/action-state";
 import { shrinkDocumentForUpload } from "@/lib/uploads/shrink-in-browser";
-import { Upload } from "lucide-react";
+import { Camera, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -17,11 +17,16 @@ export function UploadButton({
   fields = {},
   label = "Upload",
   size = "sm",
+  photo = false,
+  className,
 }: {
   action: (formData: FormData) => Promise<ActionState>;
   fields?: Record<string, string>;
   label?: string;
   size?: "sm" | "md";
+  /** A picture only, the camera first on a phone. */
+  photo?: boolean;
+  className?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -56,7 +61,8 @@ export function UploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/*"
+        accept={photo ? "image/*" : "application/pdf,image/*"}
+        capture={photo ? "environment" : undefined}
         className="sr-only"
         tabIndex={-1}
         onChange={(event) => {
@@ -69,8 +75,13 @@ export function UploadButton({
         size={size}
         disabled={busy}
         onClick={() => inputRef.current?.click()}
+        className={className}
       >
-        <Upload className="size-4" aria-hidden />
+        {photo ? (
+          <Camera className="size-4" aria-hidden />
+        ) : (
+          <Upload className="size-4" aria-hidden />
+        )}
         {busy ? "Uploading…" : label}
       </Button>
       <FormMessage error={error} size="xs" />

@@ -1,10 +1,18 @@
 import { PageTitle } from "@/components/ui/page-title";
-import { listChecklistTemplates } from "@/lib/supervisors/checklist-queries";
+import { listWorkGroups } from "@/lib/masters/works";
+import { listChecklistTemplates, listTemplateGroups } from "@/lib/supervisors/checklist-queries";
 import { TemplateDialog, TemplateList } from "./_components/template-editor";
 
 // The site's checklists, kept by supervisors. A check is never reworded once in use — switch it off and add the new one.
 export default async function ChecklistTemplatesPage() {
-  const templates = await listChecklistTemplates();
+  const [templates, links, groups] = await Promise.all([
+    listChecklistTemplates(),
+    listTemplateGroups(),
+    listWorkGroups(),
+  ]);
+  const stages = groups
+    .filter((group) => group.is_active)
+    .map((group) => ({ id: group.id, code: group.code, name: group.name }));
 
   return (
     <div className="space-y-4">
@@ -21,7 +29,11 @@ export default async function ChecklistTemplatesPage() {
           loaded by an import.
         </p>
       ) : (
-        <TemplateList templates={templates} />
+        <TemplateList
+          templates={templates}
+          stages={stages}
+          stagesByTemplate={Object.fromEntries(links)}
+        />
       )}
     </div>
   );

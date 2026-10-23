@@ -28,7 +28,7 @@ import {
   type CheckAnswer,
   type CheckStatus,
 } from "@/lib/supervisors/checklists";
-import { FileText } from "lucide-react";
+import { FileText, ImageIcon } from "lucide-react";
 import { useState } from "react";
 
 type Answer = { status: CheckStatus; remarks: string | null };
@@ -288,6 +288,17 @@ function ItemRow({
         <span className="text-muted mr-1.5 tabular-nums">{number}.</span>
         {item.text}
       </p>
+      {item.hasPhoto && (
+        <a
+          href={`/supervisors/checklists/photos/${item.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent inline-flex items-center gap-1 text-xs font-medium"
+        >
+          <ImageIcon className="size-3.5" aria-hidden />
+          Photo
+        </a>
+      )}
       {item.reviewNote && (
         <p className="border-warning/40 bg-warning/5 text-foreground rounded-lg border px-2.5 py-1.5 text-xs">
           <span className="font-medium">To confirm: </span>
