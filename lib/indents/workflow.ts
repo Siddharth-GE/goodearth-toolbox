@@ -1,5 +1,7 @@
+import { joinInWords } from "../format";
+
 // Pure rules, mirrored in the RLS policies and the indents_guard trigger (0019), which holds even against a raw PostgREST call.
-export type IndentStatus = "draft" | "submitted" | "approved";
+export type IndentStatus = "draft" | "submitted" | "approved" | "cancelled";
 
 export type Decider = { isAdmin: boolean; isApprover: boolean };
 
@@ -16,8 +18,19 @@ export function canDecide(status: IndentStatus, decider: Decider): boolean {
   return status === "submitted" && (decider.isAdmin || decider.isApprover);
 }
 
-export function canDelete(status: IndentStatus): boolean {
-  return status === "draft";
+/** A draft deletes; a submitted or approved indent cancels (0143) once no live PO orders from it. */
+export function indentRemoval(
+  status: IndentStatus,
+  livePoRefs: readonly string[],
+): { kind: "delete" } | { kind: "cancel" } | { kind: "blocked"; why: string } | null {
+  if (status === "draft") return { kind: "delete" };
+  if (status === "cancelled") return null;
+  if (livePoRefs.length === 0) return { kind: "cancel" };
+  const one = livePoRefs.length === 1;
+  return {
+    kind: "blocked",
+    why: `${joinInWords(livePoRefs)} ${one ? "orders" : "order"} from it — cancel ${one ? "that purchase order" : "those purchase orders"} first.`,
+  };
 }
 
 // A line outside the estimate (0113) needs a reason to submit and the estimator's yes to approve, as indents_guard tests.

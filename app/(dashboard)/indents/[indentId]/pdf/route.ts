@@ -29,7 +29,8 @@ export async function GET(
     }) as ReactElement<DocumentProps>,
   );
 
-  const draftTag = indent.status === "draft" ? "-DRAFT" : "";
+  const draftTag =
+    indent.status === "draft" ? "-DRAFT" : indent.status === "cancelled" ? "-CANCELLED" : "";
   const filename = `Goodearth-Indent-${safeFileNamePart(indent.reference)}${draftTag}.pdf`;
 
   return pdfResponse(buffer, filename, { disposition: "inline" });

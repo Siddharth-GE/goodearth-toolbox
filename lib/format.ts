@@ -160,6 +160,12 @@ export function formatCount(value: number | null | undefined): string {
   return value.toLocaleString(LOCALE);
 }
 
+/** "A", "A and B", "A, B and C": a list read as one phrase in a sentence. */
+export function joinInWords(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 const ONES = [
   "",
   "One",

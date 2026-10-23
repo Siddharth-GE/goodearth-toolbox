@@ -253,6 +253,8 @@ export async function getIndentApprovalsFor(
       .from("indents")
       .select("id, reference, unit_id, plot_id, work_item_id")
       .in("id", [...new Set(lines.map((line) => line.indent_id))])
+      // A cancelled indent (0143) bought nothing, so its answers settle nothing.
+      .neq("status", "cancelled")
       .order("id")
       .range(from, to),
   );

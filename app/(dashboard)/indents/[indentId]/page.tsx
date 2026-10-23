@@ -4,7 +4,13 @@ import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getIndent } from "@/lib/indents/detail-queries";
 import { isCurrentUserApprover } from "@/lib/indents/queries";
-import { approvalBlocker, canEditIndent, estimatorHold, stillToBuy } from "@/lib/indents/workflow";
+import {
+  approvalBlocker,
+  canEditIndent,
+  estimatorHold,
+  indentRemoval,
+  stillToBuy,
+} from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
@@ -78,6 +84,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               lineCount={indent.line_count}
               decider={decider}
               approvalBlocker={blocker}
+              removal={indentRemoval(indent.status, indent.live_po_refs)}
             />
           </>
         }
@@ -109,6 +116,19 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
                   : "waiting for an approver. Nothing can be changed while it waits."}
           </p>
           <Attribution name={indent.submitted_by_name} label="Submitted by" />
+        </div>
+      )}
+
+      {indent.status === "cancelled" && (
+        <div className="border-danger/40 bg-danger/5 flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            <span className="font-medium">Cancelled</span>
+            {indent.cancelled_at && (
+              <span className="text-muted"> on {formatDate(indent.cancelled_at)}</span>
+            )}
+            : {indent.cancel_reason}. It is kept on record and counts nowhere.
+          </p>
+          <Attribution name={indent.cancelled_by_name} label="Cancelled by" />
         </div>
       )}
 

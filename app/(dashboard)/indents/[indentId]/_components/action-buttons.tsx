@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DeleteOrCancel, type Removal } from "@/components/ui/delete-or-cancel";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionState } from "@/lib/action-state";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
-import { approveIndent, deleteIndent, rejectIndent, submitIndent } from "@/lib/indents/actions";
+import {
+  approveIndent,
+  cancelIndent,
+  deleteIndent,
+  rejectIndent,
+  submitIndent,
+} from "@/lib/indents/actions";
 import { canDecide, canEditIndent, canSubmit, type IndentStatus } from "@/lib/indents/workflow";
 import { useState } from "react";
 
@@ -25,6 +32,7 @@ export function ActionButtons({
   lineCount,
   decider,
   approvalBlocker,
+  removal,
 }: {
   indentId: string;
   status: IndentStatus;
@@ -32,9 +40,9 @@ export function ActionButtons({
   decider: { isAdmin: boolean; isApprover: boolean };
   /** Why Approve is locked (0113: lines outside the estimate wait for the estimator); Send back stays open. */
   approvalBlocker: string | null;
+  removal: Removal | null;
 }) {
   const { pending, error, run: runAction, clearError } = useActionRunner();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
 
@@ -43,10 +51,21 @@ export function ActionButtons({
     if (!result?.error) setRejecting(false);
   };
 
+  const goes = (
+    <DeleteOrCancel
+      noun="indent"
+      removal={removal}
+      deleteNote="Nothing uses a draft, so it goes for good. Its number stays used."
+      onDelete={() => deleteIndent(indentId)}
+      onCancel={(reason) => cancelIndent(indentId, reason)}
+    />
+  );
+
   if (canDecide(status, decider)) {
     return (
       <div className="space-y-1 text-right">
         <div className="flex items-center justify-end gap-2">
+          {goes}
           <Button variant="secondary" disabled={pending} onClick={() => setRejecting(true)}>
             Send back
           </Button>
@@ -108,50 +127,21 @@ export function ActionButtons({
     );
   }
 
-  if (!canEditIndent(status)) return null;
+  if (!canEditIndent(status)) return goes;
 
   return (
     <div className="space-y-1 text-right">
       <div className="flex items-center justify-end gap-2">
-        {confirmingDelete ? (
-          <>
-            <span className="text-muted text-xs">Its number stays used — sure?</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Keep it
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="text-danger"
-              disabled={pending}
-              onClick={() => run(() => deleteIndent(indentId))}
-            >
-              {pending ? "Deleting…" : "Delete draft"}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(true)}>
-              Delete
-            </Button>
-            <Button
-              disabled={pending || !canSubmit(status, lineCount)}
-              title={lineCount === 0 ? "Add at least one line first" : undefined}
-              onClick={() => run(() => submitIndent(indentId))}
-            >
-              {pending ? "Submitting…" : "Submit for approval"}
-            </Button>
-          </>
-        )}
+        {goes}
+        <Button
+          disabled={pending || !canSubmit(status, lineCount)}
+          title={lineCount === 0 ? "Add at least one line first" : undefined}
+          onClick={() => run(() => submitIndent(indentId))}
+        >
+          {pending ? "Submitting…" : "Submit for approval"}
+        </Button>
       </div>
-      {lineCount === 0 && !confirmingDelete && (
-        <p className="text-muted text-xs">Add at least one line to submit</p>
-      )}
+      {lineCount === 0 && <p className="text-muted text-xs">Add at least one line to submit</p>}
       <FormMessage error={error} size="xs" />
     </div>
   );

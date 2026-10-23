@@ -12,7 +12,15 @@ import {
   formatPercent,
   formatQuantity,
   formatTime,
+  joinInWords,
 } from "./format";
+
+test("a list reads as one phrase", () => {
+  assert.equal(joinInWords([]), "");
+  assert.equal(joinInWords(["PO/1"]), "PO/1");
+  assert.equal(joinInWords(["PO/1", "PO/2"]), "PO/1 and PO/2");
+  assert.equal(joinInWords(["PO/1", "PO/2", "PO/3"]), "PO/1, PO/2 and PO/3");
+});
 
 test("money groups in lakhs, not thousands", () => {
   // Indian grouping: 12,34,567, not 1,234,567.

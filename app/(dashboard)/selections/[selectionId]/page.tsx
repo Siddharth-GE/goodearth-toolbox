@@ -1,6 +1,8 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { EmptyState } from "@/components/ui/empty-state";
+import { deleteDraftSelection } from "@/lib/selections/actions";
 import { Button, LinkButton } from "@/components/ui/button";
 import {
   diffRevisions,
@@ -121,6 +123,12 @@ export default async function SelectionEditorPage({
               </>
             )}
             {selection.status === "issued" && <NextRevisionButton fromSelectionId={selectionId} />}
+            <DeleteOrCancel
+              noun="draft revision"
+              removal={isDraft ? { kind: "delete" } : null}
+              deleteNote={`Nothing uses a draft, so R${selection.revision_no} and its items go for good. The unit's spaces stay.`}
+              onDelete={deleteDraftSelection.bind(null, selectionId)}
+            />
           </>
         }
       />

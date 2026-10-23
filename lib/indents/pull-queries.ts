@@ -237,8 +237,10 @@ export async function getBudgetPull(
   const raised = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
-      .select("line_key, quantity, indent_id")
+      .select("line_key, quantity, indent_id, indents!indent_lines_indent_id_fkey!inner(status)")
       .in("budget_id", siblingIds)
+      // A cancelled indent (0143) gives back what it asked for.
+      .neq("indents.status", "cancelled")
       .order("id")
       .range(from, to),
   );
@@ -456,7 +458,9 @@ export async function getEstimatePull(
   const { data: villaIndents, error: indentsError } = await supabase
     .from("indents")
     .select("id, work_item_id")
-    .eq("unit_id", unitId);
+    .eq("unit_id", unitId)
+    // A cancelled indent (0143) gives back what it asked for.
+    .neq("status", "cancelled");
   if (indentsError) {
     console.error("estimate pull indents read failed:", indentsError);
     throw new Error("Could not open the estimate.", { cause: indentsError });

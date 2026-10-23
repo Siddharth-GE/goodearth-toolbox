@@ -26,6 +26,7 @@ const TABS: { key: string; label: string; status?: IndentStatus }[] = [
   { key: "draft", label: "Draft", status: "draft" },
   { key: "submitted", label: "Submitted", status: "submitted" },
   { key: "approved", label: "Approved", status: "approved" },
+  { key: "cancelled", label: "Cancelled", status: "cancelled" },
 ];
 
 export default async function IndentsPage({
