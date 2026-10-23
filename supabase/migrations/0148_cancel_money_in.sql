@@ -2,7 +2,7 @@
 --
 -- Client receipts, funding movements, Birdwing receipts and Birdwing cross-charges were deletable by anyone holding
 -- their tool. Now none is deleted or edited: an admin or the tool's team lead (is_lead — a lead exists only in a scoped
--- tool, so elsewhere that is an admin) cancels one with a reason (the founder, 2026-10-23). It stays on record and
+-- tool, so elsewhere that is an admin) cancels one with a reason (the founder's rule). It stays on record and
 -- leaves every total; the four views over these tables carry their WHERE forward unchanged and learn only that filter.
 
 -- ---------------------------------------------------------------------
@@ -35,6 +35,12 @@ declare
   v_noun text := tg_argv[1];
   v_kept text[] := array['cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at', 'updated_by'];
 begin
+  if tg_op = 'INSERT' then
+    if new.cancelled_at is not null or new.cancelled_by is not null or new.cancel_reason is not null then
+      raise exception 'A new % cannot arrive cancelled', v_noun;
+    end if;
+    return new;
+  end if;
   if old.cancelled_at is not null then
     raise exception 'A cancelled % can no longer be changed', v_noun;
   end if;
@@ -58,20 +64,20 @@ revoke execute on function money_in_cancel_guard() from public, anon, authentica
 
 drop trigger if exists client_receipts_cancel_guard on client_receipts;
 create trigger client_receipts_cancel_guard
-  before update on client_receipts
+  before insert or update on client_receipts
   for each row execute function money_in_cancel_guard('/client-relations', 'payment');
 drop trigger if exists funding_movements_cancel_guard on funding_movements;
 create trigger funding_movements_cancel_guard
-  before update on funding_movements
+  before insert or update on funding_movements
   for each row execute function money_in_cancel_guard('/financial-management', 'movement');
 drop trigger if exists birdwing_receipts_cancel_guard on birdwing_receipts;
 create trigger birdwing_receipts_cancel_guard
-  before update on birdwing_receipts
+  before insert or update on birdwing_receipts
   for each row execute function money_in_cancel_guard('/birdwing', 'receipt');
 drop trigger if exists birdwing_cross_charges_cancel_guard on birdwing_cross_charges;
 create trigger birdwing_cross_charges_cancel_guard
-  before update on birdwing_cross_charges
-  for each row execute function money_in_cancel_guard('/birdwing', 'settlement');
+  before insert or update on birdwing_cross_charges
+  for each row execute function money_in_cancel_guard('/birdwing', 'cross-charge');
 
 -- ---------------------------------------------------------------------
 -- 2. Policies: no delete; a cancel is the only update

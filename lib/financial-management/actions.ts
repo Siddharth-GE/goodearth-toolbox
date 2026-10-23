@@ -226,19 +226,23 @@ export async function cancelMovement(
   if (!reason.trim()) return { error: "Say why it is cancelled." };
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("funding_movements")
     .update({ cancel_reason: reason.trim() })
-    .eq("id", movementId);
+    .eq("id", movementId)
+    .select("id");
   if (error) {
     console.error("cancelMovement failed:", error);
     return {
       error: dbErrorMessage(error, "Could not cancel the movement. Try again.", [
-        "cancel",
-        "never edited",
+        "can no longer be changed",
+        "is never edited",
+        "can cancel a",
+        "Say why it is cancelled",
       ]),
     };
   }
+  if (!data?.length) return { error: "That movement is no longer on record." };
 
   revalidateFunding(facilityId);
   return undefined;

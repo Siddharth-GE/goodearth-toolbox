@@ -19,8 +19,13 @@ declare
   v_text text;
   v_n numeric;
   v_before numeric;
+  v_milestone uuid;
+  v_received numeric;
+  v_collections numeric;
 begin
-  select e.id, e.project_id into v_engagement, v_project from client_engagements e order by e.id limit 1;
+  select e.id, e.project_id, m.id into v_engagement, v_project, v_milestone
+    from client_engagements e join client_payment_milestones m on m.engagement_id = e.id
+   order by e.id, m.sort_order limit 1;
   select r.stay_id, r.id into v_stay, v_bw_receipt from birdwing_receipts r order by r.amount desc, r.id limit 1;
   if v_user is null or v_engagement is null or v_stay is null then
     raise exception 'TRIAL SETUP: staging is missing the staff account, a client engagement or a Birdwing receipt';
@@ -36,14 +41,25 @@ begin
     'role', 'authenticated', 'session_id', s_user)::text, true);
 
   -- Setup as the owner: a receipt of 5,000 on a plot, a facility with a drawdown, a write-off on a Birdwing stay.
-  insert into client_receipts (engagement_id, amount, received_on, mode, reference)
-  values (v_engagement, 5000, current_date, 'bank', 'TRIAL-0148') returning id into v_receipt;
+  insert into client_receipts (engagement_id, milestone_id, amount, received_on, mode, reference)
+  values (v_engagement, v_milestone, 5000, current_date, 'bank', 'TRIAL-0148') returning id into v_receipt;
   insert into funding_facilities (party, kind) values ('Trial 0148 lender', 'bank_loan') returning id into v_facility;
   insert into funding_movements (facility_id, kind, amount, happened_on)
   values (v_facility, 'drawdown', 100000, current_date) returning id into v_movement;
   insert into birdwing_cross_charges (stay_id, kind, amount, charged_month, note)
   values (v_stay, 'write_off', 1, date_trunc('month', current_date)::date, 'Trial 0148') returning id into v_settlement;
   set local role authenticated;
+
+  -- 0. Nothing arrives already cancelled, whoever it claims cancelled it.
+  v_text := null;
+  begin
+    insert into funding_movements (facility_id, kind, amount, happened_on, cancelled_at, cancelled_by, cancel_reason)
+    values (v_facility, 'drawdown', 1, current_date, now(), gen_random_uuid(), 'Born cancelled');
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'A new movement cannot arrive cancelled' then
+    raise exception 'TRIAL 0 FAILED: a movement born cancelled gave %', coalesce(v_text, 'no refusal');
+  end if;
 
   -- 1. Nobody deletes money any more.
   delete from client_receipts where id = v_receipt;
@@ -71,6 +87,12 @@ begin
   if (select cancelled_at from birdwing_receipts where id = v_bw_receipt) is not null then
     raise exception 'TRIAL 2b FAILED: a non-lead cancelled a Birdwing receipt';
   end if;
+  update client_receipts set cancel_reason = 'Typed twice' where id = v_receipt;
+  reset role;
+  if (select cancelled_at from client_receipts where id = v_receipt) is not null then
+    raise exception 'TRIAL 2c FAILED: a Client Relations member who is not lead cancelled a receipt';
+  end if;
+  set local role authenticated;
 
   -- 3. Leads, as a row in tool_leads makes them.
   reset role;
@@ -98,6 +120,8 @@ begin
 
   -- 5. Each cancels, stamped by the database, and a cancelled row never changes again.
   select collected into v_before from birdwing_stay_facts where stay_id = v_stay;
+  select received_amount into v_received from crm_milestone_facts where id = v_milestone;
+  select sum(actual_collections) into v_collections from business_plan_target_facts where project_id = v_project;
   update client_receipts set cancel_reason = ' Wrong plot ', cancelled_at = '2020-01-01' where id = v_receipt;
   update funding_movements set cancel_reason = 'Typed twice' where id = v_movement;
   update birdwing_receipts set cancel_reason = 'Typed twice' where id = v_bw_receipt;
@@ -121,6 +145,14 @@ begin
   end if;
 
   -- 6. Every view leaves the cancelled money out.
+  if (select received_amount from crm_milestone_facts where id = v_milestone) <> v_received - 5000 then
+    raise exception 'TRIAL 6d FAILED: crm_milestone_facts still counts the cancelled receipt';
+  end if;
+  if v_collections is not null
+     and (select sum(actual_collections) from business_plan_target_facts where project_id = v_project)
+         <> v_collections - 5000 * (select count(*) from business_plan_target_facts where project_id = v_project) then
+    raise exception 'TRIAL 6e FAILED: business_plan_target_facts still counts the cancelled receipt';
+  end if;
   if exists (select 1 from crm_receipt_facts where id = v_receipt) then
     raise exception 'TRIAL 6a FAILED: crm_receipt_facts lists a cancelled receipt';
   end if;

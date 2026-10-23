@@ -250,7 +250,7 @@ export function SettlePanel({
                 </p>
               </div>
               <DeleteOrCancel
-                noun={settlement.kind === "write_off" ? "write-off" : "charge"}
+                noun={settlement.kind === "write_off" ? "write-off" : "cross-charge"}
                 removal={canCancel && !settlement.cancelledAt ? { kind: "cancel" } : null}
                 cancelNote={`${money(settlement.amount)} goes back to pending on this stay, and stays listed here with your reason.`}
                 reasonPlaceholder="Charged to the wrong cost centre"

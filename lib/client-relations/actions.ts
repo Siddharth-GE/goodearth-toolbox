@@ -24,7 +24,10 @@ function revalidateAll(): void {
 const CRM_GUARD_PHRASES = [
   "no longer exists",
   // money_in_cancel_guard (0148).
-  "cancel",
+  "can no longer be changed",
+  "is never edited",
+  "can cancel a",
+  "Say why it is cancelled",
   "You need the Client Relations app",
   "Unknown unit status",
   // crm_assign_unit and crm_release_unit, on a plot someone else owns (0123).
