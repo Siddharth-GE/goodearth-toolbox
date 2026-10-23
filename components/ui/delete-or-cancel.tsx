@@ -27,11 +27,12 @@ export function DeleteOrCancel({
   onCancel?: (reason: string) => Promise<ActionState>;
   deleteNote?: string;
   /** What going is called once something depends on it: an official estimate is withdrawn. */
-  verb?: "Cancel" | "Withdraw";
+  /** "Delete" asks a reason too: a stock record that already moved stock (0146). */
+  verb?: "Cancel" | "Withdraw" | "Delete";
   cancelNote?: string;
 }) {
-  const doing = verb === "Withdraw" ? "Withdrawing…" : "Cancelling…";
-  const done = verb === "Withdraw" ? "withdrawn" : "cancelled";
+  const doing = { Cancel: "Cancelling…", Withdraw: "Withdrawing…", Delete: "Deleting…" }[verb];
+  const done = { Cancel: "cancelled", Withdraw: "withdrawn", Delete: "deleted" }[verb];
   if (!removal) return null;
 
   if (removal.kind === "delete" && onDelete) {

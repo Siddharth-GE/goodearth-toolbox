@@ -525,3 +525,48 @@ export async function retagIssueWork(issueId: string, workItemId: string): Promi
   revalidatePath("/inventory", "layout");
   return undefined;
 }
+
+// delete_goods_receipt (0146) refuses once anything has drawn on it, a bill counts it or the site has confirmed it.
+export async function deleteGoodsReceipt(receiptId: string, reason: string): Promise<ActionState> {
+  await requireTool("/inventory");
+  const why = reason.trim();
+  if (!why) return { error: "Say why this delivery is deleted." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_goods_receipt", {
+    p_receipt_id: receiptId,
+    p_reason: why,
+  });
+  if (error) {
+    console.error("deleteGoodsReceipt failed:", error);
+    // The function's refusals are written for the store-keeper.
+    return error.code === "P0001"
+      ? { error: error.message }
+      : { error: "Could not delete this delivery. Try again." };
+  }
+
+  revalidatePath("/inventory", "layout");
+  redirect("/inventory/receive");
+}
+
+// delete_stock_issue (0146) refuses once the site has confirmed it or a transfer's material has moved on.
+export async function deleteStockIssue(issueId: string, reason: string): Promise<ActionState> {
+  await requireTool("/inventory");
+  const why = reason.trim();
+  if (!why) return { error: "Say why this issue is deleted." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_stock_issue", {
+    p_issue_id: issueId,
+    p_reason: why,
+  });
+  if (error) {
+    console.error("deleteStockIssue failed:", error);
+    return error.code === "P0001"
+      ? { error: error.message }
+      : { error: "Could not delete this issue. Try again." };
+  }
+
+  revalidatePath("/inventory", "layout");
+  redirect("/inventory/issues");
+}

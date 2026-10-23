@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -13,6 +14,7 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import { deleteGoodsReceipt } from "@/lib/inventory/actions";
 import { getGoodsReceipt } from "@/lib/inventory/receipts-queries";
 import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
@@ -34,7 +36,23 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
         backHref="/inventory/receive"
         backLabel="Receive"
         actions={
-          <Badge variant={receipt.to_site ? "info" : "success"}>{receipt.destination}</Badge>
+          <>
+            <Badge variant={receipt.to_site ? "info" : "success"}>{receipt.destination}</Badge>
+            <DeleteOrCancel
+              noun="delivery"
+              verb="Delete"
+              removal={
+                confirmation
+                  ? {
+                      kind: "blocked",
+                      why: "The site has confirmed it — correct it with an adjustment instead.",
+                    }
+                  : { kind: "cancel" }
+              }
+              cancelNote="Only while nothing has been issued from it, no bill counts it and the site hasn't confirmed it. Stock and the order's received figure correct themselves, and your reason is kept on record."
+              onCancel={deleteGoodsReceipt.bind(null, receipt.id)}
+            />
+          </>
         }
       />
 
