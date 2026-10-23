@@ -12,7 +12,12 @@ import {
   type StageStatus,
 } from "@/lib/supervisors/programme";
 import type { StageEvent, StageView, VillaProgramme } from "@/lib/supervisors/programme-queries";
-import type { ContractorOption, VillaDetail, WorkOption } from "@/lib/supervisors/queries";
+import type {
+  ContractorOption,
+  VillaBasics,
+  VillaDetail,
+  WorkOption,
+} from "@/lib/supervisors/queries";
 import type { Readiness } from "@/lib/supervisors/readiness";
 import { cn } from "@/lib/utils";
 import { ChevronRight, ClipboardCheck, HardHat, Package } from "lucide-react";
@@ -117,7 +122,7 @@ export function VillaHeader({
   programme,
   plotId,
 }: {
-  villa: VillaDetail;
+  villa: VillaBasics;
   programme: VillaProgramme;
   plotId: string;
 }) {

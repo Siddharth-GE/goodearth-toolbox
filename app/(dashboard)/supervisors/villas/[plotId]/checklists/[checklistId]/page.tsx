@@ -25,7 +25,7 @@ export default async function ChecklistPage({
       <PageTitle
         title={checklist.templateName}
         description={`Plot ${checklist.plotName}${checklist.location ? ` · ${checklist.location}` : ""} · started ${formatDate(checklist.startedOn)}`}
-        backHref={`/supervisors/villas/${plotId}`}
+        backHref={`/supervisors/villas/${plotId}?tab=checklists`}
         backLabel="The villa"
         actions={
           checklist.status === "signed_off" ? (
