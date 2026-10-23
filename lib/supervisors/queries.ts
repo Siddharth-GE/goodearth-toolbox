@@ -100,6 +100,50 @@ export type VillaDetail = {
 
 const LOGS_SHOWN = 30;
 
+export type VillaBasics = Pick<
+  VillaDetail,
+  "plotId" | "unitId" | "villaName" | "plotName" | "plotNumber" | "projectName" | "estimate"
+>;
+
+/** The villa's header alone — the tabs that show no materials or labour read only this. */
+export async function getVillaBasics(plotId: string): Promise<VillaBasics | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const [{ data: plot, error: plotError }, { data: unit, error: unitError }] = await Promise.all([
+    supabase
+      .from("plots")
+      .select("id, name, code, project_id, projects(name)")
+      .eq("id", plotId)
+      .maybeSingle(),
+    supabase.from("units").select("id, name").eq("plot_id", plotId).maybeSingle(),
+  ]);
+  if (plotError) fail("the villa", plotError);
+  if (unitError) fail("the villa", unitError);
+  if (!plot) return null;
+  // One row names the official estimate; its lines are the Work tab's.
+  const { data: official, error: officialError } = unit
+    ? await supabase
+        .from("estimate_takeoff_facts")
+        .select("reference, submitted_at")
+        .eq("unit_id", unit.id)
+        .limit(1)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (officialError) fail("the villa's estimate", officialError);
+  return {
+    plotId,
+    unitId: unit?.id ?? null,
+    villaName: unit?.name ?? plot.name,
+    plotName: plot.name,
+    plotNumber: plotNumber(plot.code, plot.name),
+    projectName: (plot.projects as { name: string } | null)?.name ?? "—",
+    estimate:
+      official?.reference && official.submitted_at
+        ? { reference: official.reference, submittedAt: official.submitted_at }
+        : null,
+  };
+}
+
 export async function getVillaDetail(plotId: string): Promise<VillaDetail | null> {
   await requireTool(GRANT);
   const supabase = await createClient();

@@ -92,6 +92,10 @@ export async function setStageStatus(input: {
   if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
 
   const { current } = input;
+  const pinned = current.startedOn ? null : await pinnedStart(input.plotId, input.groupId);
+  if (typeof pinned === "object" && pinned !== null) return pinned;
+  // A planned start that has passed is the day it began, not today.
+  const begun = current.startedOn ?? (pinned && pinned <= today ? pinned : today);
   switch (input.status) {
     case "working":
       return writeStage(
@@ -99,7 +103,7 @@ export async function setStageStatus(input: {
         input.groupId,
         {
           status: "working",
-          started_on: current.startedOn ?? today,
+          started_on: begun,
           finished_on: null,
           waiting_on: null,
           waiting_note: null,
@@ -123,7 +127,7 @@ export async function setStageStatus(input: {
       );
     }
     case "done": {
-      const started = current.startedOn ?? today;
+      const started = begun;
       return writeStage(
         input.plotId,
         input.groupId,
@@ -151,6 +155,25 @@ export async function setStageStatus(input: {
         "setStageStatus not started",
       );
   }
+}
+
+/** The stage's planned start, or an error to show when it could not be read. */
+async function pinnedStart(
+  plotId: string,
+  groupId: string,
+): Promise<string | null | { error: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("site_stages")
+    .select("pinned_start")
+    .eq("plot_id", plotId)
+    .eq("work_group_id", groupId)
+    .maybeSingle();
+  if (error) {
+    console.error("pinnedStart read failed:", error);
+    return { error: "Could not read the stage. Try again." };
+  }
+  return data?.pinned_start ?? null;
 }
 
 /** Undo: the stage exactly as it was before the last tap. */
@@ -215,12 +238,19 @@ export async function setStageContractor(input: {
   );
 }
 
-/** This villa's own days for a stage and a start fixed by hand; empty goes back to the learned or typical days, and the chain. */
+/**
+ * This villa's own days for a stage and when it starts; empty goes back to the learned or typical days, and the chain. A start
+ * that has already passed on a stage not yet begun means it began that day: the stage turns working from then.
+ */
 export async function setStagePlan(input: {
   plotId: string;
   groupId: string;
   days: string;
   pinnedStart: string;
+  /** The stage's real start, if it has one: a passed date then plans nothing. */
+  startedOn: string | null;
+  /** Waiting before it began: a passed date gives it its start and leaves it waiting. */
+  waiting: boolean;
 }): Promise<ActionState> {
   await requireTool(GRANT);
   const daysText = input.days.trim();
@@ -228,12 +258,30 @@ export async function setStagePlan(input: {
   if (days !== null && (!Number.isInteger(days) || days < 1 || days > 999)) {
     return { error: "Days is a whole number, 1 or more." };
   }
-  const pinnedStart = input.pinnedStart.trim();
-  if (pinnedStart && !DATE.test(pinnedStart)) return { error: "Pick the date from the calendar." };
+  const startOn = input.pinnedStart.trim();
+  if (startOn && !DATE.test(startOn)) return { error: "Pick the date from the calendar." };
+  if (startOn && startOn <= todayInIndia() && !input.startedOn) {
+    return writeStage(
+      input.plotId,
+      input.groupId,
+      input.waiting
+        ? { days, pinned_start: null, started_on: startOn }
+        : {
+            days,
+            pinned_start: null,
+            status: "working",
+            started_on: startOn,
+            finished_on: null,
+            waiting_on: null,
+            waiting_note: null,
+          },
+      "setStagePlan started",
+    );
+  }
   return writeStage(
     input.plotId,
     input.groupId,
-    { days, pinned_start: pinnedStart || null },
+    { days, pinned_start: startOn || null },
     "setStagePlan",
   );
 }

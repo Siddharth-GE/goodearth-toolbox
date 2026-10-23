@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 /** The one typed date of the schedule: the day the villa's first stage starts. */
 export function VillaStartControl({ plotId, startOn }: { plotId: string; startOn: string | null }) {
   const [value, setValue] = useState(startOn ?? "");
+  const [saved, setSaved] = useState(false);
   const { pending, error, run } = useActionRunner();
   return (
     <div className="space-y-1.5">
@@ -28,12 +29,16 @@ export function VillaStartControl({ plotId, startOn }: { plotId: string; startOn
         <Button
           variant="secondary"
           disabled={pending || value === (startOn ?? "")}
-          onClick={() => run(() => setVillaStart({ plotId, startOn: value }))}
+          onClick={() =>
+            run(() => setVillaStart({ plotId, startOn: value })).then((result) =>
+              setSaved(!result?.error),
+            )
+          }
         >
           {pending ? "Saving…" : "Save"}
         </Button>
       </div>
-      <FormMessage error={error} />
+      <FormMessage error={error} success={saved && !pending ? "Saved" : undefined} />
     </div>
   );
 }

@@ -12,12 +12,14 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { NavTabs } from "@/components/ui/tabs";
 import { UndoBarProvider } from "@/components/ui/undo-bar";
 import { formatDate, formatQuantity } from "@/lib/format";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { describeLabour } from "@/lib/supervisors/labour";
 import {
+  getVillaBasics,
   getVillaDetail,
   listContractors,
   listWorkOptions,
@@ -31,7 +33,11 @@ import {
   listTemplateGroups,
   listVillaChecklists,
 } from "@/lib/supervisors/checklist-queries";
-import { getVillaProgramme, storeStock } from "@/lib/supervisors/programme-queries";
+import {
+  getVillaProgramme,
+  storeStock,
+  type VillaProgramme,
+} from "@/lib/supervisors/programme-queries";
 import Link from "next/link";
 import { listVillaDeliveries, type VillaDelivery } from "@/lib/supervisors/site-receipt-queries";
 import { isShort } from "@/lib/supervisors/site-receipt";
@@ -52,52 +58,77 @@ import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request
 import { FirstPlanControl, VillaStartControl } from "./_components/schedule-controls";
 import { ScheduleStrip } from "./_components/schedule-strip";
 
-// One villa, phone-first: where it stands, the stages being worked and what comes next, then the full records folded away below.
-export default async function VillaPage({ params }: { params: Promise<{ plotId: string }> }) {
-  const { plotId } = await params;
+const TABS = [
+  { key: "work", label: "Work" },
+  { key: "schedule", label: "Schedule" },
+  { key: "checklists", label: "Checklists" },
+  { key: "records", label: "Records" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
+const isTab = (value: string | undefined): value is Tab =>
+  TABS.some((entry) => entry.key === value);
+
+// One villa, phone-first: its header, then a tab at a time — the work in hand, the schedule, its checklists, its records. Each
+// tab reads only what it shows.
+export default async function VillaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ plotId: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const [{ plotId }, { tab: asked }] = await Promise.all([params, searchParams]);
+  const tab: Tab = isTab(asked) ? asked : "work";
+  const withDetail = tab === "work" || tab === "records";
   const [
-    villa,
+    basics,
     contractors,
-    works,
-    categories,
-    brands,
     checklists,
     templates,
     templateGroups,
     deliveries,
+    villa,
+    works,
+    categories,
+    brands,
   ] = await Promise.all([
-    getVillaDetail(plotId),
+    getVillaBasics(plotId),
     listContractors(),
-    listWorkOptions(),
-    listItemCategories(),
-    listBrands(),
     listVillaChecklists(plotId),
     listChecklistTemplates(),
     listTemplateGroups(),
     listVillaDeliveries(plotId),
+    withDetail ? getVillaDetail(plotId) : Promise.resolve(null),
+    withDetail ? listWorkOptions() : Promise.resolve([]),
+    withDetail ? listItemCategories() : Promise.resolve([]),
+    withDetail ? listBrands() : Promise.resolve([]),
   ]);
-  if (!villa) notFound();
+  if (!basics) notFound();
 
   const programme = await getVillaProgramme({
     plotId,
-    unitId: villa.unitId,
+    unitId: basics.unitId,
     checklists,
     templates,
     templateGroups,
     deliveries,
     contractors,
   });
-  const nextItemIds = [
-    ...new Set(
-      programme.next.flatMap((stage) =>
-        stageReadiness(
-          stage.works.map((work) => work.id),
-          villa,
-          new Map(),
-        ).flatMap((row) => (row.pick ? [row.pick.itemId] : [])),
-      ),
-    ),
-  ];
+  const nextItemIds =
+    tab === "work" && villa
+      ? [
+          ...new Set(
+            programme.next.flatMap((stage) =>
+              stageReadiness(
+                stage.works.map((work) => work.id),
+                villa,
+                new Map(),
+              ).flatMap((row) => (row.pick ? [row.pick.itemId] : [])),
+            ),
+          ),
+        ]
+      : [];
   const stock = await storeStock(nextItemIds);
 
   const pickerCategories = categories.map(({ id, name }) => ({ id, name }));
@@ -110,11 +141,11 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
       itemCount: template.items.filter((item) => item.isActive).length,
     }))
     .filter((template) => template.itemCount > 0);
-  const openRequests = villa.requests.filter((request) => request.status === "requested");
-  const answered = villa.requests.filter((request) => request.status !== "requested");
   const toConfirm = deliveries.filter(
     (delivery) => !delivery.confirmedAt && delivery.lines.length > 0,
   );
+  const openChecklists = checklists.filter((checklist) => checklist.status === "open").length;
+  const here = `/supervisors/villas/${plotId}`;
 
   return (
     <UndoBarProvider>
@@ -126,298 +157,366 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
           <ChevronLeft className="size-4" aria-hidden /> Villas
         </Link>
 
-        <VillaHeader villa={villa} programme={programme} plotId={plotId} />
+        <VillaHeader villa={basics} programme={programme} plotId={plotId} />
 
-        <section className="space-y-2">
-          <SectionHead
-            title="Now"
-            count={programme.now.length}
-            hint="Working or waiting"
-            aside={
-              <LabourLogDialog
-                plotId={plotId}
-                works={works}
-                contractors={contractors}
-                trigger={
-                  <button type="button" className="text-accent text-sm font-medium">
-                    Log other labour
-                  </button>
+        <NavTabs
+          active={tab}
+          tabs={TABS.map((entry) => ({
+            key: entry.key,
+            href: entry.key === "work" ? here : `${here}?tab=${entry.key}`,
+            label:
+              entry.key === "work" && programme.now.length + toConfirm.length > 0
+                ? `Work · ${programme.now.length + toConfirm.length}`
+                : entry.key === "checklists" && openChecklists > 0
+                  ? `Checklists · ${openChecklists}`
+                  : entry.label,
+          }))}
+        />
+
+        {tab === "work" && villa ? (
+          <>
+            <section className="space-y-2">
+              <SectionHead
+                title="Now"
+                count={programme.now.length}
+                hint="Working or waiting"
+                aside={
+                  <LabourLogDialog
+                    plotId={plotId}
+                    works={works}
+                    contractors={contractors}
+                    trigger={
+                      <button type="button" className="text-accent text-sm font-medium">
+                        Log other labour
+                      </button>
+                    }
+                  />
                 }
               />
-            }
-          />
-          {programme.now.length === 0 ? (
-            <Card className="p-5">
-              <p className="text-muted text-sm">
-                Nothing is being worked. The first labour logged on a stage starts it — or tap
-                Working on the next stage below.
-              </p>
-            </Card>
-          ) : (
-            programme.now.map((stage) => (
-              <NowCard
-                key={stage.id}
-                plotId={plotId}
-                stage={stage}
-                works={works}
-                contractors={contractors}
-                villa={villa}
-                categories={pickerCategories}
-                brands={pickerBrands}
-                templates={startable}
+              {programme.now.length === 0 ? (
+                <Card className="p-5">
+                  <p className="text-muted text-sm">
+                    Nothing is being worked. The first labour logged on a stage starts it — or tap
+                    Working on the next stage below.
+                  </p>
+                </Card>
+              ) : (
+                programme.now.map((stage) => (
+                  <NowCard
+                    key={stage.id}
+                    plotId={plotId}
+                    stage={stage}
+                    works={works}
+                    contractors={contractors}
+                    villa={villa}
+                    categories={pickerCategories}
+                    brands={pickerBrands}
+                    templates={startable}
+                  />
+                ))
+              )}
+            </section>
+
+            {programme.next.length > 0 && (
+              <section className="space-y-2">
+                <SectionHead
+                  title="Next up"
+                  hint="Line up the crew and the material before it starts"
+                />
+                {programme.next.map((stage) => (
+                  <NextCard
+                    key={stage.id}
+                    plotId={plotId}
+                    stage={stage}
+                    readiness={stageReadiness(
+                      stage.works.map((work) => work.id),
+                      villa,
+                      stock,
+                    )}
+                    works={works}
+                    contractors={contractors}
+                    villa={villa}
+                    categories={pickerCategories}
+                    brands={pickerBrands}
+                  />
+                ))}
+              </section>
+            )}
+
+            {toConfirm.length > 0 && (
+              <section className="space-y-2">
+                <SectionHead title="Deliveries to confirm" count={toConfirm.length} tone="info" />
+                <Card className="p-5">
+                  <DeliveryList deliveries={toConfirm} />
+                </Card>
+              </section>
+            )}
+          </>
+        ) : null}
+
+        {tab === "schedule" ? (
+          <>
+            <section className="space-y-2">
+              <SectionHead
+                title="Schedule"
+                hint={
+                  programme.schedule.handover
+                    ? `Handover ${formatDate(programme.schedule.handover)}`
+                    : "Dates follow the sequence"
+                }
               />
-            ))
-          )}
-        </section>
+              <Card className="space-y-4 p-5">
+                <VillaStartControl
+                  key={programme.schedule.startOn ?? ""}
+                  plotId={plotId}
+                  startOn={programme.schedule.startOn}
+                />
+                <FirstPlanControl
+                  plotId={plotId}
+                  baselinedAt={programme.schedule.baselinedAt}
+                  handover={programme.schedule.handover}
+                  blocker={firstPlanBlocker(programme.schedule, programme.schedule.startOn)}
+                />
+                <ScheduleStrip stages={programme.stages} today={programme.today} />
+              </Card>
+            </section>
+            {programme.stages.length > 0 && (
+              <section className="space-y-2">
+                <SectionHead
+                  title="Every stage"
+                  count={programme.stages.length}
+                  hint="Tap a stage for its status, contractor, days and dates"
+                />
+                <ProgrammeList
+                  plotId={plotId}
+                  stages={programme.stages}
+                  contractors={contractors}
+                />
+              </section>
+            )}
+          </>
+        ) : null}
 
-        {programme.next.length > 0 && (
+        {tab === "checklists" ? (
           <section className="space-y-2">
             <SectionHead
-              title="Next up"
-              hint="Line up the crew and the material before it starts"
-            />
-            {programme.next.map((stage) => (
-              <NextCard
-                key={stage.id}
-                plotId={plotId}
-                stage={stage}
-                readiness={stageReadiness(
-                  stage.works.map((work) => work.id),
-                  villa,
-                  stock,
-                )}
-                works={works}
-                contractors={contractors}
-                villa={villa}
-                categories={pickerCategories}
-                brands={pickerBrands}
-              />
-            ))}
-          </section>
-        )}
-
-        {toConfirm.length > 0 && (
-          <section className="space-y-2">
-            <SectionHead title="Deliveries to confirm" count={toConfirm.length} tone="info" />
-            <Card className="p-5">
-              <DeliveryList deliveries={toConfirm} />
-            </Card>
-          </section>
-        )}
-
-        {programme.stages.length > 0 && (
-          <section className="space-y-2">
-            <SectionHead
-              title="Programme"
-              count={programme.stages.length}
-              hint="Tap a stage to change it"
-            />
-            <ProgrammeList plotId={plotId} stages={programme.stages} contractors={contractors} />
-          </section>
-        )}
-
-        {programme.stages.length > 0 && (
-          <section className="space-y-2">
-            <SectionHead
-              title="Schedule"
+              title="Checklists"
+              count={checklists.length}
               hint={
-                programme.schedule.handover
-                  ? `Handover ${formatDate(programme.schedule.handover)}`
-                  : "Dates follow the sequence"
-              }
-            />
-            <Card className="space-y-4 p-5">
-              <VillaStartControl
-                key={programme.schedule.startOn ?? ""}
-                plotId={plotId}
-                startOn={programme.schedule.startOn}
-              />
-              <FirstPlanControl
-                plotId={plotId}
-                baselinedAt={programme.schedule.baselinedAt}
-                handover={programme.schedule.handover}
-                blocker={firstPlanBlocker(programme.schedule, programme.schedule.startOn)}
-              />
-              <ScheduleStrip stages={programme.stages} today={programme.today} />
-            </Card>
-          </section>
-        )}
-
-        <div className="space-y-3 pt-2">
-          <Section
-            title="Labour"
-            note={
-              villa.labourLogs.length
-                ? `Showing ${villa.labourLogs.length} of ${villa.labourTotal} entries, newest first.`
-                : undefined
-            }
-            collapsible
-            defaultOpen={false}
-          >
-            <LabourList villa={villa} plotId={plotId} works={works} contractors={contractors} />
-          </Section>
-
-          <Section
-            title="Requests"
-            note={openRequests.length ? `${openRequests.length} waiting at the store.` : undefined}
-            aside={
-              <RequestIssueDialog
-                plotId={plotId}
-                works={works}
-                hasEstimate={villa.estimate !== null}
-                quickPicks={villa.quickPicks}
-                categories={pickerCategories}
-                brands={pickerBrands}
-                trigger={
-                  <button type="button" className="text-accent text-sm font-medium">
-                    New request
-                  </button>
-                }
-              />
-            }
-            collapsible
-            defaultOpen={false}
-          >
-            {villa.requests.length === 0 ? (
-              <p className="text-muted text-sm">
-                No requests yet — Material on a stage sends the first one to the store-keeper.
-              </p>
-            ) : (
-              <ul className="divide-border divide-y">
-                {[...openRequests, ...answered].map((request) => (
-                  <li
-                    key={request.id}
-                    className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-                  >
-                    <div>
-                      <p className="text-foreground text-sm font-medium">
-                        {formatQuantity(request.quantity)} {request.itemUom} · {request.itemName}
-                      </p>
-                      <p className="text-muted text-xs">
-                        {request.workLabel}
-                        {request.workClass !== "standard" &&
-                          ` · ${WORK_CLASS_LABEL[request.workClass]}`}{" "}
-                        · asked {formatDate(request.createdAt)}
-                        {request.status === "declined" && request.declinedReason
-                          ? ` · ${request.declinedReason}`
-                          : ""}
-                      </p>
-                      {request.offEstimateReason && (
-                        <p className="text-muted text-xs">
-                          {`Not on the estimate — ${request.offEstimateReason}`}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <RequestBadge status={request.status} />
-                      {request.status === "requested" && (
-                        <WithdrawRequestButton requestId={request.id} />
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-
-          <Section
-            title="Checklists"
-            note={
-              checklists.length
-                ? `${checklists.filter((checklist) => checklist.status === "open").length} open, ${checklists.filter((checklist) => checklist.status === "signed_off").length} signed off.`
-                : undefined
-            }
-            aside={<StartChecklistDialog plotId={plotId} templates={startable} />}
-            collapsible
-            defaultOpen={false}
-          >
-            {checklists.length === 0 ? (
-              <p className="text-muted text-sm">
-                No checklists yet — a stage being worked offers its own.
-              </p>
-            ) : (
-              <ul className="divide-border divide-y">
-                {checklists.map((checklist) => (
-                  <li key={checklist.id}>
-                    <Link
-                      href={`/supervisors/villas/${plotId}/checklists/${checklist.id}`}
-                      className="hover:bg-foreground/[0.03] -mx-2 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5"
-                    >
-                      <div>
-                        <p className="text-foreground text-sm font-medium">
-                          {checklist.templateName}
-                          {checklist.location ? ` · ${checklist.location}` : ""}
-                        </p>
-                        <p className="text-muted text-xs">
-                          {checklist.status === "signed_off"
-                            ? `Signed off ${formatDate(checklist.signedOffAt)}`
-                            : `Started ${formatDate(checklist.startedOn)} · ${checklist.answered} of ${checklist.total} checked`}
-                          {checklist.failed > 0 ? ` · ${checklist.failed} failed` : ""}
-                        </p>
-                      </div>
-                      {checklist.status === "signed_off" ? (
-                        <Badge variant={checklist.failed > 0 ? "warning" : "success"}>
-                          Signed off
-                        </Badge>
-                      ) : (
-                        <Badge variant="info">Open</Badge>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-
-          <Section
-            title="Deliveries to this villa"
-            note={deliveries.length ? `${toConfirm.length} waiting for you to confirm.` : undefined}
-            collapsible
-            defaultOpen={false}
-          >
-            {deliveries.length === 0 ? (
-              <p className="text-muted text-sm">
-                Nothing has been issued or delivered to this villa yet.
-              </p>
-            ) : (
-              <DeliveryList deliveries={deliveries} />
-            )}
-          </Section>
-
-          <Section
-            title="Materials, work by work"
-            note={
-              villa.estimate
-                ? `Drawn against official estimate ${villa.estimate.reference}, submitted ${formatDate(villa.estimate.submittedAt)}.`
-                : "No official estimate yet — what was drawn, with nothing to check against."
-            }
-            collapsible
-            defaultOpen={false}
-          >
-            <MaterialsByWork villa={villa} />
-          </Section>
-
-          <div id="drawings" className="scroll-mt-4">
-            <Section
-              title="Drawings"
-              note={
-                villa.drawings.length
-                  ? `${villa.drawings.length} set${villa.drawings.length === 1 ? "" : "s"} released to site.`
+                checklists.length
+                  ? `${openChecklists} open, ${checklists.length - openChecklists} signed off`
                   : undefined
               }
-              collapsible
-              defaultOpen={false}
-            >
-              <Drawings villa={villa} />
-            </Section>
-          </div>
+              aside={<StartChecklistDialog plotId={plotId} templates={startable} />}
+            />
+            <Card className="p-5">
+              {checklists.length === 0 ? (
+                <p className="text-muted text-sm">
+                  No checklists yet — a stage being worked offers its own, or start one here.
+                </p>
+              ) : (
+                <ul className="divide-border divide-y">
+                  {checklists.map((checklist) => (
+                    <li key={checklist.id}>
+                      <Link
+                        href={`/supervisors/villas/${plotId}/checklists/${checklist.id}`}
+                        className="hover:bg-foreground/[0.03] -mx-2 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5"
+                      >
+                        <div>
+                          <p className="text-foreground text-sm font-medium">
+                            {checklist.templateName}
+                            {checklist.location ? ` · ${checklist.location}` : ""}
+                          </p>
+                          <p className="text-muted text-xs">
+                            {checklist.status === "signed_off"
+                              ? `Signed off ${formatDate(checklist.signedOffAt)}`
+                              : `Started ${formatDate(checklist.startedOn)} · ${checklist.answered} of ${checklist.total} checked`}
+                            {checklist.failed > 0 ? ` · ${checklist.failed} failed` : ""}
+                          </p>
+                        </div>
+                        {checklist.status === "signed_off" ? (
+                          <Badge variant={checklist.failed > 0 ? "warning" : "success"}>
+                            Signed off
+                          </Badge>
+                        ) : (
+                          <Badge variant="info">Open</Badge>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </section>
+        ) : null}
 
-          <Section title="History" collapsible defaultOpen={false}>
-            <StageHistory events={programme.history} />
-          </Section>
-        </div>
+        {tab === "records" && villa ? (
+          <Records
+            villa={villa}
+            plotId={plotId}
+            works={works}
+            contractors={contractors}
+            categories={pickerCategories}
+            brands={pickerBrands}
+            deliveries={deliveries}
+            history={programme.history}
+          />
+        ) : null}
       </div>
     </UndoBarProvider>
+  );
+}
+
+/** Everything recorded on the villa, each kind folded on its own. */
+function Records({
+  villa,
+  plotId,
+  works,
+  contractors,
+  categories,
+  brands,
+  deliveries,
+  history,
+}: {
+  villa: VillaDetail;
+  plotId: string;
+  works: Awaited<ReturnType<typeof listWorkOptions>>;
+  contractors: Awaited<ReturnType<typeof listContractors>>;
+  categories: { id: string; name: string }[];
+  brands: { id: string; name: string }[];
+  deliveries: VillaDelivery[];
+  history: VillaProgramme["history"];
+}) {
+  const openRequests = villa.requests.filter((request) => request.status === "requested");
+  const answered = villa.requests.filter((request) => request.status !== "requested");
+  const toConfirm = deliveries.filter(
+    (delivery) => !delivery.confirmedAt && delivery.lines.length > 0,
+  );
+  return (
+    <div className="space-y-3">
+      <Section
+        title="Labour"
+        note={
+          villa.labourLogs.length
+            ? `Showing ${villa.labourLogs.length} of ${villa.labourTotal} entries, newest first.`
+            : undefined
+        }
+        collapsible
+        defaultOpen
+      >
+        <LabourList villa={villa} plotId={plotId} works={works} contractors={contractors} />
+      </Section>
+
+      <Section
+        title="Requests"
+        note={openRequests.length ? `${openRequests.length} waiting at the store.` : undefined}
+        aside={
+          <RequestIssueDialog
+            plotId={plotId}
+            works={works}
+            hasEstimate={villa.estimate !== null}
+            quickPicks={villa.quickPicks}
+            categories={categories}
+            brands={brands}
+            trigger={
+              <button type="button" className="text-accent text-sm font-medium">
+                New request
+              </button>
+            }
+          />
+        }
+        collapsible
+        defaultOpen={openRequests.length > 0}
+      >
+        {villa.requests.length === 0 ? (
+          <p className="text-muted text-sm">
+            No requests yet — Material on a stage sends the first one to the store-keeper.
+          </p>
+        ) : (
+          <ul className="divide-border divide-y">
+            {[...openRequests, ...answered].map((request) => (
+              <li
+                key={request.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+              >
+                <div>
+                  <p className="text-foreground text-sm font-medium">
+                    {formatQuantity(request.quantity)} {request.itemUom} · {request.itemName}
+                  </p>
+                  <p className="text-muted text-xs">
+                    {request.workLabel}
+                    {request.workClass !== "standard" &&
+                      ` · ${WORK_CLASS_LABEL[request.workClass]}`}{" "}
+                    · asked {formatDate(request.createdAt)}
+                    {request.status === "declined" && request.declinedReason
+                      ? ` · ${request.declinedReason}`
+                      : ""}
+                  </p>
+                  {request.offEstimateReason && (
+                    <p className="text-muted text-xs">
+                      {`Not on the estimate — ${request.offEstimateReason}`}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <RequestBadge status={request.status} />
+                  {request.status === "requested" && (
+                    <WithdrawRequestButton requestId={request.id} />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section
+        title="Deliveries to this villa"
+        note={deliveries.length ? `${toConfirm.length} waiting for you to confirm.` : undefined}
+        collapsible
+        defaultOpen={false}
+      >
+        {deliveries.length === 0 ? (
+          <p className="text-muted text-sm">
+            Nothing has been issued or delivered to this villa yet.
+          </p>
+        ) : (
+          <DeliveryList deliveries={deliveries} />
+        )}
+      </Section>
+
+      <Section
+        title="Materials, work by work"
+        note={
+          villa.estimate
+            ? `Drawn against official estimate ${villa.estimate.reference}, submitted ${formatDate(villa.estimate.submittedAt)}.`
+            : "No official estimate yet — what was drawn, with nothing to check against."
+        }
+        collapsible
+        defaultOpen={false}
+      >
+        <MaterialsByWork villa={villa} />
+      </Section>
+
+      <div id="drawings" className="scroll-mt-4">
+        <Section
+          title="Drawings"
+          note={
+            villa.drawings.length
+              ? `${villa.drawings.length} set${villa.drawings.length === 1 ? "" : "s"} released to site.`
+              : undefined
+          }
+          collapsible
+          defaultOpen={false}
+        >
+          <Drawings villa={villa} />
+        </Section>
+      </div>
+
+      <Section title="History" collapsible defaultOpen={false}>
+        <StageHistory events={history} />
+      </Section>
+    </div>
   );
 }
 

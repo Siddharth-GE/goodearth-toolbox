@@ -389,6 +389,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
   const [days, setDays] = useState(plan.ownDays ? String(plan.ownDays) : "");
   const [pinned, setPinned] = useState(plan.pinnedStart ?? "");
   const { pending, error, run } = useActionRunner();
+  const [saved, setSaved] = useState(false);
   const usedDays =
     plan.days === null
       ? "No days yet — set typical days under Sequence, or this villa's own here."
@@ -400,7 +401,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
       <p className="text-muted text-xs">{usedDays}</p>
       {plan.pinnedBehind && plan.pinnedStart ? (
         <p className="text-warning text-xs">
-          {`Pinned to start ${formatShortDate(plan.pinnedStart)}, but it can't start before ${formatShortDate(plan.start)}.`}
+          {`Set to start ${formatShortDate(plan.pinnedStart)}, but the stages before it run until ${formatShortDate(plan.start)}.`}
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3">
@@ -418,7 +419,7 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
         </div>
         {notStarted ? (
           <div className="space-y-1.5">
-            <Label htmlFor={`pinned-${stage.groupId}`}>Not before</Label>
+            <Label htmlFor={`pinned-${stage.groupId}`}>Starts on</Label>
             <Input
               id={`pinned-${stage.groupId}`}
               type="date"
@@ -428,7 +429,13 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
           </div>
         ) : null}
       </div>
-      <FormMessage error={error} />
+      {notStarted ? (
+        <p className="text-muted text-xs">
+          A day that has passed marks the stage started then. Leave it blank to follow the stages
+          before it.
+        </p>
+      ) : null}
+      <FormMessage error={error} success={saved && !pending ? "Saved" : undefined} />
       <Button
         variant="secondary"
         size="sm"
@@ -444,8 +451,10 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
               groupId: stage.groupId,
               days,
               pinnedStart: pinned,
+              startedOn: stage.snapshot.startedOn,
+              waiting: stage.snapshot.status === "waiting",
             }),
-          )
+          ).then((result) => setSaved(!result?.error))
         }
       >
         {pending ? "Saving…" : "Save the schedule"}
