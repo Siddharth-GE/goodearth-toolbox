@@ -668,6 +668,10 @@ export async function cancelIndent(indentId: string, reason: string): Promise<Ac
     .eq("id", indentId);
   if (error) {
     console.error("cancelIndent failed:", error);
+    // The guard locks the indent's lines against a PO being written to them at the same moment.
+    if (error.code === "40P01") {
+      return { error: "A purchase order was being made from this indent just then. Try again." };
+    }
     return guardError(error, "Could not cancel this indent. Try again.", INDENT_GUARD_PHRASES);
   }
 

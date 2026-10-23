@@ -118,10 +118,10 @@ begin
       raise exception 'Say why this indent is cancelled';
     end if;
     if (new.plot_id, new.unit_id, new.stage, new.required_by, new.note, new.rejection_note, new.work_item_id,
-        new.is_urgent, new.submitted_by, new.submitted_at, new.approved_by, new.approved_at)
+        new.is_urgent, new.created_by, new.submitted_by, new.submitted_at, new.approved_by, new.approved_at)
        is distinct from
        (old.plot_id, old.unit_id, old.stage, old.required_by, old.note, old.rejection_note, old.work_item_id,
-        old.is_urgent, old.submitted_by, old.submitted_at, old.approved_by, old.approved_at) then
+        old.is_urgent, old.created_by, old.submitted_by, old.submitted_at, old.approved_by, old.approved_at) then
       raise exception 'Cancelling an indent changes nothing else on it';
     end if;
     -- po_lines_qty_guard takes this lock per indent line before it reads the indent's status, so a PO line written
@@ -201,12 +201,13 @@ begin
   if not found then
     raise exception 'Only a draft revision can be deleted — an issued one is replaced by the next revision';
   end if;
-  if exists (select 1 from budgets where selection_id = p_selection_id) then
+  -- A /selections holder cannot read budgets, so a budget hung on a draft is found by its foreign key, not a read.
+  begin
+    delete from selection_lines where selection_id = p_selection_id;
+    delete from selections where id = p_selection_id;
+  exception when foreign_key_violation then
     raise exception 'A budget prices this revision, so it cannot be deleted';
-  end if;
-
-  delete from selection_lines where selection_id = p_selection_id;
-  delete from selections where id = p_selection_id;
+  end;
 end $$;
 
 revoke execute on function delete_draft_selection(uuid) from public, anon;
@@ -243,9 +244,18 @@ begin
     raise exception '0143: indents_status_check does not admit cancelled';
   end if;
 
-  if position('po_line_facts' in pg_get_functiondef('indents_guard()'::regprocedure)) = 0
-     or position('can_approve_indents' in pg_get_functiondef('indents_guard()'::regprocedure)) = 0 then
-    raise exception '0143: indents_guard lost a branch';
+  foreach c in array array['po_line_facts', 'can_approve_indents', 'estimator_decision', 'off_estimate_reason',
+                           'rejection_note', 'old.created_by']
+  loop
+    if position(c in pg_get_functiondef('indents_guard()'::regprocedure)) = 0 then
+      raise exception '0143: indents_guard lost its % check', c;
+    end if;
+  end loop;
+  if not exists (
+    select 1 from pg_trigger
+     where tgname = 'indents_guard' and tgrelid = 'public.indents'::regclass and tgenabled <> 'D'
+  ) then
+    raise exception '0143: the indents_guard trigger is missing or off';
   end if;
   if (select prosecdef from pg_proc where oid = 'indents_guard()'::regprocedure) then
     raise exception '0143: indents_guard must run as the caller';
@@ -258,6 +268,9 @@ begin
     end if;
     if has_function_privilege('anon', c, 'execute') then
       raise exception '0143: anon can execute %', c;
+    end if;
+    if not has_function_privilege('authenticated', c, 'execute') then
+      raise exception '0143: signed-in people cannot execute %', c;
     end if;
   end loop;
 end $$;
