@@ -2,9 +2,11 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Supervisors site board — building now
+## Building now — Delete or Cancel across every tool
 
-`plan.md`, top section, **"Next session — start here"**: phase A (a villa's stages, the phone-first villa page) is on staging as #123; next the founder's vet, then phase B (the self-adjusting schedule), C, D, E. The OS process updates are all on staging (#119–#122, the masters import run).
+`plan.md`, top section, **"Next session — start here"**: the founder vets pieces 1–3 on staging (the shorter villa page, the schedule workbook and per-villa choices, the test project — #130–#133), answers piece 4's four questions, and Fable reviews its design. The Supervisors rebuild (A–E, #123–#129) and the OS process updates (#119–#122) are on staging too, waiting for the same vet.
+
+- **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
 
 ## Native apps on iPhone and Android — next build
 
