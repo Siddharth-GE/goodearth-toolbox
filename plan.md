@@ -1,3 +1,103 @@
+# Supervisors, rebuilt — the site board and its schedule (proposed 2026-10-22, schedule settled 2026-10-23, waiting for the founder's approval)
+
+## Why
+
+The founder, 2026-10-22: the Supervisors screens are "clunky as hell". Give it the feel of Design Management and Client Relations, show what stage or work is being done now and what is next, so supervisors can plan labour and material, and make the checklists turn up as part of the stage being worked.
+
+Today a villa page is one long scroll of tables (drawings, labour, requests, deliveries, checklists, materials), and nothing says where the villa is. Design Management and Client Relations feel good because each villa is **a card on a board with a rail showing where it stands**, a page that opens on **what is happening now and what is next**, and **taps that save at once with Undo** instead of forms. Supervisors gets the same, built for a phone at site.
+
+Branch `feature/site-board` off `staging`, worktree `..\toolbox-os`. One pull request per phase; the founder vets each on staging.
+
+## The model — a villa moves through stages
+
+- **A stage is a work group** — `SS.01 Block work up to GF lintel`, `FD.02 Dry rubble`… — in the order of **the site sequence** (below), not the works list's order: slab conduiting comes before the slab it sits in, landscape last. Groups are what the rate book prices per sqft and what stage billing pays, so the site, the estimate and the bills speak about the same stage. (Coarser than this are Client Relations' nine build stages; finer are single works.)
+- **A villa's programme is the stages its official estimate covers** (the groups of the works on `estimate_takeoff_facts`, plus any stage someone adds by hand). No official estimate yet: the full list for the villa's type of work, every stage "not started".
+- **Each stage on a villa has a status**: not started → working → done, with **waiting** (for material, labour, an inspection or the client, and a note) as a side state; the contractor on it; and when it really started and finished. Its planned dates are worked out by the schedule, never typed. **The first labour logged on a stage starts it by itself**; done is a tap.
+- **Now** is every stage working or waiting; **next** is the first stages not started after the furthest stage begun (an earlier stage nobody recorded stays in the programme, not in Next). Derived on every read, never stored as the villa's position (the Design Management rule).
+- **Health**, first match wins: waiting more than 3 days · past its planned finish · no labour on a working stage for 5 days · a checklist with a failed check · a delivery not confirmed for 2 days · on track.
+- **One supervisor per villa** ("who runs it") for a Mine / Everyone switch. Everyone still sees every villa (founder, 2026-08-20) — this is a filter, not a permission.
+- **Checklists belong to stages**: each checklist template is linked to the work groups it inspects (pre-filled from its old work codes, edited under Supervisors → Checklists). A working stage shows its checklist; marking a stage done with its checklist unsigned asks once, "Done without signing off the Blockwork checklist?" — a nudge, never a block (site work never waits), unless the founder decides otherwise.
+
+## Migration `0137_site_programme.sql` `[Opus drafts, Fable reviews unless waived]`
+
+Supervisors' own tables, RLS `/supervisors` on every verb, write revokes and an assert at the end; no money anywhere.
+
+- `site_villas` (plot_id pk, supervisor_id → profiles, note, `start_on` — the one typed date of the schedule, `baselined_at`).
+- `site_stages` (plot_id, work_group_id, unique together; status `not_started|working|waiting|done`, waiting_on `material|labour|inspection|client|other`, waiting_note, started_on, finished_on, contractor_id → vendors (contractor only, the labour-log guard's rule), `days` — this villa's own length when someone sets it, `pinned_start` — a start fixed by hand, `baseline_start`, `baseline_finish` — the first plan, written only by "Set the first plan"). A guard: done needs started_on and finished_on; finished_on not before started_on; days at least 1.
+- `site_sequence` (work_group_id unique, position, `follows_group_id` → work_groups (null = the first stage), `link` `after|alongside`, `wait_days` ≥ 0, `typical_days` ≥ 1 or null) and `site_schedule_settings` (one row: `typical_sqft`, the size the typical days are for). Supervisors' reference data: read and written by `/supervisors`; a cycle in `follows_group_id` is refused by a trigger.
+- `site_stage_events` — the history, written by a trigger on `site_stages` (who, when, from → to, note), append-only, no client insert (the Design Management pattern).
+- `labour_logs` insert trigger: the first log on a stage of a villa starts it (`working`, `started_on` = the log date) if it is not started. Trigger-only definer, execute revoked, Supervisors writing Supervisors.
+- `checklist_template_groups` (template_id, work_group_id) — the link.
+- View `estimate_work_facts` (unit_id, work_item_id, quantity, uom) — the official estimate's work quantities, **money-free**, guards `/estimator`, `/indents`, `/inventory`, `/supervisors`, writes revoked, manifest row. Lets the site plan "1,800 sqft of block work, 640 done".
+
+## Phases — one pull request each
+
+### A. The engine and the villa page `[Opus — migration, rules; Sonnet — screens]`
+
+- [x] [Opus] `0137` applied to staging 2026-10-23, types regenerated (aaf028b). Fable waived; Opus reviewed plus an independent read (no defects; its notes taken: an edit fires the labour trigger only when the work changes, seeds fill only empty tables). The labour trigger runs as the caller, not a definer — only `/supervisors` writes labour logs, and Bills' stamp moves only `bill_id`. Trial `scripts/trials/site-programme.sql`, proven against three broken copies. The backfill started 11 stages from existing labour.
+- [x] [Opus] `lib/supervisors/programme.ts`, pure and tested: a villa's stages in order, now / next, health, days in stage, how much of a stage's work is logged (piece-work quantities against `estimate_work_facts`).
+- [x] [Opus] The villa page below, the stage actions, and the shared `StageRail` / `HealthPill` / `SectionHead` (their third copy; Design Management and Client Relations move onto them in phase D). Seen at 390×844 in light and dark through a probe with sample data. Fable waived; Opus reviewed with a second unanchored read, which found two client bugs fixed before the pull request (the waiting question kept its last answer; the stage sheet's dates went stale after a status tap) and smaller ones taken (days in India time, progress counts standard work only, Next skips an untouched earlier stage, a rounded "what's left").
+- [x] [Opus] `0138` on staging, on the founder's word: Undo puts a stage's clock back — a change of status may carry the time it entered that status before, taken only when its history records that time (trial `scripts/trials/stage-undo-clock.sql`, proven against a broken copy). No policy, grant, view, definer or money, so no Fable review.
+- [ ] [Founder] Vet phase A on staging.
+- **The villa page, rebuilt phone-first**, top to bottom:
+  1. **Header card** (the Design Management header): plot number large in mono, villa name, health pill, the **stage rail** (one segment per stage, coloured by status, the working one marked), the supervisor's face.
+  2. **Now** — a card per working or waiting stage: its name, day count, the contractor, "640 of 1,800 sqft logged". Four big buttons: **Log labour** (opens pre-filled with this stage's works and its contractor), **Request material** (pre-filled from this stage's estimate list), **Checklist** (a progress ring, "12 of 21"), **Done** / **Waiting**. Status chips save on tap with Undo.
+  3. **Next up** — the next one or two stages: the contractor (tap to pick), their dates once phase B lands, and **materials readiness**: each material the estimate needs for it, how much is already drawn, how much the stores hold (`stock_by_location`, open to every signed-in person), with **Request what's left** (one request per material, the off-estimate rule unchanged).
+  4. **Deliveries to confirm** (only when there are any) — the existing confirm sheet.
+  5. **Programme** — every stage as a row in site-sequence order: status chip, actual dates, its checklist's state; tap to open a stage sheet (contractor, waiting note, history).
+  6. Collapsed below: labour log, requests, materials work by work, drawings, history.
+- Labour and request dialogs become bottom sheets with chips (work class, contractor, the stage's works first) instead of long selects.
+
+### B. The schedule that adjusts itself `[Opus — the rules and the sequence; Sonnet — the screens]`
+
+Settled with the founder 2026-10-23. Dates are worked out on every read, never stored (Relay's rule 5); the only typed inputs are a villa's start date, the sequence, and a stage's own days or pinned start when someone sets them.
+
+- **The site sequence** — Supervisors → Sequence, one list for every villa: each stage starts **after** the stage it follows finishes, or **alongside** it (starts with it), plus **wait days** (curing). Typical days per stage, for a villa of `typical_sqft`. Opus seeds a draft order of the 43 groups in `0137` with typical days blank; the founder and the site team correct it on the page. A villa's own programme is the sequence minus the stages its estimate does not cover; a stage following a dropped one follows what that one followed.
+- **A stage's days**, first that applies: this villa's own `days` → **learned**, once 3 or more villas have finished that stage: the middle value of their days per sqft × this villa's sqft ("learned from 4 villas") → typical days × this villa's sqft ÷ `typical_sqft` → no days, so no dates past it and the stage says "days not set". The villa's sqft is its official estimate's `SS.01.00` package quantity through `estimate_work_facts`; no official estimate, no scaling. **Calendar days** — every day counts (founder).
+- **The forecast**, stage by stage in sequence order: done = its real dates; working or waiting = started on, finishing at started + days or today, whichever is later (running long pushes everything after it); not started = the later of what it follows (finish, or start when alongside) + wait days, its pinned start, and today. The villa's first stage starts on `start_on`. **Forecast handover** = the last finish. A pinned start that its chain has overtaken shows "behind" instead of moving.
+- **The first plan** — "Set the first plan" on the villa (once `start_on` and every stage's days exist) writes today's forecast into `baseline_start` / `baseline_finish` and `baselined_at`; resetting it later asks for a note, recorded in the stage history. The villa then reads "Handover forecast 14 Mar · 12 days behind first plan", and each stage shows its slip.
+- **Screens:** the villa header gains the forecast handover and slip; **Next up** gains its dates; a **Schedule** section on the villa page — one bar per stage on a date strip, phone-wide, scrolling sideways, today marked, the first plan as a faint bar behind; the stage sheet gains days and pinned start. `lib/supervisors/schedule.ts`, pure and tested (chains, alongside, dropped stages, running long, pinned behind, learned vs typical, no days).
+- **Not here:** Client Relations' handover date following the forecast (a cross-tool read, its own decision); Relay stays as it is — it tracks who holds a task, not site work.
+
+### C. Checklists that feel quick `[Sonnet, Opus vets]`
+
+- **The checklist runner**: one check per screen on a phone — the check in large type, its "to confirm" note, three big buttons (✓ Pass, ✕ Fail, N/A); Pass moves straight to the next; Fail and N/A open the remark with the keyboard up; a camera button attaches a photo to that check (`lib/native` camera on the app, the file picker on the web). A progress ring fills as it goes; "All clear ✓" on sign-off (respecting reduced motion). The list view stays for review.
+- `site_checklist_items` gains `photo_path` — in `0137`, so one migration.
+- Supervisors → Checklists: each template shows and edits the stages it inspects.
+
+### D. The site board `[Sonnet, Opus vets]`
+
+- `/supervisors/villas` becomes **the board**, as Design Management's: health chips with counts, Mine / Everyone, project filter; on a desktop one column per stage family (Foundation, Structure, MEP, Finishes, Handover) by each villa's current stage; on a phone a stacked card list grouped the same way.
+- **The villa card**: plot number, villa name, health pill, the stage rail, "Now: SS.01 Block work · day 6", "Next: SS.02 Lintel · from 28 Oct", the forecast handover and its slip, open deliveries and requests as small counts, the supervisor's face.
+- `StageRail`, `HealthPill` and `SectionHead` move into `components/ui/` — this is their third copy (DESIGN.md).
+
+### E. Planning the week `[Opus — the reads; Sonnet — the screen]`
+
+- **`/supervisors/plan` — Look ahead**, across the supervisor's villas (Mine by default), from the schedule's forecast, in buckets: **Starting this week**, **Next two weeks**, **Waiting**, **Behind the first plan**. Each stage row: the villa, forecast dates, contractor, and its material readiness — so a supervisor sees on Monday which crews to line up and what to request before the stage starts, and can request it from the row.
+- **Labour** on the same page: per contractor, the stages they are planned on in the next two weeks, so a clash shows ("Rafeeq Masonry on 3 villas from Monday").
+- The Supervisors welcome counts become: working stages, starting this week, waiting, deliveries to confirm.
+
+## Verification
+
+Pure rules tested (`programme.ts`, `schedule.ts`, health, readiness). `0137` dry-run with a trial as a supervisor and as the probe; the labour trigger trial (first log starts the stage, a second does not move it, a done stage stays done); the sequence cycle refused. Every new select run at staging. Phone screenshots at 390×844 of the villa page, the schedule strip, the runner and the board before each merge. The founder vets each phase on staging.
+
+## Next session — start here, after "read CLAUDE.md"
+
+Done 2026-10-22/23: #122 vetted, the masters import, the questions settled, the schedule designed, and **phase A merged into `staging` as #123** (`0137`, `0138` on staging's database).
+
+1. **Ask the founder how phase A looked on staging** (their checklist: open a Saarang villa in Supervisors on a phone — the header and stage rail, Now, Next up, the Programme; tap Working / Waiting / Done and Undo; Log labour from a stage; open a stage from the Programme). Anything broken is fixed first. Still theirs: re-send the works list to SketchUp; typical days per stage from the site team.
+2. **Then phase B, the schedule** — one pull request, worktree `..\toolbox-os`, a new branch off `staging`. Its tables already exist (`site_sequence` seeded with a draft order, `site_schedule_settings`, the villa's `start_on` and the stage's `days`, `pinned_start` and baseline columns), so B is likely code only: `lib/supervisors/schedule.ts` (pure, tested), the Sequence page, the villa's dates, Set the first plan, the schedule strip. A new migration needs a Fable review unless the founder waives it.
+3. Then C (checklist runner), D (the board), E (look ahead), one pull request each.
+
+## Settled by the founder, 2026-10-23
+
+1. **A stage is a work group** — 43 on a villa today (FD 4, SS 11, PF 3, F 4, LP 8, MEP 11, CAR 2).
+2. **The masters import ran first** (2026-10-22).
+3. **Done without a signed checklist: a nudge**, never a block.
+4. **One supervisor per villa**, set on the villa header; Mine / Everyone is a filter, not a permission.
+5. **Fable's review of `0137` is waived**; Opus self-reviews with a second unanchored read and a probe trial, recorded here.
+6. **Later, not in this plan:** Client Relations' build stage following the site's progress (a cross-tool write, its own decision).
+
 # OS process updates — the build plan
 
 ## Context
@@ -19,13 +119,12 @@ The founder's decisions (2026-10-22):
 
 ### Next session, in order — after "read CLAUDE.md"
 
-1. **Masters import.** It waits for the founder's word: "run the import". In `..\toolbox-os` on `staging`, dry-run it again, and the counts should still be 246 kept, 24 switched off and 444 new:
+1. ~~**Masters import.**~~ **Done 2026-10-22.** The command, for a re-run (it should find nothing to do):
    `npx tsx scripts/import-masters-workbook.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/1.xlsx"`
    Then run the same command with `--commit`. Then tell the founder to send the works list to SketchUp again, and to re-tag models that use old codes.
 2. ~~Apply `0133`–`0136`~~ — **done 2026-10-22** on staging's database, on the founder's word: dry-run with every trial first, then applied; types regenerated; `db:check`, `db:check-views` (13 money views) and `db:check-policies` pass; SECURITY.md and STATUS.md updated.
-3. ~~Build the screens~~ — **done 2026-10-22**, one commit each: Send to Bill without a work order; additional charges on POs and bills; site checklists (`Tb.xls` saved as `3.xlsx`); site receipt; Budget against actual (the Estimator's screens moved into a `(tool)` route group so the page can admit `/bills`); stage billing; the Inventory Items view and work-class correction. **Waiting for the founder's word:** loading the checklists into staging — `npx tsx scripts/import-checklists.ts --project ipstebqawrvhkyntctrv --xlsx "C:/Users/goodearth/Documents/Tb/3.xlsx" --commit` (dry run: 11 templates, 238 checks); the automatic check refused it without that word.
-   Checklists loaded on staging 2026-10-22 on the founder's word (11 templates, 238 checks). Fable waived; Opus re-reviewed the whole diff with a second, unanchored read before #122. It found four bugs, fixed before merge: a half-saved site confirmation read as complete; stage billing took bills that name no stage as ₹0; "left" on the budget page leaned the wrong way when spending was unpriced; charges past two decimals broke the paisa match.
-4. **One pull request into `staging`** for steps 2 and 3, merged after CI. The founder vets on staging.
+3. ~~Build the screens~~ — **done 2026-10-22**, one commit each: Send to Bill without a work order; additional charges on POs and bills; site checklists (`Tb\3.xls` saved as `Tb\3.xlsx`, loaded on staging on the founder's word: 11 templates, 238 checks); site receipt; Budget against actual (the Estimator's screens moved into a `(tool)` route group so the page can admit `/bills`); stage billing; the Inventory Items view and work-class correction.
+4. ~~One pull request into `staging`~~ — **merged as #122, 2026-10-22**, after CI. Fable waived; Opus re-reviewed with a second, unanchored read, which found four bugs fixed before merge: a half-saved site confirmation read as complete; stage billing took bills that name no stage as ₹0; "left" on the budget page leaned the wrong way when spending was unpriced; charges past two decimals broke the paisa match. **The founder vets on staging.**
 5. **Later:** the cramped Design board (`TODO.md`); `Tb\later.xlsx` (steel and tile takeoffs), parked.
 
 ## What already exists — remind the founder, build nothing
@@ -45,7 +144,7 @@ Everything else below is new.
 ## Wave 1 — Masters: the works list and GST on items `[Opus orchestrates]`
 
 - [x] [Opus] `0131` applied to staging; importer, readers and tests; Masters works by family, items GST, pickers, PO GST; docs. Commits 18cbe59, a97c126.
-- [ ] [Founder] Read the importer's dry run (246 of 270 works kept, 24 switched off, 444 new; no vendor or material changes), then `--commit` on staging.
+- [x] [Opus] On the founder's word, `--commit` on staging 2026-10-22 (246 of 270 works kept, 24 off, 444 new; no vendor or material changes). Backup in `data/backups/`.
 - [ ] [Founder] After the import: send the works list to SketchUp again, and re-tag any model using old codes (FD.14 is now FD.03.03).
 - Found in the sheet, for the founder: the Finishes remarks sit one row low (fixed in code); FD.04.06 "Plinth Beam" and its works sit under FD.04 Pile Foundation; Engineering Consultation for villas (ENC.1–3) has no place in the new sheet and is switched off.
 

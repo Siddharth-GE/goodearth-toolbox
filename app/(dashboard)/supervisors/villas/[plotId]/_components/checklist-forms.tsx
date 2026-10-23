@@ -13,9 +13,14 @@ export type StartableTemplate = { id: string; name: string; itemCount: number };
 export function StartChecklistDialog({
   plotId,
   templates,
+  workGroupId,
+  trigger,
 }: {
   plotId: string;
   templates: StartableTemplate[];
+  /** Started from a stage: the stage it inspects, and that stage's checklist picked. */
+  workGroupId?: string;
+  trigger?: React.ReactNode;
 }) {
   return (
     <RecordFormDialog
@@ -23,15 +28,23 @@ export function StartChecklistDialog({
       isEdit={false}
       action={startChecklist}
       trigger={
-        <Button variant="secondary" disabled={templates.length === 0}>
-          Start a checklist
-        </Button>
+        trigger ?? (
+          <Button variant="secondary" disabled={templates.length === 0}>
+            Start a checklist
+          </Button>
+        )
       }
     >
       <input type="hidden" name="plot_id" value={plotId} />
+      {workGroupId && <input type="hidden" name="work_group_id" value={workGroupId} />}
       <div className="space-y-1.5">
         <Label htmlFor="checklist-template">Checklist</Label>
-        <Select id="checklist-template" name="template_id" required defaultValue="">
+        <Select
+          id="checklist-template"
+          name="template_id"
+          required
+          defaultValue={workGroupId && templates.length === 1 ? templates[0].id : ""}
+        >
           <option value="" disabled>
             Pick the checklist…
           </option>

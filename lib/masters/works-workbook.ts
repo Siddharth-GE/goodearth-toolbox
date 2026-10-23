@@ -595,7 +595,9 @@ export function matchWorks(
   const matches: Match[] = [];
 
   for (const remap of remaps) {
-    if (!db.some((w) => w.code === remap.code && w.name === remap.name))
+    // Already moved by an earlier run: the re-run must still pass.
+    const done = remap.becomes !== null && db.some((w) => w.code === remap.becomes);
+    if (!done && !db.some((w) => w.code === remap.code && w.name === remap.name))
       throw new Error(
         `${remap.code} "${remap.name}" is no longer in Masters — re-check WORK_REMAPS.`,
       );

@@ -38,6 +38,7 @@ export async function startChecklist(
   const templateId = text(formData, "template_id");
   const location = text(formData, "location");
   const drawingRevision = text(formData, "drawing_revision");
+  const workGroupId = text(formData, "work_group_id");
   if (!plotId) return { error: "Which villa?" };
   if (!templateId) return { error: "Pick the checklist." };
   if (location.length > TEXT_LIMIT || drawingRevision.length > TEXT_LIMIT) {
@@ -62,6 +63,7 @@ export async function startChecklist(
     .insert({
       plot_id: plotId,
       template_id: templateId,
+      work_group_id: workGroupId || null,
       location: location || null,
       drawing_revision: drawingRevision || null,
       created_by: user.id,

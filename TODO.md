@@ -2,9 +2,9 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## OS process updates — building now
+## Supervisors site board — building now
 
-The operations team's 18 requests: `plan.md`, top section. Waves 1 and 2 are on staging (#119, #120). **Next session starts at "Next session, in order" there**: the masters import, then applying `0133`–`0136` and building their screens.
+`plan.md`, top section, **"Next session — start here"**: phase A (a villa's stages, the phone-first villa page) is on staging as #123; next the founder's vet, then phase B (the self-adjusting schedule), C, D, E. The OS process updates are all on staging (#119–#122, the masters import run).
 
 ## Native apps on iPhone and Android — next build
 
