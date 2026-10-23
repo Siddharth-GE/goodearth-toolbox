@@ -11,6 +11,7 @@ import {
   canSendBack,
   exceedsAnchor,
   exceedsApprovalLimit,
+  workOrderRemoval,
 } from "./workflow";
 
 const adminDecider = { isAdmin: true, isApprover: false };
@@ -116,4 +117,17 @@ test("over-billing warns past the anchor total, never at or under it", () => {
   assert.equal(exceedsAnchor(1000, 900, 100.01), true);
   assert.equal(exceedsAnchor(1000, 0, 1500), true);
   assert.equal(exceedsAnchor(null, 900, 100000), false);
+});
+
+test("a pending work order deletes; an approved one cancels by an approver until something rests on it", () => {
+  const approver = { isAdmin: false, isApprover: true };
+  const bystander = { isAdmin: false, isApprover: false };
+  assert.deepEqual(workOrderRemoval("pending_approval", bystander, []), { kind: "delete" });
+  assert.deepEqual(workOrderRemoval("approved", approver, []), { kind: "cancel" });
+  assert.equal(workOrderRemoval("approved", bystander, []), null);
+  assert.deepEqual(workOrderRemoval("approved", approver, ["2 bills", "an advance"]), {
+    kind: "blocked",
+    why: "It has 2 bills and an advance, so it cannot be cancelled — switch it off instead.",
+  });
+  assert.equal(workOrderRemoval("cancelled", approver, []), null);
 });

@@ -20,6 +20,7 @@ import {
   type MixDef,
   type WorkRecipe,
 } from "./calc";
+import { joinInWords } from "../format";
 import type { EstimateDetail, EstimateVariations, RecipeBook } from "./estimate-queries";
 import type { MixRow } from "./mixes-queries";
 import type { MaterialItemRow } from "./shared";
@@ -270,3 +271,17 @@ export function buildEstimateView(input: {
 }
 
 export type EstimateView = ReturnType<typeof buildEstimateView>;
+
+/** Only an official estimate is withdrawn (0144), and only once no live indent draws on it. */
+export function officialRemoval(
+  status: EstimateDetail["status"],
+  drawingIndentRefs: readonly string[],
+): { kind: "cancel" } | { kind: "blocked"; why: string } | null {
+  if (status !== "submitted") return null;
+  if (drawingIndentRefs.length === 0) return { kind: "cancel" };
+  const one = drawingIndentRefs.length === 1;
+  return {
+    kind: "blocked",
+    why: `${joinInWords(drawingIndentRefs)} ${one ? "draws" : "draw"} on it — cancel ${one ? "that indent" : "those indents"} first.`,
+  };
+}

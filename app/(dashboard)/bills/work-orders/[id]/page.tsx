@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -12,9 +13,10 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { getCurrentBillActor } from "@/lib/bills/queries";
+import { cancelWorkOrder, deleteWorkOrder } from "@/lib/bills/work-order-actions";
 import { getWorkOrder, getWorkOrderFormOptions } from "@/lib/bills/work-order-queries";
 import { workOrderLineAmount } from "@/lib/bills/work-orders";
-import { canApproveContract, canEditContract } from "@/lib/bills/workflow";
+import { canApproveContract, canEditContract, workOrderRemoval } from "@/lib/bills/workflow";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { FileDown } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -55,24 +57,37 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </LinkButton>
             {order.status === "approved" ? (
               <Badge variant="success">Approved</Badge>
+            ) : order.status === "cancelled" ? (
+              <Badge variant="danger">Cancelled</Badge>
             ) : (
               <Badge variant="warning">Pending approval</Badge>
             )}
             {!order.is_active && <Badge variant="neutral">Switched off</Badge>}
-            <WorkOrderActions
-              orderId={order.id}
-              isActive={order.is_active}
-              showApprove={canApproveContract(order.status, actor, order.contract_value)}
+            <DeleteOrCancel
+              noun="work order"
+              removal={workOrderRemoval(order.status, actor, order.resting_on_it)}
+              deleteNote="It is still waiting for approval and nothing rests on it, so it goes with its works. Its number stays used."
+              onDelete={deleteWorkOrder.bind(null, order.id)}
+              onCancel={cancelWorkOrder.bind(null, order.id)}
             />
+            {order.status !== "cancelled" && (
+              <WorkOrderActions
+                orderId={order.id}
+                isActive={order.is_active}
+                showApprove={canApproveContract(order.status, actor, order.contract_value)}
+              />
+            )}
           </>
         }
       />
 
       <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
         <p className="text-foreground text-sm">
-          {order.status === "approved"
-            ? `Approved${order.approved_by_name ? ` by ${order.approved_by_name}` : ""}${order.approved_at ? ` on ${formatDate(order.approved_at)}` : ""} — its works, value and terms are permanent. ${billed > 0 ? `${formatMoney(billed)} billed against it so far.` : "Nothing billed against it yet."}`
-            : "Waiting for a bill approver. Its works and terms can change until it is approved."}
+          {order.status === "cancelled"
+            ? `Cancelled${order.cancelled_by_name ? ` by ${order.cancelled_by_name}` : ""}${order.cancelled_at ? ` on ${formatDate(order.cancelled_at)}` : ""}: ${order.cancel_reason ?? ""}. Kept on record; nothing can be billed or advanced against it.`
+            : order.status === "approved"
+              ? `Approved${order.approved_by_name ? ` by ${order.approved_by_name}` : ""}${order.approved_at ? ` on ${formatDate(order.approved_at)}` : ""} — its works, value and terms are permanent. ${billed > 0 ? `${formatMoney(billed)} billed against it so far.` : "Nothing billed against it yet."}`
+              : "Waiting for a bill approver. Its works and terms can change until it is approved."}
         </p>
         {order.lines.length > 0 && <SaveAsTemplate orderId={order.id} />}
       </div>

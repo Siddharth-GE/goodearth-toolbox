@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { EstimateDetail, EstimateVariations, RecipeBook } from "./estimate-queries";
-import { buildEstimateView, missingParts } from "./estimate-view";
+import { buildEstimateView, missingParts, officialRemoval } from "./estimate-view";
 import type { WorkStatusRow } from "./works-queries";
 
 const book: RecipeBook = {
@@ -185,4 +185,19 @@ test("the warning counts in plain words", () => {
     "1 work has no setup",
     "3 works use materials with no rate",
   ]);
+});
+
+test("an official estimate withdraws until a live indent draws on it", () => {
+  assert.deepEqual(officialRemoval("submitted", []), { kind: "cancel" });
+  assert.deepEqual(officialRemoval("submitted", ["IND/S/004"]), {
+    kind: "blocked",
+    why: "IND/S/004 draws on it — cancel that indent first.",
+  });
+  assert.deepEqual(officialRemoval("submitted", ["IND/S/004", "IND/S/009"]), {
+    kind: "blocked",
+    why: "IND/S/004 and IND/S/009 draw on it — cancel those indents first.",
+  });
+  assert.equal(officialRemoval("draft", []), null);
+  assert.equal(officialRemoval("superseded", []), null);
+  assert.equal(officialRemoval("cancelled", []), null);
 });

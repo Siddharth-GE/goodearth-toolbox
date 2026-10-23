@@ -98,6 +98,27 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
   redirect("/estimator/estimates");
 }
 
+// estimator_estimates_guard (0144) refuses while a live indent draws on it, stamps who and when, and makes it final.
+export async function withdrawEstimate(id: string, reason: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const why = reason.trim();
+  if (!why) return { error: "Say why this estimate is withdrawn." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimates")
+    .update({ status: "cancelled", cancel_reason: why })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("withdrawEstimate failed:", error);
+    return { error: "Could not withdraw the estimate. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
 /** Put works on an estimate, set up or not. They arrive "to measure" (0097: no quantity yet).
  * Works already on the estimate are skipped (one line per work, 0074). */
 export async function addEstimateLines(

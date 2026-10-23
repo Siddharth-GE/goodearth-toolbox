@@ -20,6 +20,11 @@ const WO_GUARD_PHRASES = [
   "approver",
   "approval limit",
   "no longer change",
+  // 0144: deleting and cancelling.
+  "cancel",
+  "Cancel",
+  "Say why",
+  "deleted",
 ] as const;
 
 export type WorkOrderSaveInput = {
@@ -241,6 +246,41 @@ export async function setWorkOrderTemplateActive(
     console.error("setWorkOrderTemplateActive failed:", error);
     return { error: "Could not change the template. Try again." };
   }
+  revalidatePath("/bills", "layout");
+  return undefined;
+}
+
+// Only one waiting for approval goes: delete_pending_work_order (0144) takes its works with it; the number stays used.
+export async function deleteWorkOrder(id: string): Promise<ActionState> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("delete_pending_work_order", { p_contract_id: id });
+  if (error) {
+    console.error("deleteWorkOrder failed:", error);
+    return guardError(error, "Could not delete this work order. Try again.", WO_GUARD_PHRASES);
+  }
+
+  revalidatePath("/bills", "layout");
+  redirect("/bills/work-orders");
+}
+
+// labour_contracts_guard (0144): an approver or admin, a reason, and nothing resting on it.
+export async function cancelWorkOrder(id: string, reason: string): Promise<ActionState> {
+  await requireTool("/bills");
+  const why = reason.trim();
+  if (!why) return { error: "Say why this work order is cancelled." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("labour_contracts")
+    .update({ status: "cancelled", cancel_reason: why })
+    .eq("id", id);
+  if (error) {
+    console.error("cancelWorkOrder failed:", error);
+    return guardError(error, "Could not cancel this work order. Try again.", WO_GUARD_PHRASES);
+  }
+
   revalidatePath("/bills", "layout");
   return undefined;
 }
