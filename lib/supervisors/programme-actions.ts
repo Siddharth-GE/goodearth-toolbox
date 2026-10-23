@@ -86,14 +86,18 @@ export async function setStageStatus(input: {
   waitingOn?: string;
   waitingNote?: string;
 }): Promise<ActionState> {
+  await requireTool(GRANT);
   if (!isStageStatus(input.status)) return { error: "Pick working, waiting or done." };
   const today = todayInIndia();
   const note = (input.waitingNote ?? "").trim();
   if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
 
   const { current } = input;
-  const pinned = current.startedOn ? null : await pinnedStart(input.plotId, input.groupId);
-  if (typeof pinned === "object" && pinned !== null) return pinned;
+  const starting = input.status === "working" || input.status === "done";
+  const stored =
+    starting && !current.startedOn ? await readStage(input.plotId, input.groupId) : null;
+  if (stored && "error" in stored) return stored;
+  const pinned = stored?.pinnedStart ?? null;
   // A planned start that has passed is the day it began, not today.
   const begun = current.startedOn ?? (pinned && pinned <= today ? pinned : today);
   switch (input.status) {
@@ -157,23 +161,29 @@ export async function setStageStatus(input: {
   }
 }
 
-/** The stage's planned start, or an error to show when it could not be read. */
-async function pinnedStart(
+/** The stage as the database holds it (a stage with no row is not started), or an error to show. */
+async function readStage(
   plotId: string,
   groupId: string,
-): Promise<string | null | { error: string }> {
+): Promise<
+  { status: string; startedOn: string | null; pinnedStart: string | null } | { error: string }
+> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("site_stages")
-    .select("pinned_start")
+    .select("status, started_on, pinned_start")
     .eq("plot_id", plotId)
     .eq("work_group_id", groupId)
     .maybeSingle();
   if (error) {
-    console.error("pinnedStart read failed:", error);
+    console.error("readStage failed:", error);
     return { error: "Could not read the stage. Try again." };
   }
-  return data?.pinned_start ?? null;
+  return {
+    status: data?.status ?? "not_started",
+    startedOn: data?.started_on ?? null,
+    pinnedStart: data?.pinned_start ?? null,
+  };
 }
 
 /** Undo: the stage exactly as it was before the last tap. */
@@ -247,10 +257,6 @@ export async function setStagePlan(input: {
   groupId: string;
   days: string;
   pinnedStart: string;
-  /** The stage's real start, if it has one: a passed date then plans nothing. */
-  startedOn: string | null;
-  /** Waiting before it began: a passed date gives it its start and leaves it waiting. */
-  waiting: boolean;
 }): Promise<ActionState> {
   await requireTool(GRANT);
   const daysText = input.days.trim();
@@ -260,15 +266,23 @@ export async function setStagePlan(input: {
   }
   const startOn = input.pinnedStart.trim();
   if (startOn && !DATE.test(startOn)) return { error: "Pick the date from the calendar." };
-  if (startOn && startOn <= todayInIndia() && !input.startedOn) {
+  const stored =
+    startOn && startOn <= todayInIndia() ? await readStage(input.plotId, input.groupId) : null;
+  if (stored && "error" in stored) return stored;
+  // The date is kept as well, so "Not started" by mistake can be undone to it.
+  if (
+    stored &&
+    !stored.startedOn &&
+    (stored.status === "not_started" || stored.status === "waiting")
+  ) {
     return writeStage(
       input.plotId,
       input.groupId,
-      input.waiting
-        ? { days, pinned_start: null, started_on: startOn }
+      stored.status === "waiting"
+        ? { days, pinned_start: startOn, started_on: startOn }
         : {
             days,
-            pinned_start: null,
+            pinned_start: startOn,
             status: "working",
             started_on: startOn,
             finished_on: null,

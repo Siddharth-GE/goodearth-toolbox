@@ -14,6 +14,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export function VillaStartControl({ plotId, startOn }: { plotId: string; startOn: string | null }) {
   const [value, setValue] = useState(startOn ?? "");
   const [saved, setSaved] = useState(false);
+  // Follows the saved date once it changes, without remounting away the "Saved".
+  const [seen, setSeen] = useState(startOn);
+  if (seen !== startOn) {
+    setSeen(startOn);
+    setValue(startOn ?? "");
+  }
   const { pending, error, run } = useActionRunner();
   return (
     <div className="space-y-1.5">

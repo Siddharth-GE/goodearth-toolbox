@@ -266,11 +266,7 @@ export default async function VillaPage({
                 }
               />
               <Card className="space-y-4 p-5">
-                <VillaStartControl
-                  key={programme.schedule.startOn ?? ""}
-                  plotId={plotId}
-                  startOn={programme.schedule.startOn}
-                />
+                <VillaStartControl plotId={plotId} startOn={programme.schedule.startOn} />
                 <FirstPlanControl
                   plotId={plotId}
                   baselinedAt={programme.schedule.baselinedAt}
