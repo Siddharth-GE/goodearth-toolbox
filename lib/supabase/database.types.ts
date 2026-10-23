@@ -9980,6 +9980,44 @@ export type Database = {
           },
         ]
       }
+      stock_deletions: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          id: string
+          kind: string
+          reason: string
+          reference: string
+          snapshot: Json
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          kind: string
+          reason: string
+          reference: string
+          snapshot: Json
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          kind?: string
+          reason?: string
+          reference?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_deletions_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_issue_lines: {
         Row: {
           created_at: string
@@ -12419,6 +12457,10 @@ export type Database = {
         Args: { p_transmittal_id: string }
         Returns: undefined
       }
+      delete_goods_receipt: {
+        Args: { p_reason: string; p_receipt_id: string }
+        Returns: undefined
+      }
       delete_pending_work_order: {
         Args: { p_contract_id: string }
         Returns: undefined
@@ -12428,6 +12470,10 @@ export type Database = {
         Returns: undefined
       }
       delete_recorded_bill: { Args: { p_bill_id: string }; Returns: undefined }
+      delete_stock_issue: {
+        Args: { p_issue_id: string; p_reason: string }
+        Returns: undefined
+      }
       delete_test_project: { Args: { p_project: string }; Returns: Json }
       design_pass_step: {
         Args: {

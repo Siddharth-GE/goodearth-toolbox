@@ -568,5 +568,7 @@ export async function deleteStockIssue(issueId: string, reason: string): Promise
   }
 
   revalidatePath("/inventory", "layout");
+  // A site request it filled is open again on the supervisor's side.
+  revalidatePath("/supervisors", "layout");
   redirect("/inventory/issues");
 }

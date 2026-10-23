@@ -27,6 +27,7 @@ declare
   v_onward uuid;
   v_request uuid;
   v_bill uuid;
+  v_grn3 uuid;
   v_text text;
   v_refused boolean;
 begin
@@ -86,7 +87,7 @@ begin
     perform delete_goods_receipt(v_grn, 'Entered twice');
   exception when others then v_text := sqlerrm;
   end;
-  if v_text not like 'Material from this delivery has already been issued%' then
+  if coalesce(v_text, '') not like 'Material from this delivery has already been issued%' then
     raise exception 'TRIAL 1 FAILED: a drawn-on delivery gave %', coalesce(v_text, 'no refusal');
   end if;
 
@@ -139,7 +140,7 @@ begin
     perform delete_stock_issue(v_transfer, 'Wrong store');
   exception when others then v_text := sqlerrm;
   end;
-  if v_text not like 'Material from this transfer has already left%' then
+  if coalesce(v_text, '') not like 'Material from this transfer has already left%' then
     raise exception 'TRIAL 4a FAILED: a transfer moved on gave %', coalesce(v_text, 'no refusal');
   end if;
   perform delete_stock_issue(v_onward, 'Not sent');
@@ -201,6 +202,36 @@ begin
   exception when others then v_refused := sqlerrm like 'A bill already counts this delivery%';
   end;
   if not v_refused then raise exception 'TRIAL 7 FAILED: a billed delivery was deleted'; end if;
+
+  -- 8. A delivery whose supplier invoice a bill carries stays, though the quantities alone would let it go.
+  v_grn3 := create_goods_receipt(p_po_id => v_po, p_store_id => v_store_a, p_to_site => false,
+    p_work_item_id => null, p_challan_no => 'CH-T3', p_received_at => current_date, p_note => null);
+  insert into goods_receipt_lines (receipt_id, po_line_id, item_id, quantity, uom, created_by, updated_by)
+  values (v_grn3, v_po_line, v_item, 5, v_uom, v_user, v_user);
+  update goods_receipts set invoice_no = ' inv-t461 ' where id = v_grn3;
+  v_refused := false;
+  begin
+    perform delete_goods_receipt(v_grn3, 'Entered twice');
+  exception when others then v_refused := sqlerrm like 'A bill already counts this delivery%';
+  end;
+  if not v_refused then raise exception 'TRIAL 8 FAILED: a delivery on a billed invoice was deleted'; end if;
+
+  -- 9. A removal adjustment that drew on a delivery's batch holds it too.
+  insert into stock_adjustments (store_id, item_id, quantity, uom, reason, created_by, updated_by)
+  values (v_store_a, v_item, -1, v_uom, 'Trial breakage', v_user, v_user);
+  select l.receipt_id into v_grn2
+    from stock_batch_movements m join goods_receipt_lines l on l.id = m.receipt_line_id
+   where m.adjustment_id is not null and l.receipt_id in (v_grn2, v_grn3)
+   limit 1;
+  if v_grn2 is null then raise exception 'TRIAL 9 SETUP: the adjustment drew on neither delivery'; end if;
+  v_text := null;
+  begin
+    perform delete_goods_receipt(v_grn2, 'Entered twice');
+  exception when others then v_text := sqlerrm;
+  end;
+  if coalesce(v_text, '') not like 'Material from this delivery has already been issued%' then
+    raise exception 'TRIAL 9 FAILED: a delivery an adjustment drew on gave %', coalesce(v_text, 'no refusal');
+  end if;
 
   reset role;
   raise exception 'ALL TRIALS PASSED';

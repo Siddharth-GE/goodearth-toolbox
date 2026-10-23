@@ -267,13 +267,28 @@ begin
     raise exception 'Material from this delivery has already been issued or moved — correct it with an adjustment instead';
   end if;
 
+  if v_receipt.store_id is not null and exists (
+       select 1 from goods_receipt_lines l
+        where l.receipt_id = p_receipt_id
+        group by l.item_id
+       having stock_qty_on_hand(v_receipt.store_id, l.item_id) < sum(l.quantity)
+     ) then
+    raise exception 'Taking this delivery out would leave the store below zero — correct it with an adjustment instead';
+  end if;
+
+  -- bill_lines_guard takes its bill for share, so a line added to one of this PO's bills waits until this is done.
+  perform 1 from bills where po_id = v_receipt.po_id for update;
+  if v_receipt.invoice_no is not null and exists (
+       select 1 from bills b
+        where b.po_id = v_receipt.po_id
+          and lower(trim(b.invoice_no)) = lower(trim(v_receipt.invoice_no))
+     ) then
+    raise exception 'A bill already counts this delivery, so it cannot be deleted';
+  end if;
+
   for v_line in
     select id, po_line_id, item_id, quantity from goods_receipt_lines where receipt_id = p_receipt_id order by id
   loop
-    if v_receipt.store_id is not null
-       and stock_qty_on_hand(v_receipt.store_id, v_line.item_id) < v_line.quantity then
-      raise exception 'Taking this delivery out would leave the store below zero — correct it with an adjustment instead';
-    end if;
     select coalesce(sum(bl.quantity), 0) into v_billed from bill_lines bl where bl.po_line_id = v_line.po_line_id;
     select coalesce(sum(rl.quantity), 0) into v_received_after
       from goods_receipt_lines rl
@@ -429,8 +444,10 @@ begin
   if not exists (select 1 from pg_class where relname = 'stock_deletions' and relrowsecurity) then
     raise exception '0146: stock_deletions is missing or has RLS off';
   end if;
-  if (select count(*) from pg_policies where tablename = 'stock_deletions') <> 1
-     or not exists (select 1 from pg_policies where tablename = 'stock_deletions' and cmd = 'SELECT') then
+  if (select count(*) from pg_policies where schemaname = 'public' and tablename = 'stock_deletions') <> 1
+     or not exists (
+       select 1 from pg_policies where schemaname = 'public' and tablename = 'stock_deletions' and cmd = 'SELECT'
+     ) then
     raise exception '0146: stock_deletions should have one SELECT policy and nothing else';
   end if;
 

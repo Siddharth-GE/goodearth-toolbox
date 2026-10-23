@@ -34,6 +34,7 @@ const CLEARED = [
   "stock_issues",
   "iss_counters",
   "stock_adjustments",
+  "stock_deletions",
   // Bills
   "bill_lines",
   "bill_payments",
