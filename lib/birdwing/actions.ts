@@ -40,6 +40,9 @@ const GUARD_PHRASES = [
   "never change",
   "cannot go from",
   "is cancelled",
+  "can no longer be changed",
+  "cancel a",
+  "Say why it is cancelled",
   "its record now",
   "falls outside",
   "must fall within",
@@ -636,11 +639,18 @@ export async function addReceipt(
   return undefined;
 }
 
-export async function deleteReceipt(receiptId: string): Promise<ActionState> {
+/** Money is cancelled with a reason, never deleted (0148): an admin's or the team lead's, whom the update policy admits alone. */
+export async function cancelReceipt(receiptId: string, reason: string): Promise<ActionState> {
   await requireTool(GRANT);
+  if (!reason.trim()) return { error: "Say why it is cancelled." };
   const supabase = await createClient();
-  const { error } = await supabase.from("birdwing_receipts").delete().eq("id", receiptId);
-  if (error) return fromDb(error, "Could not remove the receipt. Try again.");
+  const { data, error } = await supabase
+    .from("birdwing_receipts")
+    .update({ cancel_reason: reason.trim() })
+    .eq("id", receiptId)
+    .select("id");
+  if (error) return fromDb(error, "Could not cancel the receipt. Try again.");
+  if (!data?.length) return { error: "Only an admin can cancel a receipt." };
   refresh();
   return undefined;
 }
@@ -681,11 +691,17 @@ export async function addSettlement(
   return undefined;
 }
 
-export async function deleteSettlement(settlementId: string): Promise<ActionState> {
+export async function cancelSettlement(settlementId: string, reason: string): Promise<ActionState> {
   await requireTool(GRANT);
+  if (!reason.trim()) return { error: "Say why it is cancelled." };
   const supabase = await createClient();
-  const { error } = await supabase.from("birdwing_cross_charges").delete().eq("id", settlementId);
-  if (error) return fromDb(error, "Could not remove it. Try again.");
+  const { data, error } = await supabase
+    .from("birdwing_cross_charges")
+    .update({ cancel_reason: reason.trim() })
+    .eq("id", settlementId)
+    .select("id");
+  if (error) return fromDb(error, "Could not cancel it. Try again.");
+  if (!data?.length) return { error: "Only an admin can cancel this." };
   refresh();
   return undefined;
 }

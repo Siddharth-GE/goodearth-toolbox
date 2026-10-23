@@ -257,7 +257,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Published plan targets, three ways. THE THREE-WAY WHERE IS LOAD-BEARING: re-running an earlier migration as-is drops Financial Management and Reporter without failing anything.",
+    why: "Published plan targets, three ways. THE THREE-WAY WHERE IS LOAD-BEARING: re-running an earlier migration as-is drops Financial Management and Reporter without failing anything. A cancelled receipt counts in nothing (0148).",
   },
   crm_milestone_facts: {
     columns: [
@@ -282,7 +282,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Client payment milestones, for Reporter and Financial Management. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. /client-relations left the WHERE in 0123: a member sees only their own plots' money, through the tables, and this view would hand them every plot's. THE TWO-WAY WHERE IS LOAD-BEARING.",
+    why: "Client payment milestones, for Reporter and Financial Management. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. /client-relations left the WHERE in 0123: a member sees only their own plots' money, through the tables, and this view would hand them every plot's. THE TWO-WAY WHERE IS LOAD-BEARING. A cancelled receipt counts in nothing (0148).",
   },
   crm_receipt_facts: {
     columns: [
@@ -306,7 +306,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Money actually received, for Reporter and Financial Management. /client-relations left the WHERE in 0123, for crm_milestone_facts' reason. THE TWO-WAY WHERE IS LOAD-BEARING.",
+    why: "Money actually received, for Reporter and Financial Management. /client-relations left the WHERE in 0123, for crm_milestone_facts' reason. THE TWO-WAY WHERE IS LOAD-BEARING. A cancelled receipt counts in nothing (0148).",
   },
   budget_report_lines: {
     columns: [
@@ -453,7 +453,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "One row per Birdwing stay with its money worked out as Stays works it (0117) — Financial Management's Birdwing tab and Reporter's dataset. A guest's name only: no phone, email, ID or note may ever join it.",
+    why: "One row per Birdwing stay with its money worked out as Stays works it (0117) — Financial Management's Birdwing tab and Reporter's dataset. A guest's name only: no phone, email, ID or note may ever join it. A cancelled receipt counts in nothing (0148).",
   },
   birdwing_expense_facts: {
     columns: [

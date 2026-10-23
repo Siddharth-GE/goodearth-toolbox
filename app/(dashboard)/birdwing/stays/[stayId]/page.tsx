@@ -196,12 +196,14 @@ export default async function StayPage({ params }: { params: Promise<{ stayId: s
             pending={figures.pending}
             today={todayInIndia()}
             canAdd={stay.status !== "enquiry"}
+            canCancel={stay.canCancel}
           />
           {(figures.pending >= 1 || stay.settlements.length > 0) && (
             <SettlePanel
               stayId={stay.id}
               internal={stay.internal}
               settlements={stay.settlements}
+              canCancel={stay.canCancel}
               pending={figures.pending}
               costCentres={activeCentres}
               defaultCostCentreId={stay.costCentreId}
