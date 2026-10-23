@@ -102,15 +102,28 @@ export function buildProgramme(input: {
     });
 }
 
-/** Now: every stage working or waiting. Next: the first stages not started, in order. */
+/**
+ * Now: every stage working or waiting. Next: the first stages not started after the furthest one begun —
+ * an earlier stage nobody touched (marking never recorded) stays in the programme, not in Next.
+ */
 export function nowAndNext<T extends ProgrammeStage>(
   stages: T[],
   nextCount = 2,
 ): { now: T[]; next: T[] } {
+  const furthest = stages.findLastIndex((stage) => stage.status !== "not_started");
   return {
     now: stages.filter((stage) => stage.status === "working" || stage.status === "waiting"),
-    next: stages.filter((stage) => stage.status === "not_started").slice(0, nextCount),
+    next: stages
+      .slice(furthest + 1)
+      .filter((stage) => stage.status === "not_started")
+      .slice(0, nextCount),
   };
+}
+
+/** The day in India of a timestamp or a date: a UTC timestamp before 05:30 IST is still yesterday in UTC. */
+export function dayInIndia(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Date(Date.parse(value) + 330 * 60_000).toISOString().slice(0, 10);
 }
 
 /** Calendar days from one "YYYY-MM-DD" to another. */
@@ -163,7 +176,7 @@ export function villaHealth(input: {
     .filter((stage) => stage.status === "waiting" && stage.record)
     .map((stage) => ({
       stage,
-      days: daysBetween(stage.record!.statusChangedAt.slice(0, 10), today),
+      days: daysBetween(dayInIndia(stage.record!.statusChangedAt), today),
     }))
     .filter((entry) => entry.days > HEALTH_RULES.waitingDays)
     .sort((a, b) => b.days - a.days)[0];

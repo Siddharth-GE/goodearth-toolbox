@@ -317,7 +317,11 @@ export function stageReadiness(
           ) ?? null;
         const sameUnit =
           pick !== null && pick.itemUom.trim().toLowerCase() === row.uom.trim().toLowerCase();
-        const left = row.issued !== null ? Math.max(row.estimated - row.issued, 0) : row.estimated;
+        // Rounded so a request never pre-fills 7.099999999999999.
+        const left =
+          Math.round(
+            (row.issued !== null ? Math.max(row.estimated - row.issued, 0) : row.estimated) * 1000,
+          ) / 1000;
         return {
           key: `${row.workItemId}-${row.materialName}`,
           materialName: row.materialName,

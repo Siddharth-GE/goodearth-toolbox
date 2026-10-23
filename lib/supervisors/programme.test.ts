@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   buildProgramme,
+  dayInIndia,
   dayOfStage,
   nowAndNext,
   stageProgress,
@@ -99,6 +100,31 @@ test("now is working and waiting; next is the first two not started", () => {
   );
   assert.equal(dayOfStage({ startedOn: "2026-10-01" }, "2026-10-06"), 6);
   assert.equal(dayOfStage({ startedOn: null }, "2026-10-06"), null);
+});
+
+test("next starts after the furthest stage begun; an untouched earlier stage is not next", () => {
+  const stages = buildProgramme({
+    groups: GROUPS,
+    sequence: SEQUENCE,
+    estimateGroupIds: null,
+    // Marking and conduiting never recorded, block work already running.
+    records: [record("SS.01")],
+  });
+  const { now, next } = nowAndNext(stages);
+  assert.deepEqual(
+    now.map((stage) => stage.id),
+    ["SS.01"],
+  );
+  assert.deepEqual(
+    next.map((stage) => stage.id),
+    ["SS.02"],
+  );
+});
+
+test("a timestamp's day is India's day", () => {
+  assert.equal(dayInIndia("2026-10-14T20:00:00Z"), "2026-10-15");
+  assert.equal(dayInIndia("2026-10-14T18:00:00+00:00"), "2026-10-14");
+  assert.equal(dayInIndia("2026-10-14"), "2026-10-14");
 });
 
 const health = (stages: ProgrammeStage[], extra: Partial<Parameters<typeof villaHealth>[0]> = {}) =>

@@ -70,6 +70,8 @@ export function StageStatusChips({
   const { pending, error, run } = useActionRunner();
   const undo = useUndoBar();
   const [asking, setAsking] = useState<"waiting" | "done" | null>(null);
+  // Opened from code, so Radix never reports the opening: a new key gives each ask a blank form.
+  const [askKey, setAskKey] = useState(0);
   const unsigned = stage.checklists.filter((checklist) => !checklist.signedOff);
 
   const save = async (status: StageStatus, waitingOn?: WaitingOn, waitingNote?: string) => {
@@ -94,7 +96,10 @@ export function StageStatusChips({
 
   const choose = (status: StageStatus | null) => {
     if (!status || status === stage.snapshot.status) return;
-    if (status === "waiting") return setAsking("waiting");
+    if (status === "waiting") {
+      setAskKey((key) => key + 1);
+      return setAsking("waiting");
+    }
     if (status === "done" && unsigned.length > 0) return setAsking("done");
     void save(status);
   };
@@ -115,6 +120,7 @@ export function StageStatusChips({
       />
       <FormMessage error={error} />
       <WaitingDialog
+        key={askKey}
         open={asking === "waiting"}
         onOpenChange={(open) => setAsking(open ? "waiting" : null)}
         stageLabel={`${stage.code} ${stage.name}`}
@@ -155,17 +161,7 @@ function WaitingDialog({
   const [pending, setPending] = useState(false);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) {
-          setOn(null);
-          setNote("");
-          setError(undefined);
-        }
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Waiting on what?</DialogTitle>
@@ -261,20 +257,10 @@ export function StageSheet({
   waitingLine: string | null;
 }) {
   const { snapshot } = stage;
-  const { pending, error, run } = useActionRunner();
-  const [startedOn, setStartedOn] = useState(snapshot.startedOn ?? "");
-  const [finishedOn, setFinishedOn] = useState(snapshot.finishedOn ?? "");
   const started = snapshot.status !== "not_started";
 
   return (
-    <Dialog
-      onOpenChange={(open) => {
-        if (open) {
-          setStartedOn(snapshot.startedOn ?? "");
-          setFinishedOn(snapshot.finishedOn ?? "");
-        }
-      }}
-    >
+    <Dialog>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -296,52 +282,11 @@ export function StageSheet({
             />
           </div>
           {started ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor={`started-${stage.groupId}`}>Started</Label>
-                  <Input
-                    id={`started-${stage.groupId}`}
-                    type="date"
-                    value={startedOn}
-                    onChange={(event) => setStartedOn(event.target.value)}
-                  />
-                </div>
-                {snapshot.status === "done" ? (
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`finished-${stage.groupId}`}>Finished</Label>
-                    <Input
-                      id={`finished-${stage.groupId}`}
-                      type="date"
-                      value={finishedOn}
-                      onChange={(event) => setFinishedOn(event.target.value)}
-                    />
-                  </div>
-                ) : null}
-              </div>
-              <FormMessage error={error} />
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={
-                  pending ||
-                  (startedOn === (snapshot.startedOn ?? "") &&
-                    finishedOn === (snapshot.finishedOn ?? ""))
-                }
-                onClick={() =>
-                  run(() =>
-                    setStageDates({
-                      plotId: stage.plotId,
-                      groupId: stage.groupId,
-                      startedOn,
-                      finishedOn: snapshot.status === "done" ? finishedOn : "",
-                    }),
-                  )
-                }
-              >
-                {pending ? "Saving…" : "Save the dates"}
-              </Button>
-            </div>
+            // Keyed on what the server holds, so a status tap in this sheet refills the dates.
+            <StageDates
+              key={`${snapshot.status}|${snapshot.startedOn}|${snapshot.finishedOn}`}
+              stage={stage}
+            />
           ) : (
             <p className="text-muted text-xs">
               The first labour logged on this stage starts it by itself.
@@ -350,6 +295,64 @@ export function StageSheet({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function StageDates({ stage }: { stage: StageControlData }) {
+  const { snapshot } = stage;
+  const { pending, error, run } = useActionRunner();
+  const [startedOn, setStartedOn] = useState(snapshot.startedOn ?? "");
+  const [finishedOn, setFinishedOn] = useState(snapshot.finishedOn ?? "");
+  const done = snapshot.status === "done";
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor={`started-${stage.groupId}`}>Started</Label>
+          <Input
+            id={`started-${stage.groupId}`}
+            type="date"
+            value={startedOn}
+            onChange={(event) => setStartedOn(event.target.value)}
+          />
+        </div>
+        {done ? (
+          <div className="space-y-1.5">
+            <Label htmlFor={`finished-${stage.groupId}`}>Finished</Label>
+            <Input
+              id={`finished-${stage.groupId}`}
+              type="date"
+              value={finishedOn}
+              onChange={(event) => setFinishedOn(event.target.value)}
+            />
+          </div>
+        ) : null}
+      </div>
+      <FormMessage error={error} />
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={
+          pending ||
+          !startedOn ||
+          (done && !finishedOn) ||
+          (startedOn === (snapshot.startedOn ?? "") && finishedOn === (snapshot.finishedOn ?? ""))
+        }
+        onClick={() =>
+          run(() =>
+            setStageDates({
+              plotId: stage.plotId,
+              groupId: stage.groupId,
+              startedOn,
+              finishedOn: done ? finishedOn : "",
+            }),
+          )
+        }
+      >
+        {pending ? "Saving…" : "Save the dates"}
+      </Button>
+    </div>
   );
 }
 
@@ -376,7 +379,10 @@ export function SupervisorPicker({
       }}
     >
       <DialogTrigger asChild>
-        <PillButton tone={supervisor ? "plain" : "dashed"} aria-label="Who runs this villa">
+        <PillButton
+          tone={supervisor ? "plain" : "dashed"}
+          aria-label={supervisor ? `Run by ${supervisor.name} — change` : "Who runs this villa?"}
+        >
           {supervisor ? (
             <>
               <Avatar name={supervisor.name} size={18} letters={2} />

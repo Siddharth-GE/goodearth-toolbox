@@ -218,15 +218,21 @@ export async function setVillaSupervisor(input: {
   const user = await requireTool(GRANT);
   if (!input.plotId) return { error: "Which villa?" };
   const supabase = await createClient();
-  const { error } = await supabase.from("site_villas").upsert(
-    {
+  const supervisorId = input.supervisorId || null;
+  const updated = await supabase
+    .from("site_villas")
+    .update({ supervisor_id: supervisorId, updated_by: user.id })
+    .eq("plot_id", input.plotId)
+    .select("id");
+  let error = updated.error;
+  if (!error && (updated.data ?? []).length === 0) {
+    ({ error } = await supabase.from("site_villas").insert({
       plot_id: input.plotId,
-      supervisor_id: input.supervisorId || null,
+      supervisor_id: supervisorId,
       created_by: user.id,
       updated_by: user.id,
-    },
-    { onConflict: "plot_id" },
-  );
+    }));
+  }
   if (error) {
     console.error("setVillaSupervisor failed:", error);
     return { error: "Could not save who runs this villa. Try again." };

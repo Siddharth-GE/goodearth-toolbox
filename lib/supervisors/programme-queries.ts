@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { VillaChecklistRow } from "./checklist-queries";
 import {
   buildProgramme,
+  dayInIndia,
   dayOfStage,
   isStageStatus,
   isWaitingOn,
@@ -116,7 +117,7 @@ export async function getVillaProgramme(input: {
       fetchAll((from, to) =>
         supabase
           .from("labour_logs")
-          .select("work_item_id, log_date, kind, quantity, uom")
+          .select("work_item_id, log_date, kind, quantity, uom, work_class")
           .eq("plot_id", plotId)
           .order("id")
           .range(from, to),
@@ -208,7 +209,8 @@ export async function getVillaProgramme(input: {
     if (!last || log.log_date > last) lastLabourByGroup.set(group, log.log_date);
   }
   const pieceWork = logs
-    .filter((log) => log.kind === "pw_qty")
+    // Standard work only: rework repeats what the estimate already counts, and additional work is beyond it.
+    .filter((log) => log.kind === "pw_qty" && log.work_class === "standard")
     .map((log) => ({ workItemId: log.work_item_id, quantity: log.quantity, uom: log.uom }));
 
   const contractorNames = new Map(
@@ -259,7 +261,7 @@ export async function getVillaProgramme(input: {
   ).length;
   const unconfirmed = input.deliveries
     .filter((delivery) => !delivery.confirmedAt && delivery.lines.length > 0)
-    .map((delivery) => delivery.on.slice(0, 10))
+    .map((delivery) => dayInIndia(delivery.on))
     .sort();
 
   const names = new Map(profiles.map((person) => [person.id, person.full_name ?? "—"]));
