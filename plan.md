@@ -83,10 +83,11 @@ Pure rules tested (`programme.ts`, `schedule.ts`, health, readiness). `0137` dry
 
 ## Next session — start here, after "read CLAUDE.md"
 
-1. ~~The founder vets #122 on staging~~ — "all good so far", 2026-10-22.
-2. ~~Masters import~~ — **done 2026-10-22** on the founder's word: 690 works active (246 of the old kept their ids), 132 groups, 24 categories in five families; a re-run finds nothing to do. **The founder still re-sends the works list to SketchUp.**
-3. ~~Settle the open questions and design the schedule~~ — done 2026-10-23 (below, and phase B).
-4. **Build phase A** once the founder approves this plan, one pull request; the founder vets each phase on staging. **Founder, meanwhile:** ask the site team for typical days per stage (for a villa of a size they name) — the Sequence page in phase B takes them.
+Done 2026-10-22/23: #122 vetted, the masters import, the questions settled, the schedule designed, and **phase A merged into `staging` as #123** (`0137`, `0138` on staging's database).
+
+1. **Ask the founder how phase A looked on staging** (their checklist: open a Saarang villa in Supervisors on a phone — the header and stage rail, Now, Next up, the Programme; tap Working / Waiting / Done and Undo; Log labour from a stage; open a stage from the Programme). Anything broken is fixed first. Still theirs: re-send the works list to SketchUp; typical days per stage from the site team.
+2. **Then phase B, the schedule** — one pull request, worktree `..\toolbox-os`, a new branch off `staging`. Its tables already exist (`site_sequence` seeded with a draft order, `site_schedule_settings`, the villa's `start_on` and the stage's `days`, `pinned_start` and baseline columns), so B is likely code only: `lib/supervisors/schedule.ts` (pure, tested), the Sequence page, the villa's dates, Set the first plan, the schedule strip. A new migration needs a Fable review unless the founder waives it.
+3. Then C (checklist runner), D (the board), E (look ahead), one pull request each.
 
 ## Settled by the founder, 2026-10-23
 
