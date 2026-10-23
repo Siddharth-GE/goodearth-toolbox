@@ -31,6 +31,8 @@ export function StageRail({
   className?: string;
 }) {
   const description = segments.map((segment) => `${segment.label}: ${segment.status}`).join(", ");
+  // Many stages read as one bar with square joins; a few as separate rounded steps.
+  const shape = segments.length > 20 ? "rounded-none" : "rounded-full";
   return (
     <div
       role="img"
@@ -42,12 +44,13 @@ export function StageRail({
         <span key={segment.key} className="min-w-0">
           <span
             className={cn(
-              "bg-foreground/[0.08] block overflow-hidden rounded-full",
+              "bg-foreground/[0.08] block overflow-hidden",
+              shape,
               segment.current ? "h-3" : "h-1.5",
             )}
           >
             {segment.fill ? (
-              <span className={cn("block h-full rounded-full", FILL[segment.fill])} />
+              <span className={cn("block h-full", shape, FILL[segment.fill])} />
             ) : null}
           </span>
           {labels ? (

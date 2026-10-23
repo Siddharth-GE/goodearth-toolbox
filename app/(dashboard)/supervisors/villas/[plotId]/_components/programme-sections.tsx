@@ -154,7 +154,7 @@ function ChecklistButton({
         href={`/supervisors/villas/${plotId}/checklists/${open.id}`}
         variant="secondary"
         size="lg"
-        className="w-full"
+        className="w-full px-3 whitespace-nowrap"
       >
         <ClipboardCheck className="size-5" aria-hidden />
         {`Checklist ${open.answered}/${open.total}`}
@@ -171,7 +171,7 @@ function ChecklistButton({
         href={`/supervisors/villas/${plotId}/checklists/${signed.checklist.id}`}
         variant="secondary"
         size="lg"
-        className="w-full"
+        className="w-full px-3 whitespace-nowrap"
       >
         <ClipboardCheck className="size-5" aria-hidden />
         Signed off
@@ -184,7 +184,7 @@ function ChecklistButton({
       templates={startable}
       workGroupId={stage.id}
       trigger={
-        <Button variant="secondary" size="lg" className="w-full">
+        <Button variant="secondary" size="lg" className="w-full px-3 whitespace-nowrap">
           <ClipboardCheck className="size-5" aria-hidden />
           {signed ? "Checklist again" : "Checklist"}
         </Button>
@@ -246,37 +246,41 @@ export function NowCard({
       ) : null}
 
       <div className="grid grid-cols-2 gap-2">
-        <LabourLogDialog
-          plotId={plotId}
-          works={works}
-          contractors={contractors}
-          stageWorkIds={stageWorkIds}
-          contractorId={stage.record?.contractorId ?? null}
-          trigger={
-            <Button variant="primary" size="lg" className="w-full">
-              <HardHat className="size-5" aria-hidden />
-              Log labour
-            </Button>
-          }
-        />
-        <RequestIssueDialog
-          plotId={plotId}
-          works={works}
-          hasEstimate={villa.estimate !== null}
-          quickPicks={villa.quickPicks}
-          categories={categories}
-          brands={brands}
-          stageWorkIds={stageWorkIds}
-          trigger={
-            <Button variant="secondary" size="lg" className="w-full">
-              <Package className="size-5" aria-hidden />
-              Material
-            </Button>
-          }
-        />
-        <div className="col-span-2 sm:col-span-1">
-          <ChecklistButton plotId={plotId} stage={stage} templates={templates} />
+        <div className="col-span-2">
+          <LabourLogDialog
+            plotId={plotId}
+            works={works}
+            contractors={contractors}
+            stageWorkIds={stageWorkIds}
+            contractorId={stage.record?.contractorId ?? null}
+            trigger={
+              <Button variant="primary" size="lg" className="w-full">
+                <HardHat className="size-5" aria-hidden />
+                Log labour
+              </Button>
+            }
+          />
         </div>
+        <div className={stage.checklists.length > 0 ? undefined : "col-span-2"}>
+          <RequestIssueDialog
+            plotId={plotId}
+            works={works}
+            hasEstimate={villa.estimate !== null}
+            quickPicks={villa.quickPicks}
+            categories={categories}
+            brands={brands}
+            stageWorkIds={stageWorkIds}
+            trigger={
+              <Button variant="secondary" size="lg" className="w-full">
+                <Package className="size-5" aria-hidden />
+                Material
+              </Button>
+            }
+          />
+        </div>
+        {stage.checklists.length > 0 ? (
+          <ChecklistButton plotId={plotId} stage={stage} templates={templates} />
+        ) : null}
       </div>
 
       <StageStatusChips stage={controlData(plotId, stage)} />
