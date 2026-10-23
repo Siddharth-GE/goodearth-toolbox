@@ -17,7 +17,7 @@ The headings in everyone's sidebar, on the home page and over the grant lists he
 
 ## Test project
 
-- **One page, one red button** (`/settings/test-project`, `0142`): each project marked `is_test` with what it holds, and **Delete the test project**, which asks once and then calls `delete_test_project()` — the database decides what goes and refuses a real project or a tangled one (`SECURITY.md`). A test project is made only by `scripts/seed-test-project.ts`, never from the app.
+- **One page, one red button** (`/settings/test-project`, `0142`): each project marked `is_test` with what it holds, and **Delete the test project**, which asks once and then calls `delete_test_project()` — the database decides what goes and refuses a real project or a tangled one (`SECURITY.md`). A test project is made only by `scripts/seed-test-project.ts`, never from the app, and only the database owner can mark one (`projects_is_test_guard`). **Its records are made up but its vendors, contractors and company are real**: until it is deleted its POs and bills show in those vendors' payables and the company's totals, and work in it notifies real approvers — delete it before the switch to production, and press the button when nobody is saving (it gives up at once if someone is).
 
 ## This is the permission system
 
