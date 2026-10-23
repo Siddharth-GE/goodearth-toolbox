@@ -16,6 +16,8 @@ declare
   v_back uuid;
   v_advance uuid;
   v_recovery uuid;
+  v_order uuid;
+  v_unit uuid;
   v_text text;
   v_n numeric;
 begin
@@ -42,6 +44,9 @@ begin
   values (v_project, 'GEN', v_contractor, 'nmr', 9472, 'BILL/TRIAL/472', 'T-472', current_date, 4000, 0, 4000,
           'approved', v_user, now(), v_user, v_user)
   returning id into v_other;
+  select id into v_unit from units where project_id = v_project order by id limit 1;
+  insert into labour_contracts (vendor_id, project_id, unit_id, description, contract_value, status, approved_by, approved_at)
+  values (v_contractor, v_project, v_unit, 'Trial 0147 order', 3000, 'approved', v_user, now()) returning id into v_order;
   set local role authenticated;
 
   -- 1. Paid in full in two payments: the bill is paid.
@@ -90,6 +95,15 @@ begin
   end if;
   select coalesce(sum(amount), 0) into v_n from bill_payments where bill_id = v_bill;
   if v_n <> 6000 then raise exception 'TRIAL 4c FAILED: the bill nets % paid, expected 6000', v_n; end if;
+  v_text := null;
+  begin
+    update bills set status = 'recorded', rejection_note = 'Wrong total', approved_by = null, approved_at = null
+     where id = v_bill;
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'Money has gone out against this bill — reverse it before sending the bill back' then
+    raise exception 'TRIAL 4d FAILED: sending back a bill with money out gave %', coalesce(v_text, 'no refusal');
+  end if;
 
   -- 5. Never twice, never a reversal of a reversal, and a direct insert can fake nothing.
   v_text := null;
@@ -108,10 +122,10 @@ begin
   if v_text is distinct from 'A reversal is never itself reversed' then
     raise exception 'TRIAL 5b FAILED: reversing a reversal gave %', coalesce(v_text, 'no refusal');
   end if;
-  insert into bill_payments (bill_id, amount, payment_ref, reverses_id, reverse_reason, created_by, updated_by)
-  values (v_other, -99999, 'FAKE', v_pay1, 'Wrong amount', v_user, v_user) returning id into v_back;
-  if (select (bill_id, amount, payment_ref) from bill_payments where id = v_back)
-     is distinct from (v_bill, -6000::numeric, 'UTR-471-A'::text) then
+  insert into bill_payments (bill_id, amount, paid_on, payment_ref, reverses_id, reverse_reason, created_by, updated_by)
+  values (v_other, -99999, '2020-01-01', 'FAKE', v_pay1, 'Wrong amount', null, null) returning id into v_back;
+  if (select (bill_id, amount, payment_ref, paid_on, created_by) from bill_payments where id = v_back)
+     is distinct from (v_bill, -6000::numeric, 'UTR-471-A'::text, (now() at time zone 'Asia/Kolkata')::date, v_user) then
     raise exception 'TRIAL 5c FAILED: a direct reversal kept its own bill or amount';
   end if;
   select coalesce(sum(amount), 0) into v_n from bill_payments where bill_id = v_bill;
@@ -121,6 +135,14 @@ begin
   update bills set status = 'recorded', rejection_note = 'Wrong total', approved_by = null, approved_at = null,
                    updated_by = v_user
    where id = v_bill;
+  v_text := null;
+  begin
+    perform delete_recorded_bill(v_bill);
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'Money was paid and reversed on this bill, so it stays on record — correct it and approve it again' then
+    raise exception 'TRIAL 6a FAILED: deleting a bill with reversed money gave %', coalesce(v_text, 'no refusal');
+  end if;
   update bills set status = 'approved', rejection_note = null, approved_by = v_user, approved_at = now(),
                    updated_by = v_user
    where id = v_bill;
@@ -131,8 +153,8 @@ begin
   end if;
 
   -- 7. An advance of 3,000, 1,000 of it recovered on the other bill.
-  insert into contractor_advances (vendor_id, project_id, amount, payment_ref, created_by, updated_by)
-  values (v_contractor, v_project, 3000, 'UTR-ADV-471', v_user, v_user) returning id into v_advance;
+  insert into contractor_advances (vendor_id, project_id, labour_contract_id, amount, payment_ref, created_by, updated_by)
+  values (v_contractor, v_project, v_order, 3000, 'UTR-ADV-471', v_user, v_user) returning id into v_advance;
   insert into advance_recoveries (advance_id, bill_id, amount, created_by, updated_by)
   values (v_advance, v_other, 1000, v_user, v_user) returning id into v_recovery;
   v_text := null;
@@ -160,6 +182,12 @@ begin
   end;
   if v_text is distinct from 'That advance was reversed, so nothing is left to recover from it' then
     raise exception 'TRIAL 8c FAILED: recovering from a reversed advance gave %', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 8d. An advance reversed in full no longer holds its work order.
+  update labour_contracts set status = 'cancelled', cancel_reason = 'Wrong contractor' where id = v_order;
+  if (select status from labour_contracts where id = v_order) <> 'cancelled' then
+    raise exception 'TRIAL 8d FAILED: the work order did not cancel';
   end if;
 
   -- 9. Still append-only: nobody updates or deletes a payment.

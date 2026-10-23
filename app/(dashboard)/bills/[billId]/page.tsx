@@ -55,15 +55,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
   const editable = canEditBill(bill.status);
   const itemised = lines.length > 0;
   const moneyMoves = bill.status !== "recorded";
-  const [settlement, events, advances] = moneyMoves
-    ? await Promise.all([
-        getBillSettlement(bill.id, bill.total_amount),
-        getBillMoneyEvents(bill.id),
-        canTakePayment(bill.status) && bill.vendor_id
-          ? getOpenAdvances(bill.vendor_id)
-          : Promise.resolve([]),
-      ])
-    : [null, [], []];
+  // A recorded bill has money only when it was paid, reversed and sent back (0147); its history still shows.
+  const [settlement, events, advances] = await Promise.all([
+    getBillSettlement(bill.id, bill.total_amount),
+    getBillMoneyEvents(bill.id),
+    canTakePayment(bill.status) && bill.vendor_id
+      ? getOpenAdvances(bill.vendor_id)
+      : Promise.resolve([]),
+  ]);
+  const hasMoney = events.length > 0;
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
         listActiveGstRates(),
@@ -128,6 +128,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               actor={actor}
               createdBy={bill.created_by}
               totalAmount={bill.total_amount}
+              hasMoney={hasMoney}
             />
           </>
         }
@@ -167,7 +168,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.approved_at && (
               <span className="text-muted"> on {formatDate(bill.approved_at)}</span>
             )}
-            {settlement && settlement.paid + settlement.recovered > 0
+            {settlement.paid + settlement.recovered > 0
               ? ` — part paid ${formatMoney(settlement.paid + settlement.recovered, { paise: true })} · pending ${formatMoney(settlement.pending, { paise: true })}.`
               : " — ready to pay."}
           </p>
@@ -227,7 +228,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         <p className="text-muted text-sm">{`Total set by hand — ${bill.total_override_note}`}</p>
       )}
 
-      {moneyMoves && settlement && (
+      {(moneyMoves || hasMoney) && (
         <div className="space-y-2">
           <Heading>Payments</Heading>
           <p className="text-muted text-sm">
@@ -273,6 +274,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                       <DeleteOrCancel
                         noun={MONEY_KIND_LABEL[event.kind].noun}
                         verb="Reverse"
+                        reasonPlaceholder="Paid twice by mistake"
                         removal={moneyReversal(event, actor)}
                         cancelNote="The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone."
                         onCancel={reverseBillMoney.bind(null, event.kind, event.id)}

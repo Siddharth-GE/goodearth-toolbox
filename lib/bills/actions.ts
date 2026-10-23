@@ -34,6 +34,8 @@ const BILL_GUARD_PHRASES = [
   "does not belong",
   "not both",
   "muster roll",
+  "reverse",
+  "stays on record",
 ] as const;
 
 export async function approveLabourContract(contractId: string): Promise<ActionState> {

@@ -27,12 +27,15 @@ export function ActionButtons({
   actor,
   createdBy,
   totalAmount,
+  hasMoney,
 }: {
   billId: string;
   status: BillStatus;
   actor: { isAdmin: boolean; isApprover: boolean; approvalLimit: number | null; userId: string };
   createdBy: string | null;
   totalAmount: number;
+  /** Paid and reversed (0147): its money rows stay, so it is corrected, never deleted. */
+  hasMoney: boolean;
 }) {
   const { pending, error, run: runAction, clearError } = useActionRunner();
   const [sendingBack, setSendingBack] = useState(false);
@@ -115,7 +118,17 @@ export function ActionButtons({
       <div className="flex items-center justify-end gap-2">
         <DeleteOrCancel
           noun="bill"
-          removal={deletable ? { kind: "delete" } : null}
+          verb="Delete"
+          removal={
+            !deletable
+              ? null
+              : hasMoney
+                ? {
+                    kind: "blocked",
+                    why: "Money was paid and reversed on it, so it stays on record — correct it and approve it again.",
+                  }
+                : { kind: "delete" }
+          }
           deleteNote="It is still recorded and no money has moved, so it goes for good. Its number stays used."
           onDelete={() => deleteBill(billId)}
         />

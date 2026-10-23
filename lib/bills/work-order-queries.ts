@@ -168,7 +168,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
     lineBilling,
     untagged,
     billCount,
-    advanceCount,
+    advances,
     cashLineCount,
   ] = await Promise.all([
     supabase.from("labour_contracts").select(CONTRACT_COLUMNS).eq("id", id).maybeSingle(),
@@ -197,16 +197,20 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
       .from("bills")
       .select("id", { count: "exact", head: true })
       .eq("labour_contract_id", id),
-    supabase
-      .from("contractor_advances")
-      .select("id", { count: "exact", head: true })
-      .eq("labour_contract_id", id),
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_advances")
+        .select("id, reverses_id")
+        .eq("labour_contract_id", id)
+        .order("id")
+        .range(from, to),
+    ),
     supabase
       .from("cash_request_items")
       .select("id", { count: "exact", head: true })
       .eq("labour_contract_id", id),
   ]);
-  const countError = billCount.error ?? advanceCount.error ?? cashLineCount.error;
+  const countError = billCount.error ?? cashLineCount.error;
   if (countError) {
     console.error("getWorkOrder counts failed:", countError);
     throw new Error("Could not read the work order.", { cause: countError });
@@ -217,6 +221,11 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
   }
   if (!data) return null;
   const contract = data as unknown as ContractRow;
+  // An advance reversed in full no longer holds the order (0147).
+  const reversed = new Set(advances.map((advance) => advance.reverses_id));
+  const liveAdvances = advances.filter(
+    (advance) => advance.reverses_id === null && !reversed.has(advance.id),
+  ).length;
 
   const people = [contract.approved_by, contract.created_by, contract.cancelled_by].filter(
     (person): person is string => person != null,
@@ -248,7 +257,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
     cancel_reason: contract.cancel_reason,
     resting_on_it: [
       billCount.count ? counted(billCount.count, "a bill", "bills") : null,
-      advanceCount.count ? counted(advanceCount.count, "an advance", "advances") : null,
+      liveAdvances ? counted(liveAdvances, "an advance", "advances") : null,
       cashLineCount.count
         ? counted(cashLineCount.count, "a cash request line", "cash request lines")
         : null,

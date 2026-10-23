@@ -19,6 +19,7 @@ export function DeleteOrCancel({
   deleteNote = "Nothing uses it yet, so it goes for good.",
   verb = "Cancel",
   cancelNote = "It leaves every list and total, and stays on record with your reason. This can't be undone.",
+  reasonPlaceholder = "Raised twice by mistake",
 }: {
   /** As it reads after "this": "indent", "draft revision". */
   noun: string;
@@ -30,6 +31,7 @@ export function DeleteOrCancel({
   /** "Delete" asks a reason too: a stock record that already moved stock (0146). Money is reversed (0147). */
   verb?: "Cancel" | "Withdraw" | "Delete" | "Reverse";
   cancelNote?: string;
+  reasonPlaceholder?: string;
 }) {
   const doing = {
     Cancel: "Cancelling…",
@@ -74,7 +76,7 @@ export function DeleteOrCancel({
         description={cancelNote}
         confirmLabel={`${verb} ${noun}`}
         pendingLabel={doing}
-        reason={{ label: `Why is it ${done}?`, placeholder: "Raised twice by mistake" }}
+        reason={{ label: `Why is it ${done}?`, placeholder: reasonPlaceholder }}
         onConfirm={(reason) => onCancel(reason)}
       />
     );

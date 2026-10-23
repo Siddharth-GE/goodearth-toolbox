@@ -159,6 +159,7 @@ export default async function PaymentsPage({
                   <DeleteOrCancel
                     noun={MONEY_KIND_LABEL[row.kind].noun}
                     verb="Reverse"
+                    reasonPlaceholder="Paid twice by mistake"
                     removal={moneyReversal(row, actor)}
                     cancelNote={REVERSE_NOTE[row.kind]}
                     onCancel={reverseBillMoney.bind(null, row.kind, row.id)}

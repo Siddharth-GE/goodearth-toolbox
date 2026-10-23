@@ -96,7 +96,7 @@ export type Database = {
           {
             foreignKeyName: "advance_recoveries_reverses_id_fkey"
             columns: ["reverses_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "advance_recoveries"
             referencedColumns: ["id"]
           },
@@ -529,7 +529,7 @@ export type Database = {
           {
             foreignKeyName: "bill_payments_reverses_id_fkey"
             columns: ["reverses_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "bill_payments"
             referencedColumns: ["id"]
           },
@@ -3540,7 +3540,7 @@ export type Database = {
           {
             foreignKeyName: "contractor_advances_reverses_id_fkey"
             columns: ["reverses_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "contractor_advances"
             referencedColumns: ["id"]
           },

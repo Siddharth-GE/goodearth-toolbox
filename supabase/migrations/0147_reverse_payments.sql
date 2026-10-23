@@ -6,7 +6,8 @@
 -- admin (money, the founder's rule 2026-10-23). An advance is reversed only once nothing is left recovered from it.
 --
 -- A paid bill that falls below its total goes back to approved, and one whose money nets to nothing may be sent back,
--- so a bill paid in error can be put right. It still never deletes: its rows point at it.
+-- so a bill paid in error can be put right. It still never deletes: its rows point at it, and delete_recorded_bill
+-- says so. An advance reversed in full no longer holds its work order (labour_contracts_guard).
 
 -- ---------------------------------------------------------------------
 -- 1. The reversal columns
@@ -113,6 +114,15 @@ begin
   end if;
 
   new.amount := -v_amount;
+  -- Dated today in India and signed by whoever reverses, whatever an insert says.
+  if tg_table_name = 'advance_recoveries' then
+    new.recovered_on := (now() at time zone 'Asia/Kolkata')::date;
+  else
+    new.paid_on := (now() at time zone 'Asia/Kolkata')::date;
+  end if;
+  new.created_by := auth.uid();
+  new.updated_by := auth.uid();
+  new.note := null;
   return new;
 end $$;
 
@@ -328,6 +338,138 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 5b. 0106's delete_recorded_bill, carried forward whole: a bill sent
+--     back after a reversal keeps its money rows, so it says so
+-- ---------------------------------------------------------------------
+
+create or replace function delete_recorded_bill(p_bill_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status text;
+  v_created_by uuid;
+begin
+  if not has_app('/bills') then
+    raise exception 'Only the Bills tool can delete a bill';
+  end if;
+  select status, created_by into v_status, v_created_by from bills where id = p_bill_id for update;
+  if not found then
+    raise exception 'That bill no longer exists';
+  end if;
+  if v_status <> 'recorded' or not (is_admin() or v_created_by = auth.uid()) then
+    raise exception 'Only a recorded bill can be deleted, by whoever recorded it or an admin';
+  end if;
+  if exists (select 1 from bill_payments where bill_id = p_bill_id)
+     or exists (select 1 from advance_recoveries where bill_id = p_bill_id) then
+    raise exception 'Money was paid and reversed on this bill, so it stays on record — correct it and approve it again';
+  end if;
+
+  perform set_config('toolbox.labour_billing', 'on', true);
+  update labour_logs set bill_id = null where bill_id = p_bill_id;
+  perform set_config('toolbox.labour_billing', '', true);
+  delete from bill_lines where bill_id = p_bill_id;
+  delete from bills where id = p_bill_id;
+end $$;
+
+revoke execute on function delete_recorded_bill(uuid) from public, anon;
+grant execute on function delete_recorded_bill(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 5c. 0144's labour_contracts_guard, carried forward whole: an advance
+--     reversed in full no longer holds its work order
+-- ---------------------------------------------------------------------
+
+create or replace function labour_contracts_guard()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_cap numeric;
+  v_bills int;
+  v_advances int;
+  v_lines int;
+  v_what text[] := '{}';
+begin
+  if (new.wo_no, new.reference) is distinct from (old.wo_no, old.reference)
+     and old.reference is not null then
+    raise exception 'A work order''s number is permanent';
+  end if;
+
+  if new.status = old.status then
+    if old.status = 'approved'
+       and (new.vendor_id, new.project_id, new.plot_id, new.unit_id,
+            new.description, new.contract_value, new.terms)
+           is distinct from
+           (old.vendor_id, old.project_id, old.plot_id, old.unit_id,
+            old.description, old.contract_value, old.terms) then
+      raise exception 'An approved work order''s terms are permanent — deactivate it and make a new one';
+    end if;
+    if old.status = 'cancelled' and to_jsonb(new) - array['updated_at', 'updated_by']
+                                    is distinct from to_jsonb(old) - array['updated_at', 'updated_by'] then
+      raise exception 'A cancelled work order can no longer be changed';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'pending_approval' and new.status = 'approved' then
+    if not (is_admin() or can_approve_bills(auth.uid())) then
+      raise exception 'Only a named bill approver or an admin can approve a work order';
+    end if;
+    if not is_admin() then
+      v_cap := bill_approval_cap(auth.uid());
+      if v_cap is not null and new.contract_value > v_cap then
+        raise exception 'This work order is above your approval limit of %', v_cap;
+      end if;
+    end if;
+    if new.approved_by is null or new.approved_at is null then
+      raise exception 'Approving must record who approved and when';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'approved' and new.status = 'cancelled' then
+    if not (is_admin() or can_approve_bills(auth.uid())) then
+      raise exception 'Only a named bill approver or an admin can cancel a work order';
+    end if;
+    if length(trim(coalesce(new.cancel_reason, ''))) = 0 then
+      raise exception 'Say why this work order is cancelled';
+    end if;
+    if (to_jsonb(new) - array['status', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at', 'updated_by'])
+       is distinct from
+       (to_jsonb(old) - array['status', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at', 'updated_by']) then
+      raise exception 'Cancelling a work order changes nothing else on it';
+    end if;
+    -- Every one of these is /bills on SELECT, the grant the update policy already asked for.
+    select count(*) into v_bills from bills where labour_contract_id = new.id;
+    select count(*) into v_advances from contractor_advances a
+     where a.labour_contract_id = new.id and a.reverses_id is null
+       and not exists (select 1 from contractor_advances r where r.reverses_id = a.id);
+    select count(*) into v_lines from cash_request_items where labour_contract_id = new.id;
+    if v_bills > 0 then
+      v_what := v_what || case when v_bills = 1 then 'a bill' else v_bills || ' bills' end;
+    end if;
+    if v_advances > 0 then
+      v_what := v_what || case when v_advances = 1 then 'an advance' else v_advances || ' advances' end;
+    end if;
+    if v_lines > 0 then
+      v_what := v_what || case when v_lines = 1 then 'a cash request line' else v_lines || ' cash request lines' end;
+    end if;
+    if cardinality(v_what) > 0 then
+      raise exception 'It has %, so it cannot be cancelled — switch it off instead', array_to_string(v_what, ', ');
+    end if;
+    new.cancelled_at := now();
+    new.cancelled_by := auth.uid();
+    new.cancel_reason := trim(new.cancel_reason);
+    return new;
+  end if;
+
+  raise exception 'Invalid work order status change: % -> %', old.status, new.status;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 6. The one door the screens use
 -- ---------------------------------------------------------------------
 -- Copies the original's keys so the insert can be written; the guard above re-reads and overwrites them, so a direct
@@ -413,6 +555,23 @@ begin
       raise exception '0147: bills_guard lost its % check', c;
     end if;
   end loop;
+  foreach c in array array['bill_approval_cap', 'can_approve_bills', 'contractor_advances', 'cash_request_items', 'reverses_id']
+  loop
+    if position(c in pg_get_functiondef('labour_contracts_guard()'::regprocedure)) = 0 then
+      raise exception '0147: labour_contracts_guard lost its % check', c;
+    end if;
+  end loop;
+  foreach c in array array['has_app', 'is_admin', 'labour_billing', 'bill_payments', 'advance_recoveries']
+  loop
+    if position(c in pg_get_functiondef('delete_recorded_bill(uuid)'::regprocedure)) = 0 then
+      raise exception '0147: delete_recorded_bill lost its % check', c;
+    end if;
+  end loop;
+  if not (select prosecdef from pg_proc where oid = 'delete_recorded_bill(uuid)'::regprocedure)
+     or has_function_privilege('anon', 'delete_recorded_bill(uuid)', 'execute') then
+    raise exception '0147: delete_recorded_bill must stay a definer, signed-in only';
+  end if;
+
   foreach c in array array['more than this bill has pending', 'same contractor', 'still to recover', 'was reversed']
   loop
     if position(c in pg_get_functiondef('bill_settlement_guard()'::regprocedure)) = 0 then
@@ -421,7 +580,7 @@ begin
   end loop;
 
   foreach c in array array['money_reversal_guard()', 'bill_settlement_guard()', 'bill_settlement_marks_paid()',
-                           'bills_guard()', 'reverse_bill_money(text, uuid, text)']
+                           'bills_guard()', 'labour_contracts_guard()', 'reverse_bill_money(text, uuid, text)']
   loop
     if (select prosecdef from pg_proc where oid = c::regprocedure) then
       raise exception '0147: % must run as the caller', c;
