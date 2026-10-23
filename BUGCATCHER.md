@@ -167,6 +167,13 @@ Dexter's viewer sandboxed HTML and SVG and nothing else, so an `.xml` (or `.xhtm
 **Rule.** A policy asks `is_admin()` or `has_app()`, never `profiles.role`. When a helper learns a new condition, search every policy that bypasses it.
 **Check.** Live: `select tablename, policyname from pg_policies where qual ilike '%role%' or with_check ilike '%role%'`, which should list nothing (Phase 3's `db:check-policies` will run it on every pull request). Run a trial as an admin with an unverified `session_id`, as `scripts/trials/user-apps-is-admin.sql` does.
 
+### 23. Every read got slower one row at a time
+
+After `0129` put `session_is_verified()` on every read policy, each list paid for the check once per row: the works list (714 rows) spent 135 ms in it, and a Supervisors page, reading a dozen lists, took two seconds where Inventory took half of one. Tests, build and trials pass whatever a policy costs; only timing a page shows it.
+
+**Rule.** A policy calls its checks wrapped — `(select has_app('/x'))`, `(select session_is_verified())`, `(select auth.uid())` — so each runs once per query (`0139`). A call that takes a column stays bare: it has to.
+**Check.** `db:check-policies` refuses a bare call. A page that feels slow: time its reads as the probe, then compare a table's read with the policy wrapped inside a rolled-back trial.
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.

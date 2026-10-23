@@ -7,6 +7,7 @@
  *   - row-level security on every table in public;
  *   - no policy reads profiles.role itself (is_admin() carries the second factor, BUGCATCHER #22);
  *   - one permissive SELECT policy per table (CLAUDE.md: widen the qual, never add a second);
+ *   - every check a policy calls is wrapped as (select …), so it runs once per query, not per row (0139);
  *   - every security-definer function sets search_path, and, if a client role can call it,
  *     checks a grant or is a trigger or a named exception below;
  *   - nothing in public is executable by anon (an extension's own functions aside).
@@ -54,6 +55,17 @@ async function main() {
      where schemaname = 'public' and permissive = 'PERMISSIVE' and cmd in ('SELECT', 'ALL')
      group by tablename having count(*) > 1`)) {
     problems.push(`${row.tablename}: ${row.n} permissive SELECT policies; widen one qual instead`);
+  }
+
+  // A bare check runs once per row read; (select check(...)) runs once per query (0139).
+  for (const row of await ask(`
+    select tablename, policyname from pg_policies
+     where schemaname = 'public'
+       and coalesce(qual, '') || ' ' || coalesce(with_check, '')
+           ~ '(?<!SELECT )((has_app|is_lead)\\(''[^'']*''::text\\)|session_is_verified\\(\\)|is_admin\\(\\)|auth\\.uid\\(\\))'`)) {
+    problems.push(
+      `${row.tablename}: policy "${row.policyname}" calls a check once per row; wrap it as (select …)`,
+    );
   }
 
   const definers = await ask(`
