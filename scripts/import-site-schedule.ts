@@ -1,14 +1,18 @@
 /**
  * Loads the site team's schedule workbook into Supervisors' schedule (plan.md, piece 2).
  *
- *   npx tsx scripts/import-site-schedule.ts --project <ref> --xlsx "C:/Users/goodearth/Downloads/sched.xlsx"            # dry run
- *   npx tsx scripts/import-site-schedule.ts --project <ref> --xlsx "C:/Users/goodearth/Downloads/sched.xlsx" --commit
+ *   npx tsx scripts/import-site-schedule.ts --project <ref> --plots-in "Saarang - Villas" --xlsx "C:/Users/goodearth/Downloads/sched.xlsx"
+ *   … the same with --commit
+ *
+ * --plots-in names the project whose plots the sheets are: plot codes repeat across projects (Baveli has a P2 too).
  *
  * The workbook is .xlsb; save it once as .xlsx (the reader is xlsx-only).
  *  - The sequence: each stage's typical days rolled up from the plots' planned dates, and each curing as the wait after the
- *    stage it cures. A stage the workbook has no line for gets 1 day, marked to fill in. Days someone already typed are kept.
+ *    stage it cures, set only while the stage after it has no typed days. A stage the workbook has no line for gets 1 day,
+ *    marked to fill in. Days someone already typed are kept.
  *  - Each plot sheet's villa: its start date and its supervisor (when one active person's name starts with the sheet's), only
- *    where none is set; its stages done or working from the actual dates up to today, only on a stage nothing has happened on.
+ *    where none is set; its stages done or working from the actual dates up to today, only on a stage nothing has happened on
+ *    and not marked not needed.
  * A re-run finds nothing to do. --commit backs the three tables up first.
  */
 import { todayInIndia } from "../lib/format";
@@ -27,6 +31,10 @@ const commit = isCommit(argv);
 const xlsxAt = argv.indexOf("--xlsx");
 const xlsx = xlsxAt === -1 ? undefined : argv[xlsxAt + 1];
 if (!xlsx) throw new Error('Name the workbook: --xlsx "<path>.xlsx"');
+const projectAt = argv.indexOf("--plots-in");
+const plotsIn = projectAt === -1 ? undefined : argv[projectAt + 1];
+if (!plotsIn)
+  throw new Error('Name the project the plot sheets belong to: --plots-in "Saarang - Villas"');
 
 const STAND_IN_DAYS = 1;
 
@@ -52,15 +60,21 @@ void (async () => {
       `select s.work_group_id, g.code, s.follows_group_id, s.link, s.wait_days, s.typical_days, s.days_to_confirm
          from site_sequence s join work_groups g on g.id = s.work_group_id order by s.position`,
     ),
-    sql<{ id: string; code: string }>(ref, `select id, code from plots`),
+    sql<{ id: string; code: string | null }>(
+      ref,
+      `select p.id, p.code from plots p join projects pr on pr.id = p.project_id where pr.name = ${literal(plotsIn)}`,
+    ),
     sql<{ plot_id: string; start_on: string | null; supervisor_id: string | null }>(
       ref,
       `select plot_id, start_on, supervisor_id from site_villas`,
     ),
-    sql<{ plot_id: string; work_group_id: string; status: string; started_on: string | null }>(
-      ref,
-      `select plot_id, work_group_id, status, started_on from site_stages`,
-    ),
+    sql<{
+      plot_id: string;
+      work_group_id: string;
+      status: string;
+      started_on: string | null;
+      not_needed: boolean;
+    }>(ref, `select plot_id, work_group_id, status, started_on, not_needed from site_stages`),
     sql<{ id: string; full_name: string | null }>(
       ref,
       `select id, full_name from profiles where is_active`,
@@ -74,6 +88,8 @@ void (async () => {
 
   console.log(`Database : ${ref}`);
   console.log(`Workbook : ${xlsx} (${plots.length} plots)`);
+  console.log(`Plots in : ${plotsIn} (${plotRows.length} plots)`);
+  if (plotRows.length === 0) throw new Error(`No project called "${plotsIn}" with plots.`);
   if (days.unknown.length) {
     throw new Error(
       `The workbook has activities the mapping does not know — add them to ACTIVITY_TARGET:\n  ${days.unknown.join("\n  ")}`,
@@ -106,7 +122,9 @@ void (async () => {
     }
     const cured = row.follows_group_id ? codeOfGroup.get(row.follows_group_id) : undefined;
     const wait = cured && row.link === "after" ? days.curingDays.get(cured) : undefined;
-    if (wait !== undefined && wait !== row.wait_days) {
+    // Once the stage after it has typed days, the sequence is the site team's: a re-run leaves its wait alone.
+    const settled = row.typical_days !== null && !row.days_to_confirm;
+    if (wait !== undefined && wait !== row.wait_days && !settled) {
       waitUpdates.push({ work_group_id: row.work_group_id, wait_days: wait });
     }
   }
@@ -123,7 +141,9 @@ void (async () => {
   }
 
   // 2. Each plot's villa and stages.
-  const plotOfCode = new Map(plotRows.map((plot) => [plot.code.toUpperCase(), plot.id]));
+  const plotOfCode = new Map(
+    plotRows.flatMap((plot) => (plot.code ? [[plot.code.toUpperCase(), plot.id] as const] : [])),
+  );
   const villaOf = new Map(villas.map((villa) => [villa.plot_id, villa]));
   const stageOf = new Map(
     stages.map((stage) => [`${stage.plot_id}|${stage.work_group_id}`, stage]),
@@ -147,7 +167,10 @@ void (async () => {
     const villa = villaOf.get(plotId);
     const name = plot.supervisor?.toLowerCase();
     const matches = name
-      ? people.filter((person) => person.full_name?.toLowerCase().split(/\s+/)[0] === name)
+      ? people.filter((person) => {
+          const full = person.full_name?.toLowerCase() ?? "";
+          return full === name || full.startsWith(`${name} `);
+        })
       : [];
     const supervisorId = !villa?.supervisor_id && matches.length === 1 ? matches[0].id : null;
     const startOn = !villa?.start_on ? progress.startOn : null;
@@ -164,10 +187,15 @@ void (async () => {
     }
     const written: string[] = [];
     const kept: string[] = [];
+    const leftOff: string[] = [];
     for (const stage of progress.stages) {
       const groupId = groupOfCode.get(stage.code);
       if (!groupId) continue;
       const existing = stageOf.get(`${plotId}|${groupId}`);
+      if (existing?.not_needed) {
+        leftOff.push(stage.code);
+        continue;
+      }
       if (existing && (existing.status !== "not_started" || existing.started_on)) {
         kept.push(stage.code);
         continue;
@@ -184,6 +212,7 @@ void (async () => {
     console.log(`\n${plot.sheet} → ${plot.plotCode}: ${notes.join(", ") || "villa already set"}`);
     if (written.length) console.log(`  stages: ${written.join(", ")}`);
     if (kept.length) console.log(`  already recorded, kept: ${kept.join(", ")}`);
+    if (leftOff.length) console.log(`  marked not needed, skipped: ${leftOff.join(", ")}`);
   }
 
   const nothing =
@@ -227,7 +256,7 @@ void (async () => {
          as w(plot_id uuid, work_group_id uuid, status text, started_on date, finished_on date)
      on conflict (plot_id, work_group_id) do update
        set status = excluded.status, started_on = excluded.started_on, finished_on = excluded.finished_on
-       where site_stages.status = 'not_started' and site_stages.started_on is null;
+       where site_stages.status = 'not_started' and site_stages.started_on is null and not site_stages.not_needed;
      commit;`,
   );
   console.log(

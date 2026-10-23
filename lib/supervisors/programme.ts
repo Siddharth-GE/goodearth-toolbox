@@ -112,18 +112,26 @@ export function buildProgramme(input: {
 
 /**
  * A villa that runs a stage in its own place: each such stage moves to just after the stage it follows here, so the list reads
- * in this villa's order. A stage following one the villa does not have stays where the sequence put it.
+ * in this villa's order. A stage following one the villa does not have stays where the sequence put it. Moves repeat until
+ * nothing moves, so a chain (A after B, B after C) lands the same whatever order the choices come in.
  */
 export function placeVillaOrder<T extends { id: string }>(
   stages: T[],
   follows: Map<string, string>,
 ): T[] {
   const ordered = [...stages];
-  for (const [groupId, followsGroupId] of follows) {
-    const from = ordered.findIndex((stage) => stage.id === groupId);
-    if (from < 0 || !ordered.some((stage) => stage.id === followsGroupId)) continue;
-    const [moved] = ordered.splice(from, 1);
-    ordered.splice(ordered.findIndex((stage) => stage.id === followsGroupId) + 1, 0, moved);
+  // A circle never settles; the actions refuse one, and this stops anyway.
+  for (let pass = 0; pass <= follows.size; pass++) {
+    let moved = false;
+    for (const [groupId, followsGroupId] of follows) {
+      const from = ordered.findIndex((stage) => stage.id === groupId);
+      const after = ordered.findIndex((stage) => stage.id === followsGroupId);
+      if (from < 0 || after < 0 || from === after + 1) continue;
+      const [stage] = ordered.splice(from, 1);
+      ordered.splice(ordered.findIndex((entry) => entry.id === followsGroupId) + 1, 0, stage);
+      moved = true;
+    }
+    if (!moved) break;
   }
   return ordered;
 }

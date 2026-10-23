@@ -156,3 +156,30 @@ test("every mapped stage is a real stage code", () => {
     assert.match(code, /^(FD|SS|PF|F|MEP|CAR|LP)\.\d{2}$/);
   }
 });
+
+test("plotProgress never calls a stage done while one of its activities has no actual end", () => {
+  const plot: WorkbookPlot = {
+    sheet: "P-2",
+    plotCode: "P2",
+    supervisor: null,
+    activities: [
+      activity("6|block work upto sill level(gf)", "2026-07-15", "2026-07-21", [
+        "2026-07-15",
+        "2026-07-21",
+      ]),
+      {
+        ...activity("8|block work upto lintel level", "2026-07-25", "2026-07-31"),
+        actualStart: "2026-07-25",
+      },
+      // A row with no dates at all is a work this plot does not have.
+      activity("|random rubble", "", ""),
+    ].map((row) => ({
+      ...row,
+      plannedStart: row.plannedStart || null,
+      plannedEnd: row.plannedEnd || null,
+    })),
+  };
+  assert.deepEqual(plotProgress(plot, "2026-10-23").stages, [
+    { code: "SS.01", status: "working", startedOn: "2026-07-15", finishedOn: null },
+  ]);
+});

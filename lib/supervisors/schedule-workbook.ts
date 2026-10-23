@@ -219,8 +219,8 @@ export type PlotProgress = {
 
 /**
  * A plot's real progress. The workbook's actual dates run on into the future as a forecast, so only what has happened counts: a
- * stage is done when every one of its activities has an actual end before today, working when one has an actual start on or
- * before today.
+ * stage is working once one of its activities has an actual start on or before today, and done only when every activity it has
+ * (one with any date at all) has an actual end before today — a blank end is not finished.
  */
 export function plotProgress(plot: WorkbookPlot, today: string): PlotProgress {
   const planned = plot.activities
@@ -234,20 +234,24 @@ export function plotProgress(plot: WorkbookPlot, today: string): PlotProgress {
   }
   const stages: PlotStage[] = [];
   for (const [code, activities] of byStage) {
-    const dated = activities.filter((activity) => activity.actualStart && activity.actualEnd);
-    if (dated.length === 0) continue;
-    const started = dated.filter((activity) => activity.actualStart! <= today);
+    // Rows with no date at all (Random rubble on a footing villa) are works this plot does not have.
+    const real = activities.filter(
+      (activity) =>
+        activity.plannedStart || activity.plannedEnd || activity.actualStart || activity.actualEnd,
+    );
+    const started = real.flatMap((activity) =>
+      activity.actualStart && activity.actualStart <= today ? [activity.actualStart] : [],
+    );
     if (started.length === 0) continue;
-    const startedOn = started
-      .map((activity) => activity.actualStart!)
-      .reduce((a, b) => (a < b ? a : b));
-    const done = dated.every((activity) => activity.actualEnd! < today);
+    const done = real.every(
+      (activity) => activity.actualEnd !== null && activity.actualEnd < today,
+    );
     stages.push({
       code,
       status: done ? "done" : "working",
-      startedOn,
+      startedOn: started.reduce((a, b) => (a < b ? a : b)),
       finishedOn: done
-        ? dated.map((activity) => activity.actualEnd!).reduce((a, b) => (a > b ? a : b))
+        ? real.map((activity) => activity.actualEnd!).reduce((a, b) => (a > b ? a : b))
         : null,
     });
   }

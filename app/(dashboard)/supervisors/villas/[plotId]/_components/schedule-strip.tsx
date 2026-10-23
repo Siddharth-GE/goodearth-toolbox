@@ -61,7 +61,6 @@ export function ScheduleStrip({ stages, today }: { stages: StageView[]; today: s
 
   const top = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  const syncing = useRef(false);
 
   const dates = stages.flatMap((stage) =>
     [forecastBar(stage), baselineBar(stage)].flatMap((bar) => (bar ? [bar.start, bar.finish] : [])),
@@ -83,15 +82,10 @@ export function ScheduleStrip({ stages, today }: { stages: StageView[]; today: s
 
   if (dates.length === 0) return null;
 
-  // Setting one bar's scroll fires its own scroll event; the flag stops that echo bouncing back.
+  // Setting one bar's scroll fires its own scroll event, which then finds the two already level and stops.
   const follow = (source: HTMLDivElement | null, target: HTMLDivElement | null) => {
     if (!source || !target) return;
-    if (syncing.current) {
-      syncing.current = false;
-      return;
-    }
-    if (target.scrollLeft === source.scrollLeft) return;
-    syncing.current = true;
+    if (Math.abs(target.scrollLeft - source.scrollLeft) < 1) return;
     target.scrollLeft = source.scrollLeft;
   };
 

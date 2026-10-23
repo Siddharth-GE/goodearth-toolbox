@@ -80,6 +80,8 @@ export type StageView = ProgrammeStage & {
     own: VillaFollows | null;
     sequenceLabel: string | null;
     sequenceLink: SequenceLink;
+    /** A stage the sequence does not name follows the stage before it in the list. */
+    inSequence: boolean;
   };
 };
 
@@ -341,10 +343,19 @@ export function planVilla(
     new Map([...villaFollows].map(([groupId, own]) => [groupId, own.followsGroupId])),
   );
   const groupById = new Map(shared.groupInfos.map((group) => [group.id, group]));
-  const leftOff = shared.sequencePositions.flatMap((entry) => {
-    const group = notNeeded.has(entry.groupId) ? groupById.get(entry.groupId) : undefined;
-    return group ? [group] : [];
-  });
+  const positionOf = new Map(
+    shared.sequencePositions.map((entry) => [entry.groupId, entry.position]),
+  );
+  const leftOff = [...notNeeded]
+    .flatMap((id) => {
+      const group = groupById.get(id);
+      return group ? [group] : [];
+    })
+    .sort(
+      (a, b) =>
+        (positionOf.get(a.id) ?? Infinity) - (positionOf.get(b.id) ?? Infinity) ||
+        a.order - b.order,
+    );
 
   const villaSqft = unitId ? (shared.sizeByUnit.get(unitId) ?? null) : null;
   const daysByGroup = new Map(
@@ -554,6 +565,7 @@ export async function getVillaProgramme(input: {
         own: base.villaFollows.get(stage.id) ?? null,
         sequenceLabel: stageLabel(sequenceRule.get(stage.id)?.followsGroupId ?? null),
         sequenceLink: sequenceRule.get(stage.id)?.link ?? "after",
+        inSequence: sequenceRule.has(stage.id),
       },
     };
   });

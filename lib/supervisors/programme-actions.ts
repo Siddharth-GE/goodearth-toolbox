@@ -61,6 +61,12 @@ async function writeStage(
   }
   if (error) {
     console.error(`${what} failed:`, error);
+    if (error.code === "23514" && error.message.includes("not_needed")) {
+      return { error: "This stage has begun, so it is needed — set it back to Not started first." };
+    }
+    if (error.code === "23514" && error.message.includes("follows")) {
+      return { error: "Pick the stage it follows, and after or alongside — never itself." };
+    }
     if (error.code === "23514") {
       return {
         error:

@@ -58,6 +58,12 @@ export async function updateSequenceStage(input: {
     if (followedError) return saveFailed("updateSequenceStage read", followedError);
     if (!followed) return { error: "That stage was taken out of the sequence — pick another." };
   }
+  const { data: stored, error: storedError } = await supabase
+    .from("site_sequence")
+    .select("typical_days")
+    .eq("work_group_id", input.groupId)
+    .maybeSingle();
+  if (storedError) return saveFailed("updateSequenceStage read", storedError);
   const { data, error } = await supabase
     .from("site_sequence")
     .update({
@@ -65,7 +71,7 @@ export async function updateSequenceStage(input: {
       link: input.link,
       wait_days: wait ?? 0,
       typical_days: typical,
-      days_to_confirm: false,
+      ...(stored && stored.typical_days !== typical ? { days_to_confirm: false } : {}),
       updated_by: user.id,
     })
     .eq("work_group_id", input.groupId)

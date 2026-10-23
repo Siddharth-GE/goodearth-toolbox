@@ -32,15 +32,30 @@ export type SequenceRule = {
 
 export type VillaFollows = { followsGroupId: string; link: SequenceLink };
 
-/** The sequence as this villa runs it: a stage it follows differently keeps its wait and typical days, follows its own. */
+/**
+ * The sequence as this villa runs it: a stage it follows differently keeps its wait and typical days, follows its own; a stage
+ * the sequence does not name gets a rule of its own, with no wait.
+ */
 export function villaRules(
   rules: SequenceRule[],
   follows: Map<string, VillaFollows>,
 ): SequenceRule[] {
-  return rules.map((rule) => {
-    const own = follows.get(rule.groupId);
-    return own ? { ...rule, followsGroupId: own.followsGroupId, link: own.link } : rule;
-  });
+  const named = new Set(rules.map((rule) => rule.groupId));
+  return [
+    ...rules.map((rule) => {
+      const own = follows.get(rule.groupId);
+      return own ? { ...rule, followsGroupId: own.followsGroupId, link: own.link } : rule;
+    }),
+    ...[...follows]
+      .filter(([groupId]) => !named.has(groupId))
+      .map(([groupId, own]) => ({
+        groupId,
+        followsGroupId: own.followsGroupId,
+        link: own.link,
+        waitDays: 0,
+        typicalDays: null,
+      })),
+  ];
 }
 
 /** Whether a stage following another would end up waiting on itself, through the rules as they stand. */

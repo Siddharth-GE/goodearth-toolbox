@@ -119,6 +119,7 @@ function DaysCell({ row, field }: { row: SequenceRow; field: "typical" | "wait" 
     if (value.trim() === held) return;
     void run(() => setSequenceDays({ groupId: row.groupId, field, value })).then((result) => {
       if (result?.error) setValue(held);
+      else if (field === "wait" && !value.trim()) setValue("0");
     });
   };
   const amber = field === "typical" && (row.daysToConfirm || !row.typicalDays);
@@ -129,7 +130,6 @@ function DaysCell({ row, field }: { row: SequenceRow; field: "typical" | "wait" 
         inputMode="numeric"
         min={field === "typical" ? 1 : 0}
         aria-label={`${row.code} ${field === "typical" ? "typical days" : "wait days"}`}
-        title={error}
         value={value}
         disabled={pending}
         placeholder="—"
@@ -140,6 +140,7 @@ function DaysCell({ row, field }: { row: SequenceRow; field: "typical" | "wait" 
         }}
         className={cn("h-10 px-2 text-center", amber && "border-warning text-warning")}
       />
+      {error ? <p className="text-danger mt-1 text-[11px] leading-tight">{error}</p> : null}
     </div>
   );
 }

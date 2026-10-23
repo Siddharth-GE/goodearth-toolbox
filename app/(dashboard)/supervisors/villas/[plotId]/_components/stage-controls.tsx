@@ -75,6 +75,7 @@ export type StageControlData = {
     own: { followsGroupId: string; link: SequenceLink } | null;
     sequenceLabel: string | null;
     sequenceLink: SequenceLink;
+    inSequence: boolean;
   };
 };
 
@@ -507,16 +508,18 @@ function StageVillaOrder({
   otherStages: { id: string; label: string }[];
   onLeftOff: () => void;
 }) {
-  const { own, sequenceLabel, sequenceLink } = stage.follows;
+  const { own, sequenceLabel, sequenceLink, inSequence } = stage.follows;
   const [follows, setFollows] = useState(own?.followsGroupId ?? "");
   const [link, setLink] = useState<SequenceLink>(own?.link ?? "after");
   const { pending, error, run } = useActionRunner();
   const [saved, setSaved] = useState(false);
   const unchanged =
     follows === (own?.followsGroupId ?? "") && (!follows || link === (own?.link ?? "after"));
-  const sequenceSays = sequenceLabel
-    ? `As the sequence: ${sequenceLink === "alongside" ? "alongside" : "after"} ${sequenceLabel.split(" ")[0]}`
-    : "As the sequence: first";
+  const sequenceSays = !inSequence
+    ? "As the list: after the stage before it"
+    : sequenceLabel
+      ? `As the sequence: ${sequenceLink === "alongside" ? "alongside" : "after"} ${sequenceLabel.split(" ")[0]}`
+      : "As the sequence: first";
 
   return (
     <div className="border-border space-y-3 border-t pt-4">

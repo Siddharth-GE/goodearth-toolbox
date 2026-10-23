@@ -271,3 +271,23 @@ test("placeVillaOrder moves a stage to just after the one it follows on this vil
     ["A", "B", "C", "D"],
   );
 });
+
+test("placeVillaOrder settles a chain whatever order the choices come in", () => {
+  const stages = ["A", "B", "C", "D"].map((id) => ({ id }));
+  const ids = (follows: [string, string][]) =>
+    placeVillaOrder(stages, new Map(follows)).map((stage) => stage.id);
+  assert.deepEqual(
+    ids([
+      ["A", "B"],
+      ["B", "C"],
+    ]),
+    ["C", "B", "A", "D"],
+  );
+  assert.deepEqual(
+    ids([
+      ["B", "C"],
+      ["A", "B"],
+    ]),
+    ["C", "B", "A", "D"],
+  );
+});
