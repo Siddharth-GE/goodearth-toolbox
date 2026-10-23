@@ -88,6 +88,36 @@ export function lineLeftToPay(line: CashRequestLine): number {
   return Math.max(0, roundPaise((line.released ?? 0) - line.paid));
 }
 
+export type MoneyKind = "payment" | "advance" | "recovery";
+
+export const MONEY_KIND_LABEL: Record<
+  MoneyKind,
+  { entry: string; reversal: string; noun: string }
+> = {
+  payment: { entry: "Payment", reversal: "Payment reversed", noun: "payment" },
+  advance: { entry: "Advance", reversal: "Advance reversed", noun: "advance" },
+  recovery: { entry: "Recovered", reversal: "Recovery reversed", noun: "recovery" },
+};
+
+/**
+ * Money is reversed, never deleted (0147): once, never a reversal itself, by a bill approver or an admin; an advance
+ * only once nothing is left recovered from it. `recovered` is what is recovered from an advance, net of reversals.
+ */
+export function moneyReversal(
+  entry: { kind: MoneyKind; reversal: boolean; reversed: boolean; recovered?: number },
+  decider: { isAdmin: boolean; isApprover: boolean },
+): { kind: "cancel" } | { kind: "blocked"; why: string } | null {
+  if (entry.reversal || entry.reversed || !(decider.isAdmin || decider.isApprover)) return null;
+  const recovered = entry.recovered ?? 0;
+  if (entry.kind === "advance" && recovered > 0.005) {
+    return {
+      kind: "blocked",
+      why: `${formatMoney(recovered, { paise: true })} of it has been recovered from bills — reverse those recoveries first.`,
+    };
+  }
+  return { kind: "cancel" };
+}
+
 /** The settlement guard's refusals, said first. `pending` is what the bill still has to settle; `cap` what is left of the released line it is paid from. */
 export function paymentProblem(input: {
   amount: number;

@@ -1,9 +1,13 @@
 import { Heading } from "@/components/ui/heading";
+import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { ChargesBox } from "@/components/ui/charges-box";
 import { PageTitle } from "@/components/ui/page-title";
+import { MONEY_KIND_LABEL, moneyReversal } from "@/lib/bills/ledger";
 import { updateBillCharges } from "@/lib/bills/line-actions";
+import { reverseBillMoney } from "@/lib/bills/payment-actions";
 import {
   countLabourEntriesOnBill,
   getBillLines,
@@ -238,6 +242,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                   <TableHeaderCell>Reference</TableHeaderCell>
                   <TableHeaderCell>By</TableHeaderCell>
                   <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                  <TableHeaderCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -245,13 +250,33 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                   <TableRow key={event.id}>
                     <TableCell className="whitespace-nowrap">{formatDate(event.on)}</TableCell>
                     <TableCell>
-                      {event.kind === "payment" ? "Payment" : "Advance recovered"}
-                      {event.note && <div className="text-muted text-xs">{event.note}</div>}
+                      {event.reversal
+                        ? MONEY_KIND_LABEL[event.kind].reversal
+                        : event.kind === "payment"
+                          ? "Payment"
+                          : "Advance recovered"}
+                      {event.reversed && (
+                        <Badge variant="neutral" className="ml-2">
+                          Reversed
+                        </Badge>
+                      )}
+                      {(event.reason ?? event.note) && (
+                        <div className="text-muted text-xs">{event.reason ?? event.note}</div>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{event.reference}</TableCell>
                     <TableCell className="text-muted">{event.by ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatMoney(event.amount, { paise: true })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DeleteOrCancel
+                        noun={MONEY_KIND_LABEL[event.kind].noun}
+                        verb="Reverse"
+                        removal={moneyReversal(event, actor)}
+                        cancelNote="The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone."
+                        onCancel={reverseBillMoney.bind(null, event.kind, event.id)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

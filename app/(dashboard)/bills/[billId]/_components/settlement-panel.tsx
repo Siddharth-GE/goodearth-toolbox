@@ -162,8 +162,8 @@ export function SettlementPanel({
         </div>
       </div>
       <p className="text-muted text-xs">
-        Money recorded here is permanent — a mistake is corrected with accounts and an admin, not
-        edited.
+        Money recorded here is permanent. A mistake is reversed by a bill approver, with a reason —
+        never edited.
       </p>
       <div className="flex flex-wrap items-center justify-end gap-3">
         {!error && problem && <p className="text-muted text-xs">{problem}</p>}

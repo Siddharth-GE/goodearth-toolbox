@@ -8,11 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { mondayOf } from "./ledger";
+import { mondayOf, type MoneyKind } from "./ledger";
 import { roundPaise } from "@/lib/line-money";
 
 // Rules live in the database: bill_settlement_guard (money only against an approved bill, never past its total; an advance, to a contractor or a supplier, only from the same vendor's bills and never past what is left), the paid-in-full trigger, and the cash-request guards.
-// Money is append-only. Each guard's refusal is written for a person, so it is passed on as is.
+// Money is append-only: a mistake is reversed (0147), never edited or deleted. Each guard's refusal is written for a person, so it is passed on as is.
 
 const done = (): ActionState => {
   revalidatePath("/bills", "layout");
@@ -116,6 +116,27 @@ export async function recordAdvance(input: {
     updated_by: user.id,
   });
   if (error) return refused("recordAdvance", error);
+  return done();
+}
+
+/** An equal entry the other way, with the reason; money_reversal_guard (0147) checks the approver and copies the rest. */
+export async function reverseBillMoney(
+  kind: MoneyKind,
+  id: string,
+  reason: string,
+): Promise<ActionState> {
+  await requireTool("/bills");
+  if (!reason.trim()) return { error: "Say why it is reversed." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reverse_bill_money", {
+    p_kind: kind,
+    p_id: id,
+    p_reason: reason.trim(),
+  });
+  if (error) {
+    if (error.code === "23505") return { error: "This was reversed already." };
+    return refused("reverseBillMoney", error);
+  }
   return done();
 }
 

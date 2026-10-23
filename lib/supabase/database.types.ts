@@ -24,6 +24,8 @@ export type Database = {
           id: string
           note: string | null
           recovered_on: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -36,6 +38,8 @@ export type Database = {
           id?: string
           note?: string | null
           recovered_on?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -48,6 +52,8 @@ export type Database = {
           id?: string
           note?: string | null
           recovered_on?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -85,6 +91,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_recoveries_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: true
+            referencedRelation: "advance_recoveries"
             referencedColumns: ["id"]
           },
           {
@@ -442,6 +455,8 @@ export type Database = {
           note: string | null
           paid_on: string
           payment_ref: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -455,6 +470,8 @@ export type Database = {
           note?: string | null
           paid_on?: string
           payment_ref: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -468,6 +485,8 @@ export type Database = {
           note?: string | null
           paid_on?: string
           payment_ref?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -505,6 +524,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_payments_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: true
+            referencedRelation: "bill_payments"
             referencedColumns: ["id"]
           },
           {
@@ -3442,6 +3468,8 @@ export type Database = {
           paid_on: string
           payment_ref: string
           project_id: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
           vendor_id: string
@@ -3457,6 +3485,8 @@ export type Database = {
           paid_on?: string
           payment_ref: string
           project_id: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id: string
@@ -3472,6 +3502,8 @@ export type Database = {
           paid_on?: string
           payment_ref?: string
           project_id?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string
@@ -3503,6 +3535,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contractor_advances_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: true
+            referencedRelation: "contractor_advances"
             referencedColumns: ["id"]
           },
           {
@@ -12559,6 +12598,10 @@ export type Database = {
         Returns: undefined
       }
       replay_pre_batch_history: { Args: never; Returns: number }
+      reverse_bill_money: {
+        Args: { p_id: string; p_kind: string; p_reason: string }
+        Returns: string
+      }
       seed_default_project_stages: {
         Args: { p_project_id: string }
         Returns: undefined

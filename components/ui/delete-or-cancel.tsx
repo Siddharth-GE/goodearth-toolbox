@@ -27,12 +27,22 @@ export function DeleteOrCancel({
   onCancel?: (reason: string) => Promise<ActionState>;
   deleteNote?: string;
   /** What going is called once something depends on it: an official estimate is withdrawn. */
-  /** "Delete" asks a reason too: a stock record that already moved stock (0146). */
-  verb?: "Cancel" | "Withdraw" | "Delete";
+  /** "Delete" asks a reason too: a stock record that already moved stock (0146). Money is reversed (0147). */
+  verb?: "Cancel" | "Withdraw" | "Delete" | "Reverse";
   cancelNote?: string;
 }) {
-  const doing = { Cancel: "Cancelling…", Withdraw: "Withdrawing…", Delete: "Deleting…" }[verb];
-  const done = { Cancel: "cancelled", Withdraw: "withdrawn", Delete: "deleted" }[verb];
+  const doing = {
+    Cancel: "Cancelling…",
+    Withdraw: "Withdrawing…",
+    Delete: "Deleting…",
+    Reverse: "Reversing…",
+  }[verb];
+  const done = {
+    Cancel: "cancelled",
+    Withdraw: "withdrawn",
+    Delete: "deleted",
+    Reverse: "reversed",
+  }[verb];
   if (!removal) return null;
 
   if (removal.kind === "delete" && onDelete) {
@@ -74,7 +84,7 @@ export function DeleteOrCancel({
     return (
       <div className="space-y-1 text-right">
         <Button variant="ghost" size="sm" disabled>
-          Cancel {noun}
+          {verb} {noun}
         </Button>
         <p className="text-muted max-w-xs text-xs">{removal.why}</p>
       </div>
