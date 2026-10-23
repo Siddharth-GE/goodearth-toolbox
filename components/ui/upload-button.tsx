@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import type { ActionState } from "@/lib/action-state";
 import { shrinkDocumentForUpload } from "@/lib/uploads/shrink-in-browser";
-import { Upload } from "lucide-react";
+import { Camera, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -17,11 +17,19 @@ export function UploadButton({
   fields = {},
   label = "Upload",
   size = "sm",
+  photo = false,
+  className,
+  onBusyChange,
 }: {
   action: (formData: FormData) => Promise<ActionState>;
   fields?: Record<string, string>;
   label?: string;
   size?: "sm" | "md";
+  /** A picture only: a phone offers its camera beside the gallery. */
+  photo?: boolean;
+  className?: string;
+  /** Told when an upload starts and ends, so a screen can hold still meanwhile. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -30,6 +38,7 @@ export function UploadButton({
 
   const choose = async (file: File) => {
     setBusy(true);
+    onBusyChange?.(true);
     setError(undefined);
     try {
       let prepared: { blob: Blob; name: string; type: string };
@@ -47,6 +56,7 @@ export function UploadButton({
       else router.refresh();
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -56,7 +66,7 @@ export function UploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/*"
+        accept={photo ? "image/*" : "application/pdf,image/*"}
         className="sr-only"
         tabIndex={-1}
         onChange={(event) => {
@@ -69,8 +79,13 @@ export function UploadButton({
         size={size}
         disabled={busy}
         onClick={() => inputRef.current?.click()}
+        className={className}
       >
-        <Upload className="size-4" aria-hidden />
+        {photo ? (
+          <Camera className="size-4" aria-hidden />
+        ) : (
+          <Upload className="size-4" aria-hidden />
+        )}
         {busy ? "Uploading…" : label}
       </Button>
       <FormMessage error={error} size="xs" />

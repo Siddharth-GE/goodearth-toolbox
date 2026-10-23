@@ -238,6 +238,90 @@ export async function uploadChecklistFile(
   return undefined;
 }
 
+/** A photo of one check, taken on site. A new one replaces it; the item guard refuses once the checklist is signed off. */
+export async function uploadChecklistItemPhoto(
+  itemId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const file = checkUpload(formData.get("file"));
+  if (typeof file === "string") return { error: file };
+  if (!file.type.startsWith("image/")) return { error: "Take a photo, or pick a picture." };
+
+  const supabase = await createClient();
+  const { data: item, error: readError } = await supabase
+    .from("site_checklist_items")
+    .select("checklist_id")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (readError) {
+    console.error("uploadChecklistItemPhoto read failed:", readError);
+    return { error: "Could not attach the photo. Try again." };
+  }
+  if (!item) return { error: "That check is no longer on the checklist." };
+
+  const path = `checklists/${item.checklist_id}/checks/${crypto.randomUUID()}.${extensionFor(file.type)}`;
+  const stored = await storeUpload(supabase, BUCKET, path, file);
+  if (stored) return { error: stored };
+
+  const { error } = await supabase
+    .from("site_checklist_items")
+    .update({ photo_path: path, updated_by: user.id })
+    .eq("id", itemId);
+  if (error) {
+    console.error("uploadChecklistItemPhoto row write failed:", error);
+    return refused(error, "Could not attach the photo. Try again.");
+  }
+  refresh();
+  return undefined;
+}
+
+/** The stages a checklist inspects (0137): a working stage offers it, and Done asks once if it is unsigned. */
+export async function setTemplateStages(
+  templateId: string,
+  groupIds: string[],
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!templateId) return { error: "Which checklist?" };
+  const wanted = new Set(groupIds.filter(Boolean));
+  const supabase = await createClient();
+  const { data: links, error: readError } = await supabase
+    .from("checklist_template_groups")
+    .select("id, work_group_id")
+    .eq("template_id", templateId);
+  if (readError) {
+    console.error("setTemplateStages read failed:", readError);
+    return { error: "Could not save the stages. Try again." };
+  }
+  const have = new Set((links ?? []).map((link) => link.work_group_id));
+  const gone = (links ?? [])
+    .filter((link) => !wanted.has(link.work_group_id))
+    .map((link) => link.id);
+  const added = [...wanted].filter((id) => !have.has(id));
+  if (gone.length > 0) {
+    const { error } = await supabase.from("checklist_template_groups").delete().in("id", gone);
+    if (error) {
+      console.error("setTemplateStages delete failed:", error);
+      return { error: "Could not save the stages. Try again." };
+    }
+  }
+  if (added.length > 0) {
+    const { error } = await supabase.from("checklist_template_groups").insert(
+      added.map((workGroupId) => ({
+        template_id: templateId,
+        work_group_id: workGroupId,
+        created_by: user.id,
+      })),
+    );
+    if (error) {
+      console.error("setTemplateStages insert failed:", error);
+      return { error: "Could not save the stages. Try again." };
+    }
+  }
+  refresh();
+  return undefined;
+}
+
 // Templates: kept here by /supervisors, switched off rather than deleted. An item's wording is never rewritten, because
 // signed-off checklists point at it: a changed check is the old one switched off and a new one added.
 
