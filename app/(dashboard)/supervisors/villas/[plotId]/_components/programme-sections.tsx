@@ -4,6 +4,7 @@ import { HealthPill } from "@/components/ui/health-pill";
 import { Pill, type PillTone } from "@/components/ui/pill";
 import { StageRail, type RailFill } from "@/components/ui/stage-rail";
 import { formatDate, formatQuantity, formatShortDate } from "@/lib/format";
+import { describeSlip } from "@/lib/supervisors/schedule";
 import {
   HEALTH_TONE,
   STAGE_STATUS_LABEL,
@@ -63,7 +64,38 @@ export function controlData(plotId: string, stage: StageView): StageControlData 
       name: entry.templateName,
       signedOff: entry.checklist?.status === "signed_off",
     })),
+    plan: {
+      ownDays: stage.plan.ownDays,
+      pinnedStart: stage.plan.pinnedStart,
+      days: stage.forecast.days,
+      source: stage.forecast.source,
+      learnedFrom: stage.forecast.learnedFrom,
+      start: stage.forecast.start,
+      finish: stage.forecast.finish,
+      pinnedBehind: stage.forecast.pinnedBehind,
+    },
   };
+}
+
+/** A stage being worked: when it is due, or how far past it. */
+function dueLine(stage: StageView): string | null {
+  const { forecast } = stage;
+  if (forecast.overdueDays) {
+    return `${forecast.overdueDays} ${forecast.overdueDays === 1 ? "day" : "days"} past its finish`;
+  }
+  return forecast.finish ? `Due ${formatShortDate(forecast.finish)}` : null;
+}
+
+/** A stage coming up: its forecast dates and how long it takes. */
+function plannedLine(stage: StageView): string | null {
+  const { forecast } = stage;
+  if (!forecast.start) return null;
+  const length = forecast.days
+    ? `${forecast.days} ${forecast.days === 1 ? "day" : "days"}`
+    : "days not set";
+  return forecast.finish
+    ? `${formatShortDate(forecast.start)} – ${formatShortDate(forecast.finish)} · ${length}`
+    : `From ${formatShortDate(forecast.start)} · ${length}`;
 }
 
 function StatusPill({ stage }: { stage: StageView }) {
@@ -93,7 +125,7 @@ export function VillaHeader({
   programme: VillaProgramme;
   plotId: string;
 }) {
-  const { health } = programme;
+  const { health, schedule } = programme;
   const done = programme.stages.filter((stage) => stage.status === "done").length;
   return (
     <Card className="flex flex-wrap items-start gap-x-5 gap-y-3 p-5">
@@ -126,6 +158,16 @@ export function VillaHeader({
                 current: stage.status === "working" || stage.status === "waiting",
               }))}
             />
+            {schedule.handover ? (
+              <p className="text-foreground text-sm">
+                {`Handover forecast ${formatDate(schedule.handover)}`}
+                {schedule.slip !== null ? (
+                  <span className={schedule.slip > 0 ? "text-danger" : "text-muted"}>
+                    {` · ${describeSlip(schedule.slip)}`}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
             <p className="text-muted text-xs">
               {`${done} of ${programme.stages.length} stages done · `}
               {villa.estimate
@@ -232,6 +274,11 @@ export function NowCard({
       </div>
 
       {waitingLine(stage) ? <p className="text-warning text-sm">{waitingLine(stage)}</p> : null}
+      {dueLine(stage) ? (
+        <p className={cn("text-sm", stage.forecast.overdueDays ? "text-danger" : "text-muted")}>
+          {dueLine(stage)}
+        </p>
+      ) : null}
 
       {measured.length > 0 ? (
         <ul className="space-y-1 text-sm">
@@ -364,6 +411,12 @@ export function NextCard({
         <div className="min-w-0">
           <p className="text-muted font-mono text-xs">{stage.code}</p>
           <p className="text-foreground text-[17px] leading-snug font-semibold">{stage.name}</p>
+          {plannedLine(stage) ? (
+            <p className="text-muted mt-0.5 text-sm">{plannedLine(stage)}</p>
+          ) : null}
+          {stage.forecast.pinnedBehind ? (
+            <p className="text-warning mt-0.5 text-xs">Later than its pinned start</p>
+          ) : null}
         </div>
         <StatusPill stage={stage} />
       </div>
@@ -455,7 +508,9 @@ export function ProgrammeList({
             ? `${formatShortDate(record.startedOn)} – ${formatShortDate(record.finishedOn)}`
             : record?.startedOn
               ? `From ${formatShortDate(record.startedOn)}`
-              : null;
+              : stage.forecast.start
+                ? `Planned ${formatShortDate(stage.forecast.start)}`
+                : null;
         const checklist = stage.checklists.find((entry) => entry.checklist)?.checklist;
         return (
           <StageSheet

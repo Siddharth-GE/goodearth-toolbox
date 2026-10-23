@@ -25,6 +25,7 @@ import {
   restoreStage,
   setStageContractor,
   setStageDates,
+  setStagePlan,
   setStageStatus,
   setVillaSupervisor,
   type StageSnapshot,
@@ -36,6 +37,8 @@ import {
   type StageStatus,
   type WaitingOn,
 } from "@/lib/supervisors/programme";
+import type { DaysSource } from "@/lib/supervisors/schedule";
+import { formatShortDate } from "@/lib/format";
 import { useState, type ReactNode } from "react";
 
 /** What a status control needs to know about its stage, all plain data from the server. */
@@ -48,6 +51,17 @@ export type StageControlData = {
   contractorId: string | null;
   /** Checklists this stage should be signed off with, by name, and whether each is. */
   checklists: { name: string; signedOff: boolean }[];
+  /** The schedule: this villa's own days and pinned start, and the days and dates the forecast uses. */
+  plan: {
+    ownDays: number | null;
+    pinnedStart: string | null;
+    days: number | null;
+    source: DaysSource | null;
+    learnedFrom: number | null;
+    start: string | null;
+    finish: string | null;
+    pinnedBehind: boolean;
+  };
 };
 
 const MOVES: { value: StageStatus; label: string }[] = [
@@ -292,6 +306,12 @@ export function StageSheet({
               The first labour logged on this stage starts it by itself.
             </p>
           )}
+          {snapshot.status !== "done" ? (
+            <StagePlanFields
+              key={`${stage.plan.ownDays}|${stage.plan.pinnedStart}`}
+              stage={stage}
+            />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -351,6 +371,84 @@ function StageDates({ stage }: { stage: StageControlData }) {
         }
       >
         {pending ? "Saving…" : "Save the dates"}
+      </Button>
+    </div>
+  );
+}
+
+const SOURCE_LABEL: Record<DaysSource, string> = {
+  own: "set for this villa",
+  learned: "learned",
+  typical: "typical",
+};
+
+/** How long the stage takes on this villa, and a start fixed by hand. Blank goes back to the sequence's days and chain. */
+function StagePlanFields({ stage }: { stage: StageControlData }) {
+  const { plan } = stage;
+  const notStarted = !stage.snapshot.startedOn;
+  const [days, setDays] = useState(plan.ownDays ? String(plan.ownDays) : "");
+  const [pinned, setPinned] = useState(plan.pinnedStart ?? "");
+  const { pending, error, run } = useActionRunner();
+  const usedDays =
+    plan.days === null
+      ? "No days yet — set typical days under Sequence, or this villa's own here."
+      : `Using ${plan.days} ${plan.days === 1 ? "day" : "days"} (${SOURCE_LABEL[plan.source!]}${plan.source === "learned" && plan.learnedFrom ? ` from ${plan.learnedFrom} villas` : ""})${plan.start && plan.finish ? ` · ${formatShortDate(plan.start)} – ${formatShortDate(plan.finish)}` : ""}.`;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Schedule</p>
+      <p className="text-muted text-xs">{usedDays}</p>
+      {plan.pinnedBehind && plan.pinnedStart ? (
+        <p className="text-warning text-xs">
+          {`Pinned to start ${formatShortDate(plan.pinnedStart)}, but the stages before it run until ${formatShortDate(plan.start)}.`}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor={`days-${stage.groupId}`}>Days on this villa</Label>
+          <Input
+            id={`days-${stage.groupId}`}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={days}
+            placeholder={plan.days && plan.source !== "own" ? String(plan.days) : "Not set"}
+            onChange={(event) => setDays(event.target.value)}
+          />
+        </div>
+        {notStarted ? (
+          <div className="space-y-1.5">
+            <Label htmlFor={`pinned-${stage.groupId}`}>Not before</Label>
+            <Input
+              id={`pinned-${stage.groupId}`}
+              type="date"
+              value={pinned}
+              onChange={(event) => setPinned(event.target.value)}
+            />
+          </div>
+        ) : null}
+      </div>
+      <FormMessage error={error} />
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={
+          pending ||
+          (days === (plan.ownDays ? String(plan.ownDays) : "") &&
+            pinned === (plan.pinnedStart ?? ""))
+        }
+        onClick={() =>
+          run(() =>
+            setStagePlan({
+              plotId: stage.plotId,
+              groupId: stage.groupId,
+              days,
+              pinnedStart: pinned,
+            }),
+          )
+        }
+      >
+        {pending ? "Saving…" : "Save the schedule"}
       </Button>
     </div>
   );

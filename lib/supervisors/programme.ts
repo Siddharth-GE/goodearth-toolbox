@@ -140,13 +140,21 @@ export function dayOfStage(stage: { startedOn: string | null }, today: string): 
 export const HEALTH_RULES = { waitingDays: 3, idleDays: 5, deliveryDays: 2 } as const;
 
 export type HealthKind =
-  "waiting" | "idle" | "failed_check" | "delivery" | "on_track" | "not_started" | "finished";
+  | "waiting"
+  | "late"
+  | "idle"
+  | "failed_check"
+  | "delivery"
+  | "on_track"
+  | "not_started"
+  | "finished";
 
 export type Health = { kind: HealthKind; label: string; detail: string | null };
 
 /** The pill tones (components/ui/pill) a health reads in. */
 export const HEALTH_TONE: Record<HealthKind, "danger" | "warning" | "success" | "plain"> = {
   waiting: "danger",
+  late: "danger",
   idle: "warning",
   failed_check: "danger",
   delivery: "warning",
@@ -156,15 +164,16 @@ export const HEALTH_TONE: Record<HealthKind, "danger" | "warning" | "success" | 
 };
 
 /**
- * First match wins: waiting more than 3 days · no labour on a working stage for 5 days · an open
- * checklist with a failed check · a delivery unconfirmed for 2 days · on track. Past its planned
- * finish joins once the schedule exists (phase B).
+ * First match wins: waiting more than 3 days · past its planned finish · no labour on a working stage for
+ * 5 days · an open checklist with a failed check · a delivery unconfirmed for 2 days · on track.
  */
 export function villaHealth(input: {
   stages: ProgrammeStage[];
   /** The newest labour day per stage (group id → "YYYY-MM-DD"). */
   lastLabourByGroup: Map<string, string>;
   failedOpenChecklists: number;
+  /** The stage furthest past its planned finish (schedule.ts), or null. */
+  late?: { stage: ProgrammeStage; days: number } | null;
   /** The oldest unconfirmed delivery's date, or null. */
   oldestUnconfirmedDelivery: string | null;
   today: string;
@@ -186,6 +195,14 @@ export function villaHealth(input: {
       kind: "waiting",
       label: `Waiting ${waiting.days} days`,
       detail: `${label(waiting.stage)}${on ? ` · on ${WAITING_ON_LABEL[on].toLowerCase()}` : ""}`,
+    };
+  }
+
+  if (input.late) {
+    return {
+      kind: "late",
+      label: `${input.late.days} ${input.late.days === 1 ? "day" : "days"} past its finish`,
+      detail: label(input.late.stage),
     };
   }
 

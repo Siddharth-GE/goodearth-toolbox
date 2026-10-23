@@ -115,6 +115,14 @@ export function formatShortDate(value: string | Date | null | undefined): string
   return date.toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 }
 
+/** `Nov 2026` — a month mark on a date strip. */
+export function formatMonthMark(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(LOCALE, { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 /** `4:05 pm`, for where only the time of day matters. */
 export function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";

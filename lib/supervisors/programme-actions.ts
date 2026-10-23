@@ -7,6 +7,8 @@ import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isStageStatus, isWaitingOn, type StageStatus, type WaitingOn } from "./programme";
+import { getVillaForecast } from "./programme-queries";
+import { firstPlanBlocker } from "./schedule";
 
 /** Writes to Supervisors' own stage tables (0137). A stage row is made the first time anything is set on it; the database keeps the
  * dates in line with the status and writes the history. Every action revalidates the layout (the exact-path trap in CLAUDE.md). */
@@ -34,7 +36,7 @@ function refresh(plotId: string) {
 async function writeStage(
   plotId: string,
   groupId: string,
-  fields: Record<string, string | null>,
+  fields: Record<string, string | number | null>,
   what: string,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -213,33 +215,140 @@ export async function setStageContractor(input: {
   );
 }
 
-/** Who runs the villa — the board's Mine / Everyone. A filter, not a permission. */
-export async function setVillaSupervisor(input: {
+/** This villa's own days for a stage and a start fixed by hand; empty goes back to the learned or typical days, and the chain. */
+export async function setStagePlan(input: {
   plotId: string;
-  supervisorId: string;
+  groupId: string;
+  days: string;
+  pinnedStart: string;
 }): Promise<ActionState> {
+  const daysText = input.days.trim();
+  const days = daysText ? Number(daysText) : null;
+  if (days !== null && (!Number.isInteger(days) || days < 1 || days > 999)) {
+    return { error: "Days is a whole number, 1 or more." };
+  }
+  const pinnedStart = input.pinnedStart.trim();
+  if (pinnedStart && !DATE.test(pinnedStart)) return { error: "Pick the date from the calendar." };
+  return writeStage(
+    input.plotId,
+    input.groupId,
+    { days, pinned_start: pinnedStart || null },
+    "setStagePlan",
+  );
+}
+
+async function writeVilla(
+  plotId: string,
+  fields: Record<string, string | null>,
+  what: string,
+  failure: string,
+): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  if (!input.plotId) return { error: "Which villa?" };
+  if (!plotId) return { error: "Which villa?" };
   const supabase = await createClient();
-  const supervisorId = input.supervisorId || null;
   const updated = await supabase
     .from("site_villas")
-    .update({ supervisor_id: supervisorId, updated_by: user.id })
-    .eq("plot_id", input.plotId)
+    .update({ ...fields, updated_by: user.id })
+    .eq("plot_id", plotId)
     .select("id");
   let error = updated.error;
   if (!error && (updated.data ?? []).length === 0) {
     ({ error } = await supabase.from("site_villas").insert({
-      plot_id: input.plotId,
-      supervisor_id: supervisorId,
+      plot_id: plotId,
+      ...fields,
       created_by: user.id,
       updated_by: user.id,
     }));
   }
   if (error) {
-    console.error("setVillaSupervisor failed:", error);
-    return { error: "Could not save who runs this villa. Try again." };
+    console.error(`${what} failed:`, error);
+    return { error: failure };
   }
-  refresh(input.plotId);
+  refresh(plotId);
   return undefined;
+}
+
+/** Who runs the villa — the board's Mine / Everyone. A filter, not a permission. */
+export async function setVillaSupervisor(input: {
+  plotId: string;
+  supervisorId: string;
+}): Promise<ActionState> {
+  return writeVilla(
+    input.plotId,
+    { supervisor_id: input.supervisorId || null },
+    "setVillaSupervisor",
+    "Could not save who runs this villa. Try again.",
+  );
+}
+
+/** The one typed date of the schedule: the day the villa's first stage starts. */
+export async function setVillaStart(input: {
+  plotId: string;
+  startOn: string;
+}): Promise<ActionState> {
+  const startOn = input.startOn.trim();
+  if (startOn && !DATE.test(startOn)) return { error: "Pick the date from the calendar." };
+  return writeVilla(
+    input.plotId,
+    { start_on: startOn || null },
+    "setVillaStart",
+    "Could not save the start date. Try again.",
+  );
+}
+
+/**
+ * Copies today's forecast, worked out here and never sent from the phone, into each stage's first plan. Setting it again needs a
+ * note, which the history keeps. The stages first, then the villa's stamp: a failure between leaves no first plan showing.
+ */
+export async function setFirstPlan(input: { plotId: string; note: string }): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!input.plotId) return { error: "Which villa?" };
+  const note = input.note.trim();
+  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
+  let forecast: Awaited<ReturnType<typeof getVillaForecast>>;
+  try {
+    forecast = await getVillaForecast(input.plotId);
+  } catch (thrown) {
+    console.error("setFirstPlan read failed:", thrown);
+    return { error: "Could not work out the plan. Try again." };
+  }
+  const { startOn, baselinedAt, schedule } = forecast;
+  if (baselinedAt && !note) return { error: "Say why the first plan is being set again." };
+  const blocker = firstPlanBlocker(schedule, startOn);
+  if (blocker) return { error: blocker };
+
+  const supabase = await createClient();
+  const missing = await supabase.from("site_stages").upsert(
+    schedule.stages.map((stage) => ({
+      plot_id: input.plotId,
+      work_group_id: stage.groupId,
+      created_by: user.id,
+      updated_by: user.id,
+    })),
+    { onConflict: "plot_id,work_group_id", ignoreDuplicates: true },
+  );
+  const planned =
+    missing.error ??
+    (
+      await supabase.from("site_stages").upsert(
+        schedule.stages.map((stage) => ({
+          plot_id: input.plotId,
+          work_group_id: stage.groupId,
+          baseline_start: stage.start,
+          baseline_finish: stage.finish,
+          updated_by: user.id,
+        })),
+        { onConflict: "plot_id,work_group_id" },
+      )
+    ).error;
+  if (planned) {
+    console.error("setFirstPlan stages failed:", planned);
+    return { error: "Could not set the first plan. Try again." };
+  }
+  return writeVilla(
+    input.plotId,
+    { baselined_at: new Date().toISOString(), baseline_note: note || null },
+    "setFirstPlan",
+    "Could not set the first plan. Try again.",
+  );
 }

@@ -159,6 +159,12 @@ test("health: first match wins, in the plan's order", () => {
     statusChangedAt: "2026-10-07T10:00:00Z",
   });
   assert.equal(health(programme([shortWait, idle])).kind, "idle");
+  // Past its planned finish comes after a long wait and before no labour.
+  const lateStage = programme([shortWait, idle]).find((stage) => stage.id === "SS.01")!;
+  const late = health(programme([shortWait, idle]), { late: { stage: lateStage, days: 4 } });
+  assert.equal(late.kind, "late");
+  assert.equal(late.label, "4 days past its finish");
+  assert.equal(health(both, { late: { stage: lateStage, days: 4 } }).kind, "waiting");
   assert.equal(
     health(programme([shortWait, idle]), { lastLabourByGroup: new Map([["SS.01", "2026-10-08"]]) })
       .kind,

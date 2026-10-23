@@ -35,6 +35,7 @@ import { getVillaProgramme, storeStock } from "@/lib/supervisors/programme-queri
 import Link from "next/link";
 import { listVillaDeliveries, type VillaDelivery } from "@/lib/supervisors/site-receipt-queries";
 import { isShort } from "@/lib/supervisors/site-receipt";
+import { firstPlanBlocker } from "@/lib/supervisors/schedule";
 import { StartChecklistDialog } from "./_components/checklist-forms";
 import { ConfirmDeliveryDialog } from "./_components/delivery-forms";
 import { DrawingHistory } from "./_components/drawing-history";
@@ -48,6 +49,8 @@ import {
   stageReadiness,
 } from "./_components/programme-sections";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
+import { FirstPlanControl, VillaStartControl } from "./_components/schedule-controls";
+import { ScheduleStrip } from "./_components/schedule-strip";
 
 // One villa, phone-first: where it stands, the stages being worked and what comes next, then the full records folded away below.
 export default async function VillaPage({ params }: { params: Promise<{ plotId: string }> }) {
@@ -204,6 +207,29 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
               hint="Tap a stage to change it"
             />
             <ProgrammeList plotId={plotId} stages={programme.stages} contractors={contractors} />
+          </section>
+        )}
+
+        {programme.stages.length > 0 && (
+          <section className="space-y-2">
+            <SectionHead
+              title="Schedule"
+              hint={
+                programme.schedule.handover
+                  ? `Handover ${formatDate(programme.schedule.handover)}`
+                  : "Dates follow the sequence"
+              }
+            />
+            <Card className="space-y-4 p-5">
+              <VillaStartControl plotId={plotId} startOn={programme.schedule.startOn} />
+              <FirstPlanControl
+                plotId={plotId}
+                baselinedAt={programme.schedule.baselinedAt}
+                handover={programme.schedule.handover}
+                blocker={firstPlanBlocker(programme.schedule, programme.schedule.startOn)}
+              />
+              <ScheduleStrip stages={programme.stages} today={programme.today} />
+            </Card>
           </section>
         )}
 
