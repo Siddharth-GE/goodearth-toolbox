@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
@@ -12,7 +13,10 @@ import {
   TableRow,
   TableTotalCell,
 } from "@/components/ui/table";
+import { MONEY_KIND_LABEL, moneyReversal, type MoneyKind } from "@/lib/bills/ledger";
+import { reverseBillMoney } from "@/lib/bills/payment-actions";
 import { listPaymentsLedger } from "@/lib/bills/payment-queries";
+import { getCurrentBillActor } from "@/lib/bills/queries";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { listProjects } from "@/lib/masters/projects";
@@ -20,13 +24,19 @@ import { listVendors } from "@/lib/masters/vendors";
 import { Banknote } from "lucide-react";
 import Link from "next/link";
 
-const KIND: Record<
-  "payment" | "advance" | "recovery",
-  { label: string; variant: "neutral" | "info" | "warning" }
-> = {
-  payment: { label: "Payment", variant: "neutral" },
-  advance: { label: "Advance", variant: "info" },
-  recovery: { label: "Recovered", variant: "warning" },
+const VARIANT: Record<MoneyKind, "neutral" | "info" | "warning"> = {
+  payment: "neutral",
+  advance: "info",
+  recovery: "warning",
+};
+
+const REVERSE_NOTE: Record<MoneyKind, string> = {
+  payment:
+    "The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone.",
+  advance:
+    "The same amount is entered the other way with your reason, so the advance no longer counts as given. Both entries stay on record. This can't be undone.",
+  recovery:
+    "The same amount is entered the other way with your reason, so the bill has it pending again and the advance has it to recover. Both entries stay on record. This can't be undone.",
 };
 
 export default async function PaymentsPage({
@@ -47,10 +57,11 @@ export default async function PaymentsPage({
   const from = dateParam(raw.from);
   const to = dateParam(raw.to);
 
-  const [rows, vendors, projects] = await Promise.all([
+  const [rows, vendors, projects, actor] = await Promise.all([
     listPaymentsLedger({ q, vendorId: vendor, projectId: project, from, to }),
     listVendors(),
     listProjects(),
+    getCurrentBillActor(),
   ]);
   const paid = rows
     .filter((row) => row.kind === "payment")
@@ -113,6 +124,7 @@ export default async function PaymentsPage({
               <TableHeaderCell>Bill</TableHeaderCell>
               <TableHeaderCell>Reference</TableHeaderCell>
               <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+              <TableHeaderCell />
             </TableRow>
           </TableHead>
           <TableBody>
@@ -120,7 +132,11 @@ export default async function PaymentsPage({
               <TableRow key={`${row.kind}-${row.id}`}>
                 <TableCell className="whitespace-nowrap">{formatDate(row.on)}</TableCell>
                 <TableCell>
-                  <Badge variant={KIND[row.kind].variant}>{KIND[row.kind].label}</Badge>
+                  <Badge variant={row.reversal ? "neutral" : VARIANT[row.kind]}>
+                    {MONEY_KIND_LABEL[row.kind][row.reversal ? "reversal" : "entry"]}
+                  </Badge>
+                  {row.reversed && <div className="text-muted mt-1 text-xs">Reversed</div>}
+                  {row.reason && <div className="text-muted mt-1 text-xs">{row.reason}</div>}
                 </TableCell>
                 <TableCell>
                   {row.vendor_name}
@@ -139,6 +155,16 @@ export default async function PaymentsPage({
                 <TableCell className="text-right font-mono">
                   {formatMoney(row.amount, { paise: true })}
                 </TableCell>
+                <TableCell className="text-right">
+                  <DeleteOrCancel
+                    noun={MONEY_KIND_LABEL[row.kind].noun}
+                    verb="Reverse"
+                    reasonPlaceholder="Paid twice by mistake"
+                    removal={moneyReversal(row, actor)}
+                    cancelNote={REVERSE_NOTE[row.kind]}
+                    onCancel={reverseBillMoney.bind(null, row.kind, row.id)}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -150,6 +176,7 @@ export default async function PaymentsPage({
               <TableTotalCell className="text-right font-mono">
                 {formatMoney(paid + advanced, { paise: true })}
               </TableTotalCell>
+              <TableTotalCell />
             </TableRow>
           </TableFoot>
         </Table>
@@ -157,7 +184,8 @@ export default async function PaymentsPage({
       {rows.length > 0 && (
         <p className="text-muted text-xs">
           The total is money out — payments and advances. A recovery moves an advance onto a bill,
-          so it is not counted again.
+          so it is not counted again. A reversal is entered the other way, so it takes its entry
+          back out of every total.
         </p>
       )}
     </div>

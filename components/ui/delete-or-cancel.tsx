@@ -19,6 +19,7 @@ export function DeleteOrCancel({
   deleteNote = "Nothing uses it yet, so it goes for good.",
   verb = "Cancel",
   cancelNote = "It leaves every list and total, and stays on record with your reason. This can't be undone.",
+  reasonPlaceholder = "Raised twice by mistake",
 }: {
   /** As it reads after "this": "indent", "draft revision". */
   noun: string;
@@ -27,12 +28,23 @@ export function DeleteOrCancel({
   onCancel?: (reason: string) => Promise<ActionState>;
   deleteNote?: string;
   /** What going is called once something depends on it: an official estimate is withdrawn. */
-  /** "Delete" asks a reason too: a stock record that already moved stock (0146). */
-  verb?: "Cancel" | "Withdraw" | "Delete";
+  /** "Delete" asks a reason too: a stock record that already moved stock (0146). Money is reversed (0147). */
+  verb?: "Cancel" | "Withdraw" | "Delete" | "Reverse";
   cancelNote?: string;
+  reasonPlaceholder?: string;
 }) {
-  const doing = { Cancel: "Cancelling…", Withdraw: "Withdrawing…", Delete: "Deleting…" }[verb];
-  const done = { Cancel: "cancelled", Withdraw: "withdrawn", Delete: "deleted" }[verb];
+  const doing = {
+    Cancel: "Cancelling…",
+    Withdraw: "Withdrawing…",
+    Delete: "Deleting…",
+    Reverse: "Reversing…",
+  }[verb];
+  const done = {
+    Cancel: "cancelled",
+    Withdraw: "withdrawn",
+    Delete: "deleted",
+    Reverse: "reversed",
+  }[verb];
   if (!removal) return null;
 
   if (removal.kind === "delete" && onDelete) {
@@ -64,7 +76,7 @@ export function DeleteOrCancel({
         description={cancelNote}
         confirmLabel={`${verb} ${noun}`}
         pendingLabel={doing}
-        reason={{ label: `Why is it ${done}?`, placeholder: "Raised twice by mistake" }}
+        reason={{ label: `Why is it ${done}?`, placeholder: reasonPlaceholder }}
         onConfirm={(reason) => onCancel(reason)}
       />
     );
@@ -74,7 +86,7 @@ export function DeleteOrCancel({
     return (
       <div className="space-y-1 text-right">
         <Button variant="ghost" size="sm" disabled>
-          Cancel {noun}
+          {verb} {noun}
         </Button>
         <p className="text-muted max-w-xs text-xs">{removal.why}</p>
       </div>

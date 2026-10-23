@@ -1,9 +1,13 @@
 import { Heading } from "@/components/ui/heading";
+import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { ChargesBox } from "@/components/ui/charges-box";
 import { PageTitle } from "@/components/ui/page-title";
+import { MONEY_KIND_LABEL, moneyReversal } from "@/lib/bills/ledger";
 import { updateBillCharges } from "@/lib/bills/line-actions";
+import { reverseBillMoney } from "@/lib/bills/payment-actions";
 import {
   countLabourEntriesOnBill,
   getBillLines,
@@ -51,15 +55,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
   const editable = canEditBill(bill.status);
   const itemised = lines.length > 0;
   const moneyMoves = bill.status !== "recorded";
-  const [settlement, events, advances] = moneyMoves
-    ? await Promise.all([
-        getBillSettlement(bill.id, bill.total_amount),
-        getBillMoneyEvents(bill.id),
-        canTakePayment(bill.status) && bill.vendor_id
-          ? getOpenAdvances(bill.vendor_id)
-          : Promise.resolve([]),
-      ])
-    : [null, [], []];
+  // A recorded bill has money only when it was paid, reversed and sent back (0147); its history still shows.
+  const [settlement, events, advances] = await Promise.all([
+    getBillSettlement(bill.id, bill.total_amount),
+    getBillMoneyEvents(bill.id),
+    canTakePayment(bill.status) && bill.vendor_id
+      ? getOpenAdvances(bill.vendor_id)
+      : Promise.resolve([]),
+  ]);
+  const hasMoney = events.length > 0;
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
         listActiveGstRates(),
@@ -124,6 +128,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               actor={actor}
               createdBy={bill.created_by}
               totalAmount={bill.total_amount}
+              hasMoney={hasMoney}
             />
           </>
         }
@@ -163,7 +168,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.approved_at && (
               <span className="text-muted"> on {formatDate(bill.approved_at)}</span>
             )}
-            {settlement && settlement.paid + settlement.recovered > 0
+            {settlement.paid + settlement.recovered > 0
               ? ` — part paid ${formatMoney(settlement.paid + settlement.recovered, { paise: true })} · pending ${formatMoney(settlement.pending, { paise: true })}.`
               : " — ready to pay."}
           </p>
@@ -223,7 +228,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         <p className="text-muted text-sm">{`Total set by hand — ${bill.total_override_note}`}</p>
       )}
 
-      {moneyMoves && settlement && (
+      {(moneyMoves || hasMoney) && (
         <div className="space-y-2">
           <Heading>Payments</Heading>
           <p className="text-muted text-sm">
@@ -238,6 +243,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                   <TableHeaderCell>Reference</TableHeaderCell>
                   <TableHeaderCell>By</TableHeaderCell>
                   <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                  <TableHeaderCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -245,13 +251,34 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                   <TableRow key={event.id}>
                     <TableCell className="whitespace-nowrap">{formatDate(event.on)}</TableCell>
                     <TableCell>
-                      {event.kind === "payment" ? "Payment" : "Advance recovered"}
-                      {event.note && <div className="text-muted text-xs">{event.note}</div>}
+                      {event.reversal
+                        ? MONEY_KIND_LABEL[event.kind].reversal
+                        : event.kind === "payment"
+                          ? "Payment"
+                          : "Advance recovered"}
+                      {event.reversed && (
+                        <Badge variant="neutral" className="ml-2">
+                          Reversed
+                        </Badge>
+                      )}
+                      {(event.reason ?? event.note) && (
+                        <div className="text-muted text-xs">{event.reason ?? event.note}</div>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{event.reference}</TableCell>
                     <TableCell className="text-muted">{event.by ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatMoney(event.amount, { paise: true })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DeleteOrCancel
+                        noun={MONEY_KIND_LABEL[event.kind].noun}
+                        verb="Reverse"
+                        reasonPlaceholder="Paid twice by mistake"
+                        removal={moneyReversal(event, actor)}
+                        cancelNote="The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone."
+                        onCancel={reverseBillMoney.bind(null, event.kind, event.id)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
