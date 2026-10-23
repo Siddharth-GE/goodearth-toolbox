@@ -2,6 +2,17 @@
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { PillButton } from "@/components/ui/pill";
+import { SearchSelect } from "@/components/ui/search-select";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -14,6 +25,7 @@ import {
   createChecklistTemplate,
   setChecklistTemplateActive,
   setChecklistTemplateItemActive,
+  setTemplateStages,
   updateChecklistTemplate,
 } from "@/lib/supervisors/checklist-actions";
 import type { TemplateItemRow, TemplateRow } from "@/lib/supervisors/checklist-queries";
@@ -62,20 +74,41 @@ export function TemplateDialog({ template }: { template?: TemplateRow }) {
   );
 }
 
-export function TemplateList({ templates }: { templates: TemplateRow[] }) {
+type Stage = { id: string; code: string; name: string };
+
+export function TemplateList({
+  templates,
+  stages,
+  stagesByTemplate,
+}: {
+  templates: TemplateRow[];
+  stages: Stage[];
+  stagesByTemplate: Record<string, string[]>;
+}) {
+  const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   return (
     <div className="space-y-3">
       {templates.map((template) => {
         const active = template.items.filter((item) => item.isActive).length;
+        const linked = (stagesByTemplate[template.id] ?? []).flatMap((id) => {
+          const stage = stageById.get(id);
+          return stage ? [stage] : [];
+        });
         return (
           <Section
             key={template.id}
             title={template.isActive ? template.name : `${template.name} (switched off)`}
-            note={`${active} ${active === 1 ? "check" : "checks"}${template.workRefs ? ` · works ${template.workRefs}` : ""}`}
+            note={`${active} ${active === 1 ? "check" : "checks"} · ${linked.length ? `stages ${linked.map((stage) => stage.code).join(", ")}` : "no stage yet"}`}
             collapsible
             defaultOpen={false}
             aside={
               <div className="flex items-center gap-1">
+                <StagesDialog
+                  templateId={template.id}
+                  name={template.name}
+                  linkedIds={stagesByTemplate[template.id] ?? []}
+                  stages={stages}
+                />
                 <TemplateDialog template={template} />
                 <ActiveToggle
                   active={template.isActive}
@@ -97,6 +130,100 @@ export function TemplateList({ templates }: { templates: TemplateRow[] }) {
         );
       })}
     </div>
+  );
+}
+
+/** The stages this checklist inspects: a working stage offers it, and Done asks once while it is unsigned. */
+function StagesDialog({
+  templateId,
+  name,
+  linkedIds,
+  stages,
+}: {
+  templateId: string;
+  name: string;
+  /** Every linked stage, a switched-off one included, so saving never drops it unseen. */
+  linkedIds: string[];
+  stages: Stage[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [adding, setAdding] = useState("");
+  const { pending, error, run, clearError } = useActionRunner();
+  const stageById = new Map(stages.map((stage) => [stage.id, stage]));
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setChosen(linkedIds);
+          setAdding("");
+          clearError();
+        }
+        setOpen(next);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          Stages
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Stages it inspects</DialogTitle>
+          <DialogDescription>{name}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {chosen.length === 0 ? (
+            <p className="text-muted text-sm">
+              No stage yet — add the stages this checklist is for.
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {chosen.map((id) => {
+                const stage = stageById.get(id);
+                return (
+                  <li key={id}>
+                    <PillButton
+                      tone="plain"
+                      aria-label={`Take ${stage?.code ?? "this stage"} off`}
+                      onClick={() => setChosen((all) => all.filter((other) => other !== id))}
+                    >
+                      {stage ? `${stage.code} ${stage.name}` : "A stage switched off"}
+                      <X className="size-3.5" aria-hidden />
+                    </PillButton>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <SearchSelect
+            options={stages
+              .filter((stage) => !chosen.includes(stage.id))
+              .map((stage) => ({ value: stage.id, label: `${stage.code} ${stage.name}` }))}
+            value={adding}
+            onChange={(value) => {
+              if (value) setChosen((all) => [...all, value]);
+              setAdding("");
+            }}
+            placeholder="Add a stage — type a code or name…"
+          />
+          <FormMessage error={error} />
+          <Button
+            variant="primary"
+            className="w-full"
+            disabled={pending}
+            onClick={async () => {
+              const result = await run(() => setTemplateStages(templateId, chosen));
+              if (!result?.error) setOpen(false);
+            }}
+          >
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
