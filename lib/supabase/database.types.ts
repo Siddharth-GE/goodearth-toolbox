@@ -4998,6 +4998,9 @@ export type Database = {
       }
       estimator_estimates: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           est_no: number | null
@@ -5022,6 +5025,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           est_no?: number | null
@@ -5046,6 +5052,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           est_no?: number | null
@@ -5070,6 +5079,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "estimator_estimates_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "estimator_estimates_created_by_fkey"
             columns: ["created_by"]
@@ -7102,6 +7118,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           contract_value: number
           created_at: string
           created_by: string | null
@@ -7122,6 +7141,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_value: number
           created_at?: string
           created_by?: string | null
@@ -7142,6 +7164,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_value?: number
           created_at?: string
           created_by?: string | null
@@ -7163,6 +7188,13 @@ export type Database = {
           {
             foreignKeyName: "labour_contracts_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -12362,6 +12394,10 @@ export type Database = {
         Args: { p_decision: string; p_line_id: string; p_note: string }
         Returns: undefined
       }
+      delete_draft_cash_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       delete_draft_estimate: {
         Args: { p_estimate: string }
         Returns: undefined
@@ -12381,6 +12417,10 @@ export type Database = {
       }
       delete_draft_transmittal: {
         Args: { p_transmittal_id: string }
+        Returns: undefined
+      }
+      delete_pending_work_order: {
+        Args: { p_contract_id: string }
         Returns: undefined
       }
       delete_pricing_budget: {

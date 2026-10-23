@@ -299,3 +299,13 @@ export async function closeCashRequest(requestId: string): Promise<ActionState> 
   if (error) return refused("closeCashRequest", error);
   return done();
 }
+
+// Only a draft goes, with its lines (0144); a submitted one comes back to draft through its approver first.
+export async function deleteCashRequest(requestId: string): Promise<ActionState> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_draft_cash_request", { p_request_id: requestId });
+  if (error) return refused("deleteCashRequest", error);
+  revalidatePath("/bills", "layout");
+  redirect("/bills/cash-requests");
+}

@@ -15,7 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     createElement(WorkOrderDocument, { order }) as ReactElement<DocumentProps>,
   );
 
-  const draftTag = order.status === "approved" ? "" : "-DRAFT";
+  const draftTag =
+    order.status === "approved" ? "" : order.status === "cancelled" ? "-CANCELLED" : "-DRAFT";
   const filename = `Goodearth-WorkOrder-${safeFileNamePart(order.reference ?? order.id)}${draftTag}.pdf`;
 
   return pdfResponse(buffer, filename, { disposition: "inline" });

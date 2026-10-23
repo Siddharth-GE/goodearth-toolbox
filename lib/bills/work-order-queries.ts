@@ -19,7 +19,7 @@ import type { ContractStatus } from "./workflow";
 // The labour contract renamed: the table is still labour_contracts, so bills.kind = 'contract' (0105). The rate book's labour rate comes through work_labour_rate_facts, a money view WHERE-gated to /bills or /estimator.
 
 const CONTRACT_COLUMNS =
-  "id, reference, vendor_id, project_id, plot_id, unit_id, description, contract_value, terms, status, is_active, approved_by, approved_at, created_by, created_at, vendors(name), projects(name), plots(name), units(name)";
+  "id, reference, vendor_id, project_id, plot_id, unit_id, description, contract_value, terms, status, is_active, approved_by, approved_at, cancelled_at, cancelled_by, cancel_reason, created_by, created_at, vendors(name), projects(name), plots(name), units(name)";
 
 type ContractRow = {
   id: string;
@@ -35,6 +35,9 @@ type ContractRow = {
   is_active: boolean;
   approved_by: string | null;
   approved_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
   created_by: string | null;
   created_at: string;
   vendors: { name: string } | null;
@@ -104,18 +107,23 @@ export async function listWorkOrders(filters: WorkOrderFilters = {}): Promise<Wo
   ]);
 
   const needle = filters.q?.toLowerCase();
-  return (contracts as unknown as ContractRow[])
-    .map((contract) => toRow(contract, billed))
-    .filter((row) => !filters.projectId || row.project_id === filters.projectId)
-    .filter((row) => !filters.vendorId || row.vendor_id === filters.vendorId)
-    .filter((row) => !filters.status || row.status === filters.status)
-    .filter(
-      (row) =>
-        !needle ||
-        [row.reference ?? "", row.vendor_name, row.description, row.place].some((text) =>
-          text.toLowerCase().includes(needle),
-        ),
-    );
+  return (
+    (contracts as unknown as ContractRow[])
+      .map((contract) => toRow(contract, billed))
+      .filter((row) => !filters.projectId || row.project_id === filters.projectId)
+      .filter((row) => !filters.vendorId || row.vendor_id === filters.vendorId)
+      // Cancelled orders (0144) show only when asked for by name.
+      .filter((row) =>
+        filters.status ? row.status === filters.status : row.status !== "cancelled",
+      )
+      .filter(
+        (row) =>
+          !needle ||
+          [row.reference ?? "", row.vendor_name, row.description, row.place].some((text) =>
+            text.toLowerCase().includes(needle),
+          ),
+      )
+  );
 }
 
 export type WorkOrderLineRow = {
@@ -136,15 +144,33 @@ export type WorkOrderDetail = WorkOrderRow & {
   approved_by_name: string | null;
   approved_at: string | null;
   created_by_name: string | null;
+  cancelled_at: string | null;
+  cancelled_by_name: string | null;
+  cancel_reason: string | null;
+  /** What rests on it, as "2 bills", "an advance": while any does, it is switched off rather than cancelled (0144). */
+  resting_on_it: string[];
   lines: WorkOrderLineRow[];
   company: CompanyRow | null;
 };
+
+const counted = (count: number, one: string, many: string) =>
+  count === 1 ? one : `${count} ${many}`;
 
 export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [{ data, error }, lines, billed, works, lineBilling, untagged] = await Promise.all([
+  const [
+    { data, error },
+    lines,
+    billed,
+    works,
+    lineBilling,
+    untagged,
+    billCount,
+    advanceCount,
+    cashLineCount,
+  ] = await Promise.all([
     supabase.from("labour_contracts").select(CONTRACT_COLUMNS).eq("id", id).maybeSingle(),
     fetchAll((from, to) =>
       supabase
@@ -167,7 +193,24 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
         .range(from, to),
     ),
     orderHasUntaggedBilling(supabase, id),
+    supabase
+      .from("bills")
+      .select("id", { count: "exact", head: true })
+      .eq("labour_contract_id", id),
+    supabase
+      .from("contractor_advances")
+      .select("id", { count: "exact", head: true })
+      .eq("labour_contract_id", id),
+    supabase
+      .from("cash_request_items")
+      .select("id", { count: "exact", head: true })
+      .eq("labour_contract_id", id),
   ]);
+  const countError = billCount.error ?? advanceCount.error ?? cashLineCount.error;
+  if (countError) {
+    console.error("getWorkOrder counts failed:", countError);
+    throw new Error("Could not read the work order.", { cause: countError });
+  }
   if (error) {
     console.error("getWorkOrder failed:", error);
     throw new Error("Could not read the work order.", { cause: error });
@@ -175,7 +218,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
   if (!data) return null;
   const contract = data as unknown as ContractRow;
 
-  const people = [contract.approved_by, contract.created_by].filter(
+  const people = [contract.approved_by, contract.created_by, contract.cancelled_by].filter(
     (person): person is string => person != null,
   );
   const [profiles, company] = await Promise.all([
@@ -200,6 +243,16 @@ export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> 
     approved_by_name: contract.approved_by ? (names.get(contract.approved_by) ?? null) : null,
     approved_at: contract.approved_at,
     created_by_name: contract.created_by ? (names.get(contract.created_by) ?? null) : null,
+    cancelled_at: contract.cancelled_at,
+    cancelled_by_name: contract.cancelled_by ? (names.get(contract.cancelled_by) ?? null) : null,
+    cancel_reason: contract.cancel_reason,
+    resting_on_it: [
+      billCount.count ? counted(billCount.count, "a bill", "bills") : null,
+      advanceCount.count ? counted(advanceCount.count, "an advance", "advances") : null,
+      cashLineCount.count
+        ? counted(cashLineCount.count, "a cash request line", "cash request lines")
+        : null,
+    ].filter((phrase): phrase is string => phrase !== null),
     lines: lines.map((line) => ({
       id: line.id,
       work_item_id: line.work_item_id,

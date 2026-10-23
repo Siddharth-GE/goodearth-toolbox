@@ -17,6 +17,8 @@ export function DeleteOrCancel({
   onDelete,
   onCancel,
   deleteNote = "Nothing uses it yet, so it goes for good.",
+  verb = "Cancel",
+  cancelNote = "It leaves every list and total, and stays on record with your reason. This can't be undone.",
 }: {
   /** As it reads after "this": "indent", "draft revision". */
   noun: string;
@@ -24,7 +26,12 @@ export function DeleteOrCancel({
   onDelete?: () => Promise<ActionState>;
   onCancel?: (reason: string) => Promise<ActionState>;
   deleteNote?: string;
+  /** What going is called once something depends on it: an official estimate is withdrawn. */
+  verb?: "Cancel" | "Withdraw";
+  cancelNote?: string;
 }) {
+  const doing = verb === "Withdraw" ? "Withdrawing…" : "Cancelling…";
+  const done = verb === "Withdraw" ? "withdrawn" : "cancelled";
   if (!removal) return null;
 
   if (removal.kind === "delete" && onDelete) {
@@ -49,14 +56,14 @@ export function DeleteOrCancel({
       <ConfirmDialog
         trigger={
           <Button variant="ghost" size="sm" className="text-danger">
-            Cancel {noun}
+            {verb} {noun}
           </Button>
         }
-        title={`Cancel this ${noun}?`}
-        description="It leaves every list and total, and stays on record with your reason. This can't be undone."
-        confirmLabel={`Cancel ${noun}`}
-        pendingLabel="Cancelling…"
-        reason={{ label: "Why is it cancelled?", placeholder: "Raised twice by mistake" }}
+        title={`${verb} this ${noun}?`}
+        description={cancelNote}
+        confirmLabel={`${verb} ${noun}`}
+        pendingLabel={doing}
+        reason={{ label: `Why is it ${done}?`, placeholder: "Raised twice by mistake" }}
         onConfirm={(reason) => onCancel(reason)}
       />
     );

@@ -1,3 +1,5 @@
+import { joinInWords } from "../format";
+
 // Pure rules, mirrored in RLS and the bills_guard trigger (0025).
 // recorded -> approved -> paid; send-back needs a note. Self-approval is allowed, so no recorder parameter here.
 export type BillStatus = "recorded" | "approved" | "paid";
@@ -5,7 +7,7 @@ export type BillStatus = "recorded" | "approved" | "paid";
 /** A PO, a labour contract, or NMR (daily wages: no anchor, optional vendor). */
 export type BillKind = "po" | "contract" | "nmr";
 
-export type ContractStatus = "pending_approval" | "approved";
+export type ContractStatus = "pending_approval" | "approved" | "cancelled";
 
 export type BillDecider = {
   isAdmin: boolean;
@@ -74,6 +76,24 @@ export function canApproveContract(
 
 export function canEditContract(status: ContractStatus): boolean {
   return status === "pending_approval";
+}
+
+/**
+ * Pending deletes; approved cancels by an approver or admin while nothing rests on it (0144), and once something does
+ * it is switched off instead. `restingOnIt` reads like "2 bills" or "an advance".
+ */
+export function workOrderRemoval(
+  status: ContractStatus,
+  decider: BillDecider,
+  restingOnIt: readonly string[],
+): { kind: "delete" } | { kind: "cancel" } | { kind: "blocked"; why: string } | null {
+  if (status === "pending_approval") return { kind: "delete" };
+  if (status !== "approved" || !(decider.isAdmin || decider.isApprover)) return null;
+  if (restingOnIt.length === 0) return { kind: "cancel" };
+  return {
+    kind: "blocked",
+    why: `It has ${joinInWords(restingOnIt)}, so it cannot be cancelled — switch it off instead.`,
+  };
 }
 
 /** WARNS, NEVER BLOCKS: real invoices legitimately differ. A null anchor total means no warning (NMR bills pass null: daily wages have no ceiling). */

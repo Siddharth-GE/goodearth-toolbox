@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
+import { withdrawEstimate } from "@/lib/estimator/estimate-actions";
 import type { EstimateDetail } from "@/lib/estimator/estimate-queries";
-import type { EstimateView } from "@/lib/estimator/estimate-view";
+import { officialRemoval, type EstimateView } from "@/lib/estimator/estimate-view";
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import {
@@ -42,6 +44,7 @@ export function EstimateHeader({
           <div className="flex flex-wrap items-center gap-2">
             {estimate.status === "submitted" && <Badge variant="success">Official</Badge>}
             {estimate.status === "superseded" && <Badge variant="neutral">Superseded</Badge>}
+            {estimate.status === "cancelled" && <Badge variant="danger">Withdrawn</Badge>}
             {olderDraft && <Badge variant="neutral">Older draft</Badge>}
             {isDraft && (
               <>
@@ -87,6 +90,13 @@ export function EstimateHeader({
                   />
                 )
               ))}
+            <DeleteOrCancel
+              noun="official estimate"
+              verb="Withdraw"
+              cancelNote={`${villaName} is left with no official estimate until the working one is made official again, so Supervisors plans its stages from the full stage list meanwhile. It stays on record with your reason. This can't be undone.`}
+              removal={officialRemoval(estimate.status, estimate.drawingIndentRefs)}
+              onCancel={withdrawEstimate.bind(null, estimate.id)}
+            />
           </div>
         }
       />
@@ -113,6 +123,22 @@ export function EstimateHeader({
               </Link>
               .
             </>
+          )}
+        </p>
+      )}
+      {estimate.status === "cancelled" && (
+        <p className="text-danger text-sm">
+          Withdrawn{estimate.cancelledByName ? ` by ${estimate.cancelledByName}` : ""} on{" "}
+          {formatDate(estimate.cancelledAt)}: {estimate.cancelReason}. Kept as history.{" "}
+          {estimate.villaOfficial ? (
+            <Link
+              className="underline underline-offset-2"
+              href={`/estimator/estimates/${estimate.villaOfficial.id}`}
+            >
+              See the current official estimate.
+            </Link>
+          ) : (
+            `${villaName} has no official estimate until the working one is made official again.`
           )}
         </p>
       )}
