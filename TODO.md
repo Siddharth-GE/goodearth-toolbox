@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Building now — Delete or Cancel across every tool
 
-`plan.md`, top section, **"Next session — start here"**: the founder vets pieces 1–3 on staging (the shorter villa page, the schedule workbook and per-villa choices, the test project — #130–#133), answers piece 4's four questions, and Fable reviews its design. The Supervisors rebuild (A–E, #123–#129) and the OS process updates (#119–#122) are on staging too, waiting for the same vet.
+`plan.md`, top section, **"Next session — start here"**: Piece 4's build order, B1 first. On 2026-10-23 the founder said "all looks good" of what was on staging (pieces 1–3, #130–#133, with the Supervisors rebuild #123–#129 and the OS process updates #119–#122), took piece 4's recommendations and waived Fable's design review.
 
 - **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
 
