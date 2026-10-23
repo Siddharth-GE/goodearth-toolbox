@@ -18,9 +18,10 @@ import type {
   VillaDetail,
   WorkOption,
 } from "@/lib/supervisors/queries";
-import type { Readiness } from "@/lib/supervisors/readiness";
+import { readinessSummary, type Readiness } from "@/lib/supervisors/readiness";
 import { cn } from "@/lib/utils";
 import { ChevronRight, ClipboardCheck, HardHat, Package } from "lucide-react";
+import type { ReactNode } from "react";
 import { StartChecklistDialog } from "./checklist-forms";
 import { LabourLogDialog } from "./labour-forms";
 import { RequestIssueDialog } from "./request-forms";
@@ -31,6 +32,7 @@ import {
   SupervisorPicker,
   type StageControlData,
 } from "./stage-controls";
+import { stageFamilies } from "./stage-families";
 
 const STATUS_TONE: Record<StageStatus, PillTone> = {
   not_started: "plain",
@@ -259,58 +261,44 @@ export function NowCard({
 }) {
   const stageWorkIds = stage.works.map((work) => work.id);
   const measured = stage.progress.filter((row) => row.estimated !== null);
+  const due = dueLine(stage);
   return (
-    <Card className="space-y-4 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-muted font-mono text-xs">{stage.code}</p>
-          <p className="text-foreground text-[17px] leading-snug font-semibold">{stage.name}</p>
-          <p className="text-muted mt-0.5 text-sm">
+    <Card className="space-y-3 p-4">
+      <StageTitle
+        stage={stage}
+        line={
+          <>
             {[stage.day ? `Day ${stage.day}` : null, stage.contractorName ?? "No contractor yet"]
               .filter(Boolean)
               .join(" · ")}
-          </p>
-        </div>
-        <StatusPill stage={stage} />
-      </div>
+            {due ? (
+              <span className={stage.forecast.overdueDays ? "text-danger" : undefined}>
+                {` · ${due}`}
+              </span>
+            ) : null}
+          </>
+        }
+      />
 
       {waitingLine(stage) ? <p className="text-warning text-sm">{waitingLine(stage)}</p> : null}
-      {dueLine(stage) ? (
-        <p className={cn("text-sm", stage.forecast.overdueDays ? "text-danger" : "text-muted")}>
-          {dueLine(stage)}
-        </p>
-      ) : null}
 
-      {measured.length > 0 ? (
-        <ul className="space-y-1 text-sm">
-          {measured.map((row) => (
-            <li key={row.workItemId} className="flex justify-between gap-3">
-              <span className="text-muted min-w-0 truncate">{row.label}</span>
-              <span className="text-foreground shrink-0 tabular-nums">
-                {`${formatQuantity(row.logged)} of ${formatQuantity(row.estimated)} ${row.uom}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2">
-          <LabourLogDialog
-            plotId={plotId}
-            works={works}
-            contractors={contractors}
-            stageWorkIds={stageWorkIds}
-            contractorId={stage.record?.contractorId ?? null}
-            trigger={
-              <Button variant="primary" size="lg" className="w-full">
-                <HardHat className="size-5" aria-hidden />
-                Log labour
-              </Button>
-            }
-          />
-        </div>
-        <div className={stage.checklists.length > 0 ? undefined : "col-span-2"}>
+      <div
+        className={cn("grid gap-2", stage.checklists.length > 0 ? "grid-cols-3" : "grid-cols-2")}
+      >
+        <LabourLogDialog
+          plotId={plotId}
+          works={works}
+          contractors={contractors}
+          stageWorkIds={stageWorkIds}
+          contractorId={stage.record?.contractorId ?? null}
+          trigger={
+            <Button variant="primary" size="lg" className="w-full px-3">
+              <HardHat className="size-5" aria-hidden />
+              Labour
+            </Button>
+          }
+        />
+        <div>
           <RequestIssueDialog
             plotId={plotId}
             works={works}
@@ -332,8 +320,54 @@ export function NowCard({
         ) : null}
       </div>
 
-      <StageStatusChips stage={controlData(plotId, stage)} />
+      <More label={measured.length > 0 ? "Progress and status" : "Status"}>
+        {measured.length > 0 ? (
+          <ul className="space-y-1 text-sm">
+            {measured.map((row) => (
+              <li key={row.workItemId} className="flex justify-between gap-3">
+                <span className="text-muted min-w-0 truncate">{row.label}</span>
+                <span className="text-foreground shrink-0 tabular-nums">
+                  {`${formatQuantity(row.logged)} of ${formatQuantity(row.estimated)} ${row.uom}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <StageStatusChips stage={controlData(plotId, stage)} />
+      </More>
     </Card>
+  );
+}
+
+/** The stage's code and name on one line, its status beside, and one line under. */
+function StageTitle({ stage, line }: { stage: StageView; line: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-foreground text-[15px] leading-snug font-semibold">
+          <span className="text-muted font-mono text-xs font-normal">{stage.code}</span>{" "}
+          {stage.name}
+        </p>
+        <p className="text-muted mt-0.5 text-sm">{line}</p>
+      </div>
+      <StatusPill stage={stage} />
+    </div>
+  );
+}
+
+/** What a card keeps folded until asked: the essentials stay above it. */
+function More({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="group border-border -mx-4 border-t px-4">
+      <summary className="text-muted hover:text-foreground flex min-h-10 cursor-pointer list-none items-center gap-1.5 pt-2 text-sm marker:content-none">
+        <ChevronRight
+          className="size-4 shrink-0 transition-transform group-open:rotate-90"
+          aria-hidden
+        />
+        {label}
+      </summary>
+      <div className="space-y-4 pt-2">{children}</div>
+    </details>
   );
 }
 
@@ -358,91 +392,107 @@ export function NextCard({
   brands: { id: string; name: string }[];
 }) {
   const control = controlData(plotId, stage);
+  const toRequest = readiness.some((row) => row.pick && row.left !== 0);
   return (
-    <Card className="space-y-4 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-muted font-mono text-xs">{stage.code}</p>
-          <p className="text-foreground text-[17px] leading-snug font-semibold">{stage.name}</p>
-          {plannedLine(stage) ? (
-            <p className="text-muted mt-0.5 text-sm">{plannedLine(stage)}</p>
-          ) : null}
-          {stage.forecast.pinnedBehind ? (
-            <p className="text-warning mt-0.5 text-xs">Later than its pinned start</p>
-          ) : null}
+    <Card className="space-y-3 p-4">
+      <StageTitle
+        stage={stage}
+        line={[plannedLine(stage), stage.contractorName ?? "No contractor yet"]
+          .filter(Boolean)
+          .join(" · ")}
+      />
+      {stage.forecast.pinnedBehind ? (
+        <p className="text-warning text-xs">Later than its pinned start</p>
+      ) : null}
+      <p className={cn("text-sm", toRequest ? "text-warning" : "text-muted")}>
+        {readiness.length === 0
+          ? villa.estimate
+            ? "Material: none on the official estimate"
+            : "Material: no official estimate to check against"
+          : `Material: ${readinessSummary(readiness).toLowerCase()}`}
+      </p>
+
+      <More label="Contractor, material and status">
+        <div className="space-y-1.5">
+          <label htmlFor={`next-contractor-${stage.id}`} className="text-muted text-xs">
+            Contractor
+          </label>
+          <StageContractorSelect
+            stage={control}
+            contractors={contractors}
+            id={`next-contractor-${stage.id}`}
+          />
         </div>
-        <StatusPill stage={stage} />
-      </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor={`next-contractor-${stage.id}`} className="text-muted text-xs">
-          Contractor
-        </label>
-        <StageContractorSelect
-          stage={control}
-          contractors={contractors}
-          id={`next-contractor-${stage.id}`}
-        />
-      </div>
+        <div className="space-y-2">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Material</p>
+          {readiness.length === 0 ? (
+            <p className="text-muted text-sm">
+              {villa.estimate
+                ? "The official estimate lists no material for this stage."
+                : "No official estimate yet, so there is nothing to check the material against."}
+            </p>
+          ) : (
+            <ul className="divide-border divide-y">
+              {readiness.map((row) => (
+                <li
+                  key={row.key}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-foreground text-sm font-medium">{row.materialName}</p>
+                    <p className="text-muted text-xs">
+                      {[
+                        `Estimate ${formatQuantity(row.estimated)} ${row.uom}`,
+                        `drawn ${row.drawn === null ? "—" : formatQuantity(row.drawn)}`,
+                        row.pick
+                          ? `stores hold ${formatQuantity(row.held)} ${row.pick.itemUom}`
+                          : "not linked to a catalogue item",
+                      ].join(" · ")}
+                    </p>
+                  </div>
+                  {row.pick && row.left !== 0 ? (
+                    <RequestIssueDialog
+                      plotId={plotId}
+                      works={works}
+                      hasEstimate={villa.estimate !== null}
+                      quickPicks={villa.quickPicks}
+                      categories={categories}
+                      brands={brands}
+                      preset={{
+                        workItemId: row.pick.workItemId,
+                        item: {
+                          id: row.pick.itemId,
+                          name: row.pick.itemName,
+                          uom: row.pick.itemUom,
+                        },
+                        quantity: row.left,
+                      }}
+                      trigger={
+                        <Button variant="secondary" size="sm">
+                          Request what&apos;s left
+                        </Button>
+                      }
+                    />
+                  ) : row.left === 0 ? (
+                    <Pill tone="success">All drawn</Pill>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-      <div className="space-y-2">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Material</p>
-        {readiness.length === 0 ? (
-          <p className="text-muted text-sm">
-            {villa.estimate
-              ? "The official estimate lists no material for this stage."
-              : "No official estimate yet, so there is nothing to check the material against."}
-          </p>
-        ) : (
-          <ul className="divide-border divide-y">
-            {readiness.map((row) => (
-              <li key={row.key} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <div className="min-w-0">
-                  <p className="text-foreground text-sm font-medium">{row.materialName}</p>
-                  <p className="text-muted text-xs">
-                    {[
-                      `Estimate ${formatQuantity(row.estimated)} ${row.uom}`,
-                      `drawn ${row.drawn === null ? "—" : formatQuantity(row.drawn)}`,
-                      row.pick
-                        ? `stores hold ${formatQuantity(row.held)} ${row.pick.itemUom}`
-                        : "not linked to a catalogue item",
-                    ].join(" · ")}
-                  </p>
-                </div>
-                {row.pick && row.left !== 0 ? (
-                  <RequestIssueDialog
-                    plotId={plotId}
-                    works={works}
-                    hasEstimate={villa.estimate !== null}
-                    quickPicks={villa.quickPicks}
-                    categories={categories}
-                    brands={brands}
-                    preset={{
-                      workItemId: row.pick.workItemId,
-                      item: { id: row.pick.itemId, name: row.pick.itemName, uom: row.pick.itemUom },
-                      quantity: row.left,
-                    }}
-                    trigger={
-                      <Button variant="secondary" size="sm">
-                        Request what&apos;s left
-                      </Button>
-                    }
-                  />
-                ) : row.left === 0 ? (
-                  <Pill tone="success">All drawn</Pill>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <StageStatusChips stage={control} />
+        <StageStatusChips stage={control} />
+      </More>
     </Card>
   );
 }
 
-/** Every stage of the villa as a row, in site order; a tap opens the stage. */
+/**
+ * Every stage of the villa, folded by family (Foundation, Superstructure…) with the families being worked open — or, when
+ * none is, the first not yet done. A tap on a stage opens it.
+ */
 export function ProgrammeList({
   plotId,
   stages,
@@ -452,8 +502,44 @@ export function ProgrammeList({
   stages: StageView[];
   contractors: ContractorOption[];
 }) {
+  const families = stageFamilies(stages);
+  const anyInHand = families.some((family) => family.inHand);
+  const firstOpen = families.find((family) => family.done < family.stages.length)?.name;
   return (
-    <Card className="divide-border divide-y p-0">
+    <div className="space-y-2">
+      {families.map((family) => (
+        <Card key={family.name} className="p-0">
+          <details className="group" open={anyInHand ? family.inHand : family.name === firstOpen}>
+            <summary className="hover:bg-foreground/[0.025] flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-2xl px-4 py-2.5 marker:content-none">
+              <ChevronRight
+                className="text-muted size-4 shrink-0 transition-transform group-open:rotate-90"
+                aria-hidden
+              />
+              <span className="text-foreground flex-1 text-sm font-semibold">{family.name}</span>
+              {family.inHand ? <Pill tone="info">In hand</Pill> : null}
+              <span className="text-muted text-xs tabular-nums">
+                {`${family.done} of ${family.stages.length} done`}
+              </span>
+            </summary>
+            <StageRows plotId={plotId} stages={family.stages} contractors={contractors} />
+          </details>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function StageRows({
+  plotId,
+  stages,
+  contractors,
+}: {
+  plotId: string;
+  stages: StageView[];
+  contractors: ContractorOption[];
+}) {
+  return (
+    <div className="divide-border border-border divide-y border-t">
       {stages.map((stage) => {
         const record = stage.record;
         const dates =
@@ -474,7 +560,7 @@ export function ProgrammeList({
             trigger={
               <button
                 type="button"
-                className="hover:bg-foreground/[0.025] focus-visible:ring-accent/25 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left first:rounded-t-2xl last:rounded-b-2xl focus-visible:ring-4 focus-visible:outline-none"
+                className="hover:bg-foreground/[0.025] focus-visible:ring-accent/25 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left last:rounded-b-2xl focus-visible:ring-4 focus-visible:outline-none"
               >
                 <span
                   aria-hidden="true"
@@ -512,7 +598,7 @@ export function ProgrammeList({
           />
         );
       })}
-    </Card>
+    </div>
   );
 }
 

@@ -281,7 +281,7 @@ export default async function VillaPage({
                 <SectionHead
                   title="Every stage"
                   count={programme.stages.length}
-                  hint="Tap a stage for its status, contractor, days and dates"
+                  hint="Tap a family to open it, a stage for its status, contractor, days and dates"
                 />
                 <ProgrammeList
                   plotId={plotId}
@@ -398,7 +398,7 @@ function Records({
             : undefined
         }
         collapsible
-        defaultOpen
+        defaultOpen={false}
       >
         <LabourList villa={villa} plotId={plotId} works={works} contractors={contractors} />
       </Section>
