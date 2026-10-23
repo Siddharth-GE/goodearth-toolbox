@@ -390,7 +390,9 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
             .from("estimate_work_facts")
             .select("work_item_id, quantity, uom")
             .eq("unit_id", unitId)
+            .order("estimate_id")
             .order("work_item_id")
+            .order("quantity")
             .range(from, to),
         )
       : Promise.resolve([]),

@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
   dayInIndia,
@@ -19,11 +20,23 @@ import {
   type SiteVillaRow,
   type StageRow,
 } from "./programme-queries";
+import { addDays } from "./schedule";
+import { awaitsConfirmation } from "./site-receipt";
 
 /** The site board (plan.md phase D): every villa's programme, health and forecast at once, from the same rules as the villa
  * page. Deliveries count as the villa page does: the newest 20 issues and 20 site deliveries, each until the site confirms it. */
 
 const GRANT = "/supervisors";
+/** "No labour for 5 days" needs only the recent past; older logs count as none, and the stage's start stands in. */
+const LABOUR_LOOKBACK_DAYS = 60;
+/** Ids per `.in()` read, so a long list never overflows the request's address. */
+const CHUNK = 150;
+
+async function inChunks<T>(ids: string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+  const chunks: string[][] = [];
+  for (let at = 0; at < ids.length; at += CHUNK) chunks.push(ids.slice(at, at + CHUNK));
+  return (await Promise.all(chunks.map(read))).flat();
+}
 const RECENT_DELIVERIES = 20;
 
 export const NOT_STARTED_COLUMN = "Not started";
@@ -92,7 +105,6 @@ export async function getSiteBoard(params: {
     estimate,
     logs,
     openChecklists,
-    failedItems,
     issues,
     receipts,
     confirmations,
@@ -142,6 +154,7 @@ export async function getSiteBoard(params: {
       supabase
         .from("labour_logs")
         .select("plot_id, work_item_id, log_date")
+        .gte("log_date", addDays(todayInIndia(), -LABOUR_LOOKBACK_DAYS))
         .order("id")
         .range(from, to),
     ),
@@ -150,14 +163,6 @@ export async function getSiteBoard(params: {
         .from("site_checklists")
         .select("id, plot_id")
         .eq("status", "open")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("site_checklist_items")
-        .select("checklist_id")
-        .eq("status", "fail")
         .order("id")
         .range(from, to),
     ),
@@ -183,7 +188,7 @@ export async function getSiteBoard(params: {
     fetchAll((from, to) =>
       supabase
         .from("site_receipt_confirmations")
-        .select("issue_id, receipt_id")
+        .select("id, issue_id, receipt_id")
         .order("id")
         .range(from, to),
     ),
@@ -205,7 +210,9 @@ export async function getSiteBoard(params: {
     const map = new Map<string, T[]>();
     for (const row of rows) {
       if (!row.plot_id) continue;
-      map.set(row.plot_id, [...(map.get(row.plot_id) ?? []), row]);
+      const list = map.get(row.plot_id);
+      if (list) list.push(row);
+      else map.set(row.plot_id, [row]);
     }
     return map;
   };
@@ -214,10 +221,10 @@ export async function getSiteBoard(params: {
   const estimateByUnit = new Map<string, EstimateRow[]>();
   for (const row of estimate) {
     if (!row.unit_id) continue;
-    estimateByUnit.set(row.unit_id, [
-      ...(estimateByUnit.get(row.unit_id) ?? []),
-      { work_item_id: row.work_item_id, quantity: null, uom: null },
-    ]);
+    const entry = { work_item_id: row.work_item_id, quantity: null, uom: null };
+    const list = estimateByUnit.get(row.unit_id);
+    if (list) list.push(entry);
+    else estimateByUnit.set(row.unit_id, [entry]);
   }
   const lastLabour = new Map<string, Map<string, string>>();
   for (const log of logs) {
@@ -228,39 +235,109 @@ export async function getSiteBoard(params: {
     if (!last || log.log_date > last) forPlot.set(group, log.log_date);
     lastLabour.set(log.plot_id, forPlot);
   }
+  const failedItems = await inChunks(
+    openChecklists.map((checklist) => checklist.id),
+    (ids) =>
+      fetchAll((from, to) =>
+        supabase
+          .from("site_checklist_items")
+          .select("id, checklist_id")
+          .eq("status", "fail")
+          .in("checklist_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+  );
   const failedChecklists = new Set(failedItems.map((item) => item.checklist_id));
   const failedByPlot = new Map<string, number>();
   for (const checklist of openChecklists) {
     if (!failedChecklists.has(checklist.id)) continue;
     failedByPlot.set(checklist.plot_id, (failedByPlot.get(checklist.plot_id) ?? 0) + 1);
   }
-  const confirmedIssues = new Set(
-    confirmations.flatMap((row) => (row.issue_id ? [row.issue_id] : [])),
+  // The villa page's window: the newest 20 issues and site deliveries together, by when they went.
+  const recent = [
+    ...byPlot([
+      ...issues.map((row) => ({
+        kind: "issue" as const,
+        id: row.id,
+        plot_id: row.plot_id,
+        at: row.issued_at,
+      })),
+      ...receipts.map((row) => ({
+        kind: "receipt" as const,
+        id: row.id,
+        plot_id: row.plot_id,
+        at: row.received_at,
+      })),
+    ]).values(),
+  ].flatMap((list) => list.sort((a, b) => b.at.localeCompare(a.at)).slice(0, RECENT_DELIVERIES));
+  const recentIssues = recent.filter((row) => row.kind === "issue").map((row) => row.id);
+  const recentReceipts = recent.filter((row) => row.kind === "receipt").map((row) => row.id);
+  const recentSet = new Set([...recentIssues, ...recentReceipts]);
+  const confirmationOf = new Map(
+    confirmations.flatMap((row) => {
+      const of = row.issue_id ?? row.receipt_id;
+      return of && recentSet.has(of) ? [[of, row.id] as const] : [];
+    }),
   );
-  const confirmedReceipts = new Set(
-    confirmations.flatMap((row) => (row.receipt_id ? [row.receipt_id] : [])),
+  const [issueLines, receiptLines, confirmedLines] = await Promise.all([
+    inChunks(recentIssues, (ids) =>
+      fetchAll((from, to) =>
+        supabase
+          .from("stock_issue_lines")
+          .select("id, issue_id")
+          .in("issue_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+    ),
+    inChunks(recentReceipts, (ids) =>
+      fetchAll((from, to) =>
+        supabase
+          .from("goods_receipt_lines")
+          .select("id, receipt_id")
+          .in("receipt_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+    ),
+    inChunks([...confirmationOf.values()], (ids) =>
+      fetchAll((from, to) =>
+        supabase
+          .from("site_receipt_confirmation_lines")
+          .select("id, issue_line_id, receipt_line_id")
+          .in("confirmation_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+    ),
+  ]);
+  const received = new Set(
+    confirmedLines.map((line) => line.issue_line_id ?? line.receipt_line_id),
   );
+  const linesOf = new Map<string, { received: number | null }[]>();
+  for (const line of [
+    ...issueLines.map((row) => ({ id: row.id, of: row.issue_id })),
+    ...receiptLines.map((row) => ({ id: row.id, of: row.receipt_id })),
+  ]) {
+    const entry = { received: received.has(line.id) ? 1 : null };
+    const list = linesOf.get(line.of);
+    if (list) list.push(entry);
+    else linesOf.set(line.of, [entry]);
+  }
   const unconfirmedByPlot = new Map<string, string[]>();
-  const addUnconfirmed = (
-    rows: { id: string; plot_id: string | null; at: string }[],
-    confirmed: Set<string>,
-  ) => {
-    for (const [plot, list] of byPlot(rows)) {
-      const open = list
-        .slice(0, RECENT_DELIVERIES)
-        .filter((row) => !confirmed.has(row.id))
-        .map((row) => dayInIndia(row.at));
-      unconfirmedByPlot.set(plot, [...(unconfirmedByPlot.get(plot) ?? []), ...open]);
-    }
-  };
-  addUnconfirmed(
-    issues.map((row) => ({ id: row.id, plot_id: row.plot_id, at: row.issued_at })),
-    confirmedIssues,
-  );
-  addUnconfirmed(
-    receipts.map((row) => ({ id: row.id, plot_id: row.plot_id, at: row.received_at })),
-    confirmedReceipts,
-  );
+  for (const row of recent) {
+    if (!row.plot_id) continue;
+    const waiting = awaitsConfirmation({
+      confirmed: confirmationOf.has(row.id),
+      lines: linesOf.get(row.id) ?? [],
+    });
+    if (!waiting) continue;
+    unconfirmedByPlot.set(row.plot_id, [
+      ...(unconfirmedByPlot.get(row.plot_id) ?? []),
+      dayInIndia(row.at),
+    ]);
+  }
   const requestsByPlot = new Map<string, number>();
   for (const request of requests) {
     requestsByPlot.set(request.plot_id, (requestsByPlot.get(request.plot_id) ?? 0) + 1);
@@ -269,6 +346,7 @@ export async function getSiteBoard(params: {
   const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
+  const sequenced = new Set(shared.sequencePositions.map((entry) => entry.groupId));
   // The columns: categories in the order the sequence first reaches them.
   const categoryOf = new Map(groupInfos.map((group) => [group.id, group.categoryName]));
   const categories: string[] = [];
@@ -303,13 +381,16 @@ export async function getSiteBoard(params: {
       oldestUnconfirmedDelivery: unconfirmed[0] ?? null,
       today,
     });
-    const furthest = stages.findLast((stage) => stage.status !== "not_started");
+    const furthest = stages.findLast(
+      (stage) => stage.status !== "not_started" && sequenced.has(stage.id),
+    );
     const column =
       health.kind === "finished"
         ? FINISHED_COLUMN
         : furthest
           ? furthest.categoryName
-          : NOT_STARTED_COLUMN;
+          : (stages.findLast((stage) => stage.status !== "not_started")?.categoryName ??
+            NOT_STARTED_COLUMN);
     const first = now[0];
     const supervisorId = site?.supervisor_id ?? null;
     return {
@@ -369,7 +450,18 @@ export async function getSiteBoard(params: {
   const health = isHealth(params.health) ? params.health : null;
 
   return {
-    columns: [NOT_STARTED_COLUMN, ...categories, FINISHED_COLUMN],
+    columns: [
+      NOT_STARTED_COLUMN,
+      ...categories,
+      // A villa whose only begun stages lie outside the sequence still gets a column.
+      ...[...new Set(all.map((card) => card.column))].filter(
+        (column) =>
+          column !== NOT_STARTED_COLUMN &&
+          column !== FINISHED_COLUMN &&
+          !categories.includes(column),
+      ),
+      FINISHED_COLUMN,
+    ],
     cards: health ? scoped.filter((card) => card.health.kind === health) : scoped,
     counts,
     projects: [...new Map(all.map((card) => [card.projectId, card.projectName])).entries()]

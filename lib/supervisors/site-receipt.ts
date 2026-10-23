@@ -3,6 +3,17 @@
 
 export type ReceiptLine = { lineId: string; sent: number; received: number | null };
 
+/** Waiting for the site: a delivery with lines and no confirmation, or one whose confirmation did not reach every line. */
+export function awaitsConfirmation(delivery: {
+  confirmed: boolean;
+  lines: { received: number | null }[];
+}): boolean {
+  return (
+    delivery.lines.length > 0 &&
+    (!delivery.confirmed || delivery.lines.some((line) => line.received === null))
+  );
+}
+
 export function isShort(line: { sent: number; received: number | null }): boolean {
   return line.received !== null && line.received < line.sent;
 }
