@@ -2693,6 +2693,52 @@ export type Database = {
           },
         ]
       }
+      checklist_template_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          template_id: string
+          work_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          template_id: string
+          work_group_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          template_id?: string
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_groups_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_groups_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_template_items: {
         Row: {
           created_at: string
@@ -4471,6 +4517,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_item_rates_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_item_rates_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4647,6 +4700,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_line_costs_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4805,6 +4865,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_lines_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_lines_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4883,6 +4950,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -5022,6 +5096,13 @@ export type Database = {
             columns: ["source_estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimates_source_estimate_id_fkey"
+            columns: ["source_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -5302,6 +5383,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -6234,6 +6322,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "indent_lines_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -8792,6 +8887,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          photo_path: string | null
           remarks: string | null
           status: string
           template_item_id: string
@@ -8803,6 +8899,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          photo_path?: string | null
           remarks?: string | null
           status?: string
           template_item_id: string
@@ -8814,6 +8911,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          photo_path?: string | null
           remarks?: string | null
           status?: string
           template_item_id?: string
@@ -8870,6 +8968,7 @@ export type Database = {
           template_id: string
           updated_at: string
           updated_by: string | null
+          work_group_id: string | null
         }
         Insert: {
           attachment_path?: string | null
@@ -8889,6 +8988,7 @@ export type Database = {
           template_id: string
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
         }
         Update: {
           attachment_path?: string | null
@@ -8908,6 +9008,7 @@ export type Database = {
           template_id?: string
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
         }
         Relationships: [
           {
@@ -8943,6 +9044,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -9038,6 +9146,346 @@ export type Database = {
             columns: ["receipt_id"]
             isOneToOne: true
             referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_schedule_settings: {
+        Row: {
+          created_at: string
+          id: string
+          singleton: boolean
+          typical_sqft: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          typical_sqft?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          typical_sqft?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_schedule_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_sequence: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          follows_group_id: string | null
+          id: string
+          link: string
+          position: number
+          typical_days: number | null
+          updated_at: string
+          updated_by: string | null
+          wait_days: number
+          work_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          follows_group_id?: string | null
+          id?: string
+          link?: string
+          position: number
+          typical_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          wait_days?: number
+          work_group_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          follows_group_id?: string | null
+          id?: string
+          link?: string
+          position?: number
+          typical_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          wait_days?: number
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_sequence_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_follows_group_id_fkey"
+            columns: ["follows_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: true
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_stage_events: {
+        Row: {
+          actor_id: string | null
+          at: string
+          from_status: string | null
+          id: string
+          kind: string
+          note: string | null
+          plot_id: string
+          seq: number
+          to_status: string | null
+          waiting_on: string | null
+          work_group_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          at?: string
+          from_status?: string | null
+          id?: string
+          kind: string
+          note?: string | null
+          plot_id: string
+          seq?: never
+          to_status?: string | null
+          waiting_on?: string | null
+          work_group_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          at?: string
+          from_status?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          plot_id?: string
+          seq?: never
+          to_status?: string | null
+          waiting_on?: string | null
+          work_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_stage_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stage_events_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stage_events_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_stages: {
+        Row: {
+          baseline_finish: string | null
+          baseline_start: string | null
+          contractor_id: string | null
+          created_at: string
+          created_by: string | null
+          days: number | null
+          finished_on: string | null
+          id: string
+          pinned_start: string | null
+          plot_id: string
+          started_on: string | null
+          status: string
+          status_changed_at: string
+          updated_at: string
+          updated_by: string | null
+          waiting_note: string | null
+          waiting_on: string | null
+          work_group_id: string
+        }
+        Insert: {
+          baseline_finish?: string | null
+          baseline_start?: string | null
+          contractor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          days?: number | null
+          finished_on?: string | null
+          id?: string
+          pinned_start?: string | null
+          plot_id: string
+          started_on?: string | null
+          status?: string
+          status_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          waiting_note?: string | null
+          waiting_on?: string | null
+          work_group_id: string
+        }
+        Update: {
+          baseline_finish?: string | null
+          baseline_start?: string | null
+          contractor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          days?: number | null
+          finished_on?: string | null
+          id?: string
+          pinned_start?: string | null
+          plot_id?: string
+          started_on?: string | null
+          status?: string
+          status_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          waiting_note?: string | null
+          waiting_on?: string | null
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_stages_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_villas: {
+        Row: {
+          baseline_note: string | null
+          baselined_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          plot_id: string
+          start_on: string | null
+          supervisor_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          baseline_note?: string | null
+          baselined_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plot_id: string
+          start_on?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          baseline_note?: string | null
+          baselined_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plot_id?: string
+          start_on?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_villas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: true
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -11227,6 +11675,31 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["project_id", "id"]
+          },
+        ]
+      }
+      estimate_work_facts: {
+        Row: {
+          estimate_id: string | null
+          quantity: number | null
+          unit_id: string | null
+          uom: string | null
+          work_item_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_lines_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_work_info_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
         ]
       }

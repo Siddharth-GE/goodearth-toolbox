@@ -77,7 +77,10 @@ export async function listChecklistTemplates(): Promise<TemplateRow[]> {
 
 export type VillaChecklistRow = {
   id: string;
+  templateId: string;
   templateName: string;
+  /** The stage it was started for (0137); null for one started before stages existed. */
+  workGroupId: string | null;
   location: string | null;
   startedOn: string;
   status: "open" | "signed_off";
@@ -92,7 +95,9 @@ export async function listVillaChecklists(plotId: string): Promise<VillaChecklis
   const supabase = await createClient();
   const { data: checklists, error } = await supabase
     .from("site_checklists")
-    .select("id, location, started_on, status, signed_off_at, checklist_templates(name)")
+    .select(
+      "id, template_id, work_group_id, location, started_on, status, signed_off_at, checklist_templates(name)",
+    )
     .eq("plot_id", plotId)
     .order("started_on", { ascending: false })
     .order("created_at", { ascending: false });
@@ -120,6 +125,8 @@ export async function listVillaChecklists(plotId: string): Promise<VillaChecklis
     );
     return {
       id: checklist.id,
+      templateId: checklist.template_id,
+      workGroupId: checklist.work_group_id,
       templateName: (checklist.checklist_templates as { name: string } | null)?.name ?? "—",
       location: checklist.location,
       startedOn: checklist.started_on,
@@ -128,6 +135,27 @@ export async function listVillaChecklists(plotId: string): Promise<VillaChecklis
       ...progress,
     };
   });
+}
+
+/** Which stages each checklist inspects (0137): template id → work group ids. */
+export async function listTemplateGroups(): Promise<Map<string, string[]>> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const links = await fetchAll((from, to) =>
+    supabase
+      .from("checklist_template_groups")
+      .select("template_id, work_group_id")
+      .order("id")
+      .range(from, to),
+  );
+  const byTemplate = new Map<string, string[]>();
+  for (const link of links) {
+    byTemplate.set(link.template_id, [
+      ...(byTemplate.get(link.template_id) ?? []),
+      link.work_group_id,
+    ]);
+  }
+  return byTemplate;
 }
 
 export type ChecklistItemRow = {
