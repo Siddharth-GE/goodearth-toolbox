@@ -3,10 +3,13 @@
 The founder's asks, in this order, each its own pull request into `staging` and vetted there:
 
 1. [x] **A shorter villa page** `[Opus]` — essentials first, the rest folded; the date strip by family, a scroll bar on top (`supervisors/PLAN.md`). No migration.
-2. [ ] **The site team's schedule workbook** (`Downloads\sched.xlsb`, ~70 activities a plot) `[Opus]`:
-   - each activity mapped to one of the 43 stages, its scheduled days rolled up into the stage's typical days — **the founder sees the mapping before anything is written**;
-   - typical and wait days typed straight into Supervisors → Sequence's list, no dialog per stage;
-   - the workbook's real plots (P-2, P-8, P-26, P-28, P-15, P-22-23, P-10, P-13, P-17, P-25, P-39, P-4) get their start date and their stages working or done from the actual dates (founder: "also load real plots"), dry run first.
+2. [x] **The site team's schedule workbook, and each villa bending the sequence** `[Opus]` (`0140`, applied to staging; rules in `supervisors/PLAN.md`):
+   - [x] each activity mapped to a stage, days rolled up; the app's order kept and stages with no line given 1 day marked to fill in (founder, 2026-10-23);
+   - [x] typical and wait days typed straight into Supervisors → Sequence's list;
+   - [x] per villa: "Not needed on this villa" and its own "Follows" (founder, mid-build: "some works are not needed in some houses, and some may need to be rearranged");
+   - [x] **the load itself** — on the founder's word, 2026-10-23: 43 stage days, 4 waits, 13 villas, 193 stages on staging (backup `data/backups/2026-10-23T11-45-32-429Z-…-site-schedule`). "Johny" (P-26, P-39) matches nobody on staging, so those two have no supervisor. The 187 Saarang stages check out against the stricter "done" rule the review asked for.
+   - [ ] **Plot 2 went to Baveli's P2** (the review: plot codes repeat across projects; the script now takes `--plots-in`). Waiting for the founder's word: remove what the load added there (6 stages, their 6 history lines, the villa's start and supervisor — Baveli P2's own 3 stages stay), then load P-2 into Saarang's P2.
+   - [x] Review fixes: labour on a stage left off brings it back (`0141`, on staging); every stage left off can be brought back; a chain of villa choices orders the same every time; the dialog keeps "to fill in" unless its days changed; a villa's own order works on a stage the sequence does not name; refused numbers say why on the phone; the two scroll bars follow by position.
 3. [ ] **A test project, the whole chain buzzing** `[Opus designs; Fable reviews the wipe unless waived]` — a project marked as test data (never Baveli, which is real), one villa with a big official estimate, indents, POs, deliveries into several stores, issues, labour, stages, checklists, and Design Management with dummy links and released drawings. One red **Delete the test project** button in Settings, admin only, that can touch only rows under a test project. Staging becomes production, so the flag is the safety: nothing unflagged is reachable.
 4. [ ] **Delete or Cancel, across every tool** `[Fable plans; Opus and Sonnet build]` — founder's rule: a record nothing uses yet really deletes; one something depends on offers **Cancel** instead (hidden from lists and counts, kept, with a reason), and the message says what depends on it. Needs a survey of every tool's records first; RLS delete policies make it Fable's.
 

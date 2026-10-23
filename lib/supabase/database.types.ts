@@ -9189,6 +9189,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          days_to_confirm: boolean
           follows_group_id: string | null
           id: string
           link: string
@@ -9202,6 +9203,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          days_to_confirm?: boolean
           follows_group_id?: string | null
           id?: string
           link?: string
@@ -9215,6 +9217,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          days_to_confirm?: boolean
           follows_group_id?: string | null
           id?: string
           link?: string
@@ -9329,7 +9332,10 @@ export type Database = {
           created_by: string | null
           days: number | null
           finished_on: string | null
+          follows_group_id: string | null
           id: string
+          link: string | null
+          not_needed: boolean
           pinned_start: string | null
           plot_id: string
           started_on: string | null
@@ -9349,7 +9355,10 @@ export type Database = {
           created_by?: string | null
           days?: number | null
           finished_on?: string | null
+          follows_group_id?: string | null
           id?: string
+          link?: string | null
+          not_needed?: boolean
           pinned_start?: string | null
           plot_id: string
           started_on?: string | null
@@ -9369,7 +9378,10 @@ export type Database = {
           created_by?: string | null
           days?: number | null
           finished_on?: string | null
+          follows_group_id?: string | null
           id?: string
+          link?: string | null
+          not_needed?: boolean
           pinned_start?: string | null
           plot_id?: string
           started_on?: string | null
@@ -9394,6 +9406,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_follows_group_id_fkey"
+            columns: ["follows_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
             referencedColumns: ["id"]
           },
           {

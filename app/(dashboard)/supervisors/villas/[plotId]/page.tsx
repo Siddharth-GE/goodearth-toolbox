@@ -287,6 +287,7 @@ export default async function VillaPage({
                   plotId={plotId}
                   stages={programme.stages}
                   contractors={contractors}
+                  leftOff={programme.leftOff}
                 />
               </section>
             )}

@@ -21,6 +21,8 @@ export type SequenceRow = {
   link: SequenceLink;
   waitDays: number;
   typicalDays: number | null;
+  /** Stand-in days for the site team to replace. */
+  daysToConfirm: boolean;
 };
 
 export type SiteSequence = {
@@ -38,7 +40,9 @@ export async function getSiteSequence(): Promise<SiteSequence> {
     fetchAll((from, to) =>
       supabase
         .from("site_sequence")
-        .select("work_group_id, position, follows_group_id, link, wait_days, typical_days")
+        .select(
+          "work_group_id, position, follows_group_id, link, wait_days, typical_days, days_to_confirm",
+        )
         .order("position")
         .order("id")
         .range(from, to),
@@ -69,6 +73,7 @@ export async function getSiteSequence(): Promise<SiteSequence> {
           link: isSequenceLink(entry.link) ? entry.link : "after",
           waitDays: entry.wait_days,
           typicalDays: entry.typical_days,
+          daysToConfirm: entry.days_to_confirm,
         },
       ];
     }),

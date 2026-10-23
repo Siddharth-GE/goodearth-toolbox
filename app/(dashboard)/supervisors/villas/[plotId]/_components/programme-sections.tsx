@@ -26,6 +26,7 @@ import { StartChecklistDialog } from "./checklist-forms";
 import { LabourLogDialog } from "./labour-forms";
 import { RequestIssueDialog } from "./request-forms";
 import {
+  BringBackButton,
   StageContractorSelect,
   StageSheet,
   StageStatusChips,
@@ -77,6 +78,7 @@ export function controlData(plotId: string, stage: StageView): StageControlData 
       finish: stage.forecast.finish,
       pinnedBehind: stage.forecast.pinnedBehind,
     },
+    follows: stage.follows,
   };
 }
 
@@ -497,10 +499,12 @@ export function ProgrammeList({
   plotId,
   stages,
   contractors,
+  leftOff,
 }: {
   plotId: string;
   stages: StageView[];
   contractors: ContractorOption[];
+  leftOff: VillaProgramme["leftOff"];
 }) {
   const families = stageFamilies(stages);
   const anyInHand = families.some((family) => family.inHand);
@@ -521,10 +525,41 @@ export function ProgrammeList({
                 {`${family.done} of ${family.stages.length} done`}
               </span>
             </summary>
-            <StageRows plotId={plotId} stages={family.stages} contractors={contractors} />
+            <StageRows
+              plotId={plotId}
+              stages={family.stages}
+              allStages={stages}
+              contractors={contractors}
+            />
           </details>
         </Card>
       ))}
+      {leftOff.length > 0 ? (
+        <Card className="p-0">
+          <details className="group">
+            <summary className="hover:bg-foreground/[0.025] flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-2xl px-4 py-2.5 marker:content-none">
+              <ChevronRight
+                className="text-muted size-4 shrink-0 transition-transform group-open:rotate-90"
+                aria-hidden
+              />
+              <span className="text-foreground flex-1 text-sm font-semibold">
+                Not needed on this villa
+              </span>
+              <span className="text-muted text-xs tabular-nums">{leftOff.length}</span>
+            </summary>
+            <ul className="divide-border border-border divide-y border-t">
+              {leftOff.map((stage) => (
+                <li key={stage.id} className="flex items-center gap-3 px-4 py-2">
+                  <span className="text-muted min-w-0 flex-1 truncate text-sm">
+                    <span className="font-mono text-xs">{stage.code}</span> {stage.name}
+                  </span>
+                  <BringBackButton plotId={plotId} groupId={stage.id} />
+                </li>
+              ))}
+            </ul>
+          </details>
+        </Card>
+      ) : null}
     </div>
   );
 }
@@ -532,10 +567,12 @@ export function ProgrammeList({
 function StageRows({
   plotId,
   stages,
+  allStages,
   contractors,
 }: {
   plotId: string;
   stages: StageView[];
+  allStages: StageView[];
   contractors: ContractorOption[];
 }) {
   return (
@@ -557,6 +594,9 @@ function StageRows({
             stage={controlData(plotId, stage)}
             contractors={contractors}
             waitingLine={waitingLine(stage)}
+            otherStages={allStages
+              .filter((other) => other.id !== stage.id)
+              .map((other) => ({ id: other.id, label: `${other.code} ${other.name}` }))}
             trigger={
               <button
                 type="button"

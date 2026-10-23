@@ -25,6 +25,8 @@ import {
   restoreStage,
   setStageContractor,
   setStageDates,
+  setStageFollows,
+  setStageNeeded,
   setStagePlan,
   setStageStatus,
   setVillaSupervisor,
@@ -38,7 +40,12 @@ import {
   type StageStatus,
   type WaitingOn,
 } from "@/lib/supervisors/programme";
-import type { DaysSource } from "@/lib/supervisors/schedule";
+import {
+  SEQUENCE_LINK_LABEL,
+  SEQUENCE_LINKS,
+  type DaysSource,
+  type SequenceLink,
+} from "@/lib/supervisors/schedule";
 import { formatShortDate } from "@/lib/format";
 import { useState, type ReactNode } from "react";
 
@@ -62,6 +69,13 @@ export type StageControlData = {
     start: string | null;
     finish: string | null;
     pinnedBehind: boolean;
+  };
+  /** What it follows on this villa: its own choice, or the sequence's. */
+  follows: {
+    own: { followsGroupId: string; link: SequenceLink } | null;
+    sequenceLabel: string | null;
+    sequenceLink: SequenceLink;
+    inSequence: boolean;
   };
 };
 
@@ -265,17 +279,21 @@ export function StageSheet({
   contractors,
   trigger,
   waitingLine,
+  otherStages,
 }: {
   stage: StageControlData;
   contractors: { id: string; name: string }[];
   trigger: ReactNode;
   waitingLine: string | null;
+  /** The villa's other stages, for "on this villa it follows". */
+  otherStages?: { id: string; label: string }[];
 }) {
   const { snapshot } = stage;
   const started = snapshot.status !== "not_started";
+  const [open, setOpen] = useState(false);
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -308,6 +326,13 @@ export function StageSheet({
             </p>
           )}
           {snapshot.status !== "done" ? <StagePlanFields stage={stage} /> : null}
+          {otherStages ? (
+            <StageVillaOrder
+              stage={stage}
+              otherStages={otherStages}
+              onLeftOff={() => setOpen(false)}
+            />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -466,6 +491,121 @@ function StagePlanFields({ stage }: { stage: StageControlData }) {
       >
         {pending ? "Saving…" : "Save the schedule"}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * This villa's own say on the stage: what it follows here instead of the sequence, and leaving it off altogether. Every other
+ * villa keeps the sequence.
+ */
+function StageVillaOrder({
+  stage,
+  otherStages,
+  onLeftOff,
+}: {
+  stage: StageControlData;
+  otherStages: { id: string; label: string }[];
+  onLeftOff: () => void;
+}) {
+  const { own, sequenceLabel, sequenceLink, inSequence } = stage.follows;
+  const [follows, setFollows] = useState(own?.followsGroupId ?? "");
+  const [link, setLink] = useState<SequenceLink>(own?.link ?? "after");
+  const { pending, error, run } = useActionRunner();
+  const [saved, setSaved] = useState(false);
+  const unchanged =
+    follows === (own?.followsGroupId ?? "") && (!follows || link === (own?.link ?? "after"));
+  const sequenceSays = !inSequence
+    ? "As the list: after the stage before it"
+    : sequenceLabel
+      ? `As the sequence: ${sequenceLink === "alongside" ? "alongside" : "after"} ${sequenceLabel.split(" ")[0]}`
+      : "As the sequence: first";
+
+  return (
+    <div className="border-border space-y-3 border-t pt-4">
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+        On this villa
+      </p>
+      <div className="space-y-1.5">
+        <Label htmlFor={`follows-${stage.groupId}`}>Follows</Label>
+        <Select
+          id={`follows-${stage.groupId}`}
+          value={follows}
+          onChange={(event) => setFollows(event.target.value)}
+        >
+          <option value="">{sequenceSays}</option>
+          {otherStages.map((other) => (
+            <option key={other.id} value={other.id}>
+              {other.label}
+            </option>
+          ))}
+        </Select>
+      </div>
+      {follows ? (
+        <ChoiceChips
+          label="How"
+          options={SEQUENCE_LINKS.map((value) => ({ value, label: SEQUENCE_LINK_LABEL[value] }))}
+          value={link}
+          onChange={(value) => value && setLink(value)}
+          required
+        />
+      ) : null}
+      <FormMessage error={error} success={saved && !pending ? "Saved" : undefined} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={pending || unchanged}
+          onClick={() =>
+            run(() =>
+              setStageFollows({
+                plotId: stage.plotId,
+                groupId: stage.groupId,
+                followsGroupId: follows,
+                link,
+              }),
+            ).then((result) => setSaved(!result?.error))
+          }
+        >
+          {pending ? "Saving…" : "Save the order"}
+        </Button>
+        {stage.snapshot.status === "not_started" ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={async () => {
+              const result = await run(() =>
+                setStageNeeded({ plotId: stage.plotId, groupId: stage.groupId, needed: false }),
+              );
+              if (!result?.error) onLeftOff();
+            }}
+          >
+            Not needed on this villa
+          </Button>
+        ) : null}
+      </div>
+      <p className="text-muted text-xs">
+        Only this villa changes. A stage left off is listed under Every stage, to bring back.
+      </p>
+    </div>
+  );
+}
+
+/** Puts a stage left off this villa back in its programme. */
+export function BringBackButton({ plotId, groupId }: { plotId: string; groupId: string }) {
+  const { pending, error, run } = useActionRunner();
+  return (
+    <div className="flex flex-col items-end">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        onClick={() => run(() => setStageNeeded({ plotId, groupId, needed: true }))}
+      >
+        {pending ? "Bringing back…" : "Bring back"}
+      </Button>
+      <FormMessage error={error} />
     </div>
   );
 }

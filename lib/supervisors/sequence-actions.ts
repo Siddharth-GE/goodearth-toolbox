@@ -58,6 +58,12 @@ export async function updateSequenceStage(input: {
     if (followedError) return saveFailed("updateSequenceStage read", followedError);
     if (!followed) return { error: "That stage was taken out of the sequence — pick another." };
   }
+  const { data: stored, error: storedError } = await supabase
+    .from("site_sequence")
+    .select("typical_days")
+    .eq("work_group_id", input.groupId)
+    .maybeSingle();
+  if (storedError) return saveFailed("updateSequenceStage read", storedError);
   const { data, error } = await supabase
     .from("site_sequence")
     .update({
@@ -65,11 +71,43 @@ export async function updateSequenceStage(input: {
       link: input.link,
       wait_days: wait ?? 0,
       typical_days: typical,
+      ...(stored && stored.typical_days !== typical ? { days_to_confirm: false } : {}),
       updated_by: user.id,
     })
     .eq("work_group_id", input.groupId)
     .select("id");
   if (error) return saveFailed("updateSequenceStage", error);
+  if ((data ?? []).length === 0) return { error: "That stage is no longer in the sequence." };
+  refresh();
+  return undefined;
+}
+
+/** One number typed straight into the list: a stage's typical days or its wait. Typed days are no longer a stand-in. */
+export async function setSequenceDays(input: {
+  groupId: string;
+  field: "typical" | "wait";
+  value: string;
+}): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!input.groupId) return { error: "Which stage?" };
+  const typical = input.field === "typical";
+  const value = wholeOrBlank(input.value, typical ? 1 : 0);
+  if (value === "bad") {
+    return {
+      error: typical ? "Days is a whole number, 1 or more." : "Wait is a whole number, 0 or more.",
+    };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("site_sequence")
+    .update(
+      typical
+        ? { typical_days: value, days_to_confirm: false, updated_by: user.id }
+        : { wait_days: value ?? 0, updated_by: user.id },
+    )
+    .eq("work_group_id", input.groupId)
+    .select("id");
+  if (error) return saveFailed("setSequenceDays", error);
   if ((data ?? []).length === 0) return { error: "That stage is no longer in the sequence." };
   refresh();
   return undefined;

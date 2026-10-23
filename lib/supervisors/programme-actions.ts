@@ -7,8 +7,8 @@ import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isStageStatus, isWaitingOn, type StageStatus, type WaitingOn } from "./programme";
-import { getVillaForecast } from "./programme-queries";
-import { firstPlanBlocker } from "./schedule";
+import { getVillaForecast, getVillaRules } from "./programme-queries";
+import { firstPlanBlocker, followsInCircle, isSequenceLink } from "./schedule";
 
 /** Writes to Supervisors' own stage tables (0137). A stage row is made the first time anything is set on it; the database keeps the
  * dates in line with the status and writes the history. Every action revalidates the layout (the exact-path trap in CLAUDE.md). */
@@ -36,7 +36,7 @@ function refresh(plotId: string) {
 async function writeStage(
   plotId: string,
   groupId: string,
-  fields: Record<string, string | number | null>,
+  fields: Record<string, string | number | boolean | null>,
   what: string,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -61,6 +61,12 @@ async function writeStage(
   }
   if (error) {
     console.error(`${what} failed:`, error);
+    if (error.code === "23514" && error.message.includes("not_needed")) {
+      return { error: "This stage has begun, so it is needed — set it back to Not started first." };
+    }
+    if (error.code === "23514" && error.message.includes("follows")) {
+      return { error: "Pick the stage it follows, and after or alongside — never itself." };
+    }
     if (error.code === "23514") {
       return {
         error:
@@ -414,5 +420,58 @@ export async function setFirstPlan(input: { plotId: string; note: string }): Pro
     { baselined_at: new Date().toISOString(), baseline_note: note || null },
     "setFirstPlan",
     "Could not set the first plan. Try again.",
+  );
+}
+
+/** Leaves a stage off this villa, or brings it back. Only a stage not begun can be left off; the database says so too. */
+export async function setStageNeeded(input: {
+  plotId: string;
+  groupId: string;
+  needed: boolean;
+}): Promise<ActionState> {
+  await requireTool(GRANT);
+  if (!input.needed) {
+    const stored = await readStage(input.plotId, input.groupId);
+    if ("error" in stored) return stored;
+    if (stored.status !== "not_started") {
+      return { error: "This stage has begun, so it is needed — set it back to Not started first." };
+    }
+  }
+  return writeStage(input.plotId, input.groupId, { not_needed: !input.needed }, "setStageNeeded");
+}
+
+/** What a stage follows on this villa only; empty goes back to the sequence. Refused when it would wait on itself. */
+export async function setStageFollows(input: {
+  plotId: string;
+  groupId: string;
+  followsGroupId: string;
+  link: string;
+}): Promise<ActionState> {
+  await requireTool(GRANT);
+  if (!input.followsGroupId) {
+    return writeStage(
+      input.plotId,
+      input.groupId,
+      { follows_group_id: null, link: null },
+      "setStageFollows reset",
+    );
+  }
+  if (!isSequenceLink(input.link)) return { error: "Pick after or alongside." };
+  if (input.followsGroupId === input.groupId) return { error: "A stage can't follow itself." };
+  let rules: Awaited<ReturnType<typeof getVillaRules>>;
+  try {
+    rules = await getVillaRules(input.plotId);
+  } catch (thrown) {
+    console.error("setStageFollows read failed:", thrown);
+    return { error: "Could not read the villa's order. Try again." };
+  }
+  if (followsInCircle(rules, input.groupId, input.followsGroupId)) {
+    return { error: "That stage already waits on this one — pick another." };
+  }
+  return writeStage(
+    input.plotId,
+    input.groupId,
+    { follows_group_id: input.followsGroupId, link: input.link },
+    "setStageFollows",
   );
 }

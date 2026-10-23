@@ -10,6 +10,8 @@ import {
   stageDays,
   type ScheduleStage,
   type SequenceRule,
+  followsInCircle,
+  villaRules,
 } from "./schedule";
 
 const TODAY = "2026-11-01";
@@ -334,4 +336,44 @@ test("a pinned start already past says so; the first plan's handover ignores a s
   });
   assert.equal(joined.baselineHandover, "2026-11-03");
   assert.equal(joined.slip, 3);
+});
+
+test("villaRules swaps in a villa's own follows and keeps the rest", () => {
+  const rules = [
+    { groupId: "A", followsGroupId: null, link: "after" as const, waitDays: 0, typicalDays: 3 },
+    { groupId: "B", followsGroupId: "A", link: "after" as const, waitDays: 2, typicalDays: 4 },
+    { groupId: "C", followsGroupId: "B", link: "after" as const, waitDays: 0, typicalDays: 5 },
+  ];
+  const own = villaRules(
+    rules,
+    new Map([["C", { followsGroupId: "A", link: "alongside" as const }]]),
+  );
+  assert.deepEqual(own[2], {
+    groupId: "C",
+    followsGroupId: "A",
+    link: "alongside",
+    waitDays: 0,
+    typicalDays: 5,
+  });
+  assert.equal(own[1], rules[1]);
+  assert.equal(followsInCircle(rules, "A", "C"), true);
+  assert.equal(followsInCircle(rules, "C", "A"), false);
+  assert.equal(followsInCircle(rules, "B", "B"), true);
+});
+
+test("villaRules gives a stage the sequence does not name its villa's own rule", () => {
+  const rules = [
+    { groupId: "A", followsGroupId: null, link: "after" as const, waitDays: 0, typicalDays: 3 },
+  ];
+  const own = villaRules(
+    rules,
+    new Map([["X", { followsGroupId: "A", link: "alongside" as const }]]),
+  );
+  assert.deepEqual(own[1], {
+    groupId: "X",
+    followsGroupId: "A",
+    link: "alongside",
+    waitDays: 0,
+    typicalDays: null,
+  });
 });

@@ -106,6 +106,8 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 
 - **Look ahead reads each villa with something starting in full** (`getVillaDetail`, for material readiness). Fine for a supervisor's own villas; on Everyone at ~40 villas it is hundreds of reads, so give readiness its own narrow read of the estimate's materials and what was issued, for the villas involved, before then.
 
+- **A villa's own order can meet a later sequence change in a circle.** `setStageFollows` refuses a circle as things stand, but Supervisors → Sequence knows nothing of villa choices; a later sequence edit that closes one leaves that villa with no dates until its choice is undone.
+
 ## Open questions for the founder
 
 - Should a supervisor see only their own plots? Today every supervisor sees every villa, and the same answer decides who sees which villa's drawings. The mechanism exists since `0122` (a `scoped` tool with team leads); Supervisors would first need to record which supervisor is on which villa.
