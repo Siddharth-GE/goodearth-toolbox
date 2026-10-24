@@ -2,15 +2,9 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Vet on staging — Delete or Cancel, steps E and F
-
-Piece 4 is built (`plan.md`, top section). E (actions, #140) is merged; F (Masters' delete, admins only) is its own pull request. The checklist is each pull request's "Try on staging".
-
-- **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
-
 ## Native apps on iPhone and Android — next build
 
-- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), the top section of `plan.md`.
+- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), their section of `plan.md`.
 - **Meanwhile: the Play wrapper's version 1.** Built and signed; the founder's steps (Play Console, the reviewer account, the screenshots) and the fingerprint still to add are the launch steps in `android/PLAN.md`. The Capacitor app replaces it later as an update.
 - **Waiting on the founder:** trying Google sign-in in the app; a Firebase project (phase C); Apple's Organization enrolment; what staff would scan (phase D).
 
@@ -27,6 +21,7 @@ The founder gives the steps. Before the switch:
 
 1. ~~The refactor before production~~ — done and vetted 2026-10-18 (`plan.md`).
 2. The vet list below, tried or accepted as is.
+   - If the test project has been seeded again, delete it (Settings → Test project): its POs and bills use real vendors.
 3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
