@@ -38,6 +38,10 @@ const NAMED_BY: Record<
     | "indent_lines"
     | "purchase_orders"
     | "purchase_order_lines"
+    | "goods_receipts"
+    | "goods_receipt_lines"
+    | "stock_issues"
+    | "issue_requests"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -129,8 +133,31 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("purchase_orders", line.po_id);
     add("items", line.item_id);
   }
+  // A delivered line by its delivery and item; a site's request by its villa and item.
+  const [receiptLines, requests] = await Promise.all([
+    readIn(list("goods_receipt_lines"), (chunk) =>
+      supabase
+        .from("goods_receipt_lines")
+        .select("id, receipt_id, item_id, quantity, uom")
+        .in("id", chunk),
+    ),
+    readIn(list("issue_requests"), (chunk) =>
+      supabase
+        .from("issue_requests")
+        .select("id, plot_id, item_id, quantity, status")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const line of receiptLines) {
+    add("goods_receipts", line.receipt_id);
+    add("items", line.item_id);
+  }
+  for (const request of requests) {
+    add("plots", request.plot_id);
+    add("items", request.item_id);
+  }
 
-  const [people, indents, orders] = await Promise.all([
+  const [people, indents, orders, receipts, issues] = await Promise.all([
     readIn(list("profiles"), (chunk) =>
       supabase.from("profiles").select("id, full_name").in("id", chunk),
     ),
@@ -140,7 +167,14 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     readIn(list("purchase_orders"), (chunk) =>
       supabase.from("purchase_orders").select("id, reference, status").in("id", chunk),
     ),
+    readIn(list("goods_receipts"), (chunk) =>
+      supabase.from("goods_receipts").select("id, reference").in("id", chunk),
+    ),
+    readIn(list("stock_issues"), (chunk) =>
+      supabase.from("stock_issues").select("id, reference").in("id", chunk),
+    ),
   ]);
+  for (const record of [...receipts, ...issues]) names[record.id] = record.reference;
   for (const person of people) names[person.id] = person.full_name || "A person";
   for (const indent of indents) names[indent.id] = `${indent.reference} (${indent.status})`;
   for (const order of orders)
@@ -177,11 +211,22 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const line of [
     ...lines.map((one) => ({ ...one, of: one.indent_id })),
     ...poLines.map((one) => ({ ...one, of: one.po_id })),
+    ...receiptLines.map((one) => ({ ...one, of: one.receipt_id })),
   ]) {
     names[line.id] = [
       names[line.of],
       names[line.item_id],
       `${formatQuantity(line.quantity)} ${line.uom}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  for (const request of requests) {
+    names[request.id] = [
+      names[request.plot_id],
+      names[request.item_id],
+      formatQuantity(request.quantity),
+      `(${request.status})`,
     ]
       .filter(Boolean)
       .join(" · ");
