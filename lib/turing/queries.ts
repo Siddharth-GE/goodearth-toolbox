@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, idsOf, type IdTable } from "./catalogue-fields";
 import { conversationTurns, shownProposals, type SaveResult, type Turn } from "./display";
-import { namesFor } from "./names";
+import { alikeFor, namesFor } from "./names";
 
 /** Turing is the admins' own: never a grant, the way Settings is. */
 export async function requireTuring() {
@@ -65,11 +65,22 @@ export async function getConversation(
   assertRead("Turing", "what was saved", saves.error);
 
   const ids = new Map<IdTable, Set<string>>();
+  const saved = new Set((saves.data ?? []).map((save) => save.tool_use_id));
+  const alike = new Map<string, (string | null)[]>();
   for (const proposal of shownProposals(messages).values()) {
     const entry = entryFor(proposal.action);
     if (!entry) continue;
     for (const [table, found] of idsOf(entry, proposal.rows)) {
       ids.set(table, new Set([...(ids.get(table) ?? []), ...found]));
+    }
+    // Once saved, a new record would only look like itself.
+    if (entry.alike && !saved.has(proposal.id)) {
+      try {
+        const flags = await alikeFor(entry, proposal.rows);
+        if (flags) alike.set(proposal.id, flags);
+      } catch (thrown) {
+        console.error("turing: look-alikes not read:", thrown);
+      }
     }
   }
   const names = await namesFor(ids);
@@ -94,6 +105,7 @@ export async function getConversation(
         ]),
       ),
       names,
+      alike,
     ),
   };
 }

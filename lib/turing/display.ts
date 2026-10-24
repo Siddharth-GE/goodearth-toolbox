@@ -23,6 +23,8 @@ export type ShownProposal = {
   saved: Saved | null;
   /** Each id the rows name, as the admin knows it. */
   names: Record<string, string>;
+  /** Per row, on a proposal of new Masters records not yet saved: why it may already exist. */
+  alike?: (string | null)[];
 };
 
 export type Turn =
@@ -110,6 +112,7 @@ export function conversationTurns(
   pageTitles: Map<string, string>,
   saves: Map<string, Saved> = new Map(),
   names: Record<string, string> = {},
+  alike: Map<string, (string | null)[]> = new Map(),
 ): Turn[] {
   const turns: Turn[] = [];
   const proposals = shownProposals(messages);
@@ -144,7 +147,12 @@ export function conversationTurns(
       }
       const proposal = proposals.get(String(result.tool_use_id));
       if (proposal) {
-        answering().proposals.push({ ...proposal, saved: saves.get(proposal.id) ?? null, names });
+        answering().proposals.push({
+          ...proposal,
+          saved: saves.get(proposal.id) ?? null,
+          names,
+          alike: alike.get(proposal.id),
+        });
       }
     }
     if (results.length === blocks.length && blocks.length > 0) continue;
