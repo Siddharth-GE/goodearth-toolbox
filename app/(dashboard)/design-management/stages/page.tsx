@@ -16,6 +16,7 @@ import {
   DesignStageForm,
   DesignStageMoveButtons,
   DesignStageNameField,
+  DesignStageRows,
   DesignStageToggle,
 } from "./_components/stage-forms";
 
@@ -36,11 +37,14 @@ export default async function DesignStagesPage() {
           SAA-Saarang-Villa12-WD-TB0003-GFP.pdf.
         </p>
       </div>
-      <DesignStageForm />
+      <DesignStageForm stages={stages.map(({ id, name }) => ({ id, name }))} />
       {stages.length > 0 && (
         <Table>
           <TableHead>
             <TableRow>
+              <TableHeaderCell className="w-8 max-sm:hidden">
+                <span className="sr-only">Order</span>
+              </TableHeaderCell>
               <TableHeaderCell>Stage</TableHeaderCell>
               <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Board</TableHeaderCell>
@@ -49,40 +53,46 @@ export default async function DesignStagesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {stages.map((stage, index) => (
-              <TableRow key={stage.id}>
-                <TableCell>
-                  <DesignStageNameField id={stage.id} name={stage.name} />
-                </TableCell>
-                <TableCell>
-                  <DesignStageCodeField id={stage.id} code={stage.code} />
-                </TableCell>
-                <TableCell>
-                  <DesignStageBoardSwitch
-                    id={stage.id}
-                    name={stage.name}
-                    onBoard={stage.onBoard}
-                    disabled={!stage.isActive}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Badge variant={stage.isActive ? "success" : "warning"}>
-                    {stage.isActive ? "Active" : "Retired"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
-                    <DesignStageMoveButtons
-                      id={stage.id}
-                      name={stage.name}
-                      isFirst={index === 0}
-                      isLast={index === stages.length - 1}
-                    />
-                    <DesignStageToggle id={stage.id} isActive={stage.isActive} />
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            <DesignStageRows
+              rows={stages.map((stage, index) => ({
+                id: stage.id,
+                name: stage.name,
+                cells: (
+                  <>
+                    <TableCell>
+                      <DesignStageNameField id={stage.id} name={stage.name} />
+                    </TableCell>
+                    <TableCell>
+                      <DesignStageCodeField id={stage.id} code={stage.code} />
+                    </TableCell>
+                    <TableCell>
+                      <DesignStageBoardSwitch
+                        id={stage.id}
+                        name={stage.name}
+                        onBoard={stage.onBoard}
+                        disabled={!stage.isActive}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={stage.isActive ? "success" : "warning"}>
+                        {stage.isActive ? "Active" : "Retired"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <DesignStageMoveButtons
+                          id={stage.id}
+                          name={stage.name}
+                          isFirst={index === 0}
+                          isLast={index === stages.length - 1}
+                        />
+                        <DesignStageToggle id={stage.id} isActive={stage.isActive} />
+                      </div>
+                    </TableCell>
+                  </>
+                ),
+              }))}
+            />
           </TableBody>
         </Table>
       )}
