@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ProjectStatus, ProjectType } from "./projects";
+import { deleteMaster } from "./delete-master";
 
 const PROJECT_TYPES = ["apartment_villa_community", "eco_village", "mixed_residential_commercial"];
 const PROJECT_STATUSES = ["planning", "active", "completed"];
@@ -84,4 +85,14 @@ export async function updateProject(
   revalidatePath("/masters/projects", "layout");
   revalidatePath("/masters/companies");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150). */
+export async function deleteProject(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "projects", id, {
+    noun: "project",
+    retire: false,
+    paths: ["/masters/projects", "/masters/companies"],
+  });
 }

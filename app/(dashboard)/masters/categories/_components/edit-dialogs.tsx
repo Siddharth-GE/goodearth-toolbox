@@ -6,13 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { BrandRow } from "@/lib/masters/brands";
 import type { ItemCategoryRow } from "@/lib/masters/item-categories";
-import { updateBrand } from "@/lib/masters/brands-actions";
-import { updateItemCategory } from "@/lib/masters/item-categories-actions";
+import { deleteBrand, updateBrand } from "@/lib/masters/brands-actions";
+import { deleteItemCategory, updateItemCategory } from "@/lib/masters/item-categories-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 // Kind is not editable: items filed under a category were picked with its kind in mind.
 export function CategoryEditDialog({ category }: { category: ItemCategoryRow }) {
+  const isAdmin = useMastersAdmin();
   return (
-    <RecordFormDialog label="Category" isEdit action={updateItemCategory.bind(null, category.id)}>
+    <RecordFormDialog
+      label="Category"
+      isEdit
+      action={updateItemCategory.bind(null, category.id)}
+      onDelete={isAdmin ? () => deleteItemCategory(category.id) : undefined}
+    >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>
         <Input id="name" name="name" defaultValue={category.name} required autoComplete="off" />
@@ -27,8 +34,14 @@ export function CategoryEditDialog({ category }: { category: ItemCategoryRow }) 
 }
 
 export function BrandEditDialog({ brand }: { brand: BrandRow }) {
+  const isAdmin = useMastersAdmin();
   return (
-    <RecordFormDialog label="Brand" isEdit action={updateBrand.bind(null, brand.id)}>
+    <RecordFormDialog
+      label="Brand"
+      isEdit
+      action={updateBrand.bind(null, brand.id)}
+      onDelete={isAdmin ? () => deleteBrand(brand.id) : undefined}
+    >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>
         <Input id="name" name="name" defaultValue={brand.name} required autoComplete="off" />

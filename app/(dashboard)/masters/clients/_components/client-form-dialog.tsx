@@ -5,16 +5,23 @@ import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ClientRow } from "@/lib/masters/clients";
-import { createClientRecord, updateClientRecord } from "@/lib/masters/clients-actions";
+import {
+  createClientRecord,
+  deleteClient,
+  updateClientRecord,
+} from "@/lib/masters/clients-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function ClientFormDialog({ client }: { client?: ClientRow }) {
   const isEdit = !!client;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
       label="Client"
       isEdit={isEdit}
       action={isEdit ? updateClientRecord.bind(null, client.id) : createClientRecord}
+      onDelete={isAdmin && client ? () => deleteClient(client.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

@@ -10,7 +10,8 @@ import type { ClientRow } from "@/lib/masters/clients";
 import type { PlotRow } from "@/lib/masters/plots";
 import type { ProjectRow } from "@/lib/masters/projects";
 import type { UnitRow } from "@/lib/masters/units";
-import { createUnit, updateUnit } from "@/lib/masters/units-actions";
+import { createUnit, deleteUnit, updateUnit } from "@/lib/masters/units-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function UnitFormDialog({
   projects,
@@ -26,6 +27,7 @@ export function UnitFormDialog({
   unit?: UnitRow;
 }) {
   const isEdit = !!unit;
+  const isAdmin = useMastersAdmin();
   // Only plots without a unit are offered, plus the unit's own when editing (0029); the DB's unique index is the backstop.
   const [projectId, setProjectId] = useState(unit?.project_id ?? "");
   const takenPlotIds = new Set(
@@ -44,6 +46,7 @@ export function UnitFormDialog({
       label="Unit"
       isEdit={isEdit}
       action={isEdit ? updateUnit.bind(null, unit.id) : createUnit}
+      onDelete={isAdmin && unit ? () => deleteUnit(unit.id) : undefined}
       onOpen={() => setProjectId(unit?.project_id ?? "")}
     >
       <div className="space-y-1.5">

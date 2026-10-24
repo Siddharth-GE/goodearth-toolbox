@@ -7,16 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProjectRow } from "@/lib/masters/projects";
 import type { StoreRow } from "@/lib/masters/stores";
-import { createStore, updateStore } from "@/lib/masters/stores-actions";
+import { createStore, deleteStore, updateStore } from "@/lib/masters/stores-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function StoreFormDialog({ projects, store }: { projects: ProjectRow[]; store?: StoreRow }) {
   const isEdit = !!store;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
       label="Store"
       isEdit={isEdit}
       action={isEdit ? updateStore.bind(null, store.id) : createStore}
+      onDelete={isAdmin && store ? () => deleteStore(store.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

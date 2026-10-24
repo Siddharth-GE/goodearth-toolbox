@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 export async function createBrand(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
@@ -48,4 +49,14 @@ export async function updateBrand(
 
   revalidatePath("/masters/categories");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteBrand(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "brands", id, {
+    noun: "brand",
+    retire: true,
+    paths: ["/masters/categories"],
+  });
 }

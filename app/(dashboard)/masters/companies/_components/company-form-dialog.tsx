@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { CompanyRow } from "@/lib/masters/companies";
-import { createCompany, updateCompany } from "@/lib/masters/companies-actions";
+import { createCompany, deleteCompany, updateCompany } from "@/lib/masters/companies-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function CompanyFormDialog({ company }: { company?: CompanyRow }) {
   const isEdit = !!company;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
@@ -17,6 +19,7 @@ export function CompanyFormDialog({ company }: { company?: CompanyRow }) {
       wide
       isEdit={isEdit}
       action={isEdit ? updateCompany.bind(null, company.id) : createCompany}
+      onDelete={isAdmin && company ? () => deleteCompany(company.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

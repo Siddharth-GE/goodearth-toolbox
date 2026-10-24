@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { isItemKind, type ItemKind, type Placement } from "./constants";
 import { listActiveGstRates } from "./gst-rates";
 import { isActiveUom } from "./uoms";
+import { deleteMaster } from "./delete-master";
 
 function readItemForm(formData: FormData) {
   return {
@@ -124,4 +125,14 @@ export async function setItemPrice(itemId: string, price: number | null): Promis
 
   revalidatePath("/masters/items");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteItem(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "items", id, {
+    noun: "item",
+    retire: true,
+    paths: ["/masters/items"],
+  });
 }

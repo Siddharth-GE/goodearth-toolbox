@@ -7,7 +7,8 @@ import { Select } from "@/components/ui/select";
 import type { BrandRow } from "@/lib/masters/brands";
 import type { ItemCategoryRow } from "@/lib/masters/item-categories";
 import type { ItemRow } from "@/lib/masters/items";
-import { createItem, updateItem } from "@/lib/masters/items-actions";
+import { createItem, deleteItem, updateItem } from "@/lib/masters/items-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function ItemFormDialog({
   categories,
@@ -23,6 +24,7 @@ export function ItemFormDialog({
   item?: ItemRow;
 }) {
   const isEdit = !!item;
+  const isAdmin = useMastersAdmin();
   // Deactivated options stay visible on an item already using one.
   const pickableCategories = categories.filter(
     (category) => category.is_active || category.id === item?.category_id,
@@ -34,6 +36,7 @@ export function ItemFormDialog({
       label="Item"
       isEdit={isEdit}
       action={isEdit ? updateItem.bind(null, item.id) : createItem}
+      onDelete={isAdmin && item ? () => deleteItem(item.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

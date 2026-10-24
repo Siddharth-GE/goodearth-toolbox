@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { isWorkFamily } from "@/lib/masters/work-families";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -315,4 +316,34 @@ export async function setWorkItemActive(id: string, isActive: boolean): Promise<
 
   revalidatePath("/masters/works");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkCategory(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_categories", id, {
+    noun: "work category",
+    retire: true,
+    paths: ["/masters/works"],
+  });
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkGroup(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_groups", id, {
+    noun: "work group",
+    retire: true,
+    paths: ["/masters/works"],
+  });
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkItem(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_items", id, {
+    noun: "work",
+    retire: true,
+    paths: ["/masters/works"],
+  });
 }

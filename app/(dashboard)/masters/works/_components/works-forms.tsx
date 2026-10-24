@@ -13,6 +13,9 @@ import {
   addWorkCategory,
   addWorkGroup,
   addWorkItem,
+  deleteWorkCategory,
+  deleteWorkGroup,
+  deleteWorkItem,
   setWorkCategoryActive,
   setWorkGroupActive,
   setWorkItemActive,
@@ -22,6 +25,7 @@ import {
 } from "@/lib/masters/works-actions";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function WorkCategoryFormDialog({
   category,
@@ -33,11 +37,13 @@ export function WorkCategoryFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!category;
+  const isAdmin = useMastersAdmin();
   return (
     <RecordFormDialog
       label="Category"
       isEdit={isEdit}
       action={isEdit ? updateWorkCategory.bind(null, category.id) : addWorkCategory}
+      onDelete={isAdmin && category ? () => deleteWorkCategory(category.id) : undefined}
       trigger={trigger}
     >
       <div className="space-y-1.5">
@@ -100,11 +106,13 @@ export function WorkGroupFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!group;
+  const isAdmin = useMastersAdmin();
   return (
     <RecordFormDialog
       label="Group"
       isEdit={isEdit}
       action={isEdit ? updateWorkGroup.bind(null, group.id) : addWorkGroup}
+      onDelete={isAdmin && group ? () => deleteWorkGroup(group.id) : undefined}
       trigger={trigger}
     >
       <div className="space-y-1.5">
@@ -179,6 +187,7 @@ export function WorkItemFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!item;
+  const isAdmin = useMastersAdmin();
   // Editing keeps the category fixed; moving an item means a new code (delete + add).
   const [categoryId, setCategoryId] = useState(item?.category_id ?? defaultCategoryId ?? "");
   const filteredGroups = groups.filter((group) => group.category_id === categoryId);
@@ -188,6 +197,7 @@ export function WorkItemFormDialog({
       label="Work Item"
       isEdit={isEdit}
       action={isEdit ? updateWorkItem.bind(null, item.id) : addWorkItem}
+      onDelete={isAdmin && item ? () => deleteWorkItem(item.id) : undefined}
       trigger={trigger}
       onOpen={() => setCategoryId(item?.category_id ?? defaultCategoryId ?? "")}
     >
