@@ -18,7 +18,13 @@ import {
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-import { poolPicks, withDiscountSwitch, type PURCHASE_ORDERS } from "../entries/purchase-orders";
+import {
+  poolPicks,
+  roundQuantity,
+  withDiscountSwitch,
+  type PoolPick,
+  type PURCHASE_ORDERS,
+} from "../entries/purchase-orders";
 import { idFrom } from "../redirects";
 import {
   failed,
@@ -52,9 +58,17 @@ async function referencesOf(ids: string[]): Promise<string> {
   return ids.map((id) => byId.get(id) ?? "a PO").join(", ");
 }
 
-/** A GST % given must be on the active list, as every screen's picker offers only those. */
-async function gstRefused(pcts: (number | null)[]): Promise<{ error: string } | null> {
-  const asked = pcts.filter((pct): pct is number => pct !== null);
+/**
+ * A GST % given must be on the active list, as every screen's picker offers — or the one already
+ * there (`keeps[i]`, the line's own or Masters'), which the screens keep offering after it is retired.
+ */
+async function gstRefused(
+  pcts: (number | null)[],
+  keeps: (number | null | undefined)[] = [],
+): Promise<{ error: string } | null> {
+  const asked = pcts.filter(
+    (pct, index): pct is number => pct !== null && pct !== (keeps[index] ?? null),
+  );
   if (asked.length === 0) return null;
   let rates: number[];
   try {
@@ -80,27 +94,75 @@ async function retired(
   return now.row.is_active === false ? { error: `That ${what} is retired in Masters.` } : null;
 }
 
-/** Every indent line must be in the PO's pool: an approved indent of its project, of its villa when it has one. */
-async function outsidePool(
-  ids: string[],
+/**
+ * Every pick must be one the pull screen would send: a line of an approved indent of the PO's
+ * project (of its villa, when it has one), for more than 0 and no more than is left to buy —
+ * checked before the PO is made, so a refusal never leaves an empty draft with its number used.
+ */
+async function poolRefused(
+  picks: PoolPick[],
   projectId: string,
   site: { plotId: string | null; unitId: string | null },
 ): Promise<{ error: string } | null> {
+  if (picks.some((pick) => !(pick.quantity > 0))) {
+    return { error: "Quantities must be more than 0." };
+  }
+  const ids = picks.map((pick) => pick.indentLineId);
   const supabase = await createClient();
   let rows;
+  let ordered;
   try {
-    rows = await fetchAll((from, to) =>
-      supabase
-        .from("indent_lines")
-        .select("id, indents(status, project_id, plot_id, unit_id)")
-        .in("id", ids)
-        .order("id")
-        .range(from, to),
-    );
+    [rows, ordered] = await Promise.all([
+      fetchAll((from, to) =>
+        supabase
+          .from("indent_lines")
+          .select("id, quantity, items(gst_pct), indents(status, project_id, plot_id, unit_id)")
+          .in("id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+      fetchAll((from, to) =>
+        supabase
+          .from("purchase_order_lines")
+          .select("id, indent_line_id, quantity, purchase_orders(status)")
+          .in("indent_line_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
   } catch (error) {
     return failed("indent_lines", error);
   }
-  if (rows.length < new Set(ids).size) return { error: "An indent line is gone." };
+  if (rows.length < ids.length) return { error: "An indent line is gone." };
+
+  const orderedByLine = new Map<string, number>();
+  for (const row of ordered) {
+    if ((row.purchase_orders as { status: string } | null)?.status === "cancelled") continue;
+    const id = String(row.indent_line_id);
+    orderedByLine.set(id, (orderedByLine.get(id) ?? 0) + row.quantity);
+  }
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const pick of picks) {
+    const row = byId.get(pick.indentLineId);
+    const left = row ? roundQuantity(row.quantity - (orderedByLine.get(row.id) ?? 0)) : 0;
+    if (pick.quantity > left) {
+      return {
+        error:
+          left > 0
+            ? `An indent line has ${left} left to buy, not ${pick.quantity}.`
+            : "An indent line is already fully ordered.",
+      };
+    }
+  }
+
+  const refusedGst = await gstRefused(
+    picks.map((pick) => pick.gstPct),
+    picks.map(
+      (pick) => (byId.get(pick.indentLineId)?.items as { gst_pct: number | null } | null)?.gst_pct,
+    ),
+  );
+  if (refusedGst) return refusedGst;
+
   for (const row of rows) {
     const indent = row.indents as {
       status: string;
@@ -154,15 +216,6 @@ function lineSave(now: LineNow, v: Values) {
 export const PO_RUNNERS: Runners<Key> = {
   po_from_indent: {
     lines: async (header, lines) => {
-      const refused =
-        (await gstRefused(lines.map((line) => amount(line, "gst_pct")))) ??
-        (await firstRefusal(
-          [...new Set(lines.map((line) => String(line.vendor_id)))].map((id) =>
-            retired("vendors", id),
-          ),
-        ));
-      if (refused) return refused;
-
       // A GST % left out is the item's own from Masters, as the screen prefills it.
       const supabase = await createClient();
       const { data: items, error } = await supabase
@@ -176,6 +229,18 @@ export const PO_RUNNERS: Runners<Key> = {
       const mastersGst = new Map(
         items.map((row) => [row.id, (row.items as { gst_pct: number | null } | null)?.gst_pct]),
       );
+
+      const refused =
+        (await gstRefused(
+          lines.map((line) => amount(line, "gst_pct")),
+          lines.map((line) => mastersGst.get(String(line.indent_line_id))),
+        )) ??
+        (await firstRefusal(
+          [...new Set(lines.map((line) => String(line.vendor_id)))].map((id) =>
+            retired("vendors", id),
+          ),
+        ));
+      if (refused) return refused;
 
       // The screen's own "order from this indent": one draft PO per vendor, all or nothing past the first refusal.
       const done = await saving(
@@ -208,14 +273,9 @@ export const PO_RUNNERS: Runners<Key> = {
       const site = await siteOf(projectId, text(header, "plot_id"));
       if ("error" in site) return site;
       const refused =
-        (await gstRefused(picks.map((pick) => pick.gstPct))) ??
         (await retired("vendors", String(header.vendor_id))) ??
         (await retired("stores", text(header, "deliver_store_id"))) ??
-        (await outsidePool(
-          picks.map((pick) => pick.indentLineId),
-          projectId,
-          site,
-        ));
+        (await poolRefused(picks, projectId, site));
       if (refused) return refused;
       let terms: string | null;
       try {
@@ -325,8 +385,6 @@ export const PO_RUNNERS: Runners<Key> = {
     });
   },
   po_charges: async (v) => {
-    const refused = await gstRefused([amount(v, "gst_pct")]);
-    if (refused) return refused;
     const now = await recordNow(
       "purchase_orders",
       { column: "id", id: String(v.po_id) },
@@ -347,17 +405,18 @@ export const PO_RUNNERS: Runners<Key> = {
       }
       return updatePoCharges(String(v.po_id), { amount: null, gst_pct: null, note: null });
     }
+    const refused = await gstRefused([amount(v, "gst_pct")], [row.charges_gst_pct]);
+    if (refused) return refused;
     return updatePoCharges(String(v.po_id), {
       amount: charges,
-      gst_pct: orNull(given(v, "gst_pct", row.charges_gst_pct)),
+      // New charges start at 18%, as the screen's box does.
+      gst_pct: orNull(given(v, "gst_pct", row.charges_gst_pct ?? 18)),
       note: given(v, "note", row.charges_note) || null,
     });
   },
   po_line_change: async (v) => {
     const switched = withDiscountSwitch(v);
     if ("error" in switched) return switched;
-    const refused = await gstRefused([amount(v, "gst_pct")]);
-    if (refused) return refused;
     const now = await recordNow(
       "purchase_order_lines",
       { column: "id", id: String(v.line_id) },
@@ -365,7 +424,10 @@ export const PO_RUNNERS: Runners<Key> = {
       "That line is no longer on the PO.",
     );
     if ("error" in now) return now;
-    return lineSave(now.row as unknown as LineNow, switched.values);
+    const line = now.row as unknown as LineNow;
+    const refused = await gstRefused([amount(v, "gst_pct")], [line.gst_pct]);
+    if (refused) return refused;
+    return lineSave(line, switched.values);
   },
   po_line_remove: async (v) => {
     // The remove says nothing when no line matched, so a line already gone is said here.

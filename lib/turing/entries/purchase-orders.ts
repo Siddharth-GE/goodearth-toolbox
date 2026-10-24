@@ -6,6 +6,9 @@ type Values = Record<string, Value>;
 const priceOf = (values: Values, key: string) =>
   typeof values[key] === "string" && values[key] !== "" ? Number(values[key]) : null;
 
+/** Quantities to six places, as Purchase Orders' left-to-buy is, so 0.1 + 0.2 is 0.3. */
+export const roundQuantity = (quantity: number) => Math.round(quantity * 1e6) / 1e6;
+
 export type PoolPick = {
   indentLineId: string;
   quantity: number;
@@ -20,7 +23,7 @@ export function poolPicks(lines: Values[]): { picks: PoolPick[] } | { error: str
   for (const line of lines) {
     const id = String(line.indent_line_id);
     const pick = picks.get(id) ?? { indentLineId: id, quantity: 0, rate: null, gstPct: null };
-    pick.quantity += Number(line.quantity);
+    pick.quantity = roundQuantity(pick.quantity + Number(line.quantity));
     for (const [key, field, label] of [
       ["rate", "rate", "rates"],
       ["gst_pct", "gstPct", "GST %s"],
@@ -149,7 +152,7 @@ export const PURCHASE_ORDERS = defineEntries([
     tool: "/purchase-orders",
     title: "A draft PO's charges",
     description:
-      "Freight, loading and the like on a draft PO: an amount in rupees above 0 with its GST % (one of the active gst_rates) and a note. An empty amount removes the charges.",
+      "Freight, loading and the like on a draft PO: an amount in rupees above 0 with its GST % (one of the active gst_rates; new charges start at 18) and a note. An empty amount removes the charges.",
     fields: [
       po,
       { key: "amount", label: "Amount", kind: "amount", optional: true },
@@ -161,7 +164,8 @@ export const PURCHASE_ORDERS = defineEntries([
     key: "po_line_change",
     tool: "/purchase-orders",
     title: "A PO line, changed",
-    description: `Changes a line on a draft PO (purchase_order_lines.id): quantity (not above what is left on its indent line), rate, GST %, a discount as a percentage OR in rupees (never both), other charges in rupees, note. ${PRICES}`,
+    description:
+      "Changes a line on a draft PO (purchase_order_lines.id): quantity (not above what is left on its indent line), rate per unit before GST in rupees, GST % (one of the active gst_rates), a discount as a percentage OR in rupees (never both), other charges in rupees, note. Each field left out keeps what the line has now, so a line with no GST % keeps none; every line needs a rate and GST % before the PO can be issued.",
     fields: [
       poLine,
       { ...quantity, optional: true, keep: true },

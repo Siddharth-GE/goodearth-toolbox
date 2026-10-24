@@ -128,3 +128,11 @@ test("a discount given clears the other kind; both at once is refused", () => {
   });
   assert.ok("error" in withDiscountSwitch({ discount_pct: "5", discount_amount: "100" }));
 });
+
+test("quantities added across rows round as left-to-buy does", () => {
+  const merged = poolPicks([
+    { indent_line_id: LINE, quantity: "0.1" },
+    { indent_line_id: LINE, quantity: "0.2" },
+  ]);
+  assert.ok("picks" in merged && merged.picks[0].quantity === 0.3);
+});
