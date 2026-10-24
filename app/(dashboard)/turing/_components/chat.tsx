@@ -8,7 +8,7 @@ import { Pill, PillButton } from "@/components/ui/pill";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { TuringEvent } from "@/lib/turing/chat";
-import type { Turn } from "@/lib/turing/display";
+import type { ShownProposal, Turn } from "@/lib/turing/display";
 import { ACCEPTED_EXTENSIONS, fileKind, MAX_FILE_BYTES, NOT_TAKEN } from "@/lib/turing/file-kinds";
 import { shrinkDocumentForUpload } from "@/lib/uploads/shrink-in-browser";
 import { cn } from "@/lib/utils";
@@ -16,11 +16,13 @@ import { LayoutDashboard, Paperclip, Send, Sparkles, Square, X } from "lucide-re
 import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent } from "react";
 import { MarkdownView } from "./markdown-view";
+import { ProposalCard } from "./proposal-card";
 
 type Attachment = { key: string; name: string; id?: string; error?: string };
 type Live = {
   text: string;
   pages: { id: string; title: string }[];
+  proposals: ShownProposal[];
   status: string | null;
   error: string | null;
 };
@@ -31,10 +33,24 @@ const SUGGESTIONS = [
   "Which villas have no site supervisor yet?",
 ];
 
-function Answer({ text, pages }: { text: string; pages: { id: string; title: string }[] }) {
+function Answer({
+  text,
+  pages,
+  proposals,
+  conversationId,
+}: {
+  text: string;
+  pages: { id: string; title: string }[];
+  proposals: ShownProposal[];
+  conversationId: string | null;
+}) {
   return (
     <div className="space-y-3">
       {text && <MarkdownView text={text} />}
+      {conversationId &&
+        proposals.map((proposal) => (
+          <ProposalCard key={proposal.id} conversationId={conversationId} proposal={proposal} />
+        ))}
       {pages.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {pages.map((page) => (
@@ -68,6 +84,7 @@ export function Chat({
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [turns, setTurns] = useState<Turn[]>(initialTurns);
+  const [shownTurns, setShownTurns] = useState(initialTurns);
   const [live, setLive] = useState<Live | null>(null);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -78,6 +95,11 @@ export function Chat({
   const end = useRef<HTMLDivElement>(null);
 
   const busy = live !== null && live.error === null;
+  // A refresh brings the server's copy (a saved proposal's results, the joined answer); taken when idle.
+  if (initialTurns !== shownTurns && !busy) {
+    setShownTurns(initialTurns);
+    setTurns(initialTurns);
+  }
   const uploading = attachments.some((file) => !file.id && !file.error);
   const ready = attachments.filter((file) => file.id);
 
@@ -128,12 +150,12 @@ export function Chat({
     ]);
     setText("");
     setAttachments([]);
-    setLive({ text: "", pages: [], status: "Thinking…", error: null });
+    setLive({ text: "", pages: [], proposals: [], status: "Thinking…", error: null });
     follow(true);
 
     const controller = new AbortController();
     abort.current = controller;
-    let answer: Live = { text: "", pages: [], status: null, error: null };
+    let answer: Live = { text: "", pages: [], proposals: [], status: null, error: null };
     try {
       const response = await fetch("/api/turing", {
         method: "POST",
@@ -183,6 +205,8 @@ export function Chat({
             answer = { ...answer, text: joined, status: null };
           } else if (event.type === "status") {
             answer = { ...answer, status: event.label };
+          } else if (event.type === "proposal") {
+            answer = { ...answer, proposals: [...answer.proposals, event.proposal], status: null };
           } else if (event.type === "page") {
             answer = { ...answer, pages: [...answer.pages, { id: event.id, title: event.title }] };
           } else if (event.type === "error") {
@@ -202,10 +226,18 @@ export function Chat({
       }
     } finally {
       abort.current = null;
-      if (answer.text || answer.pages.length > 0) {
-        setTurns((all) => [...all, { role: "assistant", text: answer.text, pages: answer.pages }]);
+      if (answer.text || answer.pages.length > 0 || answer.proposals.length > 0) {
+        const done: Turn = {
+          role: "assistant",
+          text: answer.text,
+          pages: answer.pages,
+          proposals: answer.proposals,
+        };
+        setTurns((all) => [...all, done]);
       }
-      setLive(answer.error ? { ...answer, text: "", pages: [], status: null } : null);
+      setLive(
+        answer.error ? { ...answer, text: "", pages: [], proposals: [], status: null } : null,
+      );
       // Moves the conversation up the list; a new one is then drawn from the server's copy.
       // An error stays on screen until the next question.
       if (!answer.error) router.refresh();
@@ -265,13 +297,24 @@ export function Chat({
               {turn.text && <p className="text-sm whitespace-pre-wrap">{turn.text}</p>}
             </div>
           ) : (
-            <Answer key={index} text={turn.text} pages={turn.pages} />
+            <Answer
+              key={index}
+              text={turn.text}
+              pages={turn.pages}
+              proposals={turn.proposals}
+              conversationId={conversationId}
+            />
           ),
         )}
 
         {live && (
           <div className="space-y-3">
-            <Answer text={live.text} pages={live.pages} />
+            <Answer
+              text={live.text}
+              pages={live.pages}
+              proposals={live.proposals}
+              conversationId={conversationId}
+            />
             {live.status && (
               <p className="text-muted flex items-center gap-2 text-sm" role="status">
                 <Spinner className="size-4 border-2" />

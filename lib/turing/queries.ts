@@ -6,7 +6,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
-import { conversationTurns, type Turn } from "./display";
+import { conversationTurns, type SaveResult, type Turn } from "./display";
 
 /** Turing is the admins' own: never a grant, the way Settings is. */
 export async function requireTuring() {
@@ -42,7 +42,7 @@ export async function getConversation(
   assertRead("Turing", "the conversation", error);
   if (!conversation) return null;
 
-  const [messages, files, pages] = await Promise.all([
+  const [messages, files, pages, saves] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("turing_messages")
@@ -53,9 +53,14 @@ export async function getConversation(
     ),
     supabase.from("turing_files").select("anthropic_file_id, name").eq("conversation_id", id),
     supabase.from("turing_pages").select("id, title").eq("conversation_id", id),
+    supabase
+      .from("turing_saves")
+      .select("tool_use_id, results, created_at")
+      .eq("conversation_id", id),
   ]);
   assertRead("Turing", "the conversation's files", files.error);
   assertRead("Turing", "the conversation's pages", pages.error);
+  assertRead("Turing", "what was saved", saves.error);
 
   return {
     id: conversation.id,
@@ -64,6 +69,18 @@ export async function getConversation(
       messages,
       new Map((files.data ?? []).map((file) => [file.anthropic_file_id, file.name])),
       new Map((pages.data ?? []).map((page) => [page.id, page.title])),
+      new Map(
+        (saves.data ?? []).map((save) => [
+          save.tool_use_id,
+          {
+            at: save.created_at,
+            results: save.results as SaveResult[] | null,
+            // A save with no results after six minutes was cut off (Vercel stops a request at five).
+            interrupted:
+              save.results === null && Date.now() - Date.parse(save.created_at) > 360_000,
+          },
+        ]),
+      ),
     ),
   };
 }

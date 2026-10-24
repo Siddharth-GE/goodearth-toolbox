@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { TOOLS } from "@/lib/tools";
 
+import { catalogueText, ENTRIES } from "./catalogue-fields";
 import { CHART_LIBRARY } from "./page-rules";
 import { FILTER_OPS } from "./read-rules";
 
@@ -104,6 +105,29 @@ export const TURING_TOOLS: Anthropic.Beta.Messages.BetaToolUnion[] = [
       required: ["title", "html", "recipe"],
     },
   },
+  {
+    name: "propose_changes",
+    description:
+      "Show the admin changes to make in a tool, as a table they can edit and save. Nothing is saved until they press Save, and each row then goes through that tool's own save and its rules. One kind of change per proposal; see the list in your instructions.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ENTRIES.map((entry) => entry.key) },
+        title: { type: "string", description: "What this proposal does, in a few words." },
+        rows: {
+          type: "array",
+          description:
+            'One object per change: a label saying what it changes (e.g. "P-07 · SS.01 Block work"), and the kind\'s fields by name.',
+          items: {
+            type: "object",
+            properties: { label: { type: "string" } },
+            required: ["label"],
+          },
+        },
+      },
+      required: ["action", "title", "rows"],
+    },
+  },
   { type: "code_execution_20260521", name: "code_execution" },
 ];
 
@@ -125,7 +149,8 @@ Reading data:
 - For more than a few hundred rows, or any sum, count or trend over many, use code execution and call fetch_rows from your code; print only what the answer needs.
 - Money is in Indian rupees, written ₹1,23,456 (Indian grouping). Dates are written 24 Oct 2026.
 
-You cannot change anything in the toolbox yet. When the admin wants something recorded, say which screen does it, and offer the details ready to type.
+Changing things. You never save anything yourself. When the admin wants something recorded that is on the list below, read what you need (the ids, and how things stand now), then call propose_changes: they see a table, edit or untick rows, and press Save, and each row goes through that tool's own save, under its rules and as them. At the start of their next message you are told what was saved and what each tool refused, with its reason. For anything not on the list, say which screen does it, and offer the details ready to type. What you can propose:
+${catalogueText()}
 
 Pages. When a dashboard, report or document to keep would help, or the admin asks for one, call make_page:
 - One self-contained HTML document that works on a phone as well as a computer. Inline CSS and script only.

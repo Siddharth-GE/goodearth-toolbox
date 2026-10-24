@@ -1,7 +1,8 @@
 /**
  * The toolbox rule (CLAUDE.md): one tool never imports another tool's code,
  * and shared code never imports a tool's. lib/overview/ is the one module
- * allowed to read other tools' queries.
+ * allowed to read other tools' queries; lib/turing/ the one allowed to call
+ * other tools' action files (lib/<tool>/actions.ts or <name>-actions.ts).
  *
  *   npx tsx scripts/check-boundaries.ts
  */
@@ -59,6 +60,9 @@ for (const file of ["app", "lib", "components"].flatMap((dir) => files(join(ROOT
     const theirs = owner(target + "/x") ?? owner(target);
     if (!theirs || theirs === mine) continue;
     if (path.startsWith("lib/overview/")) continue;
+    // Turing presses a tool's own save after the admin's Save: its action files, and nothing else of the tool's.
+    const into = relative(ROOT, target).split("\\").join("/");
+    if (path.startsWith("lib/turing/") && /^lib\/[a-z-]+\/([a-z-]+-)?actions$/.test(into)) continue;
     problems.push(
       mine
         ? `${path}: ${mine} imports ${theirs}'s code (${match[1]})`

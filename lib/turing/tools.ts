@@ -2,7 +2,8 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { pageToken } from "./display";
+import { checkProposal } from "./catalogue-fields";
+import { pageToken, proposalToken, type ShownProposal } from "./display";
 import { pageTripwire } from "./page-rules";
 import { BULK_LIMIT, checkRead, checkRecipe, DIRECT_LIMIT, type RecipeRead } from "./read-rules";
 import { runRead } from "./reads";
@@ -12,6 +13,7 @@ export type ToolOutcome = {
   content: string;
   isError: boolean;
   page?: { id: string; title: string };
+  proposal?: ShownProposal;
 };
 
 const fail = (content: string): ToolOutcome => ({ content, isError: true });
@@ -88,6 +90,7 @@ export async function runTool(
   name: string,
   input: unknown,
   conversationId: string,
+  callId: string,
 ): Promise<ToolOutcome> {
   const args = (typeof input === "object" && input !== null ? input : {}) as Record<
     string,
@@ -123,6 +126,16 @@ export async function runTool(
     }
     case "make_page":
       return makePage(args, conversationId);
+    case "propose_changes": {
+      const proposal = checkProposal(args);
+      if (!proposal.ok) return fail(proposal.error);
+      const { entry, title, rows } = proposal.value;
+      return {
+        content: `Shown to the admin as "${title}", ${rows.length} row${rows.length === 1 ? "" : "s"} of ${entry.title.toLowerCase()} ${proposalToken(callId)}. Nothing is saved until they press Save; you are told what was saved at the start of their next message.`,
+        isError: false,
+        proposal: { id: callId, action: entry.key, title, rows, saved: null },
+      };
+    }
     default:
       return fail(`There is no tool called "${name}".`);
   }
