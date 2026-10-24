@@ -9,6 +9,13 @@ const MOVED = `<!doctype html><html><head><meta charset="utf-8"></head>
 <body style="font-family:system-ui,sans-serif;background:#f0eeea;color:#180b0f;padding:24px">
 <p>This page's data has moved. Ask Turing to rebuild it.</p></body></html>`;
 
+const NOT_NOW = MOVED.replace(
+  "This page's data has moved. Ask Turing to rebuild it.",
+  "This page's data could not be read just now. Reload in a moment.",
+);
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 /**
  * A page, with its data read afresh as the admin opening it. Served under the sandbox CSP
  * (lib/turing/page-rules.ts) and shown in a sandboxed frame, so it runs on an opaque origin.
@@ -17,6 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const caller = await turingCaller();
   if ("refused" in caller) return caller.refused;
   const { id } = await params;
+  if (!UUID.test(id)) return new Response("That page is gone.", { status: 404 });
   const download = new URL(request.url).searchParams.has("download");
 
   const supabase = await createClient();
@@ -37,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const data = await runRecipe(recipe.value);
   if (!data.ok) {
     console.error("turing: page recipe failed:", id, data.error);
-    return new Response(MOVED, { headers });
+    return new Response(NOT_NOW, { status: 503, headers });
   }
 
   const { data: file, error: fileError } = await supabase.storage

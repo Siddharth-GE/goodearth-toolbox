@@ -73,15 +73,6 @@ export const TURING_SCHEMA: Schema = {
       "table_name": "string"
     }
   },
-  "auth_verified_sessions": {
-    "kind": "table",
-    "columns": {
-      "created_at": "string",
-      "method": "string",
-      "session_id": "string",
-      "user_id": "string"
-    }
-  },
   "batch_on_hand": {
     "kind": "view",
     "columns": {
@@ -1208,7 +1199,6 @@ export const TURING_SCHEMA: Schema = {
       "id": "string",
       "project_id": "string",
       "share_enabled": "boolean",
-      "share_token": "string",
       "title": "string",
       "total_bytes": "number",
       "updated_at": "string",
@@ -1683,19 +1673,6 @@ export const TURING_SCHEMA: Schema = {
       "work_item_id": "string | null"
     }
   },
-  "google_chat_spaces": {
-    "kind": "table",
-    "columns": {
-      "created_at": "string",
-      "linked_at": "string",
-      "linked_by": "string | null",
-      "project_id": "string",
-      "space_id": "string",
-      "space_name": "string | null",
-      "unit_id": "string | null",
-      "updated_at": "string | null"
-    }
-  },
   "grn_counters": {
     "kind": "table",
     "columns": {
@@ -1955,16 +1932,6 @@ export const TURING_SCHEMA: Schema = {
       "work_item_id": "string"
     }
   },
-  "login_attempts": {
-    "kind": "table",
-    "columns": {
-      "failed_count": "number",
-      "kind": "string",
-      "locked_until": "string | null",
-      "target": "string",
-      "window_started_at": "string"
-    }
-  },
   "plots": {
     "kind": "table",
     "columns": {
@@ -2150,16 +2117,6 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string",
       "updated_by": "string | null",
       "vendor_id": "string"
-    }
-  },
-  "push_devices": {
-    "kind": "table",
-    "columns": {
-      "created_at": "string",
-      "platform": "string",
-      "profile_id": "string",
-      "seen_at": "string",
-      "token": "string"
     }
   },
   "pusher_activities": {

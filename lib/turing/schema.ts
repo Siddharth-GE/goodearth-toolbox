@@ -63,6 +63,16 @@ export function parseSchema(source: string): Schema {
   return schema;
 }
 
+/** Sign-in records, phones' push tokens and the Chat door's spaces: no answer or page needs them. */
+const HIDDEN_TABLES = new Set([
+  "auth_verified_sessions",
+  "login_attempts",
+  "push_devices",
+  "google_chat_spaces",
+]);
+/** A deck's share token is its whole public gate (SECURITY.md); Dexter shows it, Turing never needs it. */
+const HIDDEN_COLUMNS: Record<string, string[]> = { dexter_decks: ["share_token"] };
+
 /**
  * The generated module's text, sorted so a re-run with nothing changed writes the same bytes.
  * Turing's own tables are left out: a page any admin opens must never read one admin's chats.
@@ -70,7 +80,7 @@ export function parseSchema(source: string): Schema {
 export function schemaModule(schema: Schema): string {
   const sorted = Object.fromEntries(
     Object.keys(schema)
-      .filter((name) => !name.startsWith("turing_"))
+      .filter((name) => !name.startsWith("turing_") && !HIDDEN_TABLES.has(name))
       .sort()
       .map((name) => [
         name,
@@ -78,6 +88,7 @@ export function schemaModule(schema: Schema): string {
           kind: schema[name].kind,
           columns: Object.fromEntries(
             Object.keys(schema[name].columns)
+              .filter((column) => !HIDDEN_COLUMNS[name]?.includes(column))
               .sort()
               .map((column) => [column, schema[name].columns[column]]),
           ),

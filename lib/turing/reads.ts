@@ -16,6 +16,22 @@ export type ReadResult =
 const PAGE = 1000;
 
 /**
+ * Reading past one page needs a total order, or rows repeat or vanish between pages (fetchAll's
+ * rule): the id where there is one, else every column read — identical rows are interchangeable.
+ * A json column cannot be ordered, so it is left out.
+ */
+function tiebreak(read: Read, order: Read["order"]): Read["order"] {
+  const columns = TURING_SCHEMA[read.table]?.columns ?? {};
+  const ordered = new Set(order.map((step) => step.column));
+  const keys = Object.hasOwn(columns, "id")
+    ? ["id"]
+    : read.columns.filter((column) => !/^Json\b/.test(columns[column] ?? ""));
+  return keys
+    .filter((column) => !ordered.has(column))
+    .map((column) => ({ column, ascending: true }));
+}
+
+/**
  * Runs a checked read as the person asking: the RLS-scoped client, so it returns exactly what
  * they could open by hand. Names were checked against the schema; the table is dynamic, so the
  * typed client is loosened here and nowhere else.
@@ -36,16 +52,12 @@ export async function runRead(read: Read): Promise<ReadResult> {
     return { ok: true, count: count ?? 0 };
   }
 
-  // Pages need a unique tiebreaker, or rows repeat or vanish between them (fetchAll's rule).
-  const order = [...read.order];
-  const hasId = Object.hasOwn(TURING_SCHEMA[read.table]?.columns ?? {}, "id");
-  if (read.limit > PAGE && hasId && !order.some((step) => step.column === "id")) {
-    order.push({ column: "id", ascending: true });
-  }
-
-  const rows: Record<string, unknown>[] = [];
   // One row past the limit says whether there is more.
   const wanted = read.limit + 1;
+  const order = [...read.order];
+  if (wanted > PAGE) order.push(...tiebreak(read, order));
+
+  const rows: Record<string, unknown>[] = [];
   for (let from = 0; from < wanted; from += PAGE) {
     const to = Math.min(from + PAGE, wanted) - 1;
     const { data, error } = await withRetry(() => {

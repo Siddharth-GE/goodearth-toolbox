@@ -147,6 +147,9 @@ export function Chat({
       }
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
+      // Each of Claude's messages in a turn is a step: a paragraph apart, and dropped if retried.
+      let stepStart = 0;
+      let breakPending = false;
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -155,13 +158,29 @@ export function Chat({
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.trim()) continue;
-          const event = JSON.parse(line) as TuringEvent;
+          let event: TuringEvent;
+          try {
+            event = JSON.parse(line) as TuringEvent;
+          } catch {
+            controller.abort();
+            throw new Error("The answer arrived garbled. Ask again.");
+          }
           if (event.type === "conversation" && !conversationId) {
             setConversationId(event.id);
             // The address follows without a navigation, so the answer keeps streaming here.
             window.history.replaceState(null, "", `/turing/${event.id}`);
+          } else if (event.type === "step") {
+            stepStart = answer.text.length;
+            breakPending = stepStart > 0;
+          } else if (event.type === "restart") {
+            answer = { ...answer, text: answer.text.slice(0, stepStart) };
+            breakPending = stepStart > 0;
           } else if (event.type === "text") {
-            answer = { ...answer, text: answer.text + event.text, status: null };
+            const joined = breakPending
+              ? `${answer.text}\n\n${event.text}`
+              : answer.text + event.text;
+            breakPending = false;
+            answer = { ...answer, text: joined, status: null };
           } else if (event.type === "status") {
             answer = { ...answer, status: event.label };
           } else if (event.type === "page") {
@@ -183,9 +202,12 @@ export function Chat({
       }
     } finally {
       abort.current = null;
-      setTurns((all) => [...all, { role: "assistant", text: answer.text, pages: answer.pages }]);
+      if (answer.text || answer.pages.length > 0) {
+        setTurns((all) => [...all, { role: "assistant", text: answer.text, pages: answer.pages }]);
+      }
       setLive(answer.error ? { ...answer, text: "", pages: [], status: null } : null);
-      // The server copy replaces this one; an error stays on screen until the next question.
+      // Moves the conversation up the list; a new one is then drawn from the server's copy.
+      // An error stays on screen until the next question.
       if (!answer.error) router.refresh();
     }
   }

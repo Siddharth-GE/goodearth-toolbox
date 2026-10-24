@@ -19,6 +19,7 @@ export const PAGE_CSP = [
   "form-action 'none'",
   "base-uri 'none'",
   "frame-src 'none'",
+  "frame-ancestors 'self'",
 ].join("; ");
 
 export function pageHeaders(download: { fileName: string } | null): Record<string, string> {
@@ -28,6 +29,7 @@ export function pageHeaders(download: { fileName: string } | null): Record<strin
     "X-Content-Type-Options": "nosniff",
     "X-Robots-Tag": "noindex",
     "Referrer-Policy": "no-referrer",
+    "X-DNS-Prefetch-Control": "off",
     "Cache-Control": "private, no-store",
     ...(download ? { "Content-Disposition": `attachment; filename="${download.fileName}"` } : {}),
   };
@@ -35,7 +37,7 @@ export function pageHeaders(download: { fileName: string } | null): Record<strin
 
 /** The policy inside the file, for a downloaded copy opened from disk with no header around it. */
 const POLICY_TAG = `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP.split("; ")
-  .filter((directive) => !directive.startsWith("sandbox") && !directive.startsWith("frame-src"))
+  .filter((directive) => !/^(sandbox|frame-src|frame-ancestors)\b/.test(directive))
   .join("; ")}">`;
 
 /**
@@ -60,7 +62,8 @@ export function pageDocument(
 /**
  * A tripwire, not the wall: the CSP above refuses the network whatever the page says. What the
  * CSP cannot stop is a page navigating itself away with data in the address, so anything that
- * could reach outside the page is refused before it is saved.
+ * could reach outside the page — or build such a thing out of strings — is refused before it is
+ * saved. A determined page can still slip past a pattern; SECURITY.md names that as the risk left.
  */
 const FORBIDDEN: [RegExp, string][] = [
   [/\bfetch\s*\(/i, "fetch()"],
@@ -83,11 +86,40 @@ const FORBIDDEN: [RegExp, string][] = [
   ],
   [/url\s*\(\s*["']?\s*(https?:|\/\/)/i, "a stylesheet url() outside the page"],
   [/@import/i, "@import"],
+  [/\bhref\s*=\s*(?!["']?#)/i, "a link (only #links within the page are allowed)"],
+  [
+    /\b(src|srcset|action|formaction|srcdoc|poster)\s*=\s*(?!["']?(data:|blob:))/i,
+    "a source outside the page",
+  ],
+  [/\.\s*(href|src|action|srcdoc|formAction)\s*=(?!=)/i, "setting a link or source from script"],
+  [
+    /setAttribute\s*\(\s*["'`](href|src|action|srcdoc|formaction|http-equiv)/i,
+    "setting a link or source from script",
+  ],
+  [
+    /createElement\s*\(\s*["'`](a|area|link|meta|form|iframe|frame|object|embed|base|script|img|image|portal)["'`]/i,
+    "making a link, form, frame or script from script",
+  ],
+  [/\.\s*click\s*\(\s*\)/i, "pressing something from script"],
+  [/document\s*\.\s*(write|writeln|open)\b/i, "document.write"],
+  [
+    /\b(window|self|globalThis|top|parent|document|frames)\s*\[/i,
+    "reaching into the page's globals by name",
+  ],
+  [
+    /\b(eval|Function)\s*\(|\bnew\s+Function\b|\batob\s*\(|fromCharCode|\bunescape\s*\(/i,
+    "code built from strings",
+  ],
+  [/\bset(Timeout|Interval)\s*\(\s*["'`]/i, "code built from strings"],
+  [/&#/, "an encoded character (write the character itself)"],
 ];
 
 /** The first thing in the page that could reach outside it, named; null when there is none. */
 export function pageTripwire(html: string): string | null {
-  const withoutLibrary = html.split(CHART_LIBRARY).join("");
+  const withoutLibrary = [`src="${CHART_LIBRARY}"`, `src='${CHART_LIBRARY}'`, CHART_LIBRARY].reduce(
+    (text, allowed) => text.split(allowed).join(""),
+    html,
+  );
   for (const [pattern, name] of FORBIDDEN) {
     if (pattern.test(withoutLibrary)) return name;
   }

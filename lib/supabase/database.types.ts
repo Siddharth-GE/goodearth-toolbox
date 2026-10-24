@@ -10656,6 +10656,7 @@ export type Database = {
           id: string
           owner_id: string
           title: string
+          turn_started_at: string | null
           updated_at: string
         }
         Insert: {
@@ -10665,6 +10666,7 @@ export type Database = {
           id?: string
           owner_id?: string
           title?: string
+          turn_started_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -10674,6 +10676,7 @@ export type Database = {
           id?: string
           owner_id?: string
           title?: string
+          turn_started_at?: string | null
           updated_at?: string
         }
         Relationships: [

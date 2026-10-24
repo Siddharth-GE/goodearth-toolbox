@@ -7,14 +7,18 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 
 import { anthropicClient, MODEL, SYSTEM_PROMPT, TURING_TOOLS } from "./claude";
 import { claudeFailure, CUT_OFF, NO_KEY, REFUSED, TOO_MANY_STEPS } from "./errors";
+import { replayable } from "./replay";
 import { runTool } from "./tools";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type ContentParam = Anthropic.Beta.Messages.BetaContentBlockParam;
 type Message = Anthropic.Beta.Messages.BetaMessage;
 
+/** `step` starts each of Claude's messages in a turn; `restart` drops the text of the step just begun. */
 export type TuringEvent =
   | { type: "conversation"; id: string }
+  | { type: "step" }
+  | { type: "restart" }
   | { type: "text"; text: string }
   | { type: "status"; label: string }
   | { type: "page"; id: string; title: string }
@@ -23,6 +27,36 @@ export type TuringEvent =
 
 /** Enough for any one question; a loop past it is stuck, not thorough. */
 const MAX_STEPS = 24;
+
+/** Longer than any answer can run (Vercel stops one at five minutes), so a stamp this old is free. */
+const TURN_LEASE_MS = 6 * 60 * 1000;
+
+/** One answer at a time per conversation (0152); taking it also lifts the conversation up the list. */
+export async function takeTurn(conversationId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const stale = new Date(Date.now() - TURN_LEASE_MS).toISOString();
+  const { data, error } = await supabase
+    .from("turing_conversations")
+    .update({ turn_started_at: new Date().toISOString() })
+    .eq("id", conversationId)
+    .or(`turn_started_at.is.null,turn_started_at.lt."${stale}"`)
+    .select("id");
+  if (error) {
+    console.error("turing: taking the turn failed:", error);
+    return false;
+  }
+  return (data ?? []).length === 1;
+}
+
+export async function releaseTurn(conversationId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("turing_conversations")
+    .update({ turn_started_at: null })
+    .eq("id", conversationId);
+  if (error)
+    console.error("turing: releasing the turn failed (it frees itself in six minutes):", error);
+}
 
 function statusFor(name: string, input: unknown): string {
   const table = (input as { table?: unknown } | null)?.table;
@@ -50,7 +84,7 @@ async function loadHistory(conversationId: string): Promise<MessageParam[]> {
       .order("id")
       .range(from, to),
   );
-  return rows.map((row): MessageParam => ({
+  return replayable(rows).map((row): MessageParam => ({
     role: row.role === "assistant" ? "assistant" : "user",
     content: row.content as unknown as ContentParam[],
   }));
@@ -77,25 +111,15 @@ async function saveMessage(
   }
 }
 
-/** A turn stopped mid-tool (the admin left, or the answer was cut) is closed before the next one. */
-function unanswered(history: MessageParam[]): ContentParam[] {
-  const last = history.at(-1);
-  if (!last || last.role !== "assistant" || typeof last.content === "string") return [];
-  return last.content
-    .filter(
-      (block): block is Anthropic.Beta.Messages.BetaToolUseBlockParam => block.type === "tool_use",
-    )
-    .map((block) => ({
-      type: "tool_result" as const,
-      tool_use_id: block.id,
-      is_error: true,
-      content: "Stopped before this ran.",
-    }));
+/** A tool call Claude made itself rather than from its code, where the code-only read belongs. */
+function directCallOfCodeTool(call: Anthropic.Beta.Messages.BetaToolUseBlock): boolean {
+  return call.name === "fetch_rows" && (call.caller === undefined || call.caller.type === "direct");
 }
 
 /**
- * One admin turn: the message is saved, then Claude answers, calling tools until it is done.
- * Every message is saved as it lands, append-only, so the conversation replays exactly.
+ * One admin turn, run while the caller holds the conversation (takeTurn). The question is saved,
+ * then Claude answers, calling tools until it is done; every message is saved as it lands,
+ * append-only, and an unfinished exchange is left out of every later replay (replay.ts).
  */
 export async function* converse({
   conversationId,
@@ -115,38 +139,34 @@ export async function* converse({
   }
 
   const history = await loadHistory(conversationId);
-  const closing = unanswered(history);
-  if (closing.length > 0) {
-    const close: MessageParam = { role: "user", content: closing };
-    await saveMessage(conversationId, close);
-    history.push(close);
-  }
   const ask: MessageParam = { role: "user", content: userContent };
   await saveMessage(conversationId, ask);
   history.push(ask);
 
   let containerId =
     container && Date.parse(container.expiresAt) > Date.now() + 30_000 ? container.id : null;
-  let jsonRetries = 0;
+  let retries = 0;
+  let finished = false;
 
-  for (let step = 0; step < MAX_STEPS; step++) {
+  for (let step = 0; step < MAX_STEPS && !finished; step++) {
+    yield { type: "step" };
+    const stream = client.beta.messages.stream(
+      {
+        model: MODEL,
+        max_tokens: 64000,
+        system: SYSTEM_PROMPT,
+        tools: TURING_TOOLS,
+        messages: history,
+        output_config: { effort: "medium" },
+        cache_control: { type: "ephemeral" },
+        ...(containerId ? { container: containerId } : {}),
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      },
+      { signal },
+    );
     let message: Message;
     try {
-      const stream = client.beta.messages.stream(
-        {
-          model: MODEL,
-          max_tokens: 64000,
-          system: SYSTEM_PROMPT,
-          tools: TURING_TOOLS,
-          messages: history,
-          output_config: { effort: "medium" },
-          cache_control: { type: "ephemeral" },
-          ...(containerId ? { container: containerId } : {}),
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
-        },
-        { signal },
-      );
       for await (const event of stream) {
         if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
           yield { type: "text", text: event.delta.text };
@@ -159,9 +179,10 @@ export async function* converse({
         }
       }
       message = await stream.finalMessage();
-      jsonRetries = 0;
+      retries = 0;
     } catch (error) {
       if (signal.aborted) return;
+      stream.abort();
       if (error instanceof Anthropic.APIError) {
         console.error("turing: Claude failed:", error.status, error.message);
         yield {
@@ -170,14 +191,22 @@ export async function* converse({
         };
         return;
       }
-      // A streamed tool input that never parsed: nothing was saved, so the turn is asked again.
-      if (jsonRetries++ < 2) {
+      // A page cut off mid-HTML fails to parse; asking again would only cut it off again.
+      if (stream.currentMessage?.stop_reason === "max_tokens") {
+        yield { type: "error", message: CUT_OFF };
+        return;
+      }
+      // A streamed tool input that never parsed: nothing was saved, so this step is asked again.
+      if (retries++ < 1) {
         console.error("turing: unreadable tool input, asking again:", error);
+        yield { type: "restart" };
+        step--;
         continue;
       }
       throw error;
     }
 
+    if (signal.aborted) return;
     const answer: MessageParam = { role: "assistant", content: message.content as ContentParam[] };
     await saveMessage(conversationId, answer, message.usage);
     history.push(answer);
@@ -200,20 +229,26 @@ export async function* converse({
     );
     if (message.stop_reason === "refusal") {
       yield { type: "error", message: REFUSED };
-      break;
+      return;
     }
     if (message.stop_reason === "max_tokens") {
       yield { type: "error", message: CUT_OFF };
-      break;
+      return;
     }
     if (message.stop_reason === "pause_turn") continue;
-    if (message.stop_reason !== "tool_use" || calls.length === 0) break;
+    if (message.stop_reason !== "tool_use" || calls.length === 0) {
+      finished = true;
+      continue;
+    }
 
     const results: ContentParam[] = [];
     for (const call of calls) {
+      if (signal.aborted) return;
       yield { type: "status", label: statusFor(call.name, call.input) };
-      const outcome = await runTool(call.name, call.input, conversationId);
-      if (outcome.page) yield { type: "page", ...outcome.page };
+      const outcome = directCallOfCodeTool(call)
+        ? { content: "fetch_rows is for your code; use read_rows here.", isError: true }
+        : await runTool(call.name, call.input, conversationId);
+      if ("page" in outcome && outcome.page) yield { type: "page", ...outcome.page };
       results.push({
         type: "tool_result",
         tool_use_id: call.id,
@@ -221,12 +256,12 @@ export async function* converse({
         ...(outcome.isError ? { is_error: true } : {}),
       });
     }
+    if (signal.aborted) return;
     const reply: MessageParam = { role: "user", content: results };
     await saveMessage(conversationId, reply);
     history.push(reply);
-
-    if (step === MAX_STEPS - 1) yield { type: "error", message: TOO_MANY_STEPS };
   }
 
+  if (!finished) yield { type: "error", message: TOO_MANY_STEPS };
   yield { type: "done" };
 }

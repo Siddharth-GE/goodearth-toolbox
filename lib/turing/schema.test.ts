@@ -30,6 +30,14 @@ test("Turing's own tables are never readable through it", () => {
   assert.ok(!text.includes("turing_messages"));
 });
 
+test("secrets are never readable through Turing", () => {
+  assert.equal(TURING_SCHEMA.auth_verified_sessions, undefined);
+  assert.equal(TURING_SCHEMA.login_attempts, undefined);
+  assert.equal(TURING_SCHEMA.push_devices, undefined);
+  assert.ok(TURING_SCHEMA.dexter_decks);
+  assert.equal(TURING_SCHEMA.dexter_decks.columns.share_token, undefined);
+});
+
 test("a wrapped union joins onto its column", () => {
   const source = [
     "export type Database = {",
