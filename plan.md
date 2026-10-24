@@ -12,6 +12,7 @@
 ## The shape
 
 - **Admins only, the way Settings is.** In `lib/tools.ts`, left out of `GRANTABLE_TOOLS`; every query, action and route calls `requireUser` + `requireAdmin`; every Turing table's policies are `(select is_admin())`. Never grantable, so neither `_app_known` CHECK changes. It opens on the chat, as Settings opens on its list — no welcome screen.
+- **First in the sidebar** (founder): its own row above Overview and the teams in `components/layout/sidebar.tsx`, shown to admins only, never under a team — Settings → Teams cannot move it.
 - **No new way in.** The admin's own session and the RLS-scoped client — no admin client, no key of ours handed to anyone, no MCP door. Turing sees exactly what the admin sees, and can do exactly what the admin could do by hand.
 - **General purpose.** One system prompt says who Goodearth is, what each tool is for (from `lib/tools.ts`), and how Turing works; beyond that it is Claude — drafting, explaining, checking, planning — with the toolbox's reads always at hand.
 - **Claude reads and proposes; a person saves.** No tool the model can call writes anything. A change is a proposal the admin sees as a table, edits, and saves with a press (T2).
