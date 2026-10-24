@@ -9,6 +9,7 @@ import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { SUPERVISORS } from "./entries/supervisors";
+import { WORK_ORDERS } from "./entries/work-orders";
 
 export type FieldKind = "id" | "date" | "whole" | "amount" | "text" | "choice" | "yesno";
 
@@ -40,7 +41,10 @@ export type IdTable =
   | "goods_receipts"
   | "goods_receipt_lines"
   | "stock_issues"
-  | "issue_requests";
+  | "issue_requests"
+  | "labour_contracts"
+  | "labour_contract_lines"
+  | "work_order_templates";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -70,6 +74,9 @@ const FROM: Record<IdTable, string> = {
   goods_receipt_lines: "goods_receipt_lines (one item on a delivery)",
   stock_issues: "stock_issues (stock sent from a store to a villa or another store)",
   issue_requests: "issue_requests (a supervisor's request for material from a store)",
+  labour_contracts: "labour_contracts (a work order to a contractor)",
+  labour_contract_lines: "labour_contract_lines (one work on a work order)",
+  work_order_templates: "work_order_templates",
 };
 
 export type Field = {
@@ -137,7 +144,14 @@ export type Value = string | boolean;
 /** A field missing from `values` was left out: keep what is there. */
 export type Row = { label: string; values: Record<string, Value> };
 
-export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS, ...PURCHASE_ORDERS, ...INVENTORY];
+export const ENTRIES = [
+  ...SUPERVISORS,
+  ...MASTERS,
+  ...INDENTS,
+  ...PURCHASE_ORDERS,
+  ...INVENTORY,
+  ...WORK_ORDERS,
+];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
 export const entryFor = (key: unknown): Entry<EntryKey> | undefined =>
