@@ -240,9 +240,15 @@ begin
   if (select done_on from design_actions where id = v_action) is null then
     raise exception 'TRIAL 8 FAILED: done without its date';
   end if;
-  delete from design_actions where id = v_action;
-  if not exists (select 1 from design_actions where id = v_action) then
-    raise exception 'TRIAL 8 FAILED: an action was deleted';
+  -- A done action is not deleted: the guard says to cancel it instead (0149).
+  v_refused := false;
+  begin
+    delete from design_actions where id = v_action;
+  exception when raise_exception then
+    v_refused := true;
+  end;
+  if not v_refused or not exists (select 1 from design_actions where id = v_action) then
+    raise exception 'TRIAL 8 FAILED: a done action was deleted';
   end if;
   v_refused := false;
   begin

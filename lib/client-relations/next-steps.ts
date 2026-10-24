@@ -12,6 +12,7 @@ import {
 
 export {
   actionBucket,
+  actionRemoval,
   addDays,
   closeRight,
   compareDone,

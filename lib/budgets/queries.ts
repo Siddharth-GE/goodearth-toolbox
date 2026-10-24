@@ -273,10 +273,13 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   };
 });
 
-export async function listVendorOptions() {
+/** Active vendors, plus any a line already expects, so a retired one stays on its line. */
+export async function listVendorOptions(keepIds: readonly string[] = []) {
   await requireTool("/budgets");
   const vendors = await listVendors();
-  return vendors.map(({ id, name }) => ({ id, name }));
+  return vendors
+    .filter((vendor) => vendor.is_active || keepIds.includes(vendor.id))
+    .map(({ id, name }) => ({ id, name }));
 }
 
 export type MarginRow = {

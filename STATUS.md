@@ -14,7 +14,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0142` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0150` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. On staging, a tool the founder makes `scoped` (Client Relations) shows each person only their own rows, and admins and its team leads everything (`0122`, `is_lead()`). Every read asks for the emailed code, not just the password, and the public key can call nothing (`0129`).
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
@@ -27,7 +27,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 
 Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`).
 
-- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, a GST % per material that POs offer first, works grouped in five families, and build progress beside construction stages). Reads ungated, writes need `/masters`.
+- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, a GST % per material that POs offer first, works grouped in five families, build progress beside construction stages, and an admin's Delete for a master nothing uses — anything in use is retired with Active, `0150`). Reads ungated, writes need `/masters`.
 - **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams, a team lead tick beside a scoped grant, and **Test project** — a made-up villa filled through every tool, with one red button that deletes it). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued interiors revision; money gated. Construction is costed in the Estimator, not here.

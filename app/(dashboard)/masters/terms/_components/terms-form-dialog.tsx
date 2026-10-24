@@ -8,7 +8,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { TERMS_KIND_LABEL, TERMS_KINDS, type TermsKind } from "@/lib/masters/constants";
 import type { DocumentTermsRow } from "@/lib/masters/terms";
-import { createTerms, updateTerms } from "@/lib/masters/terms-actions";
+import { createTerms, deleteTerms, updateTerms } from "@/lib/masters/terms-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function TermsFormDialog({
   terms,
@@ -19,6 +20,7 @@ export function TermsFormDialog({
   kind?: TermsKind;
 }) {
   const isEdit = !!terms;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
@@ -26,6 +28,7 @@ export function TermsFormDialog({
       wide
       isEdit={isEdit}
       action={isEdit ? updateTerms.bind(null, terms.id) : createTerms}
+      onDelete={isAdmin && terms ? () => deleteTerms(terms.id) : undefined}
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">

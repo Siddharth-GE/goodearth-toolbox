@@ -2,19 +2,13 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Building now — Delete or Cancel across every tool
-
-`plan.md`, top section, **"Next session — start here"**: Piece 4's build order, B1 first. On 2026-10-23 the founder said "all looks good" of what was on staging (pieces 1–3, #130–#133, with the Supervisors rebuild #123–#129 and the OS process updates #119–#122), took piece 4's recommendations and waived Fable's design review.
-
-- **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
-
 ## Next — TI, the admins' assistant
 
-`plan.md`, _Piece 5_: chat, dropped files, every operation through drafts, interactive pages. Starts once Delete or Cancel is merged; Fable reviews the plan first unless the founder waives, and the founder answers its three questions.
+`plan.md`, top section: chat, dropped files, interactive pages, every operation through drafts. Fable reviews the plan first unless the founder waives, and the founder answers its two questions.
 
 ## Native apps on iPhone and Android — next build
 
-- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), the top section of `plan.md`.
+- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), their section of `plan.md`.
 - **Meanwhile: the Play wrapper's version 1.** Built and signed; the founder's steps (Play Console, the reviewer account, the screenshots) and the fingerprint still to add are the launch steps in `android/PLAN.md`. The Capacitor app replaces it later as an update.
 - **Waiting on the founder:** trying Google sign-in in the app; a Firebase project (phase C); Apple's Organization enrolment; what staff would scan (phase D).
 
@@ -31,6 +25,7 @@ The founder gives the steps. Before the switch:
 
 1. ~~The refactor before production~~ — done and vetted 2026-10-18 (`plan.md`).
 2. The vet list below, tried or accepted as is.
+   - If the test project has been seeded again, delete it (Settings → Test project): its POs and bills use real vendors.
 3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
@@ -64,7 +59,7 @@ Each checklist is in `plan.md`, under the heading named.
   - A deck link pasted into WhatsApp shows the Kaadal K.
 - **The final masters workbook**: a look through Masters → Vendors, Works, Items and Stages.
 
-## Five stale trials
+## Six stale trials
 
 These `scripts/trials/` fail against today's staging data, with or without the latest migrations (checked 2026-10-18). Each needs its setup brought up to date, not the code:
 
@@ -72,6 +67,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 - `client-actions-setter.sql`: steps now move with their side's owner (`0125`).
 - `client-actions.sql`, step 1: the staff account sees no plots since `0123` scoped the tool.
 - `client-relations-scope.sql`: the trial accounts already hold real actions.
+- `design-board.sql`, step 0: the board's stages are no longer Design, Permit, WD, Structural and Interiors.
 - `takeoff-working-date.sql`: the trial villa already has an official estimate.
 
 ## Setup the tools are waiting on

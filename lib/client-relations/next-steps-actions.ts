@@ -43,6 +43,11 @@ function friendly(error: { message: string; code?: string }, fallback: string): 
     "You need the Client Relations app",
     "Only whoever set this action",
     "Who set an action cannot be changed",
+    // Delete or cancel (0149).
+    "since it was added",
+    "cancelled action",
+    "already closed",
+    "Say why it is cancelled",
     // One owner per side (0125): a step's owner, a side with none, a side left with nobody.
     "step on this plot is",
     "owner yet",
@@ -190,6 +195,42 @@ export async function updateNextStep(stepId: string, patch: StepPatch): Promise<
     .update(update as TablesUpdate<"client_actions">)
     .eq("id", stepId);
   if (error) return friendly(error, "Could not save that change. Try again.");
+
+  revalidateAll();
+  return undefined;
+}
+
+/** Only while nobody has changed it since it was added, by its setter or a manager; the guard (0149) words any refusal. */
+export async function deleteNextStep(stepId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("client_actions")
+    .delete()
+    .eq("id", stepId)
+    .select("id");
+  if (error) return friendly(error, "Could not delete that action. Try again.");
+  if (!data?.length) return { error: "That action is no longer here." };
+
+  revalidateAll();
+  return undefined;
+}
+
+/** Closes it for good with a reason; the database stamps who and when, and marks it done (0149). */
+export async function cancelNextStep(stepId: string, reason: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const why = reason.trim();
+  if (!why) return { error: "Say why it is cancelled." };
+  if (why.length > 500) return { error: "Keep the reason under 500 characters." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("client_actions")
+    .update({ cancel_reason: why, updated_by: user.id })
+    .eq("id", stepId)
+    .select("id");
+  if (error) return friendly(error, "Could not cancel that action. Try again.");
+  if (!data?.length) return { error: "That action is no longer here." };
 
   revalidateAll();
   return undefined;

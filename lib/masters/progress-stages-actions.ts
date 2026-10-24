@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 /**
  * Order carries meaning: the last active stage is the handover.
@@ -152,4 +153,14 @@ export async function moveProgressStage(
 
   refresh();
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteProgressStage(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "progress_stages", id, {
+    noun: "build stage",
+    retire: true,
+    paths: ["/masters/stages", "/client-relations"],
+  });
 }

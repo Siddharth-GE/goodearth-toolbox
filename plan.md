@@ -1,87 +1,26 @@
-# After the founder's look at the site board (2026-10-23)
+# TI, the admins' assistant `[Opus drafted; Fable reviews before T1, unless the founder waives]`
 
-The founder's asks, in this order, each its own pull request into `staging` and vetted there:
+**The founder's ask** (2026-10-24): an admin-only tool where you type or drag in files, to fill data across **every operation**, run analysis, and build interactive HTML docs and dashboards. Settled with them the same day: admins only; what goes into TI is sent to Anthropic, and each use costs money — both accepted. Delete or Cancel, which it waited on, is merged.
 
-1. [x] **A shorter villa page** `[Opus]` — essentials first, the rest folded; the date strip by family, a scroll bar on top (`supervisors/PLAN.md`). No migration.
-2. [x] **The site team's schedule workbook, and each villa bending the sequence** `[Opus]` (`0140`, applied to staging; rules in `supervisors/PLAN.md`):
-   - [x] each activity mapped to a stage, days rolled up; the app's order kept and stages with no line given 1 day marked to fill in (founder, 2026-10-23);
-   - [x] typical and wait days typed straight into Supervisors → Sequence's list;
-   - [x] per villa: "Not needed on this villa" and its own "Follows" (founder, mid-build: "some works are not needed in some houses, and some may need to be rearranged");
-   - [x] **the load itself** — on the founder's word, 2026-10-23: 43 stage days, 4 waits, 13 villas, 193 stages on staging (backup `data/backups/2026-10-23T11-45-32-429Z-…-site-schedule`). "Johny" (P-26, P-39) matches nobody on staging, so those two have no supervisor. The 187 Saarang stages check out against the stricter "done" rule the review asked for.
-   - [x] **Plot 2 went to Baveli's P2** (plot codes repeat across projects; the script now takes `--plots-in`). Put right 2026-10-23 by the Operations clear below and a re-load into Saarang.
-   - [x] **Operations cleared** on the founder's word, 2026-10-23 (`scripts/clear-operations.ts`, backup `data/backups/2026-10-23T12-14-42-633Z-…-clear-operations`): every record in Indents, POs, Inventory, Bills, Budgets, Selections, estimates and Supervisors; setup, the rate book and other tools kept; numbering restarts. Then the workbook re-loaded for Saarang: 13 villas, 198 stages; Baveli P2 is empty again.
-   - [x] Review fixes: labour on a stage left off brings it back (`0141`, on staging); every stage left off can be brought back; a chain of villa choices orders the same every time; the dialog keeps "to fill in" unless its days changed; a villa's own order works on a stage the sequence does not name; refused numbers say why on the phone; the two scroll bars follow by position.
-3. [x] **A test project, the whole chain buzzing** `[Opus designs; Fable reviews the wipe unless waived]` — a project marked as test data (never Baveli, which is real), one villa with a big official estimate, indents, POs, deliveries into several stores, issues, labour, stages, checklists, and Design Management with dummy links and released drawings. One red **Delete the test project** button in Settings, admin only, that can touch only rows under a test project. Staging becomes production, so the flag is the safety: nothing unflagged is reachable.
-   - [x] `0142` drafted: `projects.is_test`, `delete_test_project()` (admin, test-marked only, refuses tangled rows and setup, guards set aside per table, FKs still checked). Rehearsed with `scripts/trials/test-project-delete.sql` after the seed: refuses staff, Saarang and a real PO holding a test indent line; deletes ~550 rows in 44 tables; nothing outside moves; no guard left off.
-   - [x] `scripts/seed-test-project.sql` + `.ts`: Test project / Test plot 1 / Test villa 1, two test stores, an official estimate of 48 works with materials, 8 approved indents, 3 POs, 3 deliveries (one straight to site), 4 issues from requests plus one open, a site confirmation one short, 12 labour entries, stages done/working/waiting, a half-done checklist, 3 released drawings with dummy WorkDrive links, a transmittal, a work order, a PO bill and a wages bill, the villa on the design board. Rehearsed clean; not yet made.
-   - [x] Settings → **Test project**: the project with its counts and the red **Delete the test project**.
-   - [x] **Review**: the founder said "apply" (2026-10-23), taken as waiving Fable for `0142`; an independent Opus review stood in and found 15 points, all fixed: `truncate` (safeupdate refuses an unqualified delete through the app), `projects_is_test_guard` (a Masters holder could mark a real project test), the rate restore only while nothing moved it, audit triggers kept on, locks taken at once with `nowait`, guards re-enabled by name, set-null keys not walked, transmittal counters, file and Relay-link refusals, a `danger` button variant, plain refusal wording. The trial now counts every table before the seed and after the delete, and runs under the 8-second limits.
-   - [x] `0142` applied to staging, types regenerated (they matched), the test project made: 2 estimates, 8 indents, 3 POs, 3 deliveries, 4 issues, 2 bills, 3 drawings.
-   - [x] Merged as #133 on the founder's "merge everything", 2026-10-23.
-4. [ ] **Delete or Cancel, across every tool** — the plan below. The founder vetted pieces 1–3 on staging, took every recommendation under _Settled_, and waived Fable's review of the design (2026-10-23: "all looks good, do what you've recommended, waive the fable review"). An independent Opus review stands in on each pull request.
-5. [ ] **TI, the admins' assistant** — _Piece 5_ below. Planned 2026-10-24; built once piece 4 is merged.
+**Next session — start here:** Fable reviews this plan (or the founder waives it), the founder answers the two questions below, then T1.
 
-## Next session — start here, after "check CLAUDE.md"
-
-1. Build the next unticked step of Piece 4's build order, one pull request each, vetted on staging. Remind the founder: delete the test project before the switch to production.
-
-## Piece 4 — Delete or Cancel, across every tool
-
-**The founder's rule** (2026-10-23): "deletes are necessary across the board, it can be a simple hide or whatever but it needs to go". Settled with them: **a record nothing uses yet really deletes; a record something depends on offers Cancel instead** — hidden from lists, counts and totals, kept with who, when and why, and the message says what depends on it. Everything stays in the audit log either way.
-
-### Where things stand (the survey)
-
-- **Already the pattern, in part:** POs (draft deletes; issued → request deletion with a note → admin approves → `cancelled`, refused once goods arrive — `0021`, `0023`); Birdwing stays and invoices (cancel with a reason — `0115`); facilities ("delete if unused, else deactivate" — `deleteFacility`); masters, work orders, templates, design stages and departments (`is_active`).
-- **Delete only while a draft:** indents, estimates, revisions, transmittals, recorded bills, open checklists, requested issue requests, queued Relay chains, unbilled labour. Budgets in pricing and draft selections have the policy but **no button**.
-- **No delete or cancel at all:** goods receipts, stock issues, adjustments (append-only stock — `0023`), work orders, cash requests, client actions and engagements, design actions, site stages, Birdwing stays, every core master (projects, plots, units, clients, vendors, items, stores, companies, terms).
-- **Append-only money, by design:** `bill_payments`, `contractor_advances`, `advance_recoveries` (`0107`). **Money rows deletable with nothing but the grant:** `client_receipts`, `funding_movements`, `birdwing_receipts`, `birdwing_cross_charges` — inconsistent with the rest.
-
-### The design `[Fable waived by the founder, 2026-10-23]`
-
-- **A. One shape for every cancel** `[Opus drafts, Fable reviews]`: `cancelled_at`, `cancelled_by`, `cancel_reason` on each document that can be cancelled (POs keep their request-and-approve flow; its `deletion_note` is the reason); a status `cancelled` where the table has a status, else the three columns alone. A guard per table: cancel only from the states that allow it, reason required, cancelled is final. **Every fact view and every count leaves cancelled rows out** — the money views first, checked by `db:check-views`. One delete per table stays as today (the draft states); nothing gains a cascade.
-- **The button**: one shared `DeleteOrCancel` (`components/ui/`): it asks the server what the record holds; with nothing depending it says "Delete" and deletes; otherwise it says what depends ("2 deliveries and a bill") and offers "Cancel" with a reason. Lists get a **Show cancelled** filter. Pure helper (`lib/…/cancel.ts`, tested) for the wording.
-- **Stock and payments are never cancelled — they are reversed**: a delivery entered by mistake is undone by a return entry (an adjustment out, with the reason, pointing at it); an issue by a return to store; a payment by a negative payment with a reason. The ledger stays true; the screen shows the pair as "reversed".
-- **Masters retire**: Delete when nothing uses it (a vendor added by mistake), else **Retire** (`is_active = false`, hidden from pickers, kept on old records) — the facility pattern, everywhere.
-
-### Build order — one pull request each
-
-- [x] **B1. The shared button, indents, budgets and selections** `[Opus]` (`0143`, applied to staging; an independent Opus review stood in for Fable and its six points were fixed before applying): `DeleteOrCancel` and its wording helper; indents cancel from submitted or approved while no live PO orders from them, and every reader of indent quantities (the budget and estimate pulls, POs, the Estimator, Selections' impact, Overview, Reporter) leaves a cancelled one out; Indents' list gets **Show cancelled**; budgets in pricing and draft selections get their Delete (one function each, lines first, refused once an indent or a budget hangs off them).
-- [x] **B2. Estimates and Bills' documents** `[Opus]` (`0144`, `0145`, applied to staging; an independent Opus review stood in for Fable, nothing serious, its points folded in): an official estimate withdrawn while no live indent draws on it; work orders (pending → delete; approved with nothing resting on it → cancel by an approver or admin, else switch off); draft cash requests delete; recorded bills and draft POs on the shared button. **Changed from the plan:** an approved bill and a submitted cash request get no cancel of their own — an approver already sends either back to recorded or draft, which then deletes, so no money view changes.
-- [x] **C. Stock, deleted while untouched** `[Opus]` (`0146`, applied to staging; the founder chose this over return entries and waived Fable, 2026-10-23; an independent Opus review stood in, nothing serious, its points folded in): a delivery nothing was issued, moved or adjusted from, no bill counts on and the site has not confirmed, and an issue the site has not confirmed (a transfer only while its batches are all still in the receiving store), are deleted with a reason kept in `stock_deletions`. Anything used is corrected by an adjustment, as before. Return entries wait until that bites.
-- **D. Payments**, split in two on 2026-10-23 (the second half reaches other tools' money views):
-  - [x] **D1. Bills' money is reversed** `[Opus]` (`0147`, applied to staging, types regenerated and matching; the founder waived Fable, 2026-10-23, and an independent Opus review stood in — nothing serious, its seven points fixed; trial `scripts/trials/payment-reversals.sql`): a payment, an advance or a recovery is reversed by a bill approver or an admin, with a reason — a second row, the amount the other way, so every sum nets with no filter. Once, never a reversal of a reversal; an advance only once nothing is recovered from it. A paid bill falling below its total goes back to approved, and a bill whose money nets to nothing can be sent back and corrected. Reverse sits on the bill's payments and on Payments. A reversal ignores the approver's limit, as a send-back does (founder, 2026-10-23).
-  - [x] **D2. The four freely deletable money rows** `[Opus]` (`0148`, applied to staging, types regenerated; the founder waived Fable, 2026-10-23, and an independent Opus review stood in — nothing serious, its points fixed; trial `scripts/trials/cancel-money-in.sql`): client receipts, funding movements, Birdwing receipts and cross-charges are cancelled with a reason, never deleted or edited, and every view over them (`crm_milestone_facts`, `crm_receipt_facts`, `business_plan_target_facts`, `birdwing_stay_facts`) leaves a cancelled one out. Cancelled ones stay listed in place, struck through, rather than behind Show cancelled (founder, 2026-10-23). An admin or the tool's team lead (`is_lead()`) cancels, since these tools have no approver (founder, 2026-10-23).
-- **E. The rest** `[Sonnet, Opus vets]`: client actions and design actions (delete while untouched, else cancel), Birdwing stays (already cancel — the shared button), Relay (finish with a note — the shared button), saved reports, decks (delete as today).
-- **F. Masters retire** `[Sonnet, Opus vets]`: Delete when unused, else Retire, on every master; pickers hide retired ones.
-
-### Settled by the founder (2026-10-23)
-
-1. **Who may cancel:** whoever may edit the record, except money documents (POs, bills, payments), which need an approver or admin — as POs already do.
-2. **A reason is required** to cancel or reverse, never to delete an unused draft.
-3. **Cancelled records** are seen by everyone with the tool, under "Show cancelled", and never counted in totals.
-4. **Stock and payments are reversed, never cancelled.**
-
-## Piece 5 — TI, the admins' assistant `[Opus drafted; Fable reviews before T1, unless the founder waives]`
-
-**The founder's ask** (2026-10-24): an admin-only tool where you type or drag in files, to fill data across **every operation**, run analysis, and build interactive HTML docs and dashboards. Settled with them the same day: admins only; what goes into TI is sent to Anthropic, and each use costs money — both accepted; built once Delete or Cancel is merged.
-
-### The shape
+## The shape
 
 - **Admins only, the way Settings is.** In `lib/tools.ts`, left out of `GRANTABLE_TOOLS`; every query, action and route calls `requireUser` + `requireAdmin`; every TI table's policies are `(select is_admin())`. Never grantable, so neither `_app_known` CHECK changes. It opens on the chat, as Settings opens on its list — no welcome screen.
 - **No new way in.** The admin's own session and the RLS-scoped client — no admin client, no key of ours handed to anyone, no MCP door. TI sees exactly what the admin sees.
 - **Claude reads and proposes; a person saves.** The model's tools read, or propose rows that render as a table the admin edits before pressing Save. No tool the model can call writes a tool's table, and there is no web search or fetch, so a dropped file has no way to send data out.
-- **One new library, `@anthropic-ai/sdk`** — the server's only way to call Claude. `ANTHROPIC_API_KEY` in Vercel through `scripts/vercel-env.ts`, Preview first, never logged. `claude-opus-5-5`, effort `medium` in the chat and `high` for pages, streamed, with the server-side refusal fallback; system prompt and tool list cached. Read the `claude-api` skill's TypeScript tool-use pages before writing the loop.
-- **A monthly cap.** Each turn's tokens are kept with it; TI shows the month's spend in rupees and refuses a new turn past `TI_MONTHLY_LIMIT_INR`, in a sentence. Anthropic's console limit stands behind it.
+- **One new library, `@anthropic-ai/sdk`** — the server's only way to call Claude. `ANTHROPIC_API_KEY` from the founder's Anthropic Console account, in Vercel through `scripts/vercel-env.ts`, Preview first, never logged. `claude-opus-5-5`, effort `medium` in the chat and `high` for pages, streamed, with the server-side refusal fallback; system prompt and tool list cached. Read the `claude-api` skill's TypeScript tool-use pages before writing the loop.
+- **No spending cap in the app.** The account's prepaid API credits are the limit (founder, 2026-10-24). Each turn's tokens are kept with it; when the credits run out, TI says so in a sentence — "TI's credits have run out; top up the Anthropic account" — never a raw error.
 - **Files** dropped on the chat, 4 MB each (the body limit). PDFs and photos go to Claude as they are, uploaded once to Anthropic's Files API and referred to by id after, so a long conversation doesn't resend them; `.xlsx` through the fflate reader, moved from `scripts/read-xlsx.ts` into a shared module (and added to CLAUDE.md's list); `.csv` through `lib/csv.ts`. Kept in a private `ti-files` bucket so a conversation reopens whole.
 
-### The build — one pull request each, vetted on staging
+## The build — one pull request each, vetted on staging
 
 - [ ] **T1. Ask** `[Opus]`
-  - Migration (the next free number across every branch): `ti_conversations`, `ti_messages` (the API's content blocks as jsonb, tokens in and out), `ti_files`, bucket `ti-files`; one policy per command, an admin sees their own conversations only (Q2); revokes per SECURITY.md.
+  - Migration (the next free number across every branch): `ti_conversations`, `ti_messages` (the API's content blocks as jsonb, tokens in and out), `ti_files`, bucket `ti-files`; one policy per command, an admin sees their own conversations only (Q1); revokes per SECURITY.md.
   - `app/api/ti/route.ts`: POST, streams the reply; `maxDuration` at the plan's ceiling (check Vercel's first). Behind the proxy — not in `PUBLIC_PATHS`.
   - The read tools, argument checks pure and tested in `lib/ti/read-rules.ts`: `list_tables`, `describe_table`, `read_rows` (a table or view, its columns, filters `eq neq gt gte lt lte in ilike is`, order, ≤ 500 rows; `fetchAll` for a count or up to 5,000). Names are checked against `lib/ti/schema.generated.ts`, written from `database.types.ts` by `npm run db:types` and pinned by a test, so a new column reaches TI on the next types run. No embeds (BUGCATCHER #2). The prompt says a cancelled row is still there, with `cancelled_at`.
-  - Screen `app/(dashboard)/ti/`: conversations, the chat, the drop zone, the month's spend; works on a phone; `loading.tsx`.
-  - Verify: "how many indents wait for approval?" matches Indents; a quotation PDF's total is read right; the masters workbook's vendor count is right; the probe cannot open `/ti` or POST to `/api/ti`; a ₹1 cap on Preview refuses.
+  - Screen `app/(dashboard)/ti/`: conversations, the chat, the drop zone; works on a phone; `loading.tsx`.
+  - Verify: "how many indents wait for approval?" matches Indents; a quotation PDF's total is read right; the masters workbook's vendor count is right; the probe cannot open `/ti` or POST to `/api/ti`; with a dud key on Preview, TI answers in a sentence, not an error.
 - [ ] **T2. Pages — interactive docs and dashboards** `[Opus; Fable reviews the viewer's headers]`
   - `make_page`: Claude writes one self-contained HTML file and the list of reads behind it (the **recipe**). The server runs the recipe itself and puts the rows into the page as `<script type="application/json" id="ti-data">` — the page never asks our site for anything. **Refresh** re-runs the recipe as the refreshing admin: no Claude, no cost. A recipe whose table or column has gone says "this page's data has moved — ask TI to rebuild it".
   - Analysis over thousands of rows runs in Claude's code execution, calling `read_rows` from inside it (programmatic tool calling), so the rows don't pass through the conversation.
@@ -96,16 +35,15 @@ The founder's asks, in this order, each its own pull request into `staging` and 
 - [ ] **T4. Every operation, through drafts** `[Sonnet per tool, Opus vets]`
   - No tool's code writes another tool's table (SECURITY.md), and copying each tool's save rules into TI would drift. So TI writes only `ti_handoffs` (kind, payload jsonb, created_by, used_at), and each tool's own new-record form gains **From TI**: it opens prefilled, the person checks it and presses the tool's own Save, and the hand-off is stamped used. Numbering, approvals, guards and notifications stay where they are.
   - `ti_handoffs` is a shared surface: its row in STATUS.md's contract table; each tool reads only its own kinds. Fable: confirm this over a shared save module per tool.
-  - One pull request per tool, in the founder's order (Q3); suggested: indents, POs, labour logs, bills, client receipts, Birdwing stays.
+  - One pull request per tool, in the founder's order (Q2); suggested: indents, POs, labour logs, bills, client receipts, Birdwing stays.
   - Verify per tool: the photo of a paper indent → "draft indent ready" → open → prefilled → Save → numbered and off for approval like any other.
 
-### Questions for the founder
+## Questions for the founder
 
-1. The monthly cap — ₹5,000 to start?
-2. Each admin's conversations private to them (recommended), or open to every admin? Pages are shared either way.
-3. T4's order — which operation first?
+1. Each admin's conversations private to them (recommended), or open to every admin? Pages are shared either way.
+2. T4's order — which operation first?
 
-### Risks Fable checks
+## Risks Fable checks
 
 - Vercel's function ceiling on the current plan against a long page build — streaming keeps the line open, but the ceiling is real.
 - `read_rows` sees all an admin sees. `requireAdmin` in the route and `is_admin()` on the tables keep it from anyone else; it must never be offered behind a grant.

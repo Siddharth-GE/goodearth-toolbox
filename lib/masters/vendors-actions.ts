@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 function readVendorForm(formData: FormData) {
   const termsRaw = text(formData, "payment_term_days");
@@ -104,4 +105,14 @@ export async function saveVendorPaymentDetails(
 
   revalidatePath("/masters/vendors");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteVendor(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "vendors", id, {
+    noun: "vendor",
+    retire: true,
+    paths: ["/masters/vendors"],
+  });
 }

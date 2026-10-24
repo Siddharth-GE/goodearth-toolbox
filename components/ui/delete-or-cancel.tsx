@@ -20,6 +20,8 @@ export function DeleteOrCancel({
   verb = "Cancel",
   cancelNote = "It leaves every list and total, and stays on record with your reason. This can't be undone.",
   reasonPlaceholder = "Raised twice by mistake",
+  open,
+  onOpenChange,
 }: {
   /** As it reads after "this": "indent", "draft revision". */
   noun: string;
@@ -32,6 +34,9 @@ export function DeleteOrCancel({
   verb?: "Cancel" | "Withdraw" | "Delete" | "Reverse";
   cancelNote?: string;
   reasonPlaceholder?: string;
+  /** Opened from a menu item instead of its own button; a blocked removal then shows nothing. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const doing = {
     Cancel: "Cancelling…",
@@ -46,14 +51,18 @@ export function DeleteOrCancel({
     Reverse: "reversed",
   }[verb];
   if (!removal) return null;
+  const controlled = open !== undefined ? { open, onOpenChange } : {};
 
   if (removal.kind === "delete" && onDelete) {
     return (
       <ConfirmDialog
+        {...controlled}
         trigger={
-          <Button variant="ghost" size="sm" className="text-danger">
-            Delete
-          </Button>
+          open === undefined ? (
+            <Button variant="ghost" size="sm" className="text-danger">
+              Delete
+            </Button>
+          ) : undefined
         }
         title={`Delete this ${noun}?`}
         description={deleteNote}
@@ -67,10 +76,13 @@ export function DeleteOrCancel({
   if (removal.kind === "cancel" && onCancel) {
     return (
       <ConfirmDialog
+        {...controlled}
         trigger={
-          <Button variant="ghost" size="sm" className="text-danger">
-            {verb} {noun}
-          </Button>
+          open === undefined ? (
+            <Button variant="ghost" size="sm" className="text-danger">
+              {verb} {noun}
+            </Button>
+          ) : undefined
         }
         title={`${verb} this ${noun}?`}
         description={cancelNote}
@@ -82,7 +94,7 @@ export function DeleteOrCancel({
     );
   }
 
-  if (removal.kind === "blocked") {
+  if (removal.kind === "blocked" && open === undefined) {
     return (
       <div className="space-y-1 text-right">
         <Button variant="ghost" size="sm" disabled>

@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 export async function addUom(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
@@ -80,4 +81,14 @@ export async function setUomActive(id: string, isActive: boolean): Promise<Actio
 
   revalidatePath("/masters/uoms");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteUom(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "uoms", id, {
+    noun: "unit of measure",
+    retire: true,
+    paths: ["/masters/uoms"],
+  });
 }

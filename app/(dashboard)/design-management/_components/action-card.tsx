@@ -8,14 +8,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Pill, PillButton, PersonName, PlotChip, type PillTone } from "@/components/ui/pill";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { Textarea } from "@/components/ui/textarea";
 import { useUndoBar } from "@/components/ui/undo-bar";
-import { updateDesignAction, type DesignActionPatch } from "@/lib/design-management/board-actions";
+import {
+  cancelDesignAction,
+  deleteDesignAction,
+  updateDesignAction,
+  type DesignActionPatch,
+} from "@/lib/design-management/board-actions";
 import type { DesignAction } from "@/lib/design-management/board-queries";
 import { formatShortDate } from "@/lib/format";
-import { ACTION_STATUSES, closeRight, dueLabel, type DueTone } from "@/lib/next-steps/rules";
+import {
+  ACTION_STATUSES,
+  actionRemoval,
+  closeRight,
+  dueLabel,
+  type DueTone,
+} from "@/lib/next-steps/rules";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Check, Layers, MoreHorizontal, StickyNote } from "lucide-react";
+import { CalendarDays, Check, Layers, MoreHorizontal, StickyNote, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -51,6 +63,7 @@ export function ActionCard({
   }
   const [notesOpen, setNotesOpen] = useState(false);
   const [moreMode, setMoreMode] = useState<"menu" | "move">("menu");
+  const [removing, setRemoving] = useState(false);
 
   const status = optimistic ?? action.status;
   const done = status === "done";
@@ -117,6 +130,37 @@ export function ActionCard({
           : `Mark finished — ${setter} confirms`;
 
   if (hideWhenDone && done) return null;
+
+  if (action.cancelled) {
+    const { reason, by } = action.cancelled;
+    return (
+      <article className="border-border bg-surface/60 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-2xl border px-3 pt-3 pb-2.5">
+        <span className="-m-1.5 grid size-9 place-items-center" title="Cancelled">
+          <span className="border-foreground/15 text-muted grid size-6 place-items-center rounded-full border-2">
+            <X className="size-3.5" strokeWidth={3} />
+          </span>
+        </span>
+        <p className="text-muted px-1 py-0.5 text-[15px] leading-snug font-medium line-through">
+          {action.action}
+        </p>
+        <div className="col-start-2 mt-1.5 flex flex-wrap items-center gap-1.5">
+          {showVilla && action.villa ? (
+            <PlotChip
+              number={action.villa.number}
+              clientName={action.villa.clientName}
+              href={`/design-management/villas/${action.villa.unitId}`}
+            />
+          ) : null}
+          <Pill>
+            Cancelled{action.doneOn ? ` ${formatShortDate(action.doneOn)}` : ""}
+            {by ? ` by ${by}` : ""}
+          </Pill>
+          <span className="text-muted text-sm">{reason}</span>
+        </div>
+      </article>
+    );
+  }
+  const removal = actionRemoval(action, { id: meId, isManager });
 
   const statusLabel = ACTION_STATUSES.find((option) => option.value === action.status)?.label;
   const stamp = `${action.stamp.edited ? "Edited" : "Added"} ${formatShortDate(action.stamp.on)}${
@@ -310,6 +354,14 @@ export function ActionCard({
                 >
                   Move to another villa…
                 </DropdownMenuItem>
+                {removal ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-danger" onSelect={() => setRemoving(true)}>
+                      {removal === "delete" ? "Delete…" : "Cancel this action…"}
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </>
             )}
           </DropdownMenuContent>
@@ -319,6 +371,18 @@ export function ActionCard({
           {stamp}
         </span>
       </div>
+
+      <DeleteOrCancel
+        open={removing}
+        onOpenChange={setRemoving}
+        noun="action"
+        removal={removal ? { kind: removal } : null}
+        onDelete={() => deleteDesignAction(action.id)}
+        onCancel={(reason) => cancelDesignAction(action.id, reason)}
+        deleteNote="Nobody has changed it since it was added, so it goes for good."
+        cancelNote="It closes for good and stays among the done, struck through, with your reason. This can't be undone."
+        reasonPlaceholder="Covered by another action"
+      />
 
       {notesOpen ? <ActionNotes action={action} onSave={(notes) => save({ notes })} /> : null}
     </article>

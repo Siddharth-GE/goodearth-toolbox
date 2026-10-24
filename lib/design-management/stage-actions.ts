@@ -10,6 +10,8 @@ import { text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+import { placeStage, renumber, sameStages } from "./stage-order";
+
 /** Every action opens with requireTool and ends by revalidating the layout: an exact path would leave the welcome counts stale. Nothing here writes another tool's table. */
 
 export async function addDesignStage(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -30,17 +32,90 @@ export async function addDesignStage(_prev: ActionState, formData: FormData): Pr
     return { error: "Could not work out where to add it. Try again." };
   }
 
-  // Steps of 10, so one can slot between two without renumbering.
-  const { error } = await supabase.from("design_stages").insert({
-    name,
-    sort_order: (last?.sort_order ?? 0) + 10,
-    created_by: user.id,
-    updated_by: user.id,
-  });
+  const { data: added, error } = await supabase
+    .from("design_stages")
+    .insert({
+      name,
+      sort_order: (last?.sort_order ?? 0) + 10,
+      created_by: user.id,
+      updated_by: user.id,
+    })
+    .select("id")
+    .single();
   if (error) {
     if (error.code === "23505") return { error: "That stage is already on the list." };
     console.error("addDesignStage failed:", error);
     return { error: "Could not add the stage. Try again." };
+  }
+
+  // Added at the end, then moved to where it was put; a failed move leaves it at the end, still added.
+  const after = text(formData, "after") || "end";
+  let placed = true;
+  if (after !== "end") {
+    const order = await readOrder(supabase);
+    placed =
+      !("error" in order) &&
+      !(await writeOrder(supabase, user.id, placeStage(order.ids, added.id, after), order.current));
+  }
+
+  revalidatePath("/design-management", "layout");
+  if (!placed) return { error: "Added at the end — move it into place." };
+  return undefined;
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+async function readOrder(
+  supabase: Supabase,
+): Promise<{ ids: string[]; current: Map<string, number> } | { error: true }> {
+  const { data, error } = await supabase
+    .from("design_stages")
+    .select("id, sort_order")
+    .order("sort_order")
+    .order("name")
+    .order("id");
+  if (error) {
+    console.error("design_stages order read failed:", error);
+    return { error: true };
+  }
+  return {
+    ids: (data ?? []).map((stage) => stage.id),
+    current: new Map((data ?? []).map((stage) => [stage.id, stage.sort_order])),
+  };
+}
+
+/** Writes only the numbers that change; a part-failure leaves an order a further move puts right. */
+async function writeOrder(
+  supabase: Supabase,
+  userId: string,
+  ids: string[],
+  current: Map<string, number>,
+): Promise<boolean> {
+  const results = await Promise.all(
+    renumber(ids, current).map(({ id, sortOrder }) =>
+      supabase
+        .from("design_stages")
+        .update({ sort_order: sortOrder, updated_by: userId })
+        .eq("id", id),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) console.error("design_stages order write failed:", failed.error);
+  return !!failed;
+}
+
+/** A dragged order: the whole list as the person sees it, refused if it no longer names every stage once. */
+export async function reorderDesignStages(ids: string[]): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const order = await readOrder(supabase);
+  if ("error" in order) return { error: "Could not reorder the stages. Try again." };
+  if (!sameStages(ids, order.ids)) {
+    return { error: "The stages changed while you were moving them. Reload and try again." };
+  }
+  if (await writeOrder(supabase, user.id, ids, order.current)) {
+    return { error: "Could not save the new order. Try again." };
   }
 
   revalidatePath("/design-management", "layout");
@@ -127,42 +202,21 @@ export async function setDesignStageOnBoard(id: string, onBoard: boolean): Promi
   return undefined;
 }
 
-/** Swaps sort_order with the neighbour: two updates, not a rewrite of the list. */
+/** One step up or down, renumbering the list, so two stages sharing a number still move apart. */
 export async function moveDesignStage(id: string, direction: "up" | "down"): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
 
-  const { data: stages, error: readError } = await supabase
-    .from("design_stages")
-    .select("id, sort_order")
-    .order("sort_order")
-    .order("id");
-  if (readError) {
-    console.error("moveDesignStage read failed:", readError);
-    return { error: "Could not reorder the stages. Try again." };
-  }
-
-  const list = stages ?? [];
-  const index = list.findIndex((stage) => stage.id === id);
+  const order = await readOrder(supabase);
+  if ("error" in order) return { error: "Could not reorder the stages. Try again." };
+  const index = order.ids.indexOf(id);
   if (index === -1) return { error: "That stage no longer exists." };
   const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= list.length) return undefined;
+  if (swapIndex < 0 || swapIndex >= order.ids.length) return undefined;
 
-  const current = list[index];
-  const neighbour = list[swapIndex];
-
-  const [firstUpdate, secondUpdate] = await Promise.all([
-    supabase
-      .from("design_stages")
-      .update({ sort_order: neighbour.sort_order, updated_by: user.id })
-      .eq("id", current.id),
-    supabase
-      .from("design_stages")
-      .update({ sort_order: current.sort_order, updated_by: user.id })
-      .eq("id", neighbour.id),
-  ]);
-  if (firstUpdate.error || secondUpdate.error) {
-    console.error("moveDesignStage write failed:", firstUpdate.error ?? secondUpdate.error);
+  const ids = [...order.ids];
+  [ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]];
+  if (await writeOrder(supabase, user.id, ids, order.current)) {
     return { error: "Could not reorder the stages. Try again." };
   }
 

@@ -132,6 +132,27 @@ export function closeRight(
   return "none";
 }
 
+/**
+ * How an action goes (0149): untouched since it was added deletes; once changed (updated over a minute after it was made,
+ * or moved off open) it is cancelled with a reason. Only for whoever may close it; a closed action neither.
+ */
+export function actionRemoval(
+  action: {
+    createdBy: string | null;
+    ownerId: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  },
+  me: { id: string; isManager: boolean },
+): "delete" | "cancel" | null {
+  if (action.status === "done" || closeRight(action, me) !== "close") return null;
+  const changed =
+    action.status !== "open" ||
+    Date.parse(action.updatedAt) - Date.parse(action.createdAt) > 60_000;
+  return changed ? "cancel" : "delete";
+}
+
 export type Load = {
   open: number;
   overdue: number;
