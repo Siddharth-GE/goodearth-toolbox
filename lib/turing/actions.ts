@@ -2,11 +2,87 @@
 
 // Type-only; never re-exported from a "use server" file (BUGCATCHER #5).
 import type { ActionState } from "@/lib/action-state";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+import { RUNNERS } from "./catalogue";
+import { editedRows, entryFor } from "./catalogue-fields";
+import { shownProposals, type SaveResult } from "./display";
 import { forgetAtAnthropic, removeStored } from "./files";
 import { requireTuring } from "./queries";
+
+/**
+ * The admin's Save on a proposal: the rows they ticked, as they edited them, each through its
+ * tool's own save, as them. The proposal is taken from the conversation itself, never from the
+ * screen alone, and is taken once — the save row's unique key is claimed before anything runs.
+ */
+export async function saveProposal(input: {
+  conversationId: string;
+  proposalId: string;
+  rows: { row: number; values: Record<string, string | boolean> }[];
+}): Promise<ActionState> {
+  await requireTuring();
+  const supabase = await createClient();
+  let messages: { role: string; content: unknown }[];
+  try {
+    messages = await fetchAll((from, to) =>
+      supabase
+        .from("turing_messages")
+        .select("id, role, content")
+        .eq("conversation_id", input.conversationId)
+        .order("id")
+        .range(from, to),
+    );
+  } catch (thrown) {
+    console.error("turing: proposal read failed:", thrown);
+    return { error: "The proposal could not be read. Try again." };
+  }
+  const proposal = shownProposals(messages).get(input.proposalId);
+  const entry = entryFor(proposal?.action);
+  const run = entry ? RUNNERS[entry.key] : undefined;
+  if (!proposal || !entry || !run) return { error: "That proposal is not in this conversation." };
+  const rows = editedRows(entry, proposal.rows, input.rows);
+  if (!rows.ok) return { error: rows.error };
+
+  const { error: claimError } = await supabase
+    .from("turing_saves")
+    .insert({ conversation_id: input.conversationId, tool_use_id: input.proposalId });
+  if (claimError) {
+    if (claimError.code === "23505") return { error: "This proposal was already saved." };
+    console.error("turing: claiming the save failed:", claimError);
+    return { error: "The proposal could not be saved. Try again." };
+  }
+
+  const results: SaveResult[] = [];
+  for (const { index, row } of rows.value) {
+    try {
+      const outcome = await run(row.values);
+      results.push({
+        row: index,
+        ok: !outcome?.error,
+        message: outcome?.error ?? "",
+        values: row.values,
+      });
+    } catch (thrown) {
+      console.error("turing: a proposal row failed:", entry.key, thrown);
+      results.push({
+        row: index,
+        ok: false,
+        message: "Something went wrong. Try it on the tool's screen.",
+        values: row.values,
+      });
+    }
+  }
+
+  const { error } = await supabase
+    .from("turing_saves")
+    .update({ results: results as never })
+    .eq("conversation_id", input.conversationId)
+    .eq("tool_use_id", input.proposalId);
+  if (error) console.error("turing: save results not kept:", error);
+  revalidatePath("/turing", "layout");
+}
 
 /** The conversation, its messages and its files, here and at Anthropic. Its pages stay: they are shared. */
 export async function deleteConversation(id: string): Promise<ActionState> {

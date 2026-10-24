@@ -7,6 +7,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 
 import { anthropicClient, MODEL, SYSTEM_PROMPT, TURING_TOOLS } from "./claude";
 import { claudeFailure, CUT_OFF, NO_KEY, REFUSED, TOO_MANY_STEPS } from "./errors";
+import { CONTEXT_PREFIX, shownProposals, type SaveResult, type ShownProposal } from "./display";
 import { replayable } from "./replay";
 import { runTool } from "./tools";
 
@@ -22,6 +23,7 @@ export type TuringEvent =
   | { type: "text"; text: string }
   | { type: "status"; label: string }
   | { type: "page"; id: string; title: string }
+  | { type: "proposal"; proposal: ShownProposal }
   | { type: "error"; message: string }
   | { type: "done" };
 
@@ -67,6 +69,8 @@ function statusFor(name: string, input: unknown): string {
       return `Reading ${what}…`;
     case "make_page":
       return "Building the page…";
+    case "propose_changes":
+      return "Drawing up the changes…";
     case "code_execution":
       return "Working it out in code…";
     default:
@@ -74,7 +78,9 @@ function statusFor(name: string, input: unknown): string {
   }
 }
 
-async function loadHistory(conversationId: string): Promise<MessageParam[]> {
+async function loadHistory(
+  conversationId: string,
+): Promise<{ stored: { role: string; content: unknown }[]; history: MessageParam[] }> {
   const supabase = await createClient();
   const rows = await fetchAll((from, to) =>
     supabase
@@ -84,10 +90,67 @@ async function loadHistory(conversationId: string): Promise<MessageParam[]> {
       .order("id")
       .range(from, to),
   );
-  return replayable(rows).map((row): MessageParam => ({
-    role: row.role === "assistant" ? "assistant" : "user",
-    content: row.content as unknown as ContentParam[],
-  }));
+  return {
+    stored: rows,
+    history: replayable(rows).map((row): MessageParam => ({
+      role: row.role === "assistant" ? "assistant" : "user",
+      content: row.content as unknown as ContentParam[],
+    })),
+  };
+}
+
+/**
+ * What the admin saved from Turing's proposals since it last heard, as a line for the start of
+ * their next turn, so Claude knows what landed and what each tool refused. Read once, then marked told.
+ */
+async function savesToReport(
+  conversationId: string,
+  stored: { role: string; content: unknown }[],
+): Promise<{ line: string; ids: string[] } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("turing_saves")
+    .select("id, tool_use_id, results, created_at")
+    .eq("conversation_id", conversationId)
+    .eq("reported", false);
+  if (error) {
+    console.error("turing: saves to report not read:", error);
+    return null;
+  }
+  // A save still running is left for next time; one cut off mid-way is told as such.
+  const interruptedBefore = Date.now() - 360_000;
+  const due = (data ?? []).filter(
+    (save) => save.results !== null || Date.parse(save.created_at) < interruptedBefore,
+  );
+  if (due.length === 0) return null;
+  const proposals = shownProposals(stored);
+  const parts = due.map((save) => {
+    const proposal = proposals.get(save.tool_use_id);
+    if (save.results === null) {
+      return `"${proposal?.title ?? "a proposal"}" — the save was cut off part-way, so some rows may have landed; read before proposing again`;
+    }
+    const results = save.results as unknown as SaveResult[];
+    const rows = results
+      .map((result) => {
+        const original = proposal?.rows[result.row];
+        const label = original?.label ?? `row ${result.row + 1}`;
+        if (!result.ok) return `${label}: refused — ${result.message}`;
+        // The admin may have changed what Claude proposed before saving.
+        const changed = Object.entries(result.values ?? {})
+          .filter(([key, value]) => original?.values[key] !== value)
+          .map(([key, value]) => `${key} ${value === "" ? "cleared" : String(value)}`);
+        return changed.length > 0
+          ? `${label}: saved with ${changed.join(", ")}`
+          : `${label}: saved`;
+      })
+      .join("; ");
+    const left = (proposal?.rows.length ?? results.length) - results.length;
+    return `"${proposal?.title ?? "a proposal"}" — ${rows || "nothing"}${left > 0 ? `; ${left} row${left === 1 ? "" : "s"} left unticked` : ""}`;
+  });
+  return {
+    line: `${CONTEXT_PREFIX}Since your last answer the admin pressed Save on: ${parts.join(". ")}.</context>`,
+    ids: due.map((save) => save.id),
+  };
 }
 
 async function saveMessage(
@@ -138,10 +201,22 @@ export async function* converse({
     return;
   }
 
-  const history = await loadHistory(conversationId);
-  const ask: MessageParam = { role: "user", content: userContent };
+  const { stored, history } = await loadHistory(conversationId);
+  const report = await savesToReport(conversationId, stored);
+  const ask: MessageParam = {
+    role: "user",
+    content: report ? [{ type: "text", text: report.line }, ...userContent] : userContent,
+  };
   await saveMessage(conversationId, ask);
   history.push(ask);
+  if (report) {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("turing_saves")
+      .update({ reported: true })
+      .in("id", report.ids);
+    if (error) console.error("turing: saves not marked told:", error);
+  }
 
   let containerId =
     container && Date.parse(container.expiresAt) > Date.now() + 30_000 ? container.id : null;
@@ -247,8 +322,11 @@ export async function* converse({
       yield { type: "status", label: statusFor(call.name, call.input) };
       const outcome = directCallOfCodeTool(call)
         ? { content: "fetch_rows is for your code; use read_rows here.", isError: true }
-        : await runTool(call.name, call.input, conversationId);
+        : await runTool(call.name, call.input, conversationId, call.id);
       if ("page" in outcome && outcome.page) yield { type: "page", ...outcome.page };
+      if ("proposal" in outcome && outcome.proposal) {
+        yield { type: "proposal", proposal: outcome.proposal };
+      }
       results.push({
         type: "tool_result",
         tool_use_id: call.id,

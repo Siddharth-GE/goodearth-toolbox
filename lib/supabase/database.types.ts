@@ -10829,6 +10829,51 @@ export type Database = {
           },
         ]
       }
+      turing_saves: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          owner_id: string
+          reported: boolean
+          results: Json | null
+          tool_use_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          reported?: boolean
+          results?: Json | null
+          tool_use_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          reported?: boolean
+          results?: Json | null
+          tool_use_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_saves_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_saves_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           client_id: string | null
