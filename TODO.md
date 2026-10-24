@@ -7,7 +7,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 `plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
 
 - **Waiting on the founder:** a look at T1 on staging. The key in Vercel's Preview may expire on 31 Oct 2026; production needs its own when Turing ships.
-- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), and 6a work orders (#154). Batch 6b, bills, in review; next batch 7, Client Relations.
+- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154) and 6b bills (#155). Next: batch 7, Client Relations.
 
 ## Native apps on iPhone and Android — next build
 
