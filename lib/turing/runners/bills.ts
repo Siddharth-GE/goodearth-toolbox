@@ -9,6 +9,7 @@ import {
   updateBillCharges,
   updateBillDetails,
 } from "@/lib/bills/line-actions";
+import { roundPaise } from "@/lib/line-money";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -609,14 +610,14 @@ async function fullyBilled(
   const billedOf = new Map(
     billed.map((row) => [row.labour_contract_line_id ?? "", row.billed_value ?? 0]),
   );
-  const paise = (value: number) => Math.round(value * 100) / 100;
   return new Set(
     works
       .filter(
         (work) =>
-          paise((work.is_lump_sum ? 1 : (work.quantity ?? 0)) * work.rate) -
-            paise(billedOf.get(work.id) ?? 0) <=
-          0,
+          roundPaise(
+            roundPaise((work.is_lump_sum ? 1 : (work.quantity ?? 0)) * work.rate) -
+              (billedOf.get(work.id) ?? 0),
+          ) <= 0,
       )
       .map((work) => work.id),
   );
