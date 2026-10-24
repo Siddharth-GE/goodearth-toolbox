@@ -46,16 +46,15 @@ Data scripts in `scripts/` are dry-run by default, `--commit` to write, and matc
 | Where you are                 | Deploys from | Reads          | Who sees it                       |
 | ----------------------------- | ------------ | -------------- | --------------------------------- |
 | `npm run dev`                 | your machine | **staging**    | you                               |
-| `feature/<tool>`              | any push     | **staging**    | you, on a preview URL             |
 | `staging.goodearthkannur.org` | `staging`    | **staging**    | the founder, for days of real use |
 | `toolbox.kaadalgroup.com`     | `staging`    | **staging**    | the team, until switch day        |
 | `toolbox.goodearthkannur.org` | `master`     | **production** | seventy people doing their jobs   |
 
 ### Building anything
 
-1. Branch `feature/<tool>` off `staging`. Push early — the preview URL is free and reads staging.
+1. Branch `feature/<tool>` off `staging`. Push early: CI runs on every push. Only `staging` and `master` deploy (`vercel.json`) — Vercel's free plan allows about 100 deploys a day.
 2. **If it needs a migration**, apply it to staging first, then `npm run db:types:staging`, committed with it.
-3. Build. **Open the page** on the preview (BUGCATCHER #2).
+3. Build. **Open the page** on `npm run dev` (BUGCATCHER #2).
 4. Merge to `staging` through a pull request (CI's `db:check` is the gate). Leave it on `staging.goodearthkannur.org` for the founder. **This is a hard gate:** a ship instruction covers only what the founder had seen when they gave it (BUGCATCHER #14) — anything since waits for one sentence from them.
 5. **Then** apply the migration to production and run `npm run db:types`.
 6. `npm run db:compare -- --project pajfrgnkapicdgangjey --against ipstebqawrvhkyntctrv` — must be empty.
