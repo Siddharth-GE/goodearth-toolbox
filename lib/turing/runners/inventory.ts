@@ -11,12 +11,26 @@ import {
   setIssueWorkClass,
   updateReceiptLineRate,
 } from "@/lib/inventory/actions";
+import { fetchAll } from "@/lib/supabase/fetch-all";
+import { createClient } from "@/lib/supabase/server";
 
-import type { INVENTORY } from "../entries/inventory";
+import { totalled, type INVENTORY } from "../entries/inventory";
+import { roundQuantity } from "../entries/purchase-orders";
 import { idFrom } from "../redirects";
-import { given, recordNow, saving, type RunResult, type Runners, type Values } from "./kit";
+import {
+  failed,
+  given,
+  recordNow,
+  retired,
+  saving,
+  type RunResult,
+  type Runners,
+  type Values,
+} from "./kit";
 
 type Key = (typeof INVENTORY)[number]["key"];
+type Refusal = { error: string } | null;
+type Pick = { id: string; quantity: number };
 
 const text = (values: Values, key: string) =>
   typeof values[key] === "string" && values[key] ? String(values[key]) : null;
@@ -25,16 +39,6 @@ const text = (values: Values, key: string) =>
 async function referenceOf(table: "goods_receipts" | "stock_issues", id: string): Promise<string> {
   const now = await recordNow(table, { column: "id", id }, ["reference"], null);
   return "row" in now && now.row.reference ? String(now.row.reference) : "it";
-}
-
-/** The same line or item twice is one, its quantities added, as one row on the screen. */
-function totalled(lines: Values[], key: string): { id: string; quantity: number }[] {
-  const totals = new Map<string, number>();
-  for (const line of lines) {
-    const id = String(line[key]);
-    totals.set(id, (totals.get(id) ?? 0) + Number(line.quantity));
-  }
-  return [...totals].map(([id, quantity]) => ({ id, quantity }));
 }
 
 /** A save that ends on the record it made: its number, or the tool's refusal. */
@@ -49,26 +53,142 @@ async function made(
   return id ? { saved: await referenceOf(table, id) } : undefined;
 }
 
+const aboveZero = (picks: Pick[]): Refusal =>
+  picks.some((pick) => !(pick.quantity > 0)) ? { error: "Quantities must be more than 0." } : null;
+
+/**
+ * A delivery the receive screen would send: against an issued PO, every line on it, each no more
+ * than is still to come — checked before the delivery note is made, so a refusal leaves none behind.
+ * (The save itself skips a line not on the PO without a word.)
+ */
+async function receiptRefused(poId: string, picks: Pick[], toSite: boolean): Promise<Refusal> {
+  const refused = aboveZero(picks);
+  if (refused) return refused;
+  const po = await recordNow(
+    "purchase_orders",
+    { column: "id", id: poId },
+    ["status", "plot_id", "unit_id"],
+    "That PO is gone.",
+  );
+  if ("error" in po) return po;
+  if (po.row.status !== "issued") return { error: "Goods are received only against an issued PO." };
+  if (toSite && !po.row.plot_id && !po.row.unit_id) {
+    return { error: "That PO is a general one: its goods go into a store, not to a villa." };
+  }
+
+  const supabase = await createClient();
+  const ids = picks.map((pick) => pick.id);
+  let lines;
+  let received;
+  try {
+    [lines, received] = await Promise.all([
+      fetchAll((from, to) =>
+        supabase
+          .from("purchase_order_lines")
+          .select("id, quantity")
+          .eq("po_id", poId)
+          .in("id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+      fetchAll((from, to) =>
+        supabase
+          .from("goods_receipt_lines")
+          .select("id, po_line_id, quantity")
+          .in("po_line_id", ids)
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
+  } catch (error) {
+    return failed("purchase_order_lines", error);
+  }
+  const ordered = new Map(lines.map((line) => [line.id, line.quantity]));
+  const came = new Map<string, number>();
+  for (const line of received) {
+    came.set(line.po_line_id, (came.get(line.po_line_id) ?? 0) + line.quantity);
+  }
+  for (const pick of picks) {
+    const quantity = ordered.get(pick.id);
+    if (quantity === undefined) return { error: "A line is not on that PO." };
+    const left = Math.max(0, roundQuantity(quantity - (came.get(pick.id) ?? 0)));
+    if (pick.quantity > left) {
+      return {
+        error:
+          left > 0
+            ? `A line has ${left} still to come, not ${pick.quantity}.`
+            : "A line has already all come.",
+      };
+    }
+  }
+  return null;
+}
+
+/** An issue the screen would send: only what the store holds, each no more than it holds. */
+async function stockShort(storeId: string, picks: Pick[]): Promise<Refusal> {
+  const refused = aboveZero(picks);
+  if (refused) return refused;
+  const supabase = await createClient();
+  let held;
+  try {
+    held = await fetchAll((from, to) =>
+      supabase
+        .from("stock_on_hand")
+        .select("item_id, quantity")
+        .eq("store_id", storeId)
+        .in(
+          "item_id",
+          picks.map((pick) => pick.id),
+        )
+        .order("item_id")
+        .range(from, to),
+    );
+  } catch (error) {
+    return failed("stock_on_hand", error);
+  }
+  const onHand = new Map(held.map((row) => [row.item_id, row.quantity ?? 0]));
+  for (const pick of picks) {
+    const has = roundQuantity(onHand.get(pick.id) ?? 0);
+    if (pick.quantity > has) {
+      return {
+        error:
+          has > 0
+            ? `That store holds ${has} of an item, not ${pick.quantity}.`
+            : "That store holds none of an item.",
+      };
+    }
+  }
+  return null;
+}
+
 export const INVENTORY_RUNNERS: Runners<Key> = {
   receipt_new: {
-    lines: (header, lines) =>
-      made("goods_receipts", "/inventory/receipts/", () =>
+    lines: async (header, lines) => {
+      const toSite = header.to_site === true;
+      const poId = String(header.po_id);
+      const picks = totalled(lines, "po_line_id");
+      const storeId = toSite ? null : text(header, "store_id");
+      const workItemId = toSite ? text(header, "work_item_id") : null;
+      const refused =
+        (await retired("stores", storeId)) ??
+        (await retired("work_items", workItemId)) ??
+        (await receiptRefused(poId, picks, toSite));
+      if (refused) return refused;
+      return made("goods_receipts", "/inventory/receipts/", () =>
         recordGoodsReceipt({
-          poId: String(header.po_id),
-          storeId: header.to_site === true ? null : text(header, "store_id"),
-          toSite: header.to_site === true,
-          workItemId: header.to_site === true ? text(header, "work_item_id") : null,
+          poId,
+          storeId,
+          toSite,
+          workItemId,
           challanNo: text(header, "challan_no"),
           invoiceNo: text(header, "invoice_no"),
           invoiceDate: text(header, "invoice_date"),
           receivedAt: text(header, "received_at"),
           note: text(header, "note"),
-          lines: totalled(lines, "po_line_id").map(({ id, quantity }) => ({
-            poLineId: id,
-            quantity,
-          })),
+          lines: picks.map(({ id, quantity }) => ({ poLineId: id, quantity })),
         }),
-      ),
+      );
+    },
   },
   receipt_rate: async (v) => {
     const now = await recordNow(
@@ -86,31 +206,60 @@ export const INVENTORY_RUNNERS: Runners<Key> = {
     });
   },
   issue_new: {
-    lines: (header, lines) =>
-      made("stock_issues", "/inventory/issues/", () =>
+    lines: async (header, lines) => {
+      const storeId = String(header.store_id);
+      const plotId = text(header, "plot_id");
+      const workItemId = plotId ? text(header, "work_item_id") : null;
+      const picks = totalled(lines, "item_id");
+      const store = await recordNow(
+        "stores",
+        { column: "id", id: storeId },
+        ["is_active", "project_id"],
+        "That store is gone.",
+      );
+      if ("error" in store) return store;
+      if (store.row.is_active === false) return { error: "That store is retired in Masters." };
+      // The screen asks for a project only on a transfer out of a store tied to none.
+      const needsProject = !plotId && !store.row.project_id;
+      if (needsProject && !text(header, "project_id")) {
+        return { error: "That store is tied to no project, so a transfer from it names one." };
+      }
+      const refused =
+        (await retired("stores", text(header, "to_store_id"))) ??
+        (await retired("work_items", workItemId)) ??
+        (await stockShort(storeId, picks));
+      if (refused) return refused;
+      return made("stock_issues", "/inventory/issues/", () =>
         recordStockIssue({
-          storeId: String(header.store_id),
+          storeId,
           toStoreId: text(header, "to_store_id"),
-          plotId: text(header, "plot_id"),
-          workItemId: text(header, "plot_id") ? text(header, "work_item_id") : null,
-          projectId: text(header, "project_id"),
+          plotId,
+          workItemId,
+          projectId: needsProject ? text(header, "project_id") : null,
           issuedAt: text(header, "issued_at"),
           note: text(header, "note"),
-          workClass: text(header, "plot_id") ? text(header, "work_class") : null,
-          lines: totalled(lines, "item_id").map(({ id, quantity }) => ({ itemId: id, quantity })),
+          workClass: plotId ? text(header, "work_class") : null,
+          lines: picks.map(({ id, quantity }) => ({ itemId: id, quantity })),
         }),
-      ),
+      );
+    },
   },
-  adjustment_new: (v) =>
-    recordStockAdjustment({
+  adjustment_new: async (v) => {
+    const refused = await retired("stores", String(v.store_id));
+    if (refused) return refused;
+    return recordStockAdjustment({
       storeId: String(v.store_id),
       itemId: String(v.item_id),
       quantity: Number(v.quantity),
       reason: String(v.reason),
       adjustedAt: text(v, "adjusted_at"),
-    }),
+    });
+  },
   issue_work_class: (v) => setIssueWorkClass(String(v.issue_id), String(v.work_class)),
-  issue_work: (v) => retagIssueWork(String(v.issue_id), String(v.work_item_id)),
+  issue_work: async (v) => {
+    const refused = await retired("work_items", String(v.work_item_id));
+    return refused ?? retagIssueWork(String(v.issue_id), String(v.work_item_id));
+  },
   receipt_delete: async (v) => {
     const done = await saving(
       () => deleteGoodsReceipt(String(v.receipt_id), String(v.reason)),

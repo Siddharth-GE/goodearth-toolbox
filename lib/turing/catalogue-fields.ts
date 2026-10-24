@@ -5,6 +5,7 @@
  */
 
 import { INDENTS } from "./entries/indents";
+import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { SUPERVISORS } from "./entries/supervisors";
@@ -35,7 +36,11 @@ export type IdTable =
   | "indents"
   | "indent_lines"
   | "purchase_orders"
-  | "purchase_order_lines";
+  | "purchase_order_lines"
+  | "goods_receipts"
+  | "goods_receipt_lines"
+  | "stock_issues"
+  | "issue_requests";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -61,6 +66,10 @@ const FROM: Record<IdTable, string> = {
   indent_lines: "indent_lines (one item on an indent)",
   purchase_orders: "purchase_orders (a PO to one vendor)",
   purchase_order_lines: "purchase_order_lines (one item on a PO)",
+  goods_receipts: "goods_receipts (a delivery received against a PO)",
+  goods_receipt_lines: "goods_receipt_lines (one item on a delivery)",
+  stock_issues: "stock_issues (stock sent from a store to a villa or another store)",
+  issue_requests: "issue_requests (a supervisor's request for material from a store)",
 };
 
 export type Field = {
@@ -88,6 +97,8 @@ export type Field = {
   header?: true;
   /** Longest text taken; 500 unless said. */
   max?: number;
+  /** An amount that may be below zero (a stock count corrected down). */
+  signed?: true;
 };
 
 /**
@@ -126,7 +137,7 @@ export type Value = string | boolean;
 /** A field missing from `values` was left out: keep what is there. */
 export type Row = { label: string; values: Record<string, Value> };
 
-export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS, ...PURCHASE_ORDERS];
+export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS, ...PURCHASE_ORDERS, ...INVENTORY];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
 export const entryFor = (key: unknown): Entry<EntryKey> | undefined =>
@@ -204,7 +215,7 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a whole number up to 999.` };
     case "amount":
-      return /^\d{1,9}(\.\d{1,3})?$/.test(value)
+      return (field.signed ? /^-?\d{1,9}(\.\d{1,3})?$/ : /^\d{1,9}(\.\d{1,3})?$/).test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a number, like 12.5.` };
     case "choice":
@@ -393,7 +404,9 @@ export function catalogueText(): string {
                 : field.kind === "whole"
                   ? "whole number"
                   : field.kind === "amount"
-                    ? "number"
+                    ? field.signed
+                      ? "number, below 0 to take away"
+                      : "number"
                     : field.kind;
         const starts =
           entry.adds && field.start !== undefined ? `, ${String(field.start)} if left out` : "";

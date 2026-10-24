@@ -86,3 +86,22 @@ export async function recordNow(
   if (!data) return missing === null ? { row: {} } : { error: missing };
   return { row: data as unknown as Record<string, unknown> };
 }
+
+const RETIRED_NOUN = { vendors: "vendor", stores: "store", work_items: "work" } as const;
+
+/** A vendor, store or work retired in Masters is never offered on the screens. */
+export async function retired(
+  table: keyof typeof RETIRED_NOUN,
+  id: string | null,
+): Promise<Failure | null> {
+  if (!id) return null;
+  const what = RETIRED_NOUN[table];
+  const now = await recordNow(table, { column: "id", id }, ["is_active"], `That ${what} is gone.`);
+  if ("error" in now) return now;
+  return now.row.is_active === false ? { error: `That ${what} is retired in Masters.` } : null;
+}
+
+/** The first refusal of checks run side by side, or null. */
+export async function firstRefusal(checks: Promise<Failure | null>[]): Promise<Failure | null> {
+  return (await Promise.all(checks)).find((refusal) => refusal !== null) ?? null;
+}

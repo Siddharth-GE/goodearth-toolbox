@@ -28,8 +28,10 @@ import {
 import { idFrom } from "../redirects";
 import {
   failed,
+  firstRefusal,
   given,
   recordNow,
+  retired,
   saving,
   siteOf,
   type RunResult,
@@ -80,18 +82,6 @@ async function gstRefused(
   return off === undefined
     ? null
     : { error: `${off}% is not on the GST list. Pick one of ${rates.join(", ")}.` };
-}
-
-/** A vendor or store retired in Masters is never offered on the screens. */
-async function retired(
-  table: "vendors" | "stores",
-  id: string | null,
-): Promise<{ error: string } | null> {
-  if (!id) return null;
-  const what = table === "vendors" ? "vendor" : "store";
-  const now = await recordNow(table, { column: "id", id }, ["is_active"], `That ${what} is gone.`);
-  if ("error" in now) return now;
-  return now.row.is_active === false ? { error: `That ${what} is retired in Masters.` } : null;
 }
 
 /**
@@ -463,13 +453,6 @@ export const PO_RUNNERS: Runners<Key> = {
     return refused ?? withdrawPoDeletion(String(v.po_id));
   },
 };
-
-/** The first refusal of checks run side by side, or null. */
-async function firstRefusal(
-  checks: Promise<{ error: string } | null>[],
-): Promise<{ error: string } | null> {
-  return (await Promise.all(checks)).find((refusal) => refusal !== null) ?? null;
-}
 
 /** A refusal unless the PO is in `status` now. */
 async function unlessStatus(

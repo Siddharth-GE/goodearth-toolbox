@@ -5,6 +5,7 @@ import "server-only";
 // screens — each tool's in its own runners file.
 import type { EntryKey } from "./catalogue-fields";
 import { INDENT_RUNNERS } from "./runners/indents";
+import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
 import { PO_RUNNERS } from "./runners/purchase-orders";
 import type { Runners } from "./runners/kit";
@@ -16,4 +17,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...MASTERS_RUNNERS,
   ...INDENT_RUNNERS,
   ...PO_RUNNERS,
+  ...INVENTORY_RUNNERS,
 };
