@@ -10,6 +10,7 @@ import { MASTERS_RUNNERS } from "./runners/masters";
 import { PO_RUNNERS } from "./runners/purchase-orders";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
+import { WORK_ORDER_RUNNERS } from "./runners/work-orders";
 
 /** Every entry's runner: the type refuses an entry without one. */
 export const RUNNERS: Runners<EntryKey> = {
@@ -18,4 +19,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...INDENT_RUNNERS,
   ...PO_RUNNERS,
   ...INVENTORY_RUNNERS,
+  ...WORK_ORDER_RUNNERS,
 };
