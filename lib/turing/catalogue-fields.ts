@@ -5,6 +5,7 @@
  */
 
 import { BILLS } from "./entries/bills";
+import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -47,7 +48,10 @@ export type IdTable =
   | "labour_contract_lines"
   | "work_order_templates"
   | "bills"
-  | "bill_lines";
+  | "bill_lines"
+  | "client_actions"
+  | "client_payment_milestones"
+  | "client_receipts";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -82,6 +86,9 @@ const FROM: Record<IdTable, string> = {
   work_order_templates: "work_order_templates",
   bills: "bills (a supplier's or contractor's bill)",
   bill_lines: "bill_lines (one line on a bill)",
+  client_actions: "client_actions (an action in Client Relations)",
+  client_payment_milestones: "client_payment_milestones (one stage of a plot's payment schedule)",
+  client_receipts: "client_receipts (money a client paid)",
 };
 
 export type Field = {
@@ -157,6 +164,7 @@ export const ENTRIES = [
   ...INVENTORY,
   ...WORK_ORDERS,
   ...BILLS,
+  ...CLIENT_RELATIONS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
