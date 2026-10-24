@@ -233,9 +233,12 @@ export async function* converse({
         tools: TURING_TOOLS,
         messages: history,
         output_config: { effort: "medium" },
+        // Claude's earlier reasoning is bound to the instructions and tools it was written under;
+        // when an update changes them, that reasoning is set aside and the conversation carries on.
+        thinking: { type: "adaptive", block_binding: { prefix_mismatch_behavior: "drop_block" } },
         cache_control: { type: "ephemeral" },
         ...(containerId ? { container: containerId } : {}),
-        betas: ["server-side-fallback-2026-07-01"],
+        betas: ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
         fallbacks: "default",
       },
       { signal },

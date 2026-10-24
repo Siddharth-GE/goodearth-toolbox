@@ -174,6 +174,13 @@ After `0129` put `session_is_verified()` on every read policy, each list paid fo
 **Rule.** A policy calls its checks wrapped — `(select has_app('/x'))`, `(select session_is_verified())`, `(select auth.uid())` — so each runs once per query (`0139`). A call that takes a column stays bare: it has to.
 **Check.** `db:check-policies` refuses a bare call. A page that feels slow: time its reads as the probe, then compare a table's read with the policy wrapped inside a rolled-back trial.
 
+### 24. An update to Turing's instructions broke every older conversation
+
+The day Turing learned to propose changes, the founder's conversation from that morning answered every message with "Claude could not take that message". Claude's reasoning from earlier turns is stored and replayed, and Anthropic binds it to the system prompt and tool list it was written under; the update changed both, so the API refused the replay with a 400 (`Invalid signature in thinking block … bound to a different conversation`). Tests, build and a fresh conversation all pass — only a conversation older than the deploy shows it.
+
+**Rule.** Turing's requests carry `thinking.block_binding.prefix_mismatch_behavior: "drop_block"` (beta `thinking-binding-controls-2026-08-01`): reasoning that no longer matches is set aside and the conversation carries on.
+**Check.** After any change to `lib/turing/claude.ts`'s prompt or tools, send one message in a conversation started before the deploy. For a reported Turing error, read the deployment's log: `npx vercel logs <url> --since 3h --level error -x | grep turing`.
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.
