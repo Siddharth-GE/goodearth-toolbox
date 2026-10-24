@@ -5,6 +5,7 @@
  */
 
 import { INDENTS } from "./entries/indents";
+import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { SUPERVISORS } from "./entries/supervisors";
 
@@ -32,7 +33,9 @@ export type IdTable =
   | "progress_stages"
   | "work_categories"
   | "indents"
-  | "indent_lines";
+  | "indent_lines"
+  | "purchase_orders"
+  | "purchase_order_lines";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -56,6 +59,8 @@ const FROM: Record<IdTable, string> = {
   work_categories: "work_categories",
   indents: "indents (a site's request for materials)",
   indent_lines: "indent_lines (one item on an indent)",
+  purchase_orders: "purchase_orders (a PO to one vendor)",
+  purchase_order_lines: "purchase_order_lines (one item on a PO)",
 };
 
 export type Field = {
@@ -121,7 +126,7 @@ export type Value = string | boolean;
 /** A field missing from `values` was left out: keep what is there. */
 export type Row = { label: string; values: Record<string, Value> };
 
-export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS];
+export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS, ...PURCHASE_ORDERS];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
 export const entryFor = (key: unknown): Entry<EntryKey> | undefined =>
