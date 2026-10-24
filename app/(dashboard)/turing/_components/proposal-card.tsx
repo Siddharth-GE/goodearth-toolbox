@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { saveProposal } from "@/lib/turing/actions";
-import { entryFor, type Field, type Value } from "@/lib/turing/catalogue-fields";
+import { entryFor, recordKey, type Field, type Value } from "@/lib/turing/catalogue-fields";
 import type { SaveResult, ShownProposal } from "@/lib/turing/display";
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -136,7 +136,7 @@ function Outcome({ result }: { result: SaveResult | undefined }) {
     return (
       <Pill tone="success">
         <Check className="size-3.5" aria-hidden />
-        Saved
+        {result.made ? `Saved as ${result.made}` : "Saved"}
       </Pill>
     );
   }
@@ -180,11 +180,25 @@ export function ProposalCard({
   const count = ticked.filter(Boolean).length;
   // A saved row shows what it was saved with, which may differ from what Turing proposed.
   const shown = (index: number) => results.get(index)?.values ?? values[index];
+  // Lines of one record (one indent) are the ones Turing proposed together, whatever is edited
+  // since: a header edit changes all of them, and with several records each line says which.
+  const records = entry.lines ? proposal.rows.map((row) => recordKey(entry, row.values)) : [];
+  const recordOrder = [...new Set(records)];
+  const setValue = (index: number, field: Field, value: Value | null) =>
+    setValues((all) =>
+      all.map((current, at) =>
+        at === index || (field.header && entry.lines && records[at] === records[index])
+          ? { ...current, [field.key]: value }
+          : current,
+      ),
+    );
 
   const nameOf = (field: Field, index: number) => {
     const id = shown(index)[field.key];
-    if (id === undefined) return <span className="text-muted">Keep as is</span>;
-    if (id === "") return <span className="text-muted">None</span>;
+    // On a new record nothing is there to keep: left out is none.
+    if (id === undefined && !entry.adds) return <span className="text-muted">Keep as is</span>;
+    if (id === undefined || id === "" || id === null)
+      return <span className="text-muted">None</span>;
     return (
       proposal.names[String(id)] ??
       results.get(index)?.names?.[String(id)] ?? <span className="text-danger">Unknown</span>
@@ -264,6 +278,11 @@ export function ProposalCard({
               </TableCell>
               <TableCell className="min-w-48 text-sm">
                 {/* A new record is named by its label; what it sits under (its project, its category) follows. */}
+                {recordOrder.length > 1 && (
+                  <span className="text-muted mr-1.5 text-xs font-medium">
+                    {entry.lines?.noun} {recordOrder.indexOf(records[index]) + 1}
+                  </span>
+                )}
                 {(entry.adds || about.length === 0) && (
                   <span className="font-medium">{row.label}</span>
                 )}
@@ -300,13 +319,7 @@ export function ProposalCard({
                     value={shown(index)[field.key] ?? undefined}
                     adds={entry.adds === true}
                     disabled={locked || !ticked[index]}
-                    onChange={(value) =>
-                      setValues((all) =>
-                        all.map((current, at) =>
-                          at === index ? { ...current, [field.key]: value } : current,
-                        ),
-                      )
-                    }
+                    onChange={(value) => setValue(index, field, value)}
                   />
                 </TableCell>
               ))}

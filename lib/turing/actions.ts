@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 import { RUNNERS } from "./catalogue";
-import { editedRows, entryFor, idsOf } from "./catalogue-fields";
+import { editedRows, entryFor, idsOf, recordsOf } from "./catalogue-fields";
 import { shownProposals, type SaveResult } from "./display";
 import { forgetAtAnthropic, removeStored } from "./files";
 import { namesFor } from "./names";
@@ -43,8 +43,26 @@ export async function saveProposal(input: {
   const entry = entryFor(proposal?.action);
   const run = entry ? RUNNERS[entry.key] : undefined;
   if (!proposal || !entry || !run) return { error: "That proposal is not in this conversation." };
+  if (Boolean(entry.lines) === (typeof run === "function")) {
+    console.error("turing: an entry's lines and its runner disagree:", entry.key);
+    return { error: "Turing can't save this kind of change yet. Use the tool's own screen." };
+  }
   const rows = editedRows(entry, proposal.rows, input.rows);
   if (!rows.ok) return { error: rows.error };
+  // One call per row, or per record for an entry with lines; a record's result stands for each of its lines.
+  const records = typeof run === "function" ? null : recordsOf(entry, proposal.rows, rows.value);
+  if (records && !records.ok) return { error: records.error };
+  const calls =
+    typeof run === "function"
+      ? rows.value.map((item) => ({ items: [item], call: () => run(item.row.values) }))
+      : (records?.ok ? records.value : []).map((record) => ({
+          items: record.rows,
+          call: () =>
+            run.lines(
+              record.header,
+              record.rows.map(({ row }) => row.values),
+            ),
+        }));
 
   const { error: claimError } = await supabase
     .from("turing_saves")
@@ -75,22 +93,24 @@ export async function saveProposal(input: {
     );
 
   const results: SaveResult[] = [];
-  for (const { index, row } of rows.value) {
+  for (const { items, call } of calls) {
+    let message: string;
+    let made: string | undefined;
     try {
-      const outcome = await run(row.values);
-      results.push({
-        row: index,
-        ok: !outcome?.error,
-        message: outcome?.error ?? "",
-        values: row.values,
-        names: namesOf(row.values),
-      });
+      const result = await call();
+      message = (result && "error" in result && result.error) || "";
+      made = result && "saved" in result ? result.saved : undefined;
     } catch (thrown) {
+      // A redirect the runner did not expect (a sign-in that lapsed) is not a save either.
       console.error("turing: a proposal row failed:", entry.key, thrown);
+      message = "Something went wrong. Try it on the tool's screen.";
+    }
+    for (const { index, row } of items) {
       results.push({
         row: index,
-        ok: false,
-        message: "Something went wrong. Try it on the tool's screen.",
+        ok: !message,
+        message,
+        made,
         values: row.values,
         names: namesOf(row.values),
       });

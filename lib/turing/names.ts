@@ -30,7 +30,7 @@ async function readIn<T>(
 
 /** How each table's records read to the admin: a plot by its code, a work by code and name. */
 const NAMED_BY: Record<
-  Exclude<IdTable, "profiles" | "labour_logs">,
+  Exclude<IdTable, "profiles" | "labour_logs" | "indents" | "indent_lines">,
   "name" | "code name" | "code or name"
 > = {
   plots: "code or name",
@@ -102,11 +102,25 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("work_items", log.work_item_id);
     add("vendors", log.contractor_id);
   }
-
-  const people = await readIn(list("profiles"), (chunk) =>
-    supabase.from("profiles").select("id, full_name").in("id", chunk),
+  // An indent line likewise, by its indent and item.
+  const lines = await readIn(list("indent_lines"), (chunk) =>
+    supabase.from("indent_lines").select("id, indent_id, item_id, quantity, uom").in("id", chunk),
   );
+  for (const line of lines) {
+    add("indents", line.indent_id);
+    add("items", line.item_id);
+  }
+
+  const [people, indents] = await Promise.all([
+    readIn(list("profiles"), (chunk) =>
+      supabase.from("profiles").select("id, full_name").in("id", chunk),
+    ),
+    readIn(list("indents"), (chunk) =>
+      supabase.from("indents").select("id, reference, status").in("id", chunk),
+    ),
+  ]);
   for (const person of people) names[person.id] = person.full_name || "A person";
+  for (const indent of indents) names[indent.id] = `${indent.reference} (${indent.status})`;
   await Promise.all(
     (Object.keys(NAMED_BY) as (keyof typeof NAMED_BY)[]).map(async (table) => {
       const rows = await readIn(list(table), (chunk) =>
@@ -132,6 +146,15 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       names[log.work_item_id],
       names[log.contractor_id],
       labourSummary(log),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  for (const line of lines) {
+    names[line.id] = [
+      names[line.indent_id],
+      names[line.item_id],
+      `${formatQuantity(line.quantity)} ${line.uom}`,
     ]
       .filter(Boolean)
       .join(" · ");

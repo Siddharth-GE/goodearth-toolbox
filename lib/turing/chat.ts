@@ -139,9 +139,10 @@ async function savesToReport(
         const changed = Object.entries(result.values ?? {})
           .filter(([key, value]) => original?.values[key] !== value)
           .map(([key, value]) => `${key} ${value === "" ? "cleared" : String(value)}`);
+        const as = result.made ? ` as ${result.made}` : "";
         return changed.length > 0
-          ? `${label}: saved with ${changed.join(", ")}`
-          : `${label}: saved`;
+          ? `${label}: saved${as} with ${changed.join(", ")}`
+          : `${label}: saved${as}`;
       })
       .join("; ");
     const left = (proposal?.rows.length ?? results.length) - results.length;
