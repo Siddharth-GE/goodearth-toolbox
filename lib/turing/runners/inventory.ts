@@ -199,6 +199,10 @@ export const INVENTORY_RUNNERS: Runners<Key> = {
     );
     if ("error" in now) return now;
     const row = now.row as { rate: number | null; gst_pct: number | null; note: string | null };
+    // A blank kept would read as 0; the screen refuses a blank too.
+    if ((!("rate" in v) && row.rate === null) || (!("gst_pct" in v) && row.gst_pct === null)) {
+      return { error: "This line has no rate or GST % yet. Give both." };
+    }
     return updateReceiptLineRate(String(v.receipt_line_id), {
       rate: Number(given(v, "rate", row.rate)),
       gstPct: Number(given(v, "gst_pct", row.gst_pct)),
@@ -221,8 +225,14 @@ export const INVENTORY_RUNNERS: Runners<Key> = {
       if (store.row.is_active === false) return { error: "That store is retired in Masters." };
       // The screen asks for a project only on a transfer out of a store tied to none.
       const needsProject = !plotId && !store.row.project_id;
-      if (needsProject && !text(header, "project_id")) {
+      const projectId = text(header, "project_id");
+      if (needsProject && !projectId) {
         return { error: "That store is tied to no project, so a transfer from it names one." };
+      }
+      if (!needsProject && projectId && projectId !== store.row.project_id) {
+        return {
+          error: "This issue takes its project from the store or villa; leave the project out.",
+        };
       }
       const refused =
         (await retired("stores", text(header, "to_store_id"))) ??
@@ -235,7 +245,7 @@ export const INVENTORY_RUNNERS: Runners<Key> = {
           toStoreId: text(header, "to_store_id"),
           plotId,
           workItemId,
-          projectId: needsProject ? text(header, "project_id") : null,
+          projectId: needsProject ? projectId : null,
           issuedAt: text(header, "issued_at"),
           note: text(header, "note"),
           workClass: plotId ? text(header, "work_class") : null,
@@ -245,7 +255,8 @@ export const INVENTORY_RUNNERS: Runners<Key> = {
     },
   },
   adjustment_new: async (v) => {
-    const refused = await retired("stores", String(v.store_id));
+    const refused =
+      (await retired("stores", String(v.store_id))) ?? (await retired("items", String(v.item_id)));
     if (refused) return refused;
     return recordStockAdjustment({
       storeId: String(v.store_id),

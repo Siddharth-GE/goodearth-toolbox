@@ -87,9 +87,14 @@ export async function recordNow(
   return { row: data as unknown as Record<string, unknown> };
 }
 
-const RETIRED_NOUN = { vendors: "vendor", stores: "store", work_items: "work" } as const;
+const RETIRED_NOUN = {
+  vendors: "vendor",
+  stores: "store",
+  work_items: "work",
+  items: "item",
+} as const;
 
-/** A vendor, store or work retired in Masters is never offered on the screens. */
+/** A vendor, store, work or item retired in Masters is never offered on the screens. */
 export async function retired(
   table: keyof typeof RETIRED_NOUN,
   id: string | null,

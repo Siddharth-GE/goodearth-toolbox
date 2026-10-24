@@ -56,7 +56,9 @@ export const INVENTORY = defineEntries([
         ? "Say where the goods went: a store, or straight to the site."
         : v.to_site === true && !v.work_item_id
           ? "A delivery straight to site says which work it is for."
-          : undefined,
+          : v.to_site !== true && v.work_item_id
+            ? "A delivery into a store serves no work yet; its work is named when it is issued."
+            : undefined,
     fields: [
       { key: "po_id", label: "PO", kind: "id", table: "purchase_orders", header: true },
       {
@@ -129,7 +131,9 @@ export const INVENTORY = defineEntries([
         ? "Send it to one place: another store, or a villa."
         : v.plot_id && !v.work_item_id
           ? "An issue to a villa says which work it is for."
-          : undefined,
+          : v.to_store_id && (v.work_item_id || (v.work_class && v.work_class !== "standard"))
+            ? "A transfer between stores serves no work, so it takes no work or work class."
+            : undefined,
     fields: [
       { key: "store_id", label: "From store", kind: "id", table: "stores", header: true },
       {

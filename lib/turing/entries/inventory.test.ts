@@ -89,3 +89,22 @@ test("the same line or item twice is one, its quantities added and rounded", () 
     ],
   );
 });
+
+test("a delivery into a store and a transfer take no work, so none is dropped unsaid", () => {
+  const intoStore = checkProposal({
+    action: "receipt_new",
+    title: "x",
+    rows: [
+      { label: "a", po_id: PO, po_line_id: LINE, quantity: 1, store_id: STORE, work_item_id: WORK },
+    ],
+  });
+  assert.ok(!intoStore.ok && /serves no work yet/.test(intoStore.error));
+  const transfer = { label: "a", store_id: STORE, to_store_id: PLOT, item_id: ITEM, quantity: 1 };
+  const withClass = checkProposal({
+    action: "issue_new",
+    title: "x",
+    rows: [{ ...transfer, work_class: "rework" }],
+  });
+  assert.ok(!withClass.ok && /serves no work/.test(withClass.error));
+  assert.ok(checkProposal({ action: "issue_new", title: "x", rows: [transfer] }).ok);
+});
