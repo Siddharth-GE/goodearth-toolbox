@@ -14,6 +14,10 @@ declare
   p_free uuid;
   p_store uuid;
   pl_free uuid;
+  p_bare uuid;
+  p_planned uuid;
+  pl_bare uuid;
+  u_filled uuid;
   pl_other uuid;
   u_free uuid;
   u_sold uuid;
@@ -53,8 +57,20 @@ begin
   insert into plots (name, project_id) values ('T0150-C', p_free) returning id into pl_other;
   insert into units (name, plot_id, project_id, unit_type) values ('T0150 schedule', pl_other, p_free, v_unit_type)
   returning id into u_schedule;
-  update client_payment_milestones set due_amount = 100000
+  -- Changed since seeded: created five minutes ago, updated now (one transaction shares one now()).
+  update client_payment_milestones set due_amount = 100000, created_at = now() - interval '5 minutes'
    where stage = 'booking' and engagement_id = (select id from client_engagements where unit_id = u_schedule);
+  insert into plots (name, project_id) values ('T0150-E', p_free) returning id into pl_other;
+  insert into units (name, plot_id, project_id, unit_type) values ('T0150 filled', pl_other, p_free, v_unit_type)
+  returning id into u_filled;
+  update client_engagements set plot_value = 4500000, created_at = now() - interval '5 minutes'
+   where unit_id = u_filled;
+  -- A bare project and a bare plot; and a project whose Relay plan someone set.
+  insert into projects (name, project_type) values ('Trial 0150 bare', v_project_type) returning id into p_bare;
+  insert into plots (name, project_id) values ('T0150-F', p_store) returning id into pl_bare;
+  insert into projects (name, project_type) values ('Trial 0150 planned', v_project_type) returning id into p_planned;
+  update pusher_project_plans set start_date = current_date + 30, created_at = now() - interval '5 minutes'
+   where project_id = p_planned;
   insert into plots (name, project_id) values ('T0150-D', p_free) returning id into pl_other;
   insert into units (name, plot_id, project_id, unit_type) values ('T0150 receipt', pl_other, p_free, v_unit_type)
   returning id into u_receipt;
@@ -94,17 +110,21 @@ begin
     'role', 'authenticated', 'session_id', s_user)::text, true);
   set local role authenticated;
 
-  -- 2. An admin deletes what nothing uses, a villa's blank Client Relations record with it.
+  -- 2. An admin deletes what nothing uses: a unit with its seeded Client Relations record, a project with its
+  --    seeded Relay plan and stages, a bare plot.
   delete from brands where id = b_free;
   delete from vendors where id = v_free;
   delete from items where id = i_free;
   delete from units where id = u_free;
+  delete from plots where id = pl_bare;
+  delete from projects where id = p_bare;
   reset role;
   if exists (select 1 from brands where id = b_free) or exists (select 1 from vendors where id = v_free)
      or exists (select 1 from items where id = i_free) or exists (select 1 from units where id = u_free)
      or exists (select 1 from client_engagements where unit_id = u_free)
-     or exists (select 1 from client_payment_milestones m where not exists (
-          select 1 from client_engagements e where e.id = m.engagement_id)) then
+     or exists (select 1 from plots where id = pl_bare) or exists (select 1 from projects where id = p_bare)
+     or exists (select 1 from pusher_project_plans where project_id = p_bare)
+     or exists (select 1 from project_stages where project_id = p_bare) then
     raise exception 'TRIAL 2 FAILED: an admin could not delete an unused master';
   end if;
   set local role authenticated;
@@ -117,7 +137,7 @@ begin
   end if;
   v_text := null;
   begin delete from clients where id = c_free; exception when others then v_text := sqlerrm; end;
-  if v_text is distinct from 'Villas use this client, so it cannot be deleted' then
+  if v_text is distinct from 'Units use this client, so it cannot be deleted' then
     raise exception 'TRIAL 3b FAILED: deleting a client with a villa gave %', coalesce(v_text, 'no refusal');
   end if;
   v_text := null;
@@ -131,16 +151,27 @@ begin
     raise exception 'TRIAL 3d FAILED: deleting an item with a margin gave %', coalesce(v_text, 'no refusal');
   end if;
 
-  -- 4. A villa with a buyer or a payment schedule is refused; one with a receipt is refused by its key.
+  v_text := null;
+  begin delete from projects where id = p_planned; exception when others then v_text := sqlerrm; end;
+  if v_text is distinct from 'Relay has a schedule on this project, so it cannot be deleted' then
+    raise exception 'TRIAL 3e FAILED: deleting a project with a set Relay plan gave %', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 4. A unit with a buyer, or Client Relations details, is refused; one with a receipt is refused by its key.
   v_text := null;
   begin delete from units where id = u_sold; exception when others then v_text := sqlerrm; end;
-  if v_text is distinct from 'This villa is sold to a client, so it cannot be deleted' then
+  if v_text is distinct from 'This unit is reserved or sold, so it cannot be deleted' then
     raise exception 'TRIAL 4a FAILED: deleting a sold villa gave %', coalesce(v_text, 'no refusal');
   end if;
   v_text := null;
   begin delete from units where id = u_schedule; exception when others then v_text := sqlerrm; end;
-  if v_text is distinct from 'A payment schedule uses this villa, so it cannot be deleted' then
-    raise exception 'TRIAL 4b FAILED: deleting a villa with a schedule gave %', coalesce(v_text, 'no refusal');
+  if v_text is distinct from 'Client Relations has details on this unit, so it cannot be deleted' then
+    raise exception 'TRIAL 4b FAILED: deleting a unit with a schedule gave %', coalesce(v_text, 'no refusal');
+  end if;
+  v_text := null;
+  begin delete from units where id = u_filled; exception when others then v_text := sqlerrm; end;
+  if v_text is distinct from 'Client Relations has details on this unit, so it cannot be deleted' then
+    raise exception 'TRIAL 4d FAILED: deleting a unit with a filled-in plot record gave %', coalesce(v_text, 'no refusal');
   end if;
   v_state := null;
   begin delete from units where id = u_receipt; exception when others then v_state := sqlstate; end;
@@ -164,8 +195,10 @@ begin
   end loop;
 
   reset role;
-  if (select count(*) from units where id in (u_sold, u_schedule, u_receipt)) <> 3
-     or (select count(*) from client_engagements where unit_id in (u_schedule, u_receipt)) <> 2 then
+  if (select count(*) from units where id in (u_sold, u_schedule, u_receipt, u_filled)) <> 4
+     or (select count(*) from client_engagements where unit_id in (u_schedule, u_receipt, u_filled)) <> 3
+     or not exists (select 1 from pusher_project_plans where project_id = p_free)
+     or not exists (select 1 from pusher_project_plans where project_id = p_planned) then
     raise exception 'TRIAL 6 FAILED: a refused villa delete left something behind half done';
   end if;
 

@@ -52,7 +52,12 @@ export async function deleteMaster(
     if (message.startsWith("Could not")) console.error(`delete ${table} failed:`, error);
     return { error: message };
   }
-  if (!data?.length) return { error: `That ${noun} is no longer here.` };
+  // Nothing came back: gone already, or a session missing its emailed code (is_admin() wants both).
+  if (!data?.length) {
+    return {
+      error: `That ${noun} could not be deleted. Reload the page; if it is still there, sign in again.`,
+    };
+  }
 
   for (const path of paths) revalidatePath(path, "layout");
   return undefined;

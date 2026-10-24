@@ -11,6 +11,7 @@
  *   - every security-definer function sets search_path, and, if a client role can call it,
  *     checks a grant or is a trigger or a named exception below;
  *   - nothing in public is executable by anon (an extension's own functions aside).
+ *   - a deletable master whose children cascade or blank carries a delete guard (0150).
  */
 import { requireProjectRef, sql } from "./supabase-management";
 
@@ -24,6 +25,27 @@ const NO_GRANT_CHECK = new Set([
   "pusher_current_stage",
   "stock_qty_on_hand",
 ]);
+
+/** The shared masters an admin may delete while unused (0150). */
+const MASTERS = [
+  "projects",
+  "plots",
+  "units",
+  "clients",
+  "vendors",
+  "items",
+  "stores",
+  "companies",
+  "document_terms",
+  "item_categories",
+  "brands",
+  "construction_stages",
+  "progress_stages",
+  "uoms",
+  "work_categories",
+  "work_groups",
+  "work_items",
+];
 
 const GRANT_WORDS = ["has_app(", "is_admin(", "is_lead(", "auth.uid("];
 
@@ -93,6 +115,33 @@ async function main() {
        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
      order by 1`)) {
     problems.push(`${row.name}: executable by anon`);
+  }
+
+  // A deletable master whose children cascade or blank needs a <table>_delete_guard (0150); a unit's guard deletes its
+  // plot record, so nothing may cascade off that record but its seeded schedule, or off the schedule at all.
+  for (const row of await ask(`
+    select k.confrelid::regclass::text as parent, k.conrelid::regclass::text as child
+      from pg_constraint k
+     where k.contype = 'f' and k.confdeltype in ('c', 'n', 'd')
+       and exists (select 1 from pg_policies p
+                    where p.schemaname = 'public' and p.tablename = k.confrelid::regclass::text
+                      and p.cmd in ('DELETE', 'ALL'))
+       and k.confrelid::regclass::text in (${MASTERS.map((t) => `'${t}'`).join(", ")})
+       and not exists (select 1 from pg_trigger t
+                        where t.tgrelid = k.confrelid and t.tgenabled <> 'D'
+                          and t.tgname = k.confrelid::regclass::text || '_delete_guard')
+    union all
+    select k.confrelid::regclass::text, k.conrelid::regclass::text
+      from pg_constraint k
+     where k.contype = 'f' and k.confdeltype in ('c', 'n', 'd')
+       and k.confrelid::regclass::text in ('client_engagements', 'client_payment_milestones')
+       and (k.confrelid::regclass::text, k.conrelid::regclass::text)
+           <> ('client_engagements', 'client_payment_milestones')
+       and exists (select 1 from pg_trigger t where t.tgname = 'units_delete_guard')
+     order by 1, 2`)) {
+    problems.push(
+      `${row.parent} → ${row.child}: a delete would cascade or blank it with no guard to refuse`,
+    );
   }
 
   if (problems.length > 0) {
