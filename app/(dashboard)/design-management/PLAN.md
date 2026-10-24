@@ -22,7 +22,7 @@ Each villa's design from stage to stage — who is on it, what is next, what wen
 12. **A villa sits at the furthest stage that has started**, even while an earlier one is revised ("the stage that a house is in is marked by the latest stage even tho revisions may happen backwards"). It is not a straight line: stages run side by side and any stage can start at any time.
 13. **Several people on each stage** ("each house will have multiple people working on it").
 14. **Everyone holding the grant sees every villa** — the plan's recommendation, taken ("build it full"). Not `scoped`: a small team reviewing each other's drawings gains nothing from walls, and Supervisors already read the released drawings. Each person opens on their own work, with a switch to everyone.
-15. **Actions are Client Relations' Actions for the design team** — an owner, a date, overdue first; whoever set one closes it, or an admin; never deleted.
+15. **Actions are Client Relations' Actions for the design team** — an owner, a date, overdue first; whoever set one closes it, or an admin, and the same people delete it while nobody has changed it, else cancel it with a reason (`0149`, Client Relations' rule 9).
 
 | Screen                           | What it is                                                                                                    | Back to     |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |

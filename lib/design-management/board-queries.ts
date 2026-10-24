@@ -185,10 +185,12 @@ type ActionRecord = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
 };
 
 const ACTION_SELECT =
-  "id, unit_id, design_stage_id, action, owner_id, due_on, status, notes, done_on, created_by, updated_by, created_at, updated_at";
+  "id, unit_id, design_stage_id, action, owner_id, due_on, status, notes, done_on, created_by, updated_by, created_at, updated_at, cancelled_by, cancel_reason";
 
 export type DesignAction = {
   id: string;
@@ -206,6 +208,10 @@ export type DesignAction = {
   createdBy: string | null;
   setterName: string;
   stamp: { edited: boolean; on: string; by: string | null };
+  createdAt: string;
+  updatedAt: string;
+  /** Closed by a cancel, with its reason (0149): struck through among the done, never reopened. */
+  cancelled: { reason: string; by: string | null } | null;
   sortKey: string;
 };
 
@@ -239,6 +245,15 @@ function toAction(
       on: (edited ? row.updated_at : row.created_at).slice(0, 10),
       by: stampBy ? (names.get(stampBy)?.split(" ")[0] ?? null) : null,
     },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    cancelled:
+      row.cancel_reason === null
+        ? null
+        : {
+            reason: row.cancel_reason,
+            by: row.cancelled_by ? (names.get(row.cancelled_by)?.split(" ")[0] ?? null) : null,
+          },
     sortKey: villa ? `${villa.projectName} ${villa.sortKey}` : "",
   };
 }
@@ -316,7 +331,12 @@ async function readBoard(): Promise<BoardData> {
 
   const names = await namesFor(supabase, [
     ...people.map((row) => row.profile_id),
-    ...actionRows.flatMap((row) => [row.owner_id, row.created_by, row.updated_by]),
+    ...actionRows.flatMap((row) => [
+      row.owner_id,
+      row.created_by,
+      row.updated_by,
+      row.cancelled_by,
+    ]),
   ]);
 
   const villaById = new Map(villas.map((villa) => [villa.unitId, villa]));
@@ -658,7 +678,8 @@ export async function getDesignActions(filters: ActionsFilters): Promise<DesignA
         (action.createdBy ?? action.ownerId) === me.id &&
         action.ownerId !== me.id,
     ).length,
-    doneCount: listed.filter((action) => action.status === "done").length,
+    // A cancelled action is listed among the done but never counted (0149).
+    doneCount: listed.filter((action) => action.status === "done" && !action.cancelled).length,
     projects,
   };
 }
