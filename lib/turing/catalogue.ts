@@ -6,6 +6,7 @@ import "server-only";
 import type { EntryKey } from "./catalogue-fields";
 import { INDENT_RUNNERS } from "./runners/indents";
 import { MASTERS_RUNNERS } from "./runners/masters";
+import { PO_RUNNERS } from "./runners/purchase-orders";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
 
@@ -14,4 +15,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...SUPERVISOR_RUNNERS,
   ...MASTERS_RUNNERS,
   ...INDENT_RUNNERS,
+  ...PO_RUNNERS,
 };
