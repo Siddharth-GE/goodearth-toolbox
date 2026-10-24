@@ -312,33 +312,50 @@ export function editedRows(
   return { ok: true, value: rows.sort((a, b) => a.index - b.index) };
 }
 
-/** Which record a line belongs to: its header fields, together. */
+/** Which record a line belongs to: its header fields, together; left out and empty are the same. */
 export const recordKey = (entry: Entry, values: Record<string, Value | null>) =>
   JSON.stringify(
-    entry.fields.filter((field) => field.header).map((field) => values[field.key] ?? null),
+    entry.fields
+      .filter((field) => field.header)
+      .map((field) => (values[field.key] === "" ? null : (values[field.key] ?? null))),
   );
 
 /**
- * An entry with lines, as records: rows whose header fields all agree are one record (one indent,
- * one PO), in the order each first appears. Editing a row's header moves it to another record.
+ * An entry with lines, as records: the lines Turing proposed with the same header are one record
+ * (one indent, one PO), in the order each first appears. The grouping is fixed by the proposal, so
+ * the admin's edits can neither merge two records nor split one: a record whose lines were saved
+ * with different headers is refused.
  */
-export function recordsOf<T extends { row: Row }>(
+export function recordsOf<T extends { index: number; row: Row }>(
   entry: Entry,
+  proposed: Row[],
   rows: T[],
-): { header: Record<string, Value>; rows: T[] }[] {
+): Checked<{ header: Record<string, Value>; rows: T[] }[]> {
   const header = entry.fields.filter((field) => field.header);
   const records = new Map<string, { header: Record<string, Value>; rows: T[] }>();
   for (const item of rows) {
-    const values = Object.fromEntries(
-      header
-        .filter((field) => field.key in item.row.values)
-        .map((field) => [field.key, item.row.values[field.key]]),
-    );
-    const key = recordKey(entry, item.row.values);
-    if (!records.has(key)) records.set(key, { header: values, rows: [] });
-    records.get(key)?.rows.push(item);
+    const key = recordKey(entry, proposed[item.index]?.values ?? item.row.values);
+    const record = records.get(key);
+    if (record) {
+      if (recordKey(entry, record.rows[0].row.values) !== recordKey(entry, item.row.values)) {
+        return {
+          ok: false,
+          error: `${item.row.label}: the lines of one ${entry.lines?.noun.toLowerCase() ?? "record"} must share its ${header.map((field) => field.label.toLowerCase()).join(", ")}.`,
+        };
+      }
+      record.rows.push(item);
+      continue;
+    }
+    records.set(key, {
+      header: Object.fromEntries(
+        header
+          .filter((field) => field.key in item.row.values)
+          .map((field) => [field.key, item.row.values[field.key]]),
+      ),
+      rows: [item],
+    });
   }
-  return [...records.values()];
+  return { ok: true, value: [...records.values()] };
 }
 
 /** Every id the rows name, by the table it points into, for the server to turn into names. */

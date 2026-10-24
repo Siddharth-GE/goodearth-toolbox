@@ -15,18 +15,20 @@ export type LinesRunner = { lines: (header: Values, lines: Values[]) => Promise<
 export type Runners<K extends string> = Record<K, RowRunner | LinesRunner>;
 
 /**
- * A save that may end in a redirect: the redirect is the save succeeding, and its address is
- * returned so the new record's id can be read from it (`idFrom`).
+ * A save that ends in a redirect to what it made, under `expected` ("/indents/"): that redirect
+ * is the save succeeding, and its address is returned so the new record's id can be read from it
+ * (`idFrom`). Any other redirect — a sign-in that lapsed — is thrown on, never taken as saved.
  */
 export async function saving(
   call: () => Promise<ActionState>,
+  expected: string,
 ): Promise<{ error: string } | { path: string | null }> {
   try {
     const result = await call();
     return result?.error ? { error: result.error } : { path: null };
   } catch (thrown) {
     const path = redirectedTo(thrown);
-    if (path === null) throw thrown;
+    if (path === null || !path.startsWith(expected)) throw thrown;
     return { path };
   }
 }
@@ -40,6 +42,29 @@ export const failed = (what: string, error: unknown): Failure => {
   console.error(`turing: ${what} read failed:`, error);
   return { error: "Could not read how things stand now. Try again." };
 };
+
+/**
+ * Where a record sits, as the screens' site picker sends it: none (general), or a villa of the
+ * project — its unit when the plot has one, else the plot. A villa of another project is refused,
+ * which the picker never offers.
+ */
+export async function siteOf(
+  projectId: string,
+  plotId: string | null,
+): Promise<{ plotId: string | null; unitId: string | null } | Failure> {
+  if (!plotId) return { plotId: null, unitId: null };
+  const plot = await recordNow(
+    "plots",
+    { column: "id", id: plotId },
+    ["project_id"],
+    "That villa is gone.",
+  );
+  if ("error" in plot) return plot;
+  if (plot.row.project_id !== projectId) return { error: "That villa is in another project." };
+  const unit = await recordNow("units", { column: "plot_id", id: plotId }, ["id"], null);
+  if ("error" in unit) return unit;
+  return unit.row.id ? { plotId: null, unitId: String(unit.row.id) } : { plotId, unitId: null };
+}
 
 /**
  * One record's columns as they stand, read as the admin. `missing` says what an absent row means:

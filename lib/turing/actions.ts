@@ -12,7 +12,6 @@ import { shownProposals, type SaveResult } from "./display";
 import { forgetAtAnthropic, removeStored } from "./files";
 import { namesFor } from "./names";
 import { requireTuring } from "./queries";
-import { redirectedTo } from "./redirects";
 
 /**
  * The admin's Save on a proposal: the rows they ticked, as they edited them, each through its
@@ -50,6 +49,20 @@ export async function saveProposal(input: {
   }
   const rows = editedRows(entry, proposal.rows, input.rows);
   if (!rows.ok) return { error: rows.error };
+  // One call per row, or per record for an entry with lines; a record's result stands for each of its lines.
+  const records = typeof run === "function" ? null : recordsOf(entry, proposal.rows, rows.value);
+  if (records && !records.ok) return { error: records.error };
+  const calls =
+    typeof run === "function"
+      ? rows.value.map((item) => ({ items: [item], call: () => run(item.row.values) }))
+      : (records?.ok ? records.value : []).map((record) => ({
+          items: record.rows,
+          call: () =>
+            run.lines(
+              record.header,
+              record.rows.map(({ row }) => row.values),
+            ),
+        }));
 
   const { error: claimError } = await supabase
     .from("turing_saves")
@@ -79,18 +92,6 @@ export async function saveProposal(input: {
         .map((id) => [id, before[id]]),
     );
 
-  // One call per row, or per record for an entry with lines; a record's result stands for each of its lines.
-  const calls =
-    typeof run === "function"
-      ? rows.value.map((item) => ({ items: [item], call: () => run(item.row.values) }))
-      : recordsOf(entry, rows.value).map((record) => ({
-          items: record.rows,
-          call: () =>
-            run.lines(
-              record.header,
-              record.rows.map(({ row }) => row.values),
-            ),
-        }));
   const results: SaveResult[] = [];
   for (const { items, call } of calls) {
     let message: string;
@@ -100,12 +101,9 @@ export async function saveProposal(input: {
       message = (result && "error" in result && result.error) || "";
       made = result && "saved" in result ? result.saved : undefined;
     } catch (thrown) {
-      // A save that sends the person to what it made has saved.
-      if (redirectedTo(thrown) !== null) message = "";
-      else {
-        console.error("turing: a proposal row failed:", entry.key, thrown);
-        message = "Something went wrong. Try it on the tool's screen.";
-      }
+      // A redirect the runner did not expect (a sign-in that lapsed) is not a save either.
+      console.error("turing: a proposal row failed:", entry.key, thrown);
+      message = "Something went wrong. Try it on the tool's screen.";
     }
     for (const { index, row } of items) {
       results.push({

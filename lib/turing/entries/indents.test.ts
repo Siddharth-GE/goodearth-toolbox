@@ -34,30 +34,65 @@ test("lines with the same header are one indent, in the order they first appear"
     ],
   });
   assert.ok(proposal.ok);
+  const rows = proposal.value.rows;
   const records = recordsOf(
     proposal.value.entry,
-    proposal.value.rows.map((row, index) => ({ index, row })),
+    rows,
+    rows.map((row, index) => ({ index, row })),
   );
-  assert.equal(records.length, 2);
+  assert.ok(records.ok);
+  assert.equal(records.value.length, 2);
   assert.deepEqual(
-    records[0].rows.map(({ index }) => index),
+    records.value[0].rows.map(({ index }) => index),
     [0, 2],
   );
-  assert.equal(records[0].header.plot_id, PLOT);
+  assert.equal(records.value[0].header.plot_id, PLOT);
   // Left out, the urgent mark and the send start as the screen's do: no.
-  assert.equal(records[0].header.is_urgent, false);
-  assert.equal(records[0].header.submit, false);
-  assert.equal("item_id" in records[0].header, false);
+  assert.equal(records.value[0].header.is_urgent, false);
+  assert.equal(records.value[0].header.submit, false);
+  assert.equal("item_id" in records.value[0].header, false);
 });
 
-test("a header field that differs makes a separate indent", () => {
+const base = { project_id: PROJECT, plot_id: PLOT, is_urgent: false, submit: false };
+const line = (label: string, values: Record<string, string | boolean>) => ({
+  label,
+  values: { ...base, item_id: CEMENT, quantity: "1", ...values },
+});
+
+test("a header field that differs makes a separate indent; left out and empty do not", () => {
   const entry = entryFor("indent_new")!;
-  const base = { project_id: PROJECT, plot_id: PLOT, is_urgent: false, submit: false };
-  const records = recordsOf(entry, [
-    { row: { label: "a", values: { ...base, item_id: CEMENT, quantity: "1" } } },
-    { row: { label: "b", values: { ...base, is_urgent: true, item_id: SAND, quantity: "1" } } },
+  const two = [line("a", {}), line("b", { is_urgent: true })];
+  const split = recordsOf(
+    entry,
+    two,
+    two.map((row, index) => ({ index, row })),
+  );
+  assert.ok(split.ok && split.value.length === 2);
+  const one = [line("a", { note: "" }), line("b", {})];
+  const same = recordsOf(
+    entry,
+    one,
+    one.map((row, index) => ({ index, row })),
+  );
+  assert.ok(same.ok && same.value.length === 1);
+});
+
+test("the admin's edits can neither merge two proposed indents nor split one", () => {
+  const entry = entryFor("indent_new")!;
+  const proposed = [line("a", {}), line("b", { is_urgent: true })];
+  // Ticking Urgent on a to match b keeps them two indents.
+  const matched = recordsOf(entry, proposed, [
+    { index: 0, row: line("a", { is_urgent: true }) },
+    { index: 1, row: proposed[1] },
   ]);
-  assert.equal(records.length, 2);
+  assert.ok(matched.ok && matched.value.length === 2);
+  // One line of an indent saved with a different date is refused.
+  const together = [line("a", {}), line("b", {})];
+  const apart = recordsOf(entry, together, [
+    { index: 0, row: line("a", { required_by: "2026-11-02" }) },
+    { index: 1, row: together[1] },
+  ]);
+  assert.ok(!apart.ok && /lines of one indent must share/.test(apart.error));
 });
 
 test("an indent line needs an item and a quantity; a reason only off the estimate", () => {

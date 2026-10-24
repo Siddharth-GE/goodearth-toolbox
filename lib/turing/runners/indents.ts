@@ -14,42 +14,23 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { INDENTS } from "../entries/indents";
 import { idFrom } from "../redirects";
-import { failed, given, recordNow, saving, type RunResult, type Runners, type Values } from "./kit";
+import { given, recordNow, saving, siteOf, type RunResult, type Runners, type Values } from "./kit";
 
 type Key = (typeof INDENTS)[number]["key"];
 
 const text = (values: Values, key: string) =>
   typeof values[key] === "string" && values[key] ? String(values[key]) : null;
 
-/** The indent's number, for the result line; the id if it can't be read. */
+/** The indent's number, for the result line. */
 async function referenceOf(indentId: string): Promise<string> {
   const now = await recordNow("indents", { column: "id", id: indentId }, ["reference"], null);
   return "row" in now && now.row.reference ? String(now.row.reference) : "the indent";
 }
 
-/**
- * Lines onto a draft indent through the screen's own add, which files each item on or off the
- * villa's official estimate; then the reason for each line it put outside, as the line's own save.
- */
-async function addLines(indentId: string, lines: Values[]): Promise<RunResult> {
-  // The same item twice is one line on the screen too: its quantities added.
-  const totals = new Map<string, number>();
-  for (const line of lines) {
-    const itemId = String(line.item_id);
-    totals.set(itemId, (totals.get(itemId) ?? 0) + Number(line.quantity));
-  }
-  const added = await addDirectLines(
-    indentId,
-    [...totals].map(([itemId, quantity]) => ({ itemId, quantity })),
-  );
-  if (added?.error) return added;
+type Direct = { id: string; item_id: string; quantity: number; uom: string; note: string | null };
 
-  const reasons = new Map(
-    lines
-      .filter((line) => text(line, "reason"))
-      .map((line) => [String(line.item_id), text(line, "reason")]),
-  );
-  if (reasons.size === 0) return undefined;
+/** The indent's lines outside the estimate (and any budget) for these items: the ones a reason is for. */
+async function directLines(indentId: string, itemIds: string[]): Promise<Direct[] | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("indent_lines")
@@ -58,46 +39,83 @@ async function addLines(indentId: string, lines: Values[]): Promise<RunResult> {
     .is("estimate_id", null)
     .is("budget_id", null)
     .is("construction_line_id", null)
-    .in("item_id", [...reasons.keys()]);
+    .in("item_id", itemIds);
   if (error) {
-    failed("indent lines", error);
-    return { error: "The lines were added, but their reasons were not. Add them on the indent." };
+    console.error("turing: indent lines read failed:", error);
+    return null;
   }
-  // A reason for an item that turned out to be on the estimate has nothing to explain.
-  for (const row of data ?? []) {
-    const saved = await updateLine(row.id, {
-      quantity: row.quantity,
-      uom: row.uom,
-      note: row.note,
-      reason: reasons.get(row.item_id) ?? null,
+  return data;
+}
+
+/**
+ * Lines onto a draft indent through the screen's own add, which files each item on or off the
+ * villa's official estimate; then the reason for each line it put outside, as the line's own save.
+ * A reason goes only on a line this add made or grew, never on one already there untouched.
+ */
+async function addLines(indentId: string, lines: Values[]): Promise<RunResult> {
+  // The same item twice is one line on the screen too: its quantities added.
+  const totals = new Map<string, number>();
+  for (const line of lines) {
+    const itemId = String(line.item_id);
+    totals.set(itemId, (totals.get(itemId) ?? 0) + Number(line.quantity));
+  }
+  const reasons = new Map(
+    lines
+      .filter((line) => text(line, "reason"))
+      .map((line) => [String(line.item_id), String(line.reason)]),
+  );
+  const before = reasons.size > 0 ? await directLines(indentId, [...reasons.keys()]) : [];
+  if (before === null) return { error: "Could not read the indent's lines. Try again." };
+
+  const added = await addDirectLines(
+    indentId,
+    [...totals].map(([itemId, quantity]) => ({ itemId, quantity })),
+  );
+  // The add raises quantities one line at a time, so a refusal part-way may leave some raised.
+  if (added?.error) return { error: `${added.error} Check the indent before asking again.` };
+  if (reasons.size === 0) return undefined;
+
+  const after = await directLines(indentId, [...reasons.keys()]);
+  if (after === null)
+    return { error: "The lines were added, but not their reasons. Add them on the indent." };
+  const was = new Map(before.map((line) => [line.id, line.quantity]));
+  // A reason for an item the add filed on the estimate has nothing to explain.
+  const targets = after.filter((line) => was.get(line.id) !== line.quantity);
+  const refused: string[] = [];
+  for (const line of targets) {
+    const saved = await updateLine(line.id, {
+      quantity: line.quantity,
+      uom: line.uom,
+      note: line.note,
+      reason: reasons.get(line.item_id) ?? null,
     });
-    if (saved?.error)
-      return { error: `The lines were added, but a reason was refused: ${saved.error}` };
+    if (saved?.error) refused.push(saved.error);
   }
-  return undefined;
+  if (refused.length === 0) return undefined;
+  return {
+    error: `The lines were added, but ${refused.length} of ${targets.length} reasons were refused: ${[...new Set(refused)].join(" ")}`,
+  };
 }
 
 export const INDENT_RUNNERS: Runners<Key> = {
   indent_new: {
     lines: async (header, lines) => {
-      // As the screen does: a plot with its unit is the unit; a plot without one is the plot.
-      const plotId = text(header, "plot_id");
-      let unitId: string | null = null;
-      if (plotId) {
-        const unit = await recordNow("units", { column: "plot_id", id: plotId }, ["id"], null);
-        if ("error" in unit) return unit;
-        unitId = unit.row.id ? String(unit.row.id) : null;
-      }
-      const made = await saving(() =>
-        createIndent({
-          projectId: String(header.project_id),
-          plotId: unitId ? null : plotId,
-          unitId,
-          workItemId: text(header, "work_item_id"),
-          requiredBy: text(header, "required_by"),
-          note: text(header, "note"),
-          isUrgent: header.is_urgent === true,
-        }),
+      const projectId = String(header.project_id);
+      const site = await siteOf(projectId, text(header, "plot_id"));
+      if ("error" in site) return site;
+      const workItemId = text(header, "work_item_id");
+      const isUrgent = header.is_urgent === true;
+      const made = await saving(
+        () =>
+          createIndent({
+            projectId,
+            ...site,
+            workItemId,
+            requiredBy: text(header, "required_by"),
+            note: text(header, "note"),
+            isUrgent,
+          }),
+        "/indents/",
       );
       if ("error" in made) return made;
       const id = idFrom(made.path, "/indents/");
@@ -108,6 +126,32 @@ export const INDENT_RUNNERS: Runners<Key> = {
         };
       }
       const reference = await referenceOf(id);
+
+      // The work and the urgent mark ride a second write the create only logs when it fails.
+      const kept = await recordNow(
+        "indents",
+        { column: "id", id },
+        ["work_item_id", "is_urgent"],
+        null,
+      );
+      if (
+        "error" in kept ||
+        (kept.row.work_item_id ?? null) !== workItemId ||
+        Boolean(kept.row.is_urgent) !== isUrgent
+      ) {
+        const fixed = await updateIndentHeader(id, {
+          workItemId,
+          requiredBy: text(header, "required_by"),
+          note: text(header, "note"),
+          isUrgent,
+        });
+        if (fixed?.error) {
+          return {
+            error: `${reference} was made as a draft without its work or urgent mark: ${fixed.error}`,
+          };
+        }
+      }
+
       const added = await addLines(id, lines);
       if (added && "error" in added && added.error) {
         return { error: `${reference} was made as a draft, but: ${added.error}` };
@@ -148,7 +192,15 @@ export const INDENT_RUNNERS: Runners<Key> = {
     const now = await recordNow(
       "indent_lines",
       { column: "id", id: String(v.line_id) },
-      ["quantity", "uom", "note", "off_estimate_reason"],
+      [
+        "quantity",
+        "uom",
+        "note",
+        "off_estimate_reason",
+        "estimate_id",
+        "budget_id",
+        "construction_line_id",
+      ],
       "That line is no longer on the indent.",
     );
     if ("error" in now) return now;
@@ -157,7 +209,14 @@ export const INDENT_RUNNERS: Runners<Key> = {
       uom: string;
       note: string | null;
       off_estimate_reason: string | null;
+      estimate_id: string | null;
+      budget_id: string | null;
+      construction_line_id: string | null;
     };
+    // The line's save keeps a reason only off the estimate; elsewhere it would be dropped unsaid.
+    if (text(v, "reason") && (row.estimate_id || row.budget_id || row.construction_line_id)) {
+      return { error: "That line is on the estimate or a budget, so it needs no reason." };
+    }
     return updateLine(String(v.line_id), {
       quantity: Number(given(v, "quantity", row.quantity)),
       uom: row.uom,
@@ -178,7 +237,7 @@ export const INDENT_RUNNERS: Runners<Key> = {
   },
   indent_submit: (v) => submitIndent(String(v.indent_id)),
   indent_delete: async (v) => {
-    const done = await saving(() => deleteIndent(String(v.indent_id)));
+    const done = await saving(() => deleteIndent(String(v.indent_id)), "/indents/list");
     return "error" in done ? done : undefined;
   },
   indent_cancel: (v) => cancelIndent(String(v.indent_id), String(v.reason)),

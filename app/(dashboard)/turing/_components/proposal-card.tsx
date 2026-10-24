@@ -180,16 +180,14 @@ export function ProposalCard({
   const count = ticked.filter(Boolean).length;
   // A saved row shows what it was saved with, which may differ from what Turing proposed.
   const shown = (index: number) => results.get(index)?.values ?? values[index];
-  // Lines of one record (one indent) share its header; with several records, each line says which.
-  const records = entry.lines
-    ? proposal.rows.map((_, index) => recordKey(entry, shown(index)))
-    : [];
+  // Lines of one record (one indent) are the ones Turing proposed together, whatever is edited
+  // since: a header edit changes all of them, and with several records each line says which.
+  const records = entry.lines ? proposal.rows.map((row) => recordKey(entry, row.values)) : [];
   const recordOrder = [...new Set(records)];
   const setValue = (index: number, field: Field, value: Value | null) =>
     setValues((all) =>
       all.map((current, at) =>
-        at === index ||
-        (field.header && entry.lines && recordKey(entry, current) === recordKey(entry, all[index]))
+        at === index || (field.header && entry.lines && records[at] === records[index])
           ? { ...current, [field.key]: value }
           : current,
       ),
