@@ -209,13 +209,13 @@ create trigger design_actions_guard
 drop policy if exists "client_actions deletable by client relations app" on client_actions;
 create policy "client_actions deletable by client relations app"
   on client_actions for delete to authenticated
-  using ((has_app('/client-relations') and auth.uid() in (owner_id, created_by))
+  using (((select has_app('/client-relations')) and (select auth.uid()) in (owner_id, created_by))
          or crm_sees_action(id));
 
 drop policy if exists "design_actions deletable by design management app" on design_actions;
 create policy "design_actions deletable by design management app"
   on design_actions for delete to authenticated
-  using (has_app('/design-management'));
+  using ((select has_app('/design-management')));
 
 -- ---------------------------------------------------------------------
 -- Prove it landed
@@ -263,6 +263,13 @@ begin
   if position('has_app(''/design-management''::text)' in (select qual from pg_policies
       where tablename = 'design_actions' and cmd = 'DELETE')) = 0 then
     raise exception '0149: the design_actions delete policy is not gated on /design-management';
+  end if;
+  -- 0139's rule, as db:check-policies reads it: every check wrapped, run once per query.
+  if exists (select 1 from pg_policies
+              where schemaname = 'public' and tablename in ('client_actions', 'design_actions') and cmd = 'DELETE'
+                and coalesce(qual, '')
+                    ~ '(?<!SELECT )((has_app|is_lead)\(''[^'']*''::text\)|session_is_verified\(\)|is_admin\(\)|auth\.uid\(\))') then
+    raise exception '0149: a delete policy calls a check once per row';
   end if;
 
   foreach c in array array['client_actions_guard()', 'design_actions_guard()'] loop

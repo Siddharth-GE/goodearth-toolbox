@@ -678,7 +678,8 @@ export async function getDesignActions(filters: ActionsFilters): Promise<DesignA
         (action.createdBy ?? action.ownerId) === me.id &&
         action.ownerId !== me.id,
     ).length,
-    doneCount: listed.filter((action) => action.status === "done").length,
+    // A cancelled action is listed among the done but never counted (0149).
+    doneCount: listed.filter((action) => action.status === "done" && !action.cancelled).length,
     projects,
   };
 }

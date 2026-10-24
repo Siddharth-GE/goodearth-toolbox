@@ -8,7 +8,12 @@ do $trial$
 declare
   v_user uuid := (select id from auth.users where email = 'siddharth.cyriac.99@gmail.com');
   s_user uuid := gen_random_uuid();
-  v_other uuid;
+  v_other uuid := (select id from auth.users where email = 'siddharth.cyriac.99+probe@gmail.com');
+  v_plot uuid;
+  c_plot_open uuid;
+  c_plot_cancelled uuid;
+  c_led uuid;
+  d_theirs_fresh uuid;
   c_fresh uuid;
   c_changed uuid;
   c_theirs uuid;
@@ -18,15 +23,32 @@ declare
   d_theirs uuid;
   v_text text;
 begin
-  select id into v_other from profiles where id <> v_user and is_active order by id limit 1;
-  if v_user is null or v_other is null then
-    raise exception 'TRIAL SETUP: staging is missing the staff account or a second person';
+  select e.id into v_plot from client_engagements e join units u on u.id = e.unit_id
+   where u.client_id is not null order by u.code limit 1;
+  if v_user is null or v_other is null or v_plot is null then
+    raise exception 'TRIAL SETUP: staging is missing the staff account, the probe or a sold plot';
   end if;
 
-  update profiles set role_id = null, role = 'staff' where id = v_user;
-  delete from user_apps where user_id = v_user;
-  delete from tool_leads where user_id = v_user;
-  insert into user_apps (user_id, app) values (v_user, '/client-relations'), (v_user, '/design-management');
+  update profiles set role_id = null, role = 'staff' where id in (v_user, v_other);
+  delete from user_apps where user_id in (v_user, v_other);
+  delete from tool_leads where user_id in (v_user, v_other);
+  insert into user_apps (user_id, app)
+  values (v_user, '/client-relations'), (v_user, '/design-management'),
+         (v_other, '/client-relations'), (v_other, '/design-management');
+
+  -- A plot whose Construction side is the staff account's, with an open step and a cancelled one on it.
+  update client_engagements set crm_owner_id = v_user where id = v_plot;
+  insert into client_actions (engagement_id, action, owner_id, created_by, track)
+  values (v_plot, 'Trial 0149 plot open', v_user, v_user, 'sales') returning id into c_plot_open;
+  insert into client_actions (engagement_id, action, owner_id, created_by, track)
+  values (v_plot, 'Trial 0149 plot cancelled', v_user, v_user, 'sales') returning id into c_plot_cancelled;
+  update client_actions set cancelled_at = now(), cancel_reason = 'Trial', status = 'done', done_on = current_date
+   where id = c_plot_cancelled;
+  -- The probe's own action, which a lead sees; and a fresh design action the probe set for the staff account.
+  insert into client_actions (action, owner_id, created_by) values ('Trial 0149 led', v_other, v_other)
+  returning id into c_led;
+  insert into design_actions (action, owner_id, created_by) values ('Trial 0149 theirs fresh', v_user, v_other)
+  returning id into d_theirs_fresh;
 
   -- Setup as a script (no session): general actions owned by the staff account, set by it or by someone else.
   insert into client_actions (action, owner_id, created_by) values ('Trial 0149 fresh', v_user, v_user)
@@ -200,6 +222,50 @@ begin
   if (select status from client_actions where id = c_done) <> 'open' then
     raise exception 'TRIAL 7 FAILED: the setter could not reopen a done action';
   end if;
+  set local role authenticated;
+
+  -- 8. Untouched is not enough: a design action someone else set is theirs to delete.
+  v_text := null;
+  begin
+    delete from design_actions where id = d_theirs_fresh;
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'Only whoever set this action, or a manager, can delete it' then
+    raise exception 'TRIAL 8 FAILED: deleting a colleague''s fresh design action gave %', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 9. Handing the plot's side over moves the open step and leaves the cancelled one as it was.
+  update client_engagements set crm_owner_id = v_other where id = v_plot;
+  reset role;
+  if (select owner_id from client_actions where id = c_plot_open) is distinct from v_other
+     or (select (owner_id, status, cancel_reason) from client_actions where id = c_plot_cancelled)
+        is distinct from (v_user, 'done'::text, 'Trial'::text) then
+    raise exception 'TRIAL 9 FAILED: a hand-over moved a cancelled step or left the open one behind';
+  end if;
+
+  -- 10. A team lead sees the probe's action, and still neither deletes nor cancels it.
+  insert into tool_leads (user_id, app) values (v_user, '/client-relations');
+  set local role authenticated;
+  if not exists (select 1 from client_actions where id = c_led) then
+    raise exception 'TRIAL 10 SETUP: the lead cannot see the probe''s action';
+  end if;
+  v_text := null;
+  begin
+    delete from client_actions where id = c_led;
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'Only whoever set this action, or a manager, can delete it' then
+    raise exception 'TRIAL 10a FAILED: a lead deleting a colleague''s action gave %', coalesce(v_text, 'no refusal');
+  end if;
+  v_text := null;
+  begin
+    update client_actions set cancel_reason = 'Not needed' where id = c_led;
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'Only whoever set this action, or a manager, can cancel it' then
+    raise exception 'TRIAL 10b FAILED: a lead cancelling a colleague''s action gave %', coalesce(v_text, 'no refusal');
+  end if;
+  reset role;
 
   raise notice 'TRIAL 0149 OK — untouched actions delete, changed ones cancel with a reason, by their setter, and cancelled is final';
 end $trial$;

@@ -300,7 +300,9 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
     supabase
       .from("client_actions")
       .select("id", { count: "exact", head: true })
-      .eq("status", "done"),
+      .eq("status", "done")
+      // A cancelled action is listed among the done but never counted (0149).
+      .is("cancelled_at", null),
   ]);
   fail("done actions", doneCountRes.error);
 
