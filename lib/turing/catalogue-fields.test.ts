@@ -10,6 +10,7 @@ import {
   ENTRIES,
   idsOf,
   LABOUR_LOG_FORM,
+  labourConflict,
 } from "./catalogue-fields";
 
 const PLOT = "11111111-1111-4111-8111-111111111111";
@@ -173,6 +174,37 @@ test("a day's labour: each way of paying passes, and a quantity is a plain numbe
   assert.ok(!bad.ok);
   assert.match(bad.error, /Row 1: Quantity is a number/);
   assert.match(bad.error, /Row 2: Date is missing/);
+});
+
+test("a value the way of paying would drop is refused, not saved as nothing", () => {
+  assert.match(labourConflict({ kind: "nmr", quantity: "12" }) ?? "", /not a quantity/);
+  assert.match(labourConflict({ kind: "pw_qty", masons: "2" }) ?? "", /Heads are for daily/);
+  assert.match(labourConflict({ kind: "pw_lump", quantity: "3" }) ?? "", /not a quantity/);
+  assert.equal(labourConflict({ kind: "pw_qty", masons: "0", quantity: "4" }), undefined);
+  // A change takes the log's own way of paying when the row doesn't give one.
+  const now = { kind: "nmr", work_item_id: GROUP };
+  assert.match(labourConflict({ quantity: "5" }, now) ?? "", /not a quantity/);
+  assert.equal(labourConflict({ masons: "4" }, now), undefined);
+  const piece = { kind: "pw_qty", work_item_id: GROUP };
+  assert.match(labourConflict({ work_item_id: OTHER }, piece) ?? "", /give the quantity again/);
+  assert.equal(labourConflict({ work_item_id: OTHER, quantity: "9" }, piece), undefined);
+});
+
+test("a correction can keep the work, contractor, date or payment, but never empty them", () => {
+  const change = checkProposal({
+    action: "labour_log_change",
+    title: "x",
+    rows: [
+      { label: "a", log_id: PLOT, contractor_id: "" },
+      { label: "b", log_id: PLOT, kind: "" },
+      { label: "c", log_id: PLOT, work_class: "" },
+    ],
+  });
+  assert.ok(!change.ok);
+  assert.match(change.error, /Row 1: Contractor can be left as it is, but not emptied/);
+  assert.match(change.error, /Row 2: Paid as can be left as it is/);
+  // An empty work class goes back to standard work, the tool's own default.
+  assert.doesNotMatch(change.error, /Row 3/);
 });
 
 test("a labour log is changed or deleted by its id, which cannot be edited on screen", () => {

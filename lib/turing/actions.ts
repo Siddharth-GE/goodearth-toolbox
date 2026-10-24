@@ -7,9 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 import { RUNNERS } from "./catalogue";
-import { editedRows, entryFor } from "./catalogue-fields";
+import { editedRows, entryFor, idsOf } from "./catalogue-fields";
 import { shownProposals, type SaveResult } from "./display";
 import { forgetAtAnthropic, removeStored } from "./files";
+import { namesFor } from "./names";
 import { requireTuring } from "./queries";
 
 /**
@@ -54,6 +55,25 @@ export async function saveProposal(input: {
     return { error: "The proposal could not be saved. Try again." };
   }
 
+  // Names as they read before the save, kept with the results: a deleted log names nothing after.
+  let before: Record<string, string> = {};
+  try {
+    before = await namesFor(
+      idsOf(
+        entry,
+        rows.value.map(({ row }) => row),
+      ),
+    );
+  } catch {
+    // Logged in namesFor; the save goes ahead and the screen falls back to live names.
+  }
+  const namesOf = (values: SaveResult["values"]) =>
+    Object.fromEntries(
+      Object.values(values ?? {})
+        .filter((value): value is string => typeof value === "string" && value in before)
+        .map((id) => [id, before[id]]),
+    );
+
   const results: SaveResult[] = [];
   for (const { index, row } of rows.value) {
     try {
@@ -63,6 +83,7 @@ export async function saveProposal(input: {
         ok: !outcome?.error,
         message: outcome?.error ?? "",
         values: row.values,
+        names: namesOf(row.values),
       });
     } catch (thrown) {
       console.error("turing: a proposal row failed:", entry.key, thrown);
@@ -71,6 +92,7 @@ export async function saveProposal(input: {
         ok: false,
         message: "Something went wrong. Try it on the tool's screen.",
         values: row.values,
+        names: namesOf(row.values),
       });
     }
   }

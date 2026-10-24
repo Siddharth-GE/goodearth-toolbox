@@ -64,7 +64,10 @@ function FieldInput({
           onChange={(event) => onChange(event.target.value)}
           className="h-9 min-w-32"
         >
-          {field.optional && <option value="">{kept ? "Keep as is" : "—"}</option>}
+          {/* A field that cannot be emptied offers the blank only while it keeps what is there. */}
+          {field.optional && (kept || !field.keep) && (
+            <option value="">{kept ? "Keep as is" : (field.blank ?? "—")}</option>
+          )}
           {field.choices?.map((choice) => (
             <option key={choice} value={choice}>
               {field.labels?.[choice] ?? words(choice)}
@@ -87,7 +90,7 @@ function FieldInput({
           min={field.kind === "whole" || field.kind === "amount" ? 0 : undefined}
           step={field.kind === "amount" ? "any" : undefined}
           value={value === undefined ? "" : String(value)}
-          placeholder={kept ? "Keep as is" : adds ? "Blank" : "Empty — clears it"}
+          placeholder={kept || field.keep ? "Keep as is" : adds ? "Blank" : "Empty — clears it"}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className={
@@ -160,7 +163,10 @@ export function ProposalCard({
     const id = shown(index)[field.key];
     if (id === undefined) return <span className="text-muted">Keep as is</span>;
     if (id === "") return <span className="text-muted">None</span>;
-    return proposal.names[String(id)] ?? <span className="text-danger">Unknown</span>;
+    return (
+      proposal.names[String(id)] ??
+      results.get(index)?.names?.[String(id)] ?? <span className="text-danger">Unknown</span>
+    );
   };
 
   const save = async () => {

@@ -16,7 +16,7 @@ const FROM: Record<IdTable, string> = {
   work_items: "work_items (a work in the works list)",
   profiles: "profiles (a person)",
   vendors: "vendors (a contractor)",
-  labour_logs: "labour_logs",
+  labour_logs: "labour_logs (a day's labour on a villa)",
 };
 
 export type Field = {
@@ -28,9 +28,13 @@ export type Field = {
    * the default), as the tool's own screen does.
    */
   optional?: true;
+  /** Optional, but only ever left out: the tool refuses it empty, so it is refused here first. */
+  keep?: true;
   choices?: readonly string[];
   /** A choice as the admin reads it, where its stored word is not plain English. */
   labels?: Record<string, string>;
+  /** What an empty choice means, where it is not "none". */
+  blank?: string;
   table?: IdTable;
 };
 
@@ -58,6 +62,8 @@ export type Entry = {
   fields: Field[];
   /** Makes a new record, so a field left out is blank rather than kept. */
   adds?: true;
+  /** A rule across a row's fields, beyond each field's own. */
+  check?: (values: Record<string, Value>) => string | undefined;
 };
 
 export type Value = string | boolean;
@@ -84,8 +90,41 @@ export const LABOUR_LOG_FORM = [
   "note",
 ] as const;
 
+const has = (values: Record<string, Value>, key: string) =>
+  key in values && values[key] !== "" && values[key] !== "0";
+
+/**
+ * What Supervisors' save would drop without a word: a value the way of paying does not use, or a
+ * quantity kept from another work, whose unit may differ. `now` is the log being changed.
+ */
+export function labourConflict(
+  values: Record<string, Value>,
+  now?: { kind: string; work_item_id: string },
+): string | undefined {
+  const kind = String(values.kind ?? now?.kind ?? "");
+  if (kind === "nmr") {
+    if (has(values, "quantity"))
+      return "Daily wages take masons, helpers or others, not a quantity.";
+    if (has(values, "description"))
+      return "Daily wages keep no description of the work; put it in the note.";
+  } else if (["masons", "helpers", "others"].some((key) => has(values, key))) {
+    return "Heads are for daily wages; piece-work takes a quantity or what was done.";
+  }
+  if (kind === "pw_lump" && has(values, "quantity"))
+    return "A lump sum takes what was done, not a quantity.";
+  if (
+    now &&
+    kind === "pw_qty" &&
+    "work_item_id" in values &&
+    values.work_item_id !== now.work_item_id &&
+    !has(values, "quantity")
+  )
+    return "The work changed, so give the quantity again, in the new work's unit.";
+  return undefined;
+}
+
 const labourDetails = (optional: boolean): Field[] => {
-  const may = optional ? ({ optional: true } as const) : {};
+  const may = optional ? ({ optional: true, keep: true } as const) : {};
   return [
     { key: "work_item_id", label: "Work", kind: "id", table: "work_items", ...may },
     { key: "contractor_id", label: "Contractor", kind: "id", table: "vendors", ...may },
@@ -95,7 +134,11 @@ const labourDetails = (optional: boolean): Field[] => {
       label: "Paid as",
       kind: "choice",
       choices: ["nmr", "pw_qty", "pw_lump"],
-      labels: { nmr: "Daily wages", pw_qty: "Piece-work by quantity", pw_lump: "Lump sum" },
+      labels: {
+        nmr: "Daily wages",
+        pw_qty: "Piece-work by quantity",
+        pw_lump: "Piece-work, lump sum",
+      },
       ...may,
     },
     {
@@ -104,6 +147,8 @@ const labourDetails = (optional: boolean): Field[] => {
       kind: "choice",
       optional: true,
       choices: ["standard", "additional", "rework"],
+      labels: { standard: "Standard work", additional: "Additional work", rework: "Rework" },
+      blank: "Standard work (the default)",
     },
     { key: "masons", label: "Masons", kind: "whole", optional: true },
     { key: "helpers", label: "Helpers", kind: "whole", optional: true },
@@ -254,6 +299,7 @@ export const ENTRIES: Entry[] = [
     description:
       "Logs a day's labour on a villa: the work, the contractor (a vendor with is_contractor) and how it is paid — nmr is daily wages (masons, helpers, others; at least one), pw_qty is piece-work by quantity (in the work's unit from the rate book), pw_lump is a lump sum (what was done says what). Work class is standard unless it was additional work or rework. A second log for the same villa, work, contractor, day, payment and class is refused: change that one instead. Quantities and heads only, never wages.",
     adds: true,
+    check: (values) => labourConflict(values),
     fields: [plot, ...labourDetails(false)],
   },
   {
@@ -303,6 +349,8 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
   if (typeof text !== "string") return { ok: false, error: `${field.label} is not readable.` };
   const value = text.trim();
   if (!value) {
+    if (field.keep)
+      return { ok: false, error: `${field.label} can be left as it is, but not emptied.` };
     return field.optional
       ? { ok: true, value: "" }
       : { ok: false, error: `${field.label} is missing.` };
@@ -352,6 +400,8 @@ export function checkRow(entry: Entry, raw: unknown): Checked<Row> {
     if (!value.ok) return value;
     if (value.value !== undefined) values[field.key] = value.value;
   }
+  const problem = entry.check?.(values);
+  if (problem) return { ok: false, error: problem };
   return { ok: true, value: { label, values } };
 }
 
@@ -458,7 +508,8 @@ export function catalogueText(): string {
                   : field.kind === "amount"
                     ? "number"
                     : field.kind;
-        return `${field.key} (${kind}${field.optional ? ", optional" : ""})`;
+        const may = field.keep ? ", optional, never empty" : field.optional ? ", optional" : "";
+        return `${field.key} (${kind}${may})`;
       })
       .join(", ");
     const adds = entry.adds ? " Adds a new record." : "";

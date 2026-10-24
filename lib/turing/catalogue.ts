@@ -19,7 +19,7 @@ import {
 import { setSequenceDays } from "@/lib/supervisors/sequence-actions";
 import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
 
-import { LABOUR_LOG_FORM, type EntryKey, type Value } from "./catalogue-fields";
+import { LABOUR_LOG_FORM, labourConflict, type EntryKey, type Value } from "./catalogue-fields";
 
 type Values = Record<string, Value>;
 
@@ -189,6 +189,8 @@ export const RUNNERS: Record<EntryKey, (values: Values) => Promise<ActionState>>
   labour_log_change: async (v) => {
     const now = await logNow(v);
     if ("error" in now) return now;
+    const conflict = labourConflict(v, now.log);
+    if (conflict) return { error: conflict };
     const form = labourForm(v, now.log);
     form.set("id", String(v.log_id));
     return updateLabourLog(undefined, form);
