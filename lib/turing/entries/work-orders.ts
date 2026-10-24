@@ -101,6 +101,13 @@ export function workLineOf(
   };
 }
 
+/** The editor hides a lump sum's quantity and unit, so one given would be dropped unsaid. */
+function lumpSumCheck(values: Values): string | undefined {
+  return values.lump_sum === true && (textOf(values, "quantity") || textOf(values, "uom"))
+    ? "A lump sum has no quantity or unit: its rate is the whole amount."
+    : undefined;
+}
+
 export const WORK_ORDERS = defineEntries([
   {
     key: "work_order_new",
@@ -109,6 +116,7 @@ export const WORK_ORDERS = defineEntries([
     description: `A contractor's work order (a vendor marked as a contractor) for a project, or one villa of it, saying what it covers, with its works and terms. Terms left out are the default work-order terms from Masters → Terms; given empty, none. It waits for a bill approver. ${WORKS}`,
     adds: true,
     lines: { noun: "Work order" },
+    check: lumpSumCheck,
     fields: [
       { key: "vendor_id", label: "Contractor", kind: "id", table: "vendors", header: true },
       { key: "project_id", label: "Project", kind: "id", table: "projects", header: true },
@@ -130,6 +138,7 @@ export const WORK_ORDERS = defineEntries([
     description: `Adds works to a work order waiting for approval. ${WORKS}`,
     adds: true,
     lines: { noun: "Work order" },
+    check: lumpSumCheck,
     fields: [
       { ...order, header: true },
       work,
@@ -162,27 +171,30 @@ export const WORK_ORDERS = defineEntries([
     ],
   },
   {
-    key: "work_order_work_change",
+    key: "work_order_works_change",
     tool: "/bills",
-    title: "A work on a work order, changed",
+    title: "Works on a work order, changed or removed",
     description:
-      "Changes one work on a work order waiting for approval (labour_contract_lines.id): its description, whether it is a lump sum, quantity, unit or rate. Each left out stays as it is.",
+      "Changes or removes works on a work order waiting for approval: one row per work (labour_contract_lines.id of that order), all of one order's rows saved together. remove true takes the work off (an order keeps at least one). Otherwise give what changes: another work from the list (it brings its name, unit and labour rate unless given, as picking it on screen does), the description, whether it is a lump sum, quantity, unit or rate; each left out stays as it is. Ids of an order's works change with every save, so read them afresh before proposing again.",
+    lines: { noun: "Work order" },
+    check: (values) =>
+      values.remove === true &&
+      ["work_item_id", "line_description", "lump_sum", "quantity", "uom", "rate"].some(
+        (key) => key in values,
+      )
+        ? "A work being removed takes no changes."
+        : lumpSumCheck(values),
     fields: [
+      { ...order, header: true },
       orderLine,
+      { key: "remove", label: "Remove", kind: "yesno", optional: true },
+      work,
       { ...lineDescription, keep: true },
       lumpSum,
       { ...quantity, keep: true },
       { ...uom, keep: true },
       { ...rate, keep: true },
     ],
-  },
-  {
-    key: "work_order_work_remove",
-    tool: "/bills",
-    title: "A work, removed from a work order",
-    description:
-      "Removes one work from a work order waiting for approval; an order keeps at least one.",
-    fields: [orderLine],
   },
   {
     key: "work_order_delete",

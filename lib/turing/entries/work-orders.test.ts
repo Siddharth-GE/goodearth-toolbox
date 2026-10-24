@@ -89,3 +89,39 @@ test("a new work order's rows are one order per header", () => {
   // Terms left out stay out, so the default terms apply.
   assert.equal("terms" in rows[0].values, false);
 });
+
+test("an order's work changes are one save; a removed work takes no changes; a lump sum no quantity", () => {
+  const ORDER = "55555555-5555-4555-8555-555555555555";
+  const OTHER_LINE = "66666666-6666-4666-8666-666666666666";
+  const proposal = checkProposal({
+    action: "work_order_works_change",
+    title: "x",
+    rows: [
+      { label: "a", work_order_id: ORDER, line_id: LINE, rate: 1250 },
+      { label: "b", work_order_id: ORDER, line_id: OTHER_LINE, remove: true },
+    ],
+  });
+  assert.ok(proposal.ok);
+  const rows = proposal.value.rows;
+  const records = recordsOf(
+    proposal.value.entry,
+    rows,
+    rows.map((row, index) => ({ index, row })),
+  );
+  assert.ok(records.ok && records.value.length === 1);
+
+  const both = checkProposal({
+    action: "work_order_works_change",
+    title: "x",
+    rows: [{ label: "a", work_order_id: ORDER, line_id: LINE, remove: true, rate: 1 }],
+  });
+  assert.ok(!both.ok && /takes no changes/.test(both.error));
+  const lump = checkProposal({
+    action: "work_order_works_add",
+    title: "x",
+    rows: [
+      { label: "a", work_order_id: ORDER, line_description: "x", lump_sum: true, quantity: 3 },
+    ],
+  });
+  assert.ok(!lump.ok && /no quantity or unit/.test(lump.error));
+});

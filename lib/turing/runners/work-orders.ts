@@ -103,8 +103,11 @@ async function linesOf(rows: Values[]): Promise<Line[] | { error: string }> {
   const lines = rows.map((row) =>
     workLineOf(row, text(row, "work_item_id") ? book.get(String(row.work_item_id)) : undefined),
   );
-  return (await unitRefused(lines)) ?? lines;
+  return (await unitRefused(lines, bookUnits(book))) ?? lines;
 }
+
+/** A work's rate-book unit, which picking it on screen fills in even after it is retired. */
+const bookUnits = (book: Map<string, BookWork>) => [...book.values()].map((one) => one.uom);
 
 /** The editor sends a contractor that is active and marked as one; an order's own stays on a change. */
 async function contractorRefused(vendorId: string): Promise<Refusal> {
@@ -196,18 +199,6 @@ const saveOrder = (now: OrderNow, changes: Partial<Parameters<typeof saveWorkOrd
     ...changes,
   });
 
-/** The order a work is on, as it stands. */
-async function orderOfLine(lineId: string): Promise<OrderNow | { error: string }> {
-  const line = await recordNow(
-    "labour_contract_lines",
-    { column: "id", id: lineId },
-    ["contract_id"],
-    "That work is no longer on the work order.",
-  );
-  if ("error" in line) return line;
-  return orderNow(String(line.row.contract_id));
-}
-
 export const WORK_ORDER_RUNNERS: Runners<Key> = {
   work_order_new: {
     lines: async (header, rows): Promise<RunResult> => {
@@ -274,25 +265,55 @@ export const WORK_ORDER_RUNNERS: Runners<Key> = {
       terms: given(v, "terms", now.terms) || null,
     });
   },
-  work_order_work_change: async (v) => {
-    const now = await orderOfLine(String(v.line_id));
-    if ("error" in now) return now;
-    const at = now.lines.findIndex((line) => line.id === String(v.line_id));
-    if (at < 0) return { error: "That work is no longer on the work order." };
-    const changed = workLineOf(v, undefined, now.lines[at]);
-    const refused = await unitRefused([changed], [now.lines[at].uom]);
-    if (refused) return refused;
-    const lines = now.lines.map(bare);
-    lines[at] = changed;
-    return saveOrder(now, { lines });
-  },
-  work_order_work_remove: async (v) => {
-    const now = await orderOfLine(String(v.line_id));
-    if ("error" in now) return now;
-    const lines = now.lines.filter((line) => line.id !== String(v.line_id)).map(bare);
-    if (lines.length === now.lines.length)
-      return { error: "That work is no longer on the work order." };
-    return saveOrder(now, { lines });
+  // The save replaces every work under a new id, so all of one order's changes go in one save.
+  work_order_works_change: {
+    lines: async (header, rows) => {
+      const now = await orderNow(String(header.work_order_id));
+      if ("error" in now) return now;
+      const byId = new Map(rows.map((row) => [String(row.line_id), row]));
+      if (byId.size < rows.length) return { error: "One work is named twice; give it one row." };
+      if ([...byId.keys()].some((id) => !now.lines.some((line) => line.id === id))) {
+        return {
+          error: "A work is not on that work order as it stands now. Ask Turing to read it again.",
+        };
+      }
+      const book = await bookOf(
+        rows.flatMap((row) => (text(row, "work_item_id") ? [String(row.work_item_id)] : [])),
+      );
+      if ("error" in book) return book;
+
+      const lines: Line[] = [];
+      const changed: Line[] = [];
+      const keeps = bookUnits(book);
+      for (const line of now.lines) {
+        const row = byId.get(line.id);
+        if (!row) {
+          lines.push(bare(line));
+          continue;
+        }
+        if (row.remove === true) continue;
+        keeps.push(line.uom);
+        // Another work picked fills the line as the editor's pickWork does.
+        const pickedId = text(row, "work_item_id");
+        const picked = pickedId ? book.get(pickedId) : undefined;
+        const base =
+          picked && pickedId !== line.workItemId
+            ? {
+                ...bare(line),
+                workItemId: pickedId,
+                description: picked.name,
+                uom: picked.uom ?? line.uom,
+                rate: picked.labour_rate ?? line.rate,
+              }
+            : bare(line);
+        const next = workLineOf(row, undefined, base);
+        lines.push(next);
+        changed.push(next);
+      }
+      if (lines.length === 0) return { error: "A work order keeps at least one work." };
+      const refused = await unitRefused(changed, keeps);
+      return refused ?? saveOrder(now, { lines });
+    },
   },
   work_order_delete: async (v) => {
     const done = await saving(() => deleteWorkOrder(String(v.work_order_id)), "/bills/work-orders");
