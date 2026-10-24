@@ -515,7 +515,15 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
   );
 
   return {
-    vendors: vendors.map(({ id, name }) => ({ id, name })),
+    // A retired vendor still takes bills on its open POs and contracts; it is only left out of new choices.
+    vendors: vendors
+      .filter(
+        (vendor) =>
+          vendor.is_active ||
+          poRows.some((row) => row.vendor_id === vendor.id) ||
+          contracts.some((contract) => contract.vendor_id === vendor.id),
+      )
+      .map(({ id, name }) => ({ id, name })),
     pos: poRows.map((row) => ({
       id: row.id ?? "",
       vendor_id: row.vendor_id ?? "",

@@ -128,11 +128,13 @@ export function WorkGroupFormDialog({
           <option value="" disabled>
             Choose a category
           </option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.code} — {category.name}
-            </option>
-          ))}
+          {categories
+            .filter((category) => category.is_active || category.id === group?.category_id)
+            .map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.code} — {category.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">
@@ -214,11 +216,13 @@ export function WorkItemFormDialog({
           <option value="" disabled>
             Choose a category
           </option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.code} — {category.name}
-            </option>
-          ))}
+          {categories
+            .filter((category) => category.is_active || category.id === item?.category_id)
+            .map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.code} — {category.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">
@@ -230,11 +234,13 @@ export function WorkItemFormDialog({
           disabled={!categoryId}
         >
           <option value="">None — directly under the category</option>
-          {filteredGroups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.code} — {group.name}
-            </option>
-          ))}
+          {filteredGroups
+            .filter((group) => group.is_active || group.id === item?.group_id)
+            .map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.code} — {group.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">
