@@ -7,7 +7,16 @@ const DEED = "not_started, drafting, not_signed or signed";
 const ORIGINAL = "client, bank, chess_cafe, sreejayan or tarana (only for a signed document)";
 const ACK = "received, with_bank, with_sreejayan, requested_from_client or pending";
 const REGISTRATION = "not_due, due, scheduled or registered";
-const BOTTLENECKS = "design, client, payments, management, interiors, legal, bank_loan";
+export const BOTTLENECK_VALUES = [
+  "design",
+  "client",
+  "payments",
+  "management",
+  "interiors",
+  "legal",
+  "bank_loan",
+] as const;
+const BOTTLENECKS = BOTTLENECK_VALUES.join(", ");
 const INTERIOR =
   "to_pitch, pitch_done, retainer_pending, retainer_paid, in_design, execution or closed";
 const STATUSES = ["open", "waiting_client", "waiting_management", "awaiting_confirmation", "done"];
@@ -109,7 +118,7 @@ export const CLIENT_RELATIONS = defineEntries([
     tool: "/client-relations",
     title: "A plot, given to a client",
     description:
-      "Gives a client a plot nobody has yet (its villa in Masters), reserved or sold; a prospect becomes a client. Selling it gives it a Construction owner.",
+      "Gives a client a plot nobody has yet (its villa in Masters), reserved or sold; a prospect becomes a client. The plot's Construction owner becomes the client's handler, if they are on the team; otherwise it has none until one is set (crm_plot_change), and actions on it wait for that.",
     fields: [
       client,
       plot,
@@ -128,7 +137,7 @@ export const CLIENT_RELATIONS = defineEntries([
     key: "crm_plot_change",
     tool: "/client-relations",
     title: "A plot's record, changed",
-    description: `Changes a sold plot's record in Client Relations; each field left out stays as it is, one given empty clears it. Owners (construction_owner_id, interior_owner_id) are people on the Client Relations team; a side with open actions can't be left with nobody, and its open actions move to its new owner. Sale deed and construction agreement (ca_): status ${DEED}; original with ${ORIGINAL}; acknowledgement ${ACK}; signed on. Registration: stage ${REGISTRATION}, note, date. bottlenecks: a comma-separated list of ${BOTTLENECKS} (empty clears). progress_stage_id: build progress, from progress_stages. design_confirmed, permit, working_drawing: true marks it done today, false clears it. Interior stage ${INTERIOR}. Plot value and construction value in rupees.`,
+    description: `Changes a sold plot's record in Client Relations; each field left out stays as it is, one given empty clears it. Owners (construction_owner_id, interior_owner_id) are people on the Client Relations team; a side with open actions can't be left with nobody, and its open actions move to its new owner. Sale deed and construction agreement (ca_): status ${DEED}; original with ${ORIGINAL}; acknowledgement ${ACK}; signed on. Registration: stage ${REGISTRATION}, note, date. bottlenecks: the plot's complete new set, comma-separated, from ${BOTTLENECKS} (it replaces the set, so to add one give the others too; empty clears). Signed on is only for a signed document. progress_stage_id: build progress, an active stage from progress_stages. design_confirmed, permit, working_drawing: true marks it done today (one already done keeps its date), false clears it. Interior stage ${INTERIOR}. Plot value and construction value in rupees.`,
     fields: [
       { ...plot, record: true },
       person("construction_owner_id", "Construction owner"),
@@ -169,8 +178,9 @@ export const CLIENT_RELATIONS = defineEntries([
     tool: "/client-relations",
     title: "A payment stage on a plot",
     description:
-      "Changes one stage of a plot's payment schedule (client_payment_milestones.id): the amount due, when it is due, the invoice number with the date it was raised, or a note. Each left out stays as it is.",
+      "Changes one stage of a plot's payment schedule (client_payment_milestones.id of that plot): the amount due, when it is due, or the invoice number with the date it was raised. Each left out stays as it is.",
     fields: [
+      { ...plot, record: true },
       {
         key: "milestone_id",
         label: "Stage",
@@ -182,7 +192,6 @@ export const CLIENT_RELATIONS = defineEntries([
       date("due_on", "Due on"),
       words("invoice_no", "Invoice no.", 100),
       date("invoiced_on", "Invoiced on"),
-      words("note", "Note"),
     ],
   },
   {

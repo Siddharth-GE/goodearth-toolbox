@@ -18,7 +18,7 @@ import {
 import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
-import type { CLIENT_RELATIONS } from "../entries/client-relations";
+import { BOTTLENECK_VALUES, type CLIENT_RELATIONS } from "../entries/client-relations";
 import { failed, given, recordNow, type Runners, type Values } from "./kit";
 
 type Key = (typeof CLIENT_RELATIONS)[number]["key"];
@@ -80,7 +80,7 @@ async function plotOf(plotId: string): Promise<Plot | { error: string }> {
   };
 }
 
-/** A plot's record in Client Relations, which only a plot with a buyer has. */
+/** A plot's record in Client Relations: every villa has one (0050). */
 async function recordOf(
   plotId: string,
 ): Promise<(Plot & { engagementId: string }) | { error: string }> {
@@ -94,11 +94,19 @@ async function recordOf(
 const lostRefused = (stage: string, reason: string | null): Refusal =>
   reason && stage !== "lost" ? { error: "A reason goes only with a lost client." } : null;
 
+/** The client form's email box takes only an address. */
+const emailRefused = (email: string | null): Refusal =>
+  email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+    ? { error: `"${email}" is not an email address.` }
+    : null;
+
 export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
   crm_client_new: async (v) => {
     const stage = text(v, "stage") ?? "prospect";
     const refused =
-      lostRefused(stage, text(v, "lost_reason")) ?? (await teamRefused([text(v, "owner_id")]));
+      lostRefused(stage, text(v, "lost_reason")) ??
+      emailRefused(text(v, "email")) ??
+      (await teamRefused([text(v, "owner_id")]));
     if (refused) return refused;
     return createClientRecord({
       name: String(v.name),
@@ -136,6 +144,7 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
     const lostReason = given(v, "lost_reason", row.lost_reason) || null;
     const refused =
       ("lost_reason" in v ? lostRefused(stage, text(v, "lost_reason")) : null) ??
+      emailRefused(text(v, "email")) ??
       (ownerId !== row.crm_owner_id ? await teamRefused([ownerId]) : null);
     if (refused) return refused;
     return updateClientRecord(String(v.client_id), {
@@ -160,11 +169,68 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
   crm_plot_change: async (v) => {
     const found = await recordOf(String(v.plot_id));
     if ("error" in found) return found;
-    const flag = (key: string) => (key in v ? v[key] === true : undefined);
+    const now = await recordNow(
+      "client_engagements",
+      { column: "id", id: found.engagementId },
+      [
+        "sale_deed_status",
+        "ca_status",
+        "progress_stage_id",
+        "design_confirmed_on",
+        "permit_on",
+        "working_drawing_on",
+      ],
+      "That plot's record is gone.",
+    );
+    if ("error" in now) return now;
+    const row = now.row as Record<string, string | null>;
+
+    // The chips only save a change: a check already done keeps its date, an owner already set is not re-checked.
+    const flag = (key: string, column: string) =>
+      key in v && (v[key] === true) !== (row[column] !== null) ? v[key] === true : undefined;
+    const owner = (key: string, current: string | null) => {
+      const value = patchText(v, key);
+      return value === current ? undefined : value;
+    };
     const money = (key: string) => (key in v ? numberOf(v, key) : undefined);
+
+    // A misspelt bottleneck would be dropped by the save, shrinking the set unsaid.
+    const bottlenecks =
+      "bottlenecks" in v
+        ? (text(v, "bottlenecks") ?? "")
+            .split(",")
+            .map((one) => one.trim())
+            .filter(Boolean)
+        : undefined;
+    const offList = bottlenecks?.find(
+      (one) => !(BOTTLENECK_VALUES as readonly string[]).includes(one),
+    );
+    if (offList) return { error: `"${offList}" is not a bottleneck on the list.` };
+    // The screen shows a signed-on date only once the document is signed.
+    for (const [dateKey, statusKey] of [
+      ["sale_deed_signed_on", "sale_deed_status"],
+      ["ca_signed_on", "ca_status"],
+    ] as const) {
+      if (text(v, dateKey) && given(v, statusKey, row[statusKey]) !== "signed") {
+        return { error: "A signed-on date goes only on a signed document; mark it signed too." };
+      }
+    }
+    const stageId = text(v, "progress_stage_id");
+    if (stageId && stageId !== row.progress_stage_id) {
+      const stage = await recordNow(
+        "progress_stages",
+        { column: "id", id: stageId },
+        ["is_active"],
+        "That build stage is gone.",
+      );
+      if ("error" in stage) return stage;
+      if (stage.row.is_active === false)
+        return { error: "That build stage is switched off in Masters." };
+    }
+
     return updatePlot(found.engagementId, {
-      ownerId: patchText(v, "construction_owner_id"),
-      kaadalOwnerId: patchText(v, "interior_owner_id"),
+      ownerId: owner("construction_owner_id", found.constructionOwner),
+      kaadalOwnerId: owner("interior_owner_id", found.interiorOwner),
       saleDeedStatus: patchText(v, "sale_deed_status") ?? undefined,
       saleDeedOriginalWith: patchText(v, "sale_deed_original_with"),
       saleDeedAck: patchText(v, "sale_deed_ack"),
@@ -173,20 +239,14 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
       caOriginalWith: patchText(v, "ca_original_with"),
       caAck: patchText(v, "ca_ack"),
       caSignedOn: patchText(v, "ca_signed_on"),
-      bottlenecks:
-        "bottlenecks" in v
-          ? (text(v, "bottlenecks") ?? "")
-              .split(",")
-              .map((one) => one.trim())
-              .filter(Boolean)
-          : undefined,
+      bottlenecks,
       registrationStage: patchText(v, "registration_stage") ?? undefined,
       registrationNote: patchText(v, "registration_note"),
       registrationOn: patchText(v, "registration_on"),
       progressStageId: patchText(v, "progress_stage_id"),
-      designConfirmed: flag("design_confirmed"),
-      permit: flag("permit"),
-      workingDrawing: flag("working_drawing"),
+      designConfirmed: flag("design_confirmed", "design_confirmed_on"),
+      permit: flag("permit", "permit_on"),
+      workingDrawing: flag("working_drawing", "working_drawing_on"),
       kaadalStage: patchText(v, "interior_stage"),
       kaadalNote: patchText(v, "interior_note"),
       designSupport: patchText(v, "design_support"),
@@ -197,13 +257,18 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
     });
   },
   crm_milestone: async (v) => {
+    const found = await recordOf(String(v.plot_id));
+    if ("error" in found) return found;
     const now = await recordNow(
       "client_payment_milestones",
       { column: "id", id: String(v.milestone_id) },
-      ["due_amount", "due_on", "invoice_no", "invoiced_on", "note"],
+      ["due_amount", "due_on", "invoice_no", "invoiced_on", "note", "engagement_id"],
       "That payment stage is gone.",
     );
     if ("error" in now) return now;
+    if (now.row.engagement_id !== found.engagementId) {
+      return { error: "That payment stage is on another plot." };
+    }
     const row = now.row as {
       due_amount: number | null;
       due_on: string | null;
@@ -217,7 +282,7 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
       dueOn: given(v, "due_on", row.due_on) || null,
       invoiceNo: given(v, "invoice_no", row.invoice_no) || null,
       invoicedOn: given(v, "invoiced_on", row.invoiced_on) || null,
-      note: given(v, "note", row.note) || null,
+      note: row.note,
     });
   },
   crm_receipt: async (v) => {
@@ -284,10 +349,12 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
     const now = await recordNow(
       "client_actions",
       { column: "id", id: String(v.action_id) },
-      ["engagement_id"],
+      ["engagement_id", "owner_id"],
       "That action is gone.",
     );
     if ("error" in now) return now;
+    // An owner restated as it is changes nothing.
+    const ownerGiven = "owner_id" in v && String(v.owner_id) !== now.row.owner_id;
     let engagementId: string | null | undefined;
     if ("plot_id" in v) {
       const plotId = text(v, "plot_id");
@@ -300,12 +367,12 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
       }
     }
     const onPlot = engagementId !== undefined ? engagementId : now.row.engagement_id;
-    if ("owner_id" in v && onPlot) {
+    if (ownerGiven && onPlot) {
       return { error: "A step on a plot is its side's owner's; change the owner on the plot." };
     }
     return updateNextStep(String(v.action_id), {
       action: "action" in v ? String(v.action) : undefined,
-      ownerId: "owner_id" in v ? String(v.owner_id) : undefined,
+      ownerId: ownerGiven ? String(v.owner_id) : undefined,
       dueOn: "due_on" in v ? text(v, "due_on") : undefined,
       status: "status" in v ? String(v.status) : undefined,
       track: "side" in v ? (v.side === "interior" ? "kaadal" : "sales") : undefined,

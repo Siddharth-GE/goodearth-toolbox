@@ -184,12 +184,15 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       supabase.from("client_actions").select("id, action, status").in("id", chunk),
     ),
     readIn(list("client_payment_milestones"), (chunk) =>
-      supabase.from("client_payment_milestones").select("id, stage, due_amount").in("id", chunk),
+      supabase
+        .from("client_payment_milestones")
+        .select("id, stage, due_amount, engagement_id")
+        .in("id", chunk),
     ),
     readIn(list("client_receipts"), (chunk) =>
       supabase
         .from("client_receipts")
-        .select("id, amount, received_on, cancel_reason")
+        .select("id, amount, received_on, cancel_reason, engagement_id")
         .in("id", chunk),
     ),
   ]);
@@ -197,18 +200,20 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     const words = one.action.length > 60 ? `${one.action.slice(0, 57)}…` : one.action;
     names[one.id] = `${words} (${one.status.replace(/_/g, " ")})`;
   }
-  for (const one of crmStages) {
-    const stage = one.stage.replace(/_/g, " ");
-    names[one.id] = one.due_amount === null ? stage : `${stage} · ${formatMoney(one.due_amount)}`;
-  }
-  for (const one of crmReceipts) {
-    names[one.id] = [
-      formatMoney(one.amount),
-      formatDate(one.received_on),
-      one.cancel_reason ? "cancelled" : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+  // Money in is named with its plot and client: every plot has a Booking stage, so the stage alone says nothing.
+  const engagements = await readIn(
+    [...new Set([...crmStages, ...crmReceipts].map((one) => one.engagement_id))],
+    (chunk) => supabase.from("client_engagements").select("id, unit_id").in("id", chunk),
+  );
+  const villas = await readIn(
+    engagements.map((one) => one.unit_id),
+    (chunk) => supabase.from("units").select("id, plot_id, client_id").in("id", chunk),
+  );
+  const villaOf = new Map(villas.map((one) => [one.id, one]));
+  const plotOfEngagement = new Map(engagements.map((one) => [one.id, villaOf.get(one.unit_id)]));
+  for (const villa of villas) {
+    if (villa.plot_id) add("plots", villa.plot_id);
+    if (villa.client_id) add("clients", villa.client_id);
   }
 
   const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
@@ -280,6 +285,29 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       }
     }),
   );
+  const whose = (engagementId: string) => {
+    const villa = plotOfEngagement.get(engagementId);
+    return villa ? [names[villa.plot_id ?? ""], names[villa.client_id ?? ""]] : [];
+  };
+  for (const one of crmStages) {
+    names[one.id] = [
+      ...whose(one.engagement_id),
+      one.stage.replace(/_/g, " "),
+      one.due_amount === null ? null : formatMoney(one.due_amount),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  for (const one of crmReceipts) {
+    names[one.id] = [
+      ...whose(one.engagement_id),
+      formatMoney(one.amount),
+      formatDate(one.received_on),
+      one.cancel_reason ? "cancelled" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   for (const log of logs) {
     names[log.id] = [
       formatDate(log.log_date),
