@@ -143,18 +143,39 @@ export const BILL_RUNNERS: Runners<Key> = {
       if (po.row.status !== "issued" && po.row.status !== "completed") {
         return { error: "Bills are recorded only against an issued or completed PO." };
       }
-      const refused =
-        twice(ids, "PO line") ?? (await gstRefused(rows.map((row) => numberOf(row, "gst_pct"))));
-      if (refused) return refused;
+      const twiceRefused = twice(ids, "PO line");
+      if (twiceRefused) return twiceRefused;
       const supabase = await createClient();
-      const { data: poLines, error } = await supabase
-        .from("purchase_order_lines")
-        .select("id, item_id, uom, items(name, code)")
-        .eq("po_id", poId)
-        .in("id", ids);
-      if (error) return failed("purchase_order_lines", error);
+      const [{ data: poLines, error }, { data: facts, error: factsError }] = await Promise.all([
+        supabase
+          .from("purchase_order_lines")
+          .select("id, item_id, uom, gst_pct, items(name, code)")
+          .eq("po_id", poId)
+          .in("id", ids),
+        supabase
+          .from("po_line_billing_facts")
+          .select("po_line_id, received_quantity, billed_quantity")
+          .eq("po_id", poId)
+          .in("po_line_id", ids),
+      ]);
+      if (error || factsError) return failed("purchase_order_lines", error ?? factsError);
       const byId = new Map(poLines.map((line) => [line.id, line]));
       if (ids.some((id) => !byId.has(id))) return { error: "A line is not on that PO." };
+      // The form offers only a line with something received and not yet billed.
+      const left = new Map(
+        facts.map((fact) => [
+          fact.po_line_id,
+          Math.round(((fact.received_quantity ?? 0) - (fact.billed_quantity ?? 0)) * 1e6) / 1e6,
+        ]),
+      );
+      if (ids.some((id) => !((left.get(id) ?? 0) > 0))) {
+        return { error: "A PO line has nothing received and not yet billed." };
+      }
+      const refused = await gstRefused(
+        rows.map((row) => offList(numberOf(row, "gst_pct"))),
+        rows.map((row) => byId.get(String(row.po_line_id))?.gst_pct),
+      );
+      if (refused) return refused;
       return recorded(() =>
         createBillWithLines({
           kind: "po",
@@ -204,17 +225,23 @@ export const BILL_RUNNERS: Runners<Key> = {
         return { error: "Bills are recorded only against an approved work order that is on." };
       }
       const refused =
-        twice(ids, "work") ?? (await gstRefused(rows.map((row) => numberOf(row, "gst_pct"))));
+        twice(ids, "work") ??
+        (await gstRefused(rows.map((row) => offList(numberOf(row, "gst_pct")))));
       if (refused) return refused;
       const supabase = await createClient();
       const { data: works, error } = await supabase
         .from("labour_contract_lines")
-        .select("id, work_item_id, description, is_lump_sum, uom")
+        .select("id, work_item_id, description, is_lump_sum, quantity, uom, rate")
         .eq("contract_id", orderId)
         .in("id", ids);
       if (error) return failed("labour_contract_lines", error);
       const byId = new Map(works.map((one) => [one.id, one]));
       if (ids.some((id) => !byId.has(id))) return { error: "A work is not on that work order." };
+      const done = await fullyBilled(orderId, works);
+      if ("error" in done) return done;
+      if (ids.some((id) => done.has(id))) {
+        return { error: "A work on that order is already fully billed." };
+      }
       for (const row of rows) {
         const lump = byId.get(String(row.work_order_line_id))!.is_lump_sum;
         if (lump && numberOf(row, "quantity") !== null) {
@@ -282,7 +309,7 @@ export const BILL_RUNNERS: Runners<Key> = {
       }
       const refused =
         (await retired("vendors", text(header, "vendor_id"))) ??
-        (await gstRefused(lines.map((line) => line.gstPct))) ??
+        (await gstRefused(lines.map((line) => offList(line.gstPct)))) ??
         (await unitRefused(lines.map((line) => line.uom)));
       if (refused) return refused;
       return recorded(() =>
@@ -371,19 +398,27 @@ export const BILL_RUNNERS: Runners<Key> = {
       ) {
         return { error: "A lump-sum line takes no quantity: its rate is the amount." };
       }
-      // The editor shows a material's or a labour entry's description but never edits it.
+      // The editor never edits a material's description, nor any on a bill made from labour entries.
+      const { count: fromLabour, error: labourError } = await supabase
+        .from("labour_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("bill_id", billId);
+      if (labourError) return failed("labour_logs", labourError);
       if (
         rows.some(
           (row) =>
             "description" in row &&
-            (lineOf(row)?.line_kind === "material" || lineOf(row)?.labour_log_id),
+            (lineOf(row)?.line_kind === "material" || (fromLabour ?? 0) > 0),
         )
       ) {
-        return { error: "A material's or a labour entry's description comes from it and stays." };
+        return {
+          error:
+            "A material's description, and every one on a bill made from labour entries, comes from them and stays.",
+        };
       }
       if (next.length === 0) return { error: "A bill keeps at least one line." };
       const gstRefusal = await gstRefused(
-        rows.map((row) => numberOf(row, "gst_pct")),
+        rows.map((row) => offList(numberOf(row, "gst_pct"))),
         rows.map((row) => lines.find((one) => one.id === String(row.bill_line_id))?.gst_pct),
       );
       return gstRefusal ?? saveBillLines(billId, next);
@@ -402,15 +437,23 @@ export const BILL_RUNNERS: Runners<Key> = {
       charges_gst_pct: number | null;
       charges_note: string | null;
     };
+    const lines = await lineCount(String(v.bill_id));
+    if (typeof lines !== "number") return lines;
+    if (lines === 0) return { error: "Charges go on a bill with lines; this one has none." };
     const charges = numberOrNull(given(v, "amount", row.charges_amount));
-    // No amount is no charges: its GST and note go with it.
+    // No amount is no charges: its GST and note go with it, so either given would be dropped.
     if (charges === null) {
-      if (!("amount" in v) && (text(v, "gst_pct") || text(v, "note"))) {
-        return { error: "That bill has no charges yet. Give their amount too." };
+      if (text(v, "gst_pct") || text(v, "note")) {
+        return {
+          error:
+            "amount" in v
+              ? "Removing the charges takes no GST % or note."
+              : "That bill has no charges yet. Give their amount too.",
+        };
       }
       return updateBillCharges(String(v.bill_id), { amount: null, gst_pct: null, note: null });
     }
-    const refused = await gstRefused([numberOf(v, "gst_pct")], [row.charges_gst_pct]);
+    const refused = await gstRefused([offList(numberOf(v, "gst_pct"))], [row.charges_gst_pct]);
     if (refused) return refused;
     return updateBillCharges(String(v.bill_id), {
       amount: charges,
@@ -419,11 +462,34 @@ export const BILL_RUNNERS: Runners<Key> = {
       note: given(v, "note", row.charges_note) || null,
     });
   },
-  bill_total: (v) =>
-    setBillTotalOverride(String(v.bill_id), {
-      total: numberOf(v, "total"),
-      note: text(v, "reason"),
-    }),
+  bill_total: async (v) => {
+    const now = await recordNow(
+      "bills",
+      { column: "id", id: String(v.bill_id) },
+      ["total_amount", "total_override_note"],
+      "That bill is gone.",
+    );
+    if ("error" in now) return now;
+    const lines = await lineCount(String(v.bill_id));
+    if (typeof lines !== "number") return lines;
+    if (lines === 0)
+      return { error: "A total by hand goes on a bill with lines; this one has none." };
+    const row = now.row as { total_amount: number; total_override_note: string | null };
+    // Given empty, the total goes back to the lines' sum and the reason with it.
+    if ("total" in v && numberOf(v, "total") === null) {
+      return text(v, "reason")
+        ? { error: "Going back to the lines' sum takes no reason." }
+        : setBillTotalOverride(String(v.bill_id), { total: null, note: null });
+    }
+    // Left out, a total by hand already there stays, as the screen shows it filled in.
+    const total =
+      "total" in v ? numberOf(v, "total") : row.total_override_note ? row.total_amount : null;
+    if (total === null) return { error: "Give the total the muster roll shows." };
+    return setBillTotalOverride(String(v.bill_id), {
+      total,
+      note: given(v, "reason", row.total_override_note) || null,
+    });
+  },
   bill_delete: async (v) => {
     const done = await saving(() => deleteBill(String(v.bill_id)), "/bills/list");
     return "error" in done ? done : undefined;
@@ -455,6 +521,9 @@ export const BILL_RUNNERS: Runners<Key> = {
         )
       ) {
         return { error: "Piece-work takes each log's rate, not day rates or a total by hand." };
+      }
+      if (text(header, "override_note") && !text(header, "total_override")) {
+        return { error: "A reason goes with a total by hand; give the total too." };
       }
       if (!daily && rows.some((row) => numberOf(row, "piece_rate") === null)) {
         return { error: "Give each piece-work log its rate." };
@@ -492,3 +561,63 @@ export const BILL_RUNNERS: Runners<Key> = {
 };
 
 const numberOrNull = (value: string) => (value === "" ? null : Number(value));
+
+/** Every Bills screen offers 0% beside the GST list, so 0 is never checked against it. */
+const offList = (pct: number | null) => (pct === 0 ? null : pct);
+
+async function lineCount(billId: string): Promise<number | { error: string }> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("bill_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("bill_id", billId);
+  return error ? failed("bill_lines", error) : (count ?? 0);
+}
+
+/**
+ * The works of an order already billed in full, which the record form leaves out — none when a
+ * bill on the order names no work, since then what each has billed is unknown.
+ */
+async function fullyBilled(
+  orderId: string,
+  works: { id: string; is_lump_sum: boolean; quantity: number | null; rate: number }[],
+): Promise<Set<string> | { error: string }> {
+  const supabase = await createClient();
+  const { data: bills, error } = await supabase
+    .from("bills")
+    .select("id")
+    .eq("labour_contract_id", orderId);
+  if (error) return failed("bills", error);
+  if (bills.length === 0) return new Set();
+  const [{ count: untagged, error: untaggedError }, { data: billed, error: billedError }] =
+    await Promise.all([
+      supabase
+        .from("bill_lines")
+        .select("id", { count: "exact", head: true })
+        .in(
+          "bill_id",
+          bills.map((one) => one.id),
+        )
+        .is("labour_contract_line_id", null),
+      supabase
+        .from("work_order_line_billing_facts")
+        .select("labour_contract_line_id, billed_value")
+        .eq("contract_id", orderId),
+    ]);
+  if (untaggedError || billedError) return failed("bill_lines", untaggedError ?? billedError);
+  if ((untagged ?? 0) > 0) return new Set();
+  const billedOf = new Map(
+    billed.map((row) => [row.labour_contract_line_id ?? "", row.billed_value ?? 0]),
+  );
+  const paise = (value: number) => Math.round(value * 100) / 100;
+  return new Set(
+    works
+      .filter(
+        (work) =>
+          paise((work.is_lump_sum ? 1 : (work.quantity ?? 0)) * work.rate) -
+            paise(billedOf.get(work.id) ?? 0) <=
+          0,
+      )
+      .map((work) => work.id),
+  );
+}

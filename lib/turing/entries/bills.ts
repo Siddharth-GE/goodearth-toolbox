@@ -194,7 +194,7 @@ export const BILLS = defineEntries([
     tool: "/bills",
     title: "A daily-wages bill's total, set by hand",
     description:
-      "Sets a recorded daily-wages bill's total by hand when the muster roll differs from heads × rates, with the reason; an empty total goes back to the lines' sum.",
+      "Sets a recorded daily-wages bill's total by hand when the muster roll differs from heads × rates, with the reason. A total or reason left out keeps the one already set (a first total needs both); an empty total goes back to the lines' sum and drops the reason.",
     fields: [
       bill,
       { key: "total", label: "Total ₹", kind: "amount", optional: true },
