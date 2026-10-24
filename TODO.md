@@ -60,7 +60,7 @@ Each checklist is in `plan.md`, under the heading named.
   - A deck link pasted into WhatsApp shows the Kaadal K.
 - **The final masters workbook**: a look through Masters → Vendors, Works, Items and Stages.
 
-## Five stale trials
+## Six stale trials
 
 These `scripts/trials/` fail against today's staging data, with or without the latest migrations (checked 2026-10-18). Each needs its setup brought up to date, not the code:
 
@@ -68,6 +68,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 - `client-actions-setter.sql`: steps now move with their side's owner (`0125`).
 - `client-actions.sql`, step 1: the staff account sees no plots since `0123` scoped the tool.
 - `client-relations-scope.sql`: the trial accounts already hold real actions.
+- `design-board.sql`, step 0: the board's stages are no longer Design, Permit, WD, Structural and Interiors.
 - `takeoff-working-date.sql`: the trial villa already has an official estimate.
 
 ## Setup the tools are waiting on
