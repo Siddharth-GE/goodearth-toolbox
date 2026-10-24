@@ -2,9 +2,12 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Next — Turing, the admins' assistant
+## Building now — Turing, the admins' assistant
 
-`plan.md`, top section: a general-purpose Claude inside the toolbox (T1), then doing things in every tool behind a person's Save (T2). Fable reviews the plan and its one rule change first, unless the founder waives.
+`plan.md`, top section. T1 (the chat, reads, files, pages) is built on `feature/turing`, `0151` on staging.
+
+- **Waiting on the founder:** the Anthropic API key in Vercel (Preview first), then a look at T1 on staging.
+- **Before T2:** Fable decides _the one rule change_, unless the founder waives it.
 
 ## Native apps on iPhone and Android — next build
 
