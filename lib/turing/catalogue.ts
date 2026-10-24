@@ -4,6 +4,7 @@ import "server-only";
 // own save, and only after the admin pressed Save on the proposal. Actions only — never queries or
 // screens — each tool's in its own runners file.
 import type { EntryKey } from "./catalogue-fields";
+import { BILL_RUNNERS } from "./runners/bills";
 import { INDENT_RUNNERS } from "./runners/indents";
 import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
@@ -20,4 +21,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...PO_RUNNERS,
   ...INVENTORY_RUNNERS,
   ...WORK_ORDER_RUNNERS,
+  ...BILL_RUNNERS,
 };

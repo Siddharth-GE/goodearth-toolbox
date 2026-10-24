@@ -44,6 +44,8 @@ const NAMED_BY: Record<
     | "issue_requests"
     | "labour_contracts"
     | "labour_contract_lines"
+    | "bills"
+    | "bill_lines"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -137,7 +139,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("items", line.item_id);
   }
   // A delivered line by its delivery and item; a site's request by its villa and item; a work by its order.
-  const [receiptLines, requests, orderWorks] = await Promise.all([
+  const [receiptLines, requests, orderWorks, billLines] = await Promise.all([
     readIn(list("goods_receipt_lines"), (chunk) =>
       supabase
         .from("goods_receipt_lines")
@@ -156,8 +158,15 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
         .select("id, contract_id, description, is_lump_sum, quantity, uom")
         .in("id", chunk),
     ),
+    readIn(list("bill_lines"), (chunk) =>
+      supabase
+        .from("bill_lines")
+        .select("id, bill_id, description, line_kind, quantity, uom")
+        .in("id", chunk),
+    ),
   ]);
   for (const work of orderWorks) add("labour_contracts", work.contract_id);
+  for (const line of billLines) add("bills", line.bill_id);
   for (const line of receiptLines) {
     add("goods_receipts", line.receipt_id);
     add("items", line.item_id);
@@ -167,7 +176,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("items", request.item_id);
   }
 
-  const [people, indents, orders, receipts, issues, workOrders] = await Promise.all([
+  const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
     readIn(list("profiles"), (chunk) =>
       supabase.from("profiles").select("id, full_name").in("id", chunk),
     ),
@@ -186,7 +195,22 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     readIn(list("labour_contracts"), (chunk) =>
       supabase.from("labour_contracts").select("id, reference, status").in("id", chunk),
     ),
+    readIn(list("bills"), (chunk) =>
+      supabase.from("bills").select("id, reference, status").in("id", chunk),
+    ),
   ]);
+  for (const one of bills) names[one.id] = `${one.reference} (${one.status})`;
+  for (const line of billLines) {
+    names[line.id] = [
+      names[line.bill_id],
+      line.description,
+      line.line_kind === "pw_lump"
+        ? "lump sum"
+        : `${formatQuantity(line.quantity)} ${line.uom ?? ""}`.trim(),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   for (const record of [...receipts, ...issues]) names[record.id] = record.reference;
   for (const order of workOrders)
     names[order.id] = `${order.reference ?? "Work order"} (${order.status.replace(/_/g, " ")})`;

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { getDefaultTerms } from "@/lib/masters/terms";
 import {
   addPoolLines,
@@ -30,6 +29,7 @@ import {
   failed,
   firstRefusal,
   given,
+  gstRefused,
   recordNow,
   retired,
   saving,
@@ -58,30 +58,6 @@ async function referencesOf(ids: string[]): Promise<string> {
   if (error || !data) return ids.length === 1 ? "the PO" : `${ids.length} POs`;
   const byId = new Map(data.map((row) => [row.id, row.reference]));
   return ids.map((id) => byId.get(id) ?? "a PO").join(", ");
-}
-
-/**
- * A GST % given must be on the active list, as every screen's picker offers — or the one already
- * there (`keeps[i]`, the line's own or Masters'), which the screens keep offering after it is retired.
- */
-async function gstRefused(
-  pcts: (number | null)[],
-  keeps: (number | null | undefined)[] = [],
-): Promise<{ error: string } | null> {
-  const asked = pcts.filter(
-    (pct, index): pct is number => pct !== null && pct !== (keeps[index] ?? null),
-  );
-  if (asked.length === 0) return null;
-  let rates: number[];
-  try {
-    rates = (await listActiveGstRates()).map((row) => Number(row.rate));
-  } catch (error) {
-    return failed("gst_rates", error);
-  }
-  const off = asked.find((pct) => !rates.includes(pct));
-  return off === undefined
-    ? null
-    : { error: `${off}% is not on the GST list. Pick one of ${rates.join(", ")}.` };
 }
 
 /**
