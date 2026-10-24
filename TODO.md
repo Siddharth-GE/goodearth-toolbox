@@ -2,9 +2,9 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Building now — Delete or Cancel across every tool
+## Vet on staging — Delete or Cancel, steps E and F
 
-`plan.md`, top section, **"Next session — start here"**: Piece 4's build order, B1 first. On 2026-10-23 the founder said "all looks good" of what was on staging (pieces 1–3, #130–#133, with the Supervisors rebuild #123–#129 and the OS process updates #119–#122), took piece 4's recommendations and waived Fable's design review.
+Piece 4 is built (`plan.md`, top section). E (actions, #140) is merged; F (Masters' delete, admins only) is its own pull request. The checklist is each pull request's "Try on staging".
 
 - **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
 
