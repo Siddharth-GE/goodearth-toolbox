@@ -2,7 +2,7 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Next — TI, the admins' assistant
+## Next — Turing, the admins' assistant
 
 `plan.md`, top section: a general-purpose Claude inside the toolbox (T1), then doing things in every tool behind a person's Save (T2). Fable reviews the plan and its one rule change first, unless the founder waives.
 
