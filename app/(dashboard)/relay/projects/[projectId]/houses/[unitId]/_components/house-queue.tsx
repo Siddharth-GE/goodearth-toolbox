@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Select } from "@/components/ui/select";
@@ -127,15 +128,27 @@ export function HouseQueue({
                   <Play className="size-4" />
                   {busy === trail.chainId ? "Starting…" : "Start"}
                 </Button>
-                <IconButton
-                  className="ml-auto"
-                  tone="danger"
-                  aria-label={`Remove ${trail.activityName}`}
-                  disabled={busy !== null}
-                  onClick={() => run(`x-${trail.chainId}`, () => discardTrail(trail.chainId))}
-                >
-                  <X className="size-4" />
-                </IconButton>
+                <ConfirmDialog
+                  trigger={
+                    <IconButton
+                      className="ml-auto"
+                      tone="danger"
+                      aria-label={`Remove ${trail.activityName}`}
+                      disabled={busy !== null}
+                    >
+                      <X className="size-4" />
+                    </IconButton>
+                  }
+                  title={`Remove ${trail.activityName}?`}
+                  description="It has not started, so nothing is lost. Add it again from a trail set if it was wanted."
+                  confirmLabel="Remove"
+                  pendingLabel="Removing…"
+                  onConfirm={async () => {
+                    const result = await discardTrail(trail.chainId);
+                    if (!result?.error) router.refresh();
+                    return result;
+                  }}
+                />
               </div>
             </div>
           ))}

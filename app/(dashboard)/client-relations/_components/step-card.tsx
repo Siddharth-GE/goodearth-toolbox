@@ -7,14 +7,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { Textarea } from "@/components/ui/textarea";
-import { closeRight, dueLabel, ownerOfSide, type DueTone } from "@/lib/client-relations/next-steps";
-import { updateNextStep, type StepPatch } from "@/lib/client-relations/next-steps-actions";
+import {
+  actionRemoval,
+  closeRight,
+  dueLabel,
+  ownerOfSide,
+  type DueTone,
+} from "@/lib/client-relations/next-steps";
+import {
+  cancelNextStep,
+  deleteNextStep,
+  updateNextStep,
+  type StepPatch,
+} from "@/lib/client-relations/next-steps-actions";
 import type { NextStep } from "@/lib/client-relations/next-steps-queries";
 import { ACTION_STATUSES, ACTION_TRACKS, optionFor } from "@/lib/client-relations/stages";
 import { formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Check, MoreHorizontal, StickyNote } from "lucide-react";
+import { CalendarDays, Check, MoreHorizontal, StickyNote, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -53,6 +65,7 @@ export function StepCard({
   }
   const [notesOpen, setNotesOpen] = useState(false);
   const [moreMode, setMoreMode] = useState<"menu" | "move">("menu");
+  const [removing, setRemoving] = useState(false);
 
   const status = optimistic ?? step.status;
   const done = status === "done";
@@ -119,6 +132,37 @@ export function StepCard({
           : `Mark finished — ${setter} confirms`;
 
   if (hideWhenDone && done) return null;
+
+  if (step.cancelled) {
+    const { reason, by } = step.cancelled;
+    return (
+      <article className="border-border bg-surface/60 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-2xl border px-3 pt-3 pb-2.5">
+        <span className="-m-1.5 grid size-9 place-items-center" title="Cancelled">
+          <span className="border-foreground/15 text-muted grid size-6 place-items-center rounded-full border-2">
+            <X className="size-3.5" strokeWidth={3} />
+          </span>
+        </span>
+        <p className="text-muted px-1 py-0.5 text-[15px] leading-snug font-medium line-through">
+          {step.action}
+        </p>
+        <div className="col-start-2 mt-1.5 flex flex-wrap items-center gap-1.5">
+          {showPlot && step.plot ? (
+            <PlotChip
+              number={step.plot.number}
+              clientName={step.plot.clientName}
+              href={`/client-relations/plots/${step.plot.engagementId}`}
+            />
+          ) : null}
+          <Pill>
+            Cancelled{step.doneOn ? ` ${formatShortDate(step.doneOn)}` : ""}
+            {by ? ` by ${by}` : ""}
+          </Pill>
+          <span className="text-muted text-sm">{reason}</span>
+        </div>
+      </article>
+    );
+  }
+  const removal = actionRemoval(step, { id: meId, isManager });
 
   const statusOption = optionFor(ACTION_STATUSES, step.status);
   const stamp = `${step.stamp.edited ? "Edited" : "Added"} ${formatShortDate(step.stamp.on)}${
@@ -345,6 +389,14 @@ export function StepCard({
                 >
                   Move to another plot…
                 </DropdownMenuItem>
+                {removal ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-danger" onSelect={() => setRemoving(true)}>
+                      {removal === "delete" ? "Delete…" : "Cancel this action…"}
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </>
             )}
           </DropdownMenuContent>
@@ -354,6 +406,18 @@ export function StepCard({
           {stamp}
         </span>
       </div>
+
+      <DeleteOrCancel
+        open={removing}
+        onOpenChange={setRemoving}
+        noun="action"
+        removal={removal ? { kind: removal } : null}
+        onDelete={() => deleteNextStep(step.id)}
+        onCancel={(reason) => cancelNextStep(step.id, reason)}
+        deleteNote="Nobody has changed it since it was added, so it goes for good."
+        cancelNote="It closes for good and stays among the done, struck through, with your reason. This can't be undone."
+        reasonPlaceholder="The client no longer needs it"
+      />
 
       {notesOpen ? <StepNotes step={step} onSave={(notes) => save({ notes })} /> : null}
     </article>

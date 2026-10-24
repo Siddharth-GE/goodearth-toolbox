@@ -2918,6 +2918,9 @@ export type Database = {
       client_actions: {
         Row: {
           action: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           done_on: string | null
@@ -2934,6 +2937,9 @@ export type Database = {
         }
         Insert: {
           action: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           done_on?: string | null
@@ -2950,6 +2956,9 @@ export type Database = {
         }
         Update: {
           action?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           done_on?: string | null
@@ -2965,6 +2974,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_actions_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_actions_created_by_fkey"
             columns: ["created_by"]
@@ -3611,6 +3627,9 @@ export type Database = {
       design_actions: {
         Row: {
           action: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           design_stage_id: string | null
@@ -3626,6 +3645,9 @@ export type Database = {
         }
         Insert: {
           action: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           design_stage_id?: string | null
@@ -3641,6 +3663,9 @@ export type Database = {
         }
         Update: {
           action?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           design_stage_id?: string | null
@@ -3655,6 +3680,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "design_actions_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "design_actions_created_by_fkey"
             columns: ["created_by"]
