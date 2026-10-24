@@ -17,8 +17,9 @@ import {
   type StageSnapshot,
 } from "@/lib/supervisors/programme-actions";
 import { setSequenceDays } from "@/lib/supervisors/sequence-actions";
+import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
 
-import type { EntryKey, Value } from "./catalogue-fields";
+import { LABOUR_LOG_FORM, labourConflict, type EntryKey, type Value } from "./catalogue-fields";
 
 type Values = Record<string, Value>;
 
@@ -66,6 +67,27 @@ async function sequenceNow(values: Values) {
     .maybeSingle();
   if (error) return failed("sequence", error);
   return { sequence: data };
+}
+
+async function logNow(values: Values) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("labour_logs")
+    .select(
+      "plot_id, work_item_id, contractor_id, log_date, kind, work_class, masons, helpers, others, quantity, description, note",
+    )
+    .eq("id", String(values.log_id))
+    .maybeSingle();
+  if (error) return failed("labour log", error);
+  if (!data) return { error: "That log is gone." };
+  return { log: data };
+}
+
+/** The labour form as Supervisors' own screen sends it; a field left out keeps the log's own. */
+function labourForm(values: Values, now?: Record<string, string | number | null>) {
+  const form = new FormData();
+  for (const key of LABOUR_LOG_FORM) form.set(key, given(values, key, now?.[key]));
+  return form;
 }
 
 /** Each entry in catalogue-fields.ts, run through its tool's own action, as the admin. */
@@ -162,5 +184,21 @@ export const RUNNERS: Record<EntryKey, (values: Values) => Promise<ActionState>>
       field: wait ? "wait" : "typical",
       value: given(v, "value", wait ? now.sequence?.wait_days : now.sequence?.typical_days),
     });
+  },
+  labour_log_new: (v) => recordLabourLog(undefined, labourForm(v)),
+  labour_log_change: async (v) => {
+    const now = await logNow(v);
+    if ("error" in now) return now;
+    const conflict = labourConflict(v, now.log);
+    if (conflict) return { error: conflict };
+    const form = labourForm(v, now.log);
+    form.set("id", String(v.log_id));
+    return updateLabourLog(undefined, form);
+  },
+  labour_log_delete: async (v) => {
+    // The delete itself says nothing when no row matched, so a log already gone is said here.
+    const now = await logNow(v);
+    if ("error" in now) return now;
+    return deleteLabourLog(String(v.log_id));
   },
 };

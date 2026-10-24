@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -8,6 +9,8 @@ import {
   entryFor,
   ENTRIES,
   idsOf,
+  LABOUR_LOG_FORM,
+  labourConflict,
 } from "./catalogue-fields";
 
 const PLOT = "11111111-1111-4111-8111-111111111111";
@@ -122,6 +125,95 @@ test("the admin's edits are checked, and what a row is about cannot move", () =>
   assert.equal(editedRows(entry, original, [{ row: 7 }]).ok, false);
   assert.equal(editedRows(entry, original, [{ row: 0 }, { row: 0 }]).ok, false);
   assert.equal(editedRows(entry, original, []).ok, false);
+});
+
+test("the labour form Turing sends is the one Supervisors reads", () => {
+  // A renamed field on Supervisors' form would otherwise reach the action blank, and silently.
+  const source = readFileSync("lib/supervisors/actions.ts", "utf8");
+  const reader = source.slice(
+    source.indexOf("async function readLabourFields"),
+    source.indexOf("const sameDayMessage"),
+  );
+  const read = [...reader.matchAll(/\(formData, "(\w+)"\)/g)].map((match) => match[1]);
+  assert.deepEqual([...LABOUR_LOG_FORM].sort(), [...new Set(read)].sort());
+  assert.match(source, /export async function updateLabourLog[\s\S]*?text\(formData, "id"\)/);
+});
+
+test("Turing never presses a Settings save (SECURITY.md, Turing)", () => {
+  assert.doesNotMatch(readFileSync("lib/turing/catalogue.ts", "utf8"), /@\/lib\/settings\//);
+  assert.equal(
+    ENTRIES.some((entry) => entry.tool === "/settings"),
+    false,
+  );
+});
+
+test("a day's labour: each way of paying passes, and a quantity is a plain number", () => {
+  const base = { plot_id: PLOT, work_item_id: GROUP, contractor_id: OTHER, log_date: "2026-10-24" };
+  const proposal = checkProposal({
+    action: "labour_log_new",
+    title: "Today's labour",
+    rows: [
+      { label: "P-07 masons", ...base, kind: "nmr", masons: 2, helpers: 3 },
+      { label: "P-07 plaster", ...base, kind: "pw_qty", quantity: 12.5 },
+      { label: "P-07 porch", ...base, kind: "pw_lump", description: "Porch plastering" },
+    ],
+  });
+  assert.ok(proposal.ok);
+  assert.equal(proposal.value.rows[1].values.quantity, "12.5");
+  // Fields left out of a new log are blank, not "kept": the row simply doesn't carry them.
+  assert.equal("others" in proposal.value.rows[0].values, false);
+
+  const bad = checkProposal({
+    action: "labour_log_new",
+    title: "x",
+    rows: [
+      { label: "a", ...base, kind: "pw_qty", quantity: "12 cum" },
+      { label: "b", ...base, log_date: undefined, kind: "nmr", masons: 1 },
+    ],
+  });
+  assert.ok(!bad.ok);
+  assert.match(bad.error, /Row 1: Quantity is a number/);
+  assert.match(bad.error, /Row 2: Date is missing/);
+});
+
+test("a value the way of paying would drop is refused, not saved as nothing", () => {
+  assert.match(labourConflict({ kind: "nmr", quantity: "12" }) ?? "", /not a quantity/);
+  assert.match(labourConflict({ kind: "pw_qty", masons: "2" }) ?? "", /Heads are for daily/);
+  assert.match(labourConflict({ kind: "pw_lump", quantity: "3" }) ?? "", /not a quantity/);
+  assert.equal(labourConflict({ kind: "pw_qty", masons: "0", quantity: "4" }), undefined);
+  // A change takes the log's own way of paying when the row doesn't give one.
+  const now = { kind: "nmr", work_item_id: GROUP };
+  assert.match(labourConflict({ quantity: "5" }, now) ?? "", /not a quantity/);
+  assert.equal(labourConflict({ masons: "4" }, now), undefined);
+  const piece = { kind: "pw_qty", work_item_id: GROUP };
+  assert.match(labourConflict({ work_item_id: OTHER }, piece) ?? "", /give the quantity again/);
+  assert.equal(labourConflict({ work_item_id: OTHER, quantity: "9" }, piece), undefined);
+});
+
+test("a correction can keep the work, contractor, date or payment, but never empty them", () => {
+  const change = checkProposal({
+    action: "labour_log_change",
+    title: "x",
+    rows: [
+      { label: "a", log_id: PLOT, contractor_id: "" },
+      { label: "b", log_id: PLOT, kind: "" },
+      { label: "c", log_id: PLOT, work_class: "" },
+    ],
+  });
+  assert.ok(!change.ok);
+  assert.match(change.error, /Row 1: Contractor can be left as it is, but not emptied/);
+  assert.match(change.error, /Row 2: Paid as can be left as it is/);
+  // An empty work class goes back to standard work, the tool's own default.
+  assert.doesNotMatch(change.error, /Row 3/);
+});
+
+test("a labour log is changed or deleted by its id, which cannot be edited on screen", () => {
+  const change = entryFor("labour_log_change")!;
+  const original = [{ label: "24 Oct", values: { log_id: PLOT, masons: "3" } }];
+  assert.ok(editedRows(change, original, [{ row: 0, values: { masons: "4" } }]).ok);
+  assert.equal(editedRows(change, original, [{ row: 0, values: { log_id: OTHER } }]).ok, false);
+  const ids = idsOf(entryFor("labour_log_delete")!, [{ label: "x", values: { log_id: PLOT } }]);
+  assert.deepEqual([...(ids.get("labour_logs") ?? [])], [PLOT]);
 });
 
 test("Claude's list names every entry and its fields", () => {

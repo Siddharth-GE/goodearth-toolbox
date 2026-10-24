@@ -1,43 +1,112 @@
 import "server-only";
 
+import { formatDate, formatQuantity } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import type { IdTable } from "./catalogue-fields";
 
+/** Ids per read: a conversation's labour logs can run to hundreds, and each id lengthens the URL. */
+const CHUNK = 100;
+
+const failed = (error: unknown) => {
+  console.error("turing: names not read:", error);
+  return new Error("Could not read the names in the proposal.", { cause: error });
+};
+
+async function readIn<T>(
+  ids: string[],
+  read: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let at = 0; at < ids.length; at += CHUNK) {
+    const { data, error } = await read(ids.slice(at, at + CHUNK));
+    if (error) throw failed(error);
+    rows.push(...(data ?? []));
+  }
+  return rows;
+}
+
+/** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
+function labourSummary(log: {
+  kind: string;
+  masons: number;
+  helpers: number;
+  others: number;
+  quantity: number | null;
+  uom: string | null;
+}): string {
+  if (log.kind === "pw_qty") return `${formatQuantity(log.quantity)} ${log.uom ?? ""}`.trim();
+  if (log.kind === "pw_lump") return "lump sum";
+  const heads = (count: number, one: string) =>
+    count ? `${count} ${one}${count === 1 ? "" : "s"}` : "";
+  return [heads(log.masons, "mason"), heads(log.helpers, "helper"), heads(log.others, "other")]
+    .filter(Boolean)
+    .join(", ");
+}
+
 /**
- * Each id a proposal names, as the admin knows it: a plot's code, a stage's code and name, a
- * person's or vendor's name. Read through the admin's own session; an id missing from the answer
- * names nothing they can see.
+ * Each id a proposal names, as the admin knows it: a plot's code, a stage's or work's code and
+ * name, a person's or vendor's name, a labour log's day, villa, work, contractor and heads or
+ * quantity. Read through the admin's own session; an id missing from the answer names nothing
+ * they can see.
  */
 export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<string, string>> {
   const supabase = await createClient();
   const names: Record<string, string> = {};
-  const list = (table: IdTable) => [...(ids.get(table) ?? [])];
+  const lists = new Map<IdTable, Set<string>>(
+    [...ids].map(([table, set]) => [table, new Set(set)]),
+  );
+  const list = (table: IdTable) => [...(lists.get(table) ?? [])];
+  const add = (table: IdTable, id: string) => {
+    if (!lists.has(table)) lists.set(table, new Set());
+    lists.get(table)?.add(id);
+  };
 
-  const reads = await Promise.all([
-    list("plots").length
-      ? supabase.from("plots").select("id, code, name").in("id", list("plots"))
-      : null,
-    list("work_groups").length
-      ? supabase.from("work_groups").select("id, code, name").in("id", list("work_groups"))
-      : null,
-    list("profiles").length
-      ? supabase.from("profiles").select("id, full_name").in("id", list("profiles"))
-      : null,
-    list("vendors").length
-      ? supabase.from("vendors").select("id, name").in("id", list("vendors"))
-      : null,
-  ]);
-  const [plots, groups, people, vendors] = reads;
-  for (const read of reads) {
-    if (read?.error) {
-      console.error("turing: names not read:", read.error);
-      throw new Error("Could not read the names in the proposal.", { cause: read.error });
-    }
+  // A log is named by what it points at, so its villa, work and contractor are read with the rest.
+  const logs = await readIn(list("labour_logs"), (chunk) =>
+    supabase
+      .from("labour_logs")
+      .select(
+        "id, log_date, plot_id, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom",
+      )
+      .in("id", chunk),
+  );
+  for (const log of logs) {
+    add("plots", log.plot_id);
+    add("work_items", log.work_item_id);
+    add("vendors", log.contractor_id);
   }
-  for (const plot of plots?.data ?? []) names[plot.id] = plot.code || plot.name;
-  for (const group of groups?.data ?? []) names[group.id] = `${group.code} ${group.name}`;
-  for (const person of people?.data ?? []) names[person.id] = person.full_name || "A person";
-  for (const vendor of vendors?.data ?? []) names[vendor.id] = vendor.name;
+
+  const [plots, groups, works, people, vendors] = await Promise.all([
+    readIn(list("plots"), (chunk) =>
+      supabase.from("plots").select("id, code, name").in("id", chunk),
+    ),
+    readIn(list("work_groups"), (chunk) =>
+      supabase.from("work_groups").select("id, code, name").in("id", chunk),
+    ),
+    readIn(list("work_items"), (chunk) =>
+      supabase.from("work_items").select("id, code, name").in("id", chunk),
+    ),
+    readIn(list("profiles"), (chunk) =>
+      supabase.from("profiles").select("id, full_name").in("id", chunk),
+    ),
+    readIn(list("vendors"), (chunk) => supabase.from("vendors").select("id, name").in("id", chunk)),
+  ]);
+  for (const plot of plots) names[plot.id] = plot.code || plot.name;
+  for (const group of groups) names[group.id] = `${group.code} ${group.name}`;
+  for (const work of works) names[work.id] = `${work.code} ${work.name}`;
+  for (const person of people) names[person.id] = person.full_name || "A person";
+  for (const vendor of vendors) names[vendor.id] = vendor.name;
+  for (const log of logs) {
+    names[log.id] = [
+      formatDate(log.log_date),
+      names[log.plot_id],
+      names[log.work_item_id],
+      names[log.contractor_id],
+      labourSummary(log),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   return names;
 }

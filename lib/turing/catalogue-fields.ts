@@ -4,16 +4,19 @@
  * each tool's action live in catalogue.ts. A new kind is a new entry here and a runner there.
  */
 
-export type FieldKind = "id" | "date" | "whole" | "text" | "choice" | "yesno";
+export type FieldKind = "id" | "date" | "whole" | "amount" | "text" | "choice" | "yesno";
 
 /** Where an id points; the server turns each into a name the admin can check. */
-export type IdTable = "plots" | "work_groups" | "profiles" | "vendors";
+export type IdTable =
+  "plots" | "work_groups" | "work_items" | "profiles" | "vendors" | "labour_logs";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
   work_groups: "work_groups (a stage of the site sequence)",
+  work_items: "work_items (a work in the works list)",
   profiles: "profiles (a person)",
   vendors: "vendors (a contractor)",
+  labour_logs: "labour_logs (a day's labour on a villa)",
 };
 
 export type Field = {
@@ -25,7 +28,13 @@ export type Field = {
    * the default), as the tool's own screen does.
    */
   optional?: true;
+  /** Optional, but only ever left out: the tool refuses it empty, so it is refused here first. */
+  keep?: true;
   choices?: readonly string[];
+  /** A choice as the admin reads it, where its stored word is not plain English. */
+  labels?: Record<string, string>;
+  /** What an empty choice means, where it is not "none". */
+  blank?: string;
   table?: IdTable;
 };
 
@@ -39,7 +48,10 @@ export type EntryKey =
   | "stage_contractor"
   | "stage_needed"
   | "stage_follows"
-  | "sequence_days";
+  | "sequence_days"
+  | "labour_log_new"
+  | "labour_log_change"
+  | "labour_log_delete";
 
 export type Entry = {
   key: EntryKey;
@@ -48,6 +60,10 @@ export type Entry = {
   title: string;
   description: string;
   fields: Field[];
+  /** Makes a new record, so a field left out is blank rather than kept. */
+  adds?: true;
+  /** A rule across a row's fields, beyond each field's own. */
+  check?: (values: Record<string, Value>) => string | undefined;
 };
 
 export type Value = string | boolean;
@@ -56,6 +72,92 @@ export type Row = { label: string; values: Record<string, Value> };
 
 const plot: Field = { key: "plot_id", label: "Villa", kind: "id", table: "plots" };
 const stage: Field = { key: "group_id", label: "Stage", kind: "id", table: "work_groups" };
+const log: Field = { key: "log_id", label: "Log", kind: "id", table: "labour_logs" };
+
+/** The labour form's fields, by the names Supervisors' own form sends (pinned by a test). */
+export const LABOUR_LOG_FORM = [
+  "plot_id",
+  "work_item_id",
+  "contractor_id",
+  "log_date",
+  "kind",
+  "work_class",
+  "masons",
+  "helpers",
+  "others",
+  "quantity",
+  "description",
+  "note",
+] as const;
+
+const has = (values: Record<string, Value>, key: string) =>
+  key in values && values[key] !== "" && values[key] !== "0";
+
+/**
+ * What Supervisors' save would drop without a word: a value the way of paying does not use, or a
+ * quantity kept from another work, whose unit may differ. `now` is the log being changed.
+ */
+export function labourConflict(
+  values: Record<string, Value>,
+  now?: { kind: string; work_item_id: string },
+): string | undefined {
+  const kind = String(values.kind ?? now?.kind ?? "");
+  if (kind === "nmr") {
+    if (has(values, "quantity"))
+      return "Daily wages take masons, helpers or others, not a quantity.";
+    if (has(values, "description"))
+      return "Daily wages keep no description of the work; put it in the note.";
+  } else if (["masons", "helpers", "others"].some((key) => has(values, key))) {
+    return "Heads are for daily wages; piece-work takes a quantity or what was done.";
+  }
+  if (kind === "pw_lump" && has(values, "quantity"))
+    return "A lump sum takes what was done, not a quantity.";
+  if (
+    now &&
+    kind === "pw_qty" &&
+    "work_item_id" in values &&
+    values.work_item_id !== now.work_item_id &&
+    !has(values, "quantity")
+  )
+    return "The work changed, so give the quantity again, in the new work's unit.";
+  return undefined;
+}
+
+const labourDetails = (optional: boolean): Field[] => {
+  const may = optional ? ({ optional: true, keep: true } as const) : {};
+  return [
+    { key: "work_item_id", label: "Work", kind: "id", table: "work_items", ...may },
+    { key: "contractor_id", label: "Contractor", kind: "id", table: "vendors", ...may },
+    { key: "log_date", label: "Date", kind: "date", ...may },
+    {
+      key: "kind",
+      label: "Paid as",
+      kind: "choice",
+      choices: ["nmr", "pw_qty", "pw_lump"],
+      labels: {
+        nmr: "Daily wages",
+        pw_qty: "Piece-work by quantity",
+        pw_lump: "Piece-work, lump sum",
+      },
+      ...may,
+    },
+    {
+      key: "work_class",
+      label: "Work class",
+      kind: "choice",
+      optional: true,
+      choices: ["standard", "additional", "rework"],
+      labels: { standard: "Standard work", additional: "Additional work", rework: "Rework" },
+      blank: "Standard work (the default)",
+    },
+    { key: "masons", label: "Masons", kind: "whole", optional: true },
+    { key: "helpers", label: "Helpers", kind: "whole", optional: true },
+    { key: "others", label: "Others", kind: "whole", optional: true },
+    { key: "quantity", label: "Quantity", kind: "amount", optional: true },
+    { key: "description", label: "What was done", kind: "text", optional: true },
+    { key: "note", label: "Note", kind: "text", optional: true },
+  ];
+};
 
 export const ENTRIES: Entry[] = [
   {
@@ -190,6 +292,32 @@ export const ENTRIES: Entry[] = [
       { key: "value", label: "Days", kind: "whole", optional: true },
     ],
   },
+  {
+    key: "labour_log_new",
+    tool: "/supervisors",
+    title: "A day's labour",
+    description:
+      "Logs a day's labour on a villa: the work, the contractor (a vendor with is_contractor) and how it is paid — nmr is daily wages (masons, helpers, others; at least one), pw_qty is piece-work by quantity (in the work's unit from the rate book), pw_lump is a lump sum (what was done says what). Work class is standard unless it was additional work or rework. A second log for the same villa, work, contractor, day, payment and class is refused: change that one instead. Quantities and heads only, never wages.",
+    adds: true,
+    check: (values) => labourConflict(values),
+    fields: [plot, ...labourDetails(false)],
+  },
+  {
+    key: "labour_log_change",
+    tool: "/supervisors",
+    title: "A labour log, corrected",
+    description:
+      "Corrects a labour log (labour_logs.id); its villa stays. A log on a bill (bill_id set) cannot be changed.",
+    fields: [log, ...labourDetails(true)],
+  },
+  {
+    key: "labour_log_delete",
+    tool: "/supervisors",
+    title: "A labour log, deleted",
+    description:
+      "Deletes a labour log entered by mistake (labour_logs.id). A log on a bill (bill_id set) cannot be deleted.",
+    fields: [log],
+  },
 ];
 
 export const entryFor = (key: unknown): Entry | undefined =>
@@ -221,6 +349,8 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
   if (typeof text !== "string") return { ok: false, error: `${field.label} is not readable.` };
   const value = text.trim();
   if (!value) {
+    if (field.keep)
+      return { ok: false, error: `${field.label} can be left as it is, but not emptied.` };
     return field.optional
       ? { ok: true, value: "" }
       : { ok: false, error: `${field.label} is missing.` };
@@ -237,7 +367,11 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
     case "whole":
       return /^\d{1,3}$/.test(value)
         ? { ok: true, value }
-        : { ok: false, error: `${field.label} is a whole number of days.` };
+        : { ok: false, error: `${field.label} is a whole number up to 999.` };
+    case "amount":
+      return /^\d{1,9}(\.\d{1,3})?$/.test(value)
+        ? { ok: true, value }
+        : { ok: false, error: `${field.label} is a number, like 12.5.` };
     case "choice":
       return field.choices?.includes(value)
         ? { ok: true, value }
@@ -266,6 +400,8 @@ export function checkRow(entry: Entry, raw: unknown): Checked<Row> {
     if (!value.ok) return value;
     if (value.value !== undefined) values[field.key] = value.value;
   }
+  const problem = entry.check?.(values);
+  if (problem) return { ok: false, error: problem };
   return { ok: true, value: { label, values } };
 }
 
@@ -369,14 +505,18 @@ export function catalogueText(): string {
                 ? "true or false"
                 : field.kind === "whole"
                   ? "whole number"
-                  : field.kind;
-        return `${field.key} (${kind}${field.optional ? ", optional" : ""})`;
+                  : field.kind === "amount"
+                    ? "number"
+                    : field.kind;
+        const may = field.keep ? ", optional, never empty" : field.optional ? ", optional" : "";
+        return `${field.key} (${kind}${may})`;
       })
       .join(", ");
-    return `- ${entry.key} — ${entry.title}, in ${entry.tool}. ${entry.description} Fields: ${fields}.`;
+    const adds = entry.adds ? " Adds a new record." : "";
+    return `- ${entry.key} — ${entry.title}, in ${entry.tool}.${adds} ${entry.description} Fields: ${fields}.`;
   });
   return [
-    "An optional field left out keeps what is there now; given as empty it clears it. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",
+    "An optional field left out keeps what is there now; given as empty it clears it. On an entry that adds a new record, a field left out is blank. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",
     ...rows,
   ].join("\n");
 }

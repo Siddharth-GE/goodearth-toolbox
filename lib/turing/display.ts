@@ -9,6 +9,8 @@ export type SaveResult = {
   ok: boolean;
   message: string;
   values?: Record<string, Value>;
+  /** Each id the row names, as it read just before the save: a deleted record names nothing after. */
+  names?: Record<string, string>;
 };
 /** A proposal saved: when Save was pressed, and each row's result once they have all run. */
 export type Saved = { at: string; results: SaveResult[] | null; interrupted: boolean };
