@@ -2,6 +2,13 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## Building now — Turing, the admins' assistant
+
+`plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
+
+- **Waiting on the founder:** a look at T1 on staging. The key in Vercel's Preview may expire on 31 Oct 2026; production needs its own when Turing ships.
+- **Before T2:** Fable decides _the one rule change_, unless the founder waives it.
+
 ## Native apps on iPhone and Android — next build
 
 - **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), their section of `plan.md`.

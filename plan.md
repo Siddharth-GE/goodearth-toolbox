@@ -1,3 +1,65 @@
+# Turing, the admins' assistant `[Opus drafted; Fable's review of T1 waived by the founder, 2026-10-24]`
+
+**The founder's ask** (2026-10-24): "a Claude inside, working with us in the toolbox" — admin-only, general purpose: talk about anything, drop in files, read every tool, build interactive docs and dashboards, and fill data across **every operation**. Settled with them the same day:
+
+- admins only;
+- each admin's conversations are private to them;
+- what goes into Turing is sent to Anthropic, and each use costs money — both accepted;
+- no spending cap in the app: the founder's Anthropic account and its API credits are the limit.
+
+**Next session — start here:** T1 is built on `feature/turing` (`0151` on staging). The founder adds the API key and vets T1 on staging; Fable then decides _the one rule change_, or the founder waives it, before T2.
+
+## The shape
+
+- **Admins only, the way Settings is.** In `lib/tools.ts`, left out of `GRANTABLE_TOOLS`; every query, action and route calls `requireUser` + `requireAdmin`; every Turing table's policies are `(select is_admin())`. Never grantable, so neither `_app_known` CHECK changes. It opens on the chat, as Settings opens on its list — no welcome screen.
+- **First in the sidebar** (founder): its own row above Overview and the teams in `components/layout/sidebar.tsx`, shown to admins only, never under a team — Settings → Teams cannot move it.
+- **No new way in.** The admin's own session and the RLS-scoped client — no admin client, no key of ours handed to anyone, no MCP door. Turing sees exactly what the admin sees, and can do exactly what the admin could do by hand.
+- **General purpose.** One system prompt says who Goodearth is, what each tool is for (from `lib/tools.ts`), and how Turing works; beyond that it is Claude — drafting, explaining, checking, planning — with the toolbox's reads always at hand.
+- **Claude reads and proposes; a person saves.** No tool the model can call writes anything. A change is a proposal the admin sees as a table, edits, and saves with a press (T2).
+- **No web.** No web search or fetch, and Turing's pages cannot call out, so a dropped file carrying hidden instructions has no way to send data anywhere.
+- **One new library, `@anthropic-ai/sdk`** — the server's only way to call Claude. `ANTHROPIC_API_KEY` from the founder's Anthropic account, in Vercel through `scripts/vercel-env.ts`, Preview first, never logged. `claude-opus-5-5`, effort `medium` throughout (a page is built inside the chat's turn), streamed, with the server-side refusal fallback; system prompt and tool list cached. Read the `claude-api` skill's TypeScript tool-use pages before writing the loop.
+- **When the credits run out**, Turing says so in a sentence — "Turing's credits have run out; top up the Anthropic account" — never a raw error. Each turn's tokens are kept with it.
+- **Files** dropped on the chat, 4 MB each (the body limit), each uploaded once to Anthropic's Files API and referred to by id after, so the stored conversation stays small. PDFs and photos go as they are; an `.xlsx` is read into text by `lib/xlsx.ts` (moved out of `scripts/read-xlsx.ts`) and goes as text, as do `.csv` and `.txt`. The original is kept in the admin's own folder of the private `turing-files` bucket.
+
+## The one rule change — Fable decides
+
+Turing acting in every tool means calling each tool's own save. Today no module may import a tool's code except `lib/overview/`, for reads. The proposal: **`lib/turing/` becomes the second sanctioned exception — it may call another tool's server actions, and only from a person's Save.**
+
+- **Why not the alternatives.** Writing the tables directly skips each tool's rules (numbering, approvals, notifications); copying those rules into Turing drifts; a "From Turing" step on every tool's form is a build per tool, and one tool at a time.
+- **Why it is safe.** An action already checks `requireTool`, validates, and returns `ActionState`; Turing calling it after the admin's Save is the admin pressing that tool's button. Nothing new is reachable.
+- **What it costs.** CLAUDE.md's one-principle paragraph names the exception; `scripts/check-boundaries.ts` allows `lib/turing/` to import `lib/<tool>/actions.ts` only — never queries, never screens — and still refuses everything else.
+- **The weak spot.** Most actions take `FormData`, so Turing fills the same fields the tool's form sends; a renamed field breaks Turing silently. Each catalogue entry (T2) carries a pure test of the fields it sends, and its action's refusal comes back as the result line, word for word.
+
+## The build — one pull request each, vetted on staging
+
+- [x] **T1. Claude in the toolbox** `[Opus; Fable's review waived by the founder: "skip the review and build it", 2026-10-24]`
+  - Built 2026-10-24 on `feature/turing`; `0151` applied to staging, types regenerated. Two independent Opus reviews stood in for Fable: one of `0151` before it was applied (five fixes taken — a file or page can only hang on its owner's own conversation, pages are never changed in place, the page bucket takes `text/html` with a charset), one of the code (nine fixes taken — an unfinished exchange is left out of every replay instead of patched, one answer at a time per conversation through `0152`, a cut-off page answer says so instead of retrying, steps a paragraph apart, a total order when a read spans pages, the tripwire widened and a frame that loads twice closed, secrets left out of what Turing reads). Trial `scripts/trials/turing.sql`, proven against two broken copies. Settled while building: a page reads its data afresh every time it opens, so Reload is the refresh and nothing is stored; Turing's own tables are left out of what it can read, so a shared page can never read one admin's chats; Dexter's headers stay where they are — Turing's sandbox is its own (`lib/turing/page-rules.ts`), stricter, and a downloaded page carries the same policy as a tag; `fetch_rows` is the code's read, `read_rows` stays direct.
+  - [x] [Founder] The API key: a Default-workspace key, in Vercel's Preview environment (2026-10-24).
+  - [x] [Founder] Pages ship with the risk left (SECURITY.md, _Turing_) — the founder's "merge", 2026-10-24, given the choice of merging without pages.
+  - [ ] [Founder] Vet T1 on staging (merged as #145, 2026-10-24).
+  - Migration (the next free number across every branch): `turing_conversations`, `turing_messages` (the API's content blocks as jsonb, tokens in and out), `turing_files`, `turing_pages` (title, owner, recipe), buckets `turing-files` and `turing-pages`; one policy per command; conversations and files their owner's only, pages shared among admins; revokes per SECURITY.md.
+  - `app/api/turing/route.ts`: POST, streams the reply; `maxDuration` at the plan's ceiling (check Vercel's first). Behind the proxy — not in `PUBLIC_PATHS`.
+  - **Reads**, argument checks pure and tested in `lib/turing/read-rules.ts`: `list_tables`, `describe_table`, `read_rows` (a table or view, its columns, filters `eq neq gt gte lt lte in ilike is`, order, ≤ 500 rows; `fetchAll` for a count or up to 5,000). Names are checked against `lib/turing/schema.generated.ts`, written from `database.types.ts` by `npm run db:types` and pinned by a test, so a new column reaches Turing on the next types run. No embeds (BUGCATCHER #2). The prompt says a cancelled row is still there, with `cancelled_at`.
+  - **Analysis** over thousands of rows runs in Claude's code execution, calling `read_rows` from inside it (programmatic tool calling), so the rows don't pass through the conversation.
+  - **Pages** — `make_page`: Claude writes one self-contained HTML file and the list of reads behind it (the **recipe**). The server runs the recipe and puts the rows into the page as `<script type="application/json" id="turing-data">` — the page never asks our site for anything. Every open re-runs the recipe as the admin opening it: no Claude, no cost. A recipe whose table or column has gone says "this page's data has moved — ask Turing to rebuild it".
+  - **The viewer** `app/(dashboard)/turing/pages/[id]/view/route.ts`, admin only: `sandbox allow-scripts` — Dexter's sandbox **without** the popup flags — plus `default-src 'none'; script-src 'unsafe-inline' <one pinned chart library URL>; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'`. A page holds money and was written partly from what a dropped file said; this is what stops it calling home. A pure test pins the header. Shown in a frame with Reload, Download and Delete.
+  - **Screen** `app/(dashboard)/turing/`: conversations, the chat, the drop zone, the pages list; works on a phone; `loading.tsx`.
+  - Verify: a general question ("draft a polite reminder to a client about a late instalment") answers like Claude; "how many indents wait for approval?" matches Indents; a quotation PDF's total is read right; "a dashboard of this month's bills by villa" opens, its chart responds, and Refresh follows a new bill; a page told to `fetch()` elsewhere is refused (the console names the CSP); a second admin cannot open the first's conversation; the probe cannot open `/turing` or POST to `/api/turing`; with a dud key on Preview, Turing answers in a sentence.
+- [ ] **T2. Claude does things, in every tool** `[Opus — the catalogue and the Save; Sonnet adds entries, Opus vets]` — after Fable's yes to the rule change.
+  - **The catalogue**, `lib/turing/catalogue.ts`: one entry per thing Turing can do — new indent, PO from an indent, labour log, bill, client receipt, Birdwing stay, each Masters entity, and the rest — each with a plain description, the shape of its rows for Claude, how a row becomes the action's fields, and the action itself.
+  - `propose`: Claude names an entry and gives rows; the chat shows them as an editable table — each row new, "looks like <existing>" for Masters (same GSTIN or phone, or a near name), or refused with the reason. Untick, edit, **Save**.
+  - **Save** (`lib/turing/actions.ts`) re-checks the admin, then calls the entry's own action once per row, in order, and shows a result line per row: the record's number and a link to it, or the action's own refusal. Nothing is retried on its own.
+  - The first pull request carries the Save and the most-used entries; the rest follow in small batches, each entry with its field test.
+  - Verify: the photo of a paper indent → a proposed indent → Save → numbered and off for approval like any other; a 20-vendor sheet with two duplicates — both flagged, 18 saved, each with the admin as creator; a proposal the tool refuses shows the tool's own sentence.
+
+## Risks Fable checks
+
+- The rule change above: the exception's edges, and whether `check:boundaries` holds them.
+- Vercel's function ceiling on the current plan against a long page build — streaming keeps the line open, but the ceiling is real.
+- `read_rows` sees all an admin sees. `requireAdmin` in the route and `is_admin()` on the tables keep it from anyone else; it must never be offered behind a grant.
+- A poisoned file: Turing has no web, its pages cannot send anything out, and nothing saves without the admin's press — the worst it can do is a wrong proposal the admin sees before saving.
+- Saved recipes read tables by name, so a renamed column breaks a page's Refresh — it says so, and nothing else reads through Turing.
+
 # Supervisors, rebuilt — the site board and its schedule (proposed 2026-10-22, schedule settled 2026-10-23, waiting for the founder's approval)
 
 ## Why
