@@ -4,6 +4,7 @@
  * `entries/<tool>.ts` and its runners, which call the tool's actions, `runners/<tool>.ts`.
  */
 
+import { BILLS } from "./entries/bills";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -44,7 +45,9 @@ export type IdTable =
   | "issue_requests"
   | "labour_contracts"
   | "labour_contract_lines"
-  | "work_order_templates";
+  | "work_order_templates"
+  | "bills"
+  | "bill_lines";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -77,6 +80,8 @@ const FROM: Record<IdTable, string> = {
   labour_contracts: "labour_contracts (a work order to a contractor)",
   labour_contract_lines: "labour_contract_lines (one work on a work order)",
   work_order_templates: "work_order_templates",
+  bills: "bills (a supplier's or contractor's bill)",
+  bill_lines: "bill_lines (one line on a bill)",
 };
 
 export type Field = {
@@ -151,6 +156,7 @@ export const ENTRIES = [
   ...PURCHASE_ORDERS,
   ...INVENTORY,
   ...WORK_ORDERS,
+  ...BILLS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 

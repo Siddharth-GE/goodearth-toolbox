@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ActionState } from "@/lib/action-state";
+import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { createClient } from "@/lib/supabase/server";
 
 import type { Value } from "../catalogue-fields";
@@ -109,4 +110,28 @@ export async function retired(
 /** The first refusal of checks run side by side, or null. */
 export async function firstRefusal(checks: Promise<Failure | null>[]): Promise<Failure | null> {
   return (await Promise.all(checks)).find((refusal) => refusal !== null) ?? null;
+}
+
+/**
+ * A GST % given must be on the active list, as every screen's picker offers — or the one already
+ * there (`keeps[i]`, the line's own or Masters'), which the screens keep offering after it is retired.
+ */
+export async function gstRefused(
+  pcts: (number | null)[],
+  keeps: (number | null | undefined)[] = [],
+): Promise<Failure | null> {
+  const asked = pcts.filter(
+    (pct, index): pct is number => pct !== null && pct !== (keeps[index] ?? null),
+  );
+  if (asked.length === 0) return null;
+  let rates: number[];
+  try {
+    rates = (await listActiveGstRates()).map((row) => Number(row.rate));
+  } catch (error) {
+    return failed("gst_rates", error);
+  }
+  const off = asked.find((pct) => !rates.includes(pct));
+  return off === undefined
+    ? null
+    : { error: `${off}% is not on the GST list. Pick one of ${rates.join(", ")}.` };
 }
