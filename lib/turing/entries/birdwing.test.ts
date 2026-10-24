@@ -223,3 +223,18 @@ test("room-nights count each room's nights, leaving day not a night", () => {
   );
   assert.equal(roomNights([]), 0);
 });
+
+test("a write-off says why, in its note", () => {
+  const proposal = checkProposal({
+    action: "bw_settle",
+    title: "x",
+    rows: [
+      { label: "a", stay_id: STAY, kind: "write_off" },
+      { label: "b", stay_id: STAY, kind: "write_off", note: "Left without paying" },
+      { label: "c", stay_id: STAY },
+    ],
+  });
+  assert.ok(!proposal.ok);
+  assert.match(proposal.error, /Row 1: Say why it is written off/);
+  assert.doesNotMatch(proposal.error, /Row [23]/);
+});

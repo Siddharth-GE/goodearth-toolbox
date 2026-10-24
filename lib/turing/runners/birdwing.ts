@@ -180,24 +180,20 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     if ("error" in now) return now;
     const refused = detailsRefused(now.row, "A room block has no guest.");
     if (refused) return refused;
-    const guestId = (now.row.guest_id as string | null) ?? null;
-    let guest: Record<string, unknown> = {};
-    if (guestId) {
-      const found = await recordNow(
-        "birdwing_guests",
-        { column: "id", id: guestId },
-        ["name", "phone", "email", "city", "id_type", "id_last4"],
-        "That stay's guest is gone.",
-      );
-      if ("error" in found) return found;
-      guest = { ...found.row, guest_name: found.row.name };
-    } else if (
-      ["guest_name", "phone", "email", "city", "id_type", "id_last4"].some((key) => key in v)
-    ) {
-      // The save skips the guest's own fields when the stay names no guest.
-      return { error: "That stay has no guest record, so only its own check-in details save." };
-    }
-    const form = formOf(entry("bw_checkin"), v, { ...now.row, ...guest });
+    // Every stay that is not a block has a guest (0115).
+    const guestId = String(now.row.guest_id);
+    const guest = await recordNow(
+      "birdwing_guests",
+      { column: "id", id: guestId },
+      ["name", "phone", "email", "city", "id_type", "id_last4"],
+      "That stay's guest is gone.",
+    );
+    if ("error" in guest) return guest;
+    const form = formOf(entry("bw_checkin"), v, {
+      ...now.row,
+      ...guest.row,
+      guest_name: guest.row.name,
+    });
     return saveCheckinDetails(id, guestId, undefined, form);
   },
   bw_room_add: async (v) => {
@@ -271,10 +267,33 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     }
     return addCharge(id, undefined, formOf(entry("bw_charge_add"), values));
   },
-  bw_charge_delete: (v) => deleteCharge(String(v.charge_id)),
+  bw_charge_delete: async (v) => {
+    const id = String(v.charge_id);
+    // The delete changes nothing silently when the charge is already gone.
+    const now = await recordNow(
+      "birdwing_stay_charges",
+      { column: "id", id },
+      ["id"],
+      "That charge is gone.",
+    );
+    if ("error" in now) return now;
+    return deleteCharge(id);
+  },
   bw_invoice_issue: async (v) => {
     const id = String(v.stay_id);
     const values: Values = { ...v };
+    // Issuing again returns the invoice already there, keeping none of this row's details.
+    const supabase = await createClient();
+    const { data: issued, error: issuedError } = await supabase
+      .from("birdwing_invoices")
+      .select("number")
+      .eq("stay_id", id)
+      .eq("status", "issued")
+      .maybeSingle();
+    if (issuedError) return failed("birdwing_invoices", issuedError);
+    if (issued) {
+      return { error: `Invoice ${issued.number} has been issued; cancel it first to issue again.` };
+    }
     if (!text(v, "bill_to_name")) {
       // The form starts with the guest's name.
       const now = await stayNow(id, ["guest_id"]);
@@ -292,7 +311,6 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     }
     const result = await issueInvoice(id, undefined, formOf(entry("bw_invoice_issue"), values));
     if (result?.error) return result;
-    const supabase = await createClient();
     const { data, error } = await supabase
       .from("birdwing_invoices")
       .select("number")
@@ -320,6 +338,9 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     const now = await stayNow(id);
     if ("error" in now) return now;
     if (now.row.is_block) return { error: "A room block takes no money." };
+    // The stay page offers a receipt only once the stay is confirmed.
+    if (now.row.status === "enquiry")
+      return { error: "An enquiry takes no money; confirm it first." };
     return addReceipt(id, undefined, formOf(entry("bw_receipt"), v));
   },
   bw_receipt_cancel: async (v) => {
@@ -353,6 +374,9 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     if (kind === "write_off" && text(v, "cost_centre_id")) {
       return { error: "A write-off goes to no cost centre." };
     }
+    if (kind === "write_off" && !text(v, "note")) {
+      return { error: "Say why it is written off, in the note." };
+    }
     const centre =
       kind === "cross_charge"
         ? (text(v, "cost_centre_id") ?? (now.row.cost_centre_id as string | null))
@@ -384,7 +408,18 @@ export const BIRDWING_RUNNERS: Runners<Key> = {
     if (now.row.cancel_reason) return { error: "That is already cancelled." };
     return cancelSettlement(id, String(v.reason));
   },
-  bw_reviewed: (v) => markReviewed([String(v.stay_id)]),
+  bw_reviewed: async (v) => {
+    const id = String(v.stay_id);
+    const now = await stayNow(id, ["review_flags", "reviewed_at"]);
+    if ("error" in now) return now;
+    // The stay page offers this only on a flagged import nobody has reviewed; a second press would replace who did.
+    const flags = (now.row.review_flags as string[] | null) ?? [];
+    if (now.row.is_block || now.row.status === "cancelled" || flags.length === 0) {
+      return { error: "That stay has nothing to review." };
+    }
+    if (now.row.reviewed_at) return { error: "That stay is already reviewed." };
+    return markReviewed([id]);
+  },
   bw_rate_new: (v) => saveRateCardItem(null, undefined, formOf(entry("bw_rate_new"), v)),
   bw_rate_change: async (v) => {
     const id = String(v.rate_card_id);

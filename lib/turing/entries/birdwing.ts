@@ -352,7 +352,7 @@ export const BIRDWING = defineEntries([
     form: { ...STAYS, reader: "issueInvoice" },
     title: "An invoice, issued",
     description:
-      "Issues a stay's invoice from its charges: the next MEF/GH number, the charges frozen from then on. Made out to bill_to_name (the guest's name if left out), with a GSTIN (15 letters and digits) and address if the guest wants them on it.",
+      "Issues a stay's invoice from its charges: the next MEF/GH number, the charges frozen from then on. Made out to bill_to_name (the guest's name if left out), with a GSTIN (15 letters and digits) and address if the guest wants them on it. Not once the stay has an issued invoice: cancel that one first (bw_invoice_cancel).",
     fields: [
       stay,
       words("bill_to_name", "Made out to", 160),
@@ -387,7 +387,7 @@ export const BIRDWING = defineEntries([
     form: { ...STAYS, reader: "addReceipt" },
     title: "Money received for a stay",
     description:
-      "Records money a guest paid for a stay: the amount, the day it came (today if left out, never later), how (upi if left out; bank, cash, cheque, ota for an OTA's payout, other), the reference and a note. A receipt is never changed; a wrong one is cancelled.",
+      "Records money a guest paid for a stay, once it is confirmed (an enquiry takes none): the amount, the day it came (today if left out, never later), how (upi if left out; bank, cash, cheque, ota for an OTA's payout, other), the reference and a note. A receipt is never changed; a wrong one is cancelled.",
     adds: true,
     fields: [
       stay,
@@ -421,7 +421,7 @@ export const BIRDWING = defineEntries([
     form: { ...STAYS, reader: "addSettlement" },
     title: "A stay's balance, closed",
     description:
-      "Closes what is pending on a stay: a cross_charge to the cost centre that carries a Goodearth stay (the stay's own if left out; an active one), or a write_off with the reason, for a balance that will never be paid. Left out, a Goodearth stay is cross-charged and a guest's written off. The amount is what is pending if left out, never more; the month it counts in (written 2026-10) is the stay's own if left out.",
+      "Closes what is pending on a stay: a cross_charge to the cost centre that carries a Goodearth stay (the stay's own if left out; an active one), or a write_off with why in the note, for a balance that will never be paid. Left out, a Goodearth stay is cross-charged and a guest's written off. The amount is what is pending if left out, never more; the month it counts in (written 2026-10) is the stay's own if left out.",
     adds: true,
     fields: [
       stay,
@@ -438,7 +438,10 @@ export const BIRDWING = defineEntries([
       words("month", "Counts in", 7),
       words("note", "Note", 200),
     ],
-    check: (values) => monthRefused(values, "month"),
+    check: (values) =>
+      values.kind === "write_off" && !filled(values, "note")
+        ? "Say why it is written off, in the note."
+        : monthRefused(values, "month"),
   },
   {
     key: "bw_settle_cancel",
@@ -462,7 +465,7 @@ export const BIRDWING = defineEntries([
     tool: "/birdwing",
     title: "An imported stay, reviewed",
     description:
-      "Marks a stay brought in from the old sheet as reviewed, as Birdwing → Review does, once its figures have been checked.",
+      "Marks a stay brought in from the old sheet with flags to check (review_flags) as reviewed, as Birdwing → Review does, once its figures have been checked. Only one nobody has reviewed yet, and not a cancelled stay or a block.",
     fields: [stay],
   },
   {
