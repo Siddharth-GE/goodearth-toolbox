@@ -4,6 +4,7 @@
  * `entries/<tool>.ts` and its runners, which call the tool's actions, `runners/<tool>.ts`.
  */
 
+import { INDENTS } from "./entries/indents";
 import { MASTERS } from "./entries/masters";
 import { SUPERVISORS } from "./entries/supervisors";
 
@@ -29,7 +30,9 @@ export type IdTable =
   | "uoms"
   | "construction_stages"
   | "progress_stages"
-  | "work_categories";
+  | "work_categories"
+  | "indents"
+  | "indent_lines";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -51,6 +54,8 @@ const FROM: Record<IdTable, string> = {
   construction_stages: "construction_stages",
   progress_stages: "progress_stages (a build stage)",
   work_categories: "work_categories",
+  indents: "indents (a site's request for materials)",
+  indent_lines: "indent_lines (one item on an indent)",
 };
 
 export type Field = {
@@ -74,6 +79,8 @@ export type Field = {
   record?: true;
   /** On a new record, what a field left out starts as, as the tool's own form starts it. */
   start?: Value;
+  /** On an entry with lines: the record's own field, the same on each of its lines. */
+  header?: true;
   /** Longest text taken; 500 unless said. */
   max?: number;
 };
@@ -106,13 +113,15 @@ export type Entry<K extends string = string> = {
   check?: (values: Record<string, Value>) => string | undefined;
   form?: FormSource;
   alike?: Alike;
+  /** A record with lines: one row per line, its `header` fields saying which record (`recordsOf`); `noun` names one ("Indent"). */
+  lines?: { noun: string };
 };
 
 export type Value = string | boolean;
 /** A field missing from `values` was left out: keep what is there. */
 export type Row = { label: string; values: Record<string, Value> };
 
-export const ENTRIES = [...SUPERVISORS, ...MASTERS];
+export const ENTRIES = [...SUPERVISORS, ...MASTERS, ...INDENTS];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
 export const entryFor = (key: unknown): Entry<EntryKey> | undefined =>
@@ -303,6 +312,35 @@ export function editedRows(
   return { ok: true, value: rows.sort((a, b) => a.index - b.index) };
 }
 
+/** Which record a line belongs to: its header fields, together. */
+export const recordKey = (entry: Entry, values: Record<string, Value | null>) =>
+  JSON.stringify(
+    entry.fields.filter((field) => field.header).map((field) => values[field.key] ?? null),
+  );
+
+/**
+ * An entry with lines, as records: rows whose header fields all agree are one record (one indent,
+ * one PO), in the order each first appears. Editing a row's header moves it to another record.
+ */
+export function recordsOf<T extends { row: Row }>(
+  entry: Entry,
+  rows: T[],
+): { header: Record<string, Value>; rows: T[] }[] {
+  const header = entry.fields.filter((field) => field.header);
+  const records = new Map<string, { header: Record<string, Value>; rows: T[] }>();
+  for (const item of rows) {
+    const values = Object.fromEntries(
+      header
+        .filter((field) => field.key in item.row.values)
+        .map((field) => [field.key, item.row.values[field.key]]),
+    );
+    const key = recordKey(entry, item.row.values);
+    if (!records.has(key)) records.set(key, { header: values, rows: [] });
+    records.get(key)?.rows.push(item);
+  }
+  return [...records.values()];
+}
+
 /** Every id the rows name, by the table it points into, for the server to turn into names. */
 export function idsOf(entry: Entry, rows: Row[]): Map<IdTable, Set<string>> {
   const ids = new Map<IdTable, Set<string>>();
@@ -346,7 +384,13 @@ export function catalogueText(): string {
       })
       .join(", ");
     const adds = entry.adds ? " Adds a new record." : "";
-    return `- ${entry.key} — ${entry.title}, in ${entry.tool}.${adds} ${entry.description} Fields: ${fields}.`;
+    const lines = entry.lines
+      ? ` One row per line; rows with the same ${entry.fields
+          .filter((field) => field.header)
+          .map((field) => field.key)
+          .join(", ")} make one record, so give those the same on each of its lines.`
+      : "";
+    return `- ${entry.key} — ${entry.title}, in ${entry.tool}.${adds}${lines} ${entry.description} Fields: ${fields}.`;
   });
   return [
     "An optional field left out keeps what is there now; given as empty it clears it. On an entry that adds a new record, a field left out is blank. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",

@@ -8,6 +8,8 @@ export type SaveResult = {
   row: number;
   ok: boolean;
   message: string;
+  /** What a saved row made, where its tool numbers it: "IND/SAR/0012". */
+  made?: string;
   values?: Record<string, Value>;
   /** Each id the row names, as it read just before the save: a deleted record names nothing after. */
   names?: Record<string, string>;
