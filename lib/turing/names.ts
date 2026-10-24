@@ -1,6 +1,6 @@
 import "server-only";
 
-import { formatDate, formatQuantity } from "@/lib/format";
+import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
@@ -46,6 +46,9 @@ const NAMED_BY: Record<
     | "labour_contract_lines"
     | "bills"
     | "bill_lines"
+    | "client_actions"
+    | "client_payment_milestones"
+    | "client_receipts"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -174,6 +177,38 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const request of requests) {
     add("plots", request.plot_id);
     add("items", request.item_id);
+  }
+
+  const [crmActions, crmStages, crmReceipts] = await Promise.all([
+    readIn(list("client_actions"), (chunk) =>
+      supabase.from("client_actions").select("id, action, status").in("id", chunk),
+    ),
+    readIn(list("client_payment_milestones"), (chunk) =>
+      supabase.from("client_payment_milestones").select("id, stage, due_amount").in("id", chunk),
+    ),
+    readIn(list("client_receipts"), (chunk) =>
+      supabase
+        .from("client_receipts")
+        .select("id, amount, received_on, cancel_reason")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of crmActions) {
+    const words = one.action.length > 60 ? `${one.action.slice(0, 57)}…` : one.action;
+    names[one.id] = `${words} (${one.status.replace(/_/g, " ")})`;
+  }
+  for (const one of crmStages) {
+    const stage = one.stage.replace(/_/g, " ");
+    names[one.id] = one.due_amount === null ? stage : `${stage} · ${formatMoney(one.due_amount)}`;
+  }
+  for (const one of crmReceipts) {
+    names[one.id] = [
+      formatMoney(one.amount),
+      formatDate(one.received_on),
+      one.cancel_reason ? "cancelled" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
