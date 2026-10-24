@@ -33,10 +33,22 @@ export function pageHeaders(download: { fileName: string } | null): Record<strin
   };
 }
 
-/** The rows go in as inert JSON; `<` is escaped so no value can close the script tag. */
-export function pageDocument(html: string, data: Record<string, unknown>): string {
+/** The policy inside the file, for a downloaded copy opened from disk with no header around it. */
+const POLICY_TAG = `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP.split("; ")
+  .filter((directive) => !directive.startsWith("sandbox") && !directive.startsWith("frame-src"))
+  .join("; ")}">`;
+
+/**
+ * The rows go in as inert JSON; `<` is escaped so no value can close the script tag. A download
+ * also carries the policy as a tag, placed first so it governs everything after it.
+ */
+export function pageDocument(
+  html: string,
+  data: Record<string, unknown>,
+  { download = false } = {},
+): string {
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
-  const block = `<script type="application/json" id="turing-data">${json}</script>`;
+  const block = `${download ? POLICY_TAG : ""}<script type="application/json" id="turing-data">${json}</script>`;
   const head = /<head\b[^>]*>/i.exec(html);
   if (head)
     return (

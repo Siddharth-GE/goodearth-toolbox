@@ -33,6 +33,14 @@ test("data goes in after <head>, and no value can close the script", () => {
   assert.ok(pageDocument("<p>no head</p>", {}).startsWith("<script"));
 });
 
+test("a downloaded page carries the policy first, without the header-only parts", () => {
+  const page = pageDocument("<html><head></head></html>", {}, { download: true });
+  assert.ok(page.startsWith('<html><head><meta http-equiv="Content-Security-Policy"'));
+  assert.ok(page.includes("connect-src 'none'"));
+  assert.ok(!page.includes("sandbox"));
+  assert.ok(!pageDocument("<html><head></head></html>", {}).includes("http-equiv"));
+});
+
 test("a page that could reach outside is refused, and says why", () => {
   const cases: [string, string][] = [
     ["<script>fetch('https://x.example')</script>", "fetch()"],

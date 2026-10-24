@@ -22,12 +22,12 @@ test("tables and views are both read, with their row columns only", () => {
 });
 
 test("Turing's own tables are never readable through it", () => {
-  const module = schemaModule({
+  const text = schemaModule({
     indents: { kind: "table", columns: { id: "string" } },
     turing_messages: { kind: "table", columns: { content: "Json" } },
   });
-  assert.ok(module.includes('"indents"'));
-  assert.ok(!module.includes("turing_messages"));
+  assert.ok(text.includes('"indents"'));
+  assert.ok(!text.includes("turing_messages"));
 });
 
 test("a wrapped union joins onto its column", () => {

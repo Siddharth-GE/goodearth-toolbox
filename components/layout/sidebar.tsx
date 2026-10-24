@@ -15,10 +15,10 @@ import { biometricStatus, forgetBiometricSignIn } from "@/lib/native/biometric-s
 import { pushToken, startPush } from "@/lib/native/push";
 import { isInTool, sectionOfPage, type ToolSection } from "@/lib/nav/arrange";
 import { registerPushDevice } from "@/lib/push/actions";
-import { TOOL_ICONS } from "@/lib/tools";
+import { TOOL_ICONS, TURING } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Fingerprint, LayoutGrid, LogOut, Menu, X } from "lucide-react";
+import { Fingerprint, LayoutGrid, LogOut, Menu, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -128,14 +128,17 @@ function Brand() {
 function SidebarContent({
   sections,
   userName,
+  turing,
   pathname,
   onNavigate,
 }: {
   sections: ToolSection[];
   userName: string;
+  turing: boolean;
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const inTuring = isInTool(TURING.href, pathname);
   const current = sectionOfPage(sections, pathname);
 
   return (
@@ -145,6 +148,18 @@ function SidebarContent({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-3">
+        {/* First, above every team, and never under one (founder): admins only, like Settings. */}
+        {turing && (
+          <Link
+            href={TURING.href}
+            onClick={onNavigate}
+            aria-current={inTuring ? "page" : undefined}
+            className={cn(rowBase, "mb-0.5 h-10 text-sm", inTuring ? rowActive : rowIdle)}
+          >
+            <Sparkles className={cn("size-4 shrink-0", inTuring && "text-ground-mark")} />
+            {TURING.name}
+          </Link>
+        )}
         <Link
           href="/"
           onClick={onNavigate}
@@ -203,7 +218,15 @@ function SidebarContent({
 }
 
 /** The dashboard shell's navigation: a sticky desktop rail (the page scrolls, not the rail) and a phone top bar opening the same content in a Radix Dialog drawer. */
-export function Sidebar({ sections, userName }: { sections: ToolSection[]; userName: string }) {
+export function Sidebar({
+  sections,
+  userName,
+  turing,
+}: {
+  sections: ToolSection[];
+  userName: string;
+  turing: boolean;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -219,7 +242,12 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
   return (
     <>
       <aside className="ground-burgundy dark:ground-teal bg-ground text-on-ground sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start md:flex">
-        <SidebarContent sections={sections} userName={userName} pathname={pathname} />
+        <SidebarContent
+          sections={sections}
+          userName={userName}
+          turing={turing}
+          pathname={pathname}
+        />
       </aside>
 
       <header className="ground-burgundy dark:ground-teal bg-ground sticky top-0 z-40 flex items-center gap-2 px-3 py-2.5 md:hidden">
@@ -252,6 +280,7 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
             <SidebarContent
               sections={sections}
               userName={userName}
+              turing={turing}
               pathname={pathname}
               onNavigate={() => setOpen(false)}
             />
