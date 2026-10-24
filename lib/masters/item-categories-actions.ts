@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isItemKind } from "./constants";
+import { deleteMaster } from "./delete-master";
 
 export async function createItemCategory(
   _state: ActionState,
@@ -55,4 +56,14 @@ export async function updateItemCategory(
 
   revalidatePath("/masters/categories");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteItemCategory(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "item_categories", id, {
+    noun: "category",
+    retire: true,
+    paths: ["/masters/categories"],
+  });
 }

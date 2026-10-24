@@ -18,8 +18,11 @@ export default async function BudgetPricingPage({
 }) {
   const { budgetId } = await params;
 
-  const [budget, vendors] = await Promise.all([getBudget(budgetId), listVendorOptions()]);
+  const budget = await getBudget(budgetId);
   if (!budget) notFound();
+  const vendors = await listVendorOptions(
+    budget.spaces.flatMap((space) => space.lines.flatMap((line) => line.expected_vendor_id ?? [])),
+  );
 
   const editable = budget.status === "pricing";
 

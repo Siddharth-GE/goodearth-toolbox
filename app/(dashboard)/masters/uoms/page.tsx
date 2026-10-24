@@ -9,6 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listUomsMaster } from "@/lib/masters/uoms";
+import { deleteUom } from "@/lib/masters/uoms-actions";
+import { MasterDeleteButton } from "../_components/masters-admin";
 import { UomForm, UomNameField, UomToggle } from "./_components/uom-forms";
 
 export default async function UomsPage() {
@@ -49,7 +51,13 @@ export default async function UomsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <UomToggle id={uom.id} isActive={uom.is_active} />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <UomToggle id={uom.id} isActive={uom.is_active} />
+                      <MasterDeleteButton
+                        noun="unit of measure"
+                        onDelete={deleteUom.bind(null, uom.id)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -11,6 +11,7 @@ import {
 import { listProgressStages } from "@/lib/masters/progress-stages";
 import {
   addProgressStage,
+  deleteProgressStage,
   moveProgressStage,
   renameProgressStage,
   setProgressStageActive,
@@ -18,10 +19,12 @@ import {
 import { listConstructionStages } from "@/lib/masters/stages";
 import {
   addConstructionStage,
+  deleteConstructionStage,
   renameConstructionStage,
   setConstructionStageActive,
 } from "@/lib/masters/stages-actions";
 
+import { MasterDeleteButton } from "../_components/masters-admin";
 import { StageForm, StageMove, StageNameField, StageToggle } from "./_components/stage-forms";
 
 /** Two lists, easy to confuse: construction stages are what money is tagged with (0053); build progress is how far a villa has got (0119). */
@@ -73,11 +76,17 @@ export default async function StagesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <StageToggle
-                      id={stage.id}
-                      isActive={stage.is_active}
-                      setActive={setConstructionStageActive}
-                    />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StageToggle
+                        id={stage.id}
+                        isActive={stage.is_active}
+                        setActive={setConstructionStageActive}
+                      />
+                      <MasterDeleteButton
+                        noun="stage"
+                        onDelete={deleteConstructionStage.bind(null, stage.id)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -138,11 +147,17 @@ export default async function StagesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <StageToggle
-                      id={stage.id}
-                      isActive={stage.is_active}
-                      setActive={setProgressStageActive}
-                    />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StageToggle
+                        id={stage.id}
+                        isActive={stage.is_active}
+                        setActive={setProgressStageActive}
+                      />
+                      <MasterDeleteButton
+                        noun="build stage"
+                        onDelete={deleteProgressStage.bind(null, stage.id)}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

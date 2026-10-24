@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isTermsKind } from "./constants";
+import { deleteMaster } from "./delete-master";
 
 function readTermsForm(formData: FormData) {
   return {
@@ -118,4 +119,14 @@ export async function updateTerms(
   const result = form.is_default ? await makeDefault(id, form.kind, user.id) : undefined;
   revalidatePath("/masters/terms");
   return result;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteTerms(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "document_terms", id, {
+    noun: "terms template",
+    retire: true,
+    paths: ["/masters/terms"],
+  });
 }

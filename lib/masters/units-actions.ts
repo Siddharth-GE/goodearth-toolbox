@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { UnitStatus, UnitType } from "./units";
+import { deleteMaster } from "./delete-master";
 
 const UNIT_TYPES = ["apartment", "villa", "duplex_row_house"];
 const UNIT_STATUSES = ["available", "reserved", "sold"];
@@ -95,4 +96,14 @@ export async function updateUnit(
 
   revalidatePath("/masters/units");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150). */
+export async function deleteUnit(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "units", id, {
+    noun: "unit",
+    retire: false,
+    paths: ["/masters/units"],
+  });
 }

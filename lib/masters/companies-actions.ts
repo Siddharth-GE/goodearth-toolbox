@@ -5,6 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 import { checked, optionalText, rawText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 // GSTIN shape, loose on purpose: catches a pasted PAN or a missing character; the checksum is the tax portal's job.
 const GSTIN_SHAPE = /^[0-9]{2}[A-Z0-9]{13}$/;
@@ -81,4 +82,14 @@ export async function updateCompany(
 
   refresh();
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteCompany(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "companies", id, {
+    noun: "company",
+    retire: true,
+    paths: ["/masters/companies", "/masters/projects"],
+  });
 }
