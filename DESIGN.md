@@ -79,7 +79,7 @@ The **Section Label** is the one label style — sidebar groups, table headers, 
 
 - Controls: `rounded-xl`, `h-11` for full-size fields, `h-8`/`h-10`/`h-12` for buttons.
 - Cards, tables, the figure band, empty states: `rounded-2xl`. Dialogs `rounded-3xl`; menus `rounded-xl`; icon chips `rounded-lg`/`rounded-xl`; pills and avatars `rounded-full` (a button is never a pill).
-- Page: `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10` (`app/(dashboard)/layout.tsx`). Rhythm: `space-y-4` on most screens and in forms, `space-y-8` between the home page's blocks, `space-y-2`/`2.5` between list rows.
+- Page: `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10` (`app/(dashboard)/layout.tsx`). A full-height workspace — Turing, the one so far — marks its root `data-bleed`, which lifts that padding and width on a computer only. Rhythm: `space-y-4` on most screens and in forms, `space-y-8` between the home page's blocks, `space-y-2`/`2.5` between list rows.
 - Card padding `p-5`; a ground band (welcome, team page) `p-6 md:p-10`; an empty state `p-10`.
 
 ## Material — flat and solid
