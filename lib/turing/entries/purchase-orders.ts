@@ -1,6 +1,56 @@
 /** Purchase orders: bought from approved indents' lines, through Purchase Orders' own saves. */
-import type { Field } from "../catalogue-fields";
+import type { Field, Value } from "../catalogue-fields";
 import { defineEntries } from "./define";
+
+type Values = Record<string, Value>;
+const priceOf = (values: Values, key: string) =>
+  typeof values[key] === "string" && values[key] !== "" ? Number(values[key]) : null;
+
+/** Quantities to six places, as Purchase Orders' left-to-buy is, so 0.1 + 0.2 is 0.3. */
+export const roundQuantity = (quantity: number) => Math.round(quantity * 1e6) / 1e6;
+
+export type PoolPick = {
+  indentLineId: string;
+  quantity: number;
+  /** null: not given, so the pool add's own value stands (no rate; Masters' GST). */
+  rate: number | null;
+  gstPct: number | null;
+};
+
+/** A bulk PO's rows, one pick per indent line: quantities added, one rate and one GST % each. */
+export function poolPicks(lines: Values[]): { picks: PoolPick[] } | { error: string } {
+  const picks = new Map<string, PoolPick>();
+  for (const line of lines) {
+    const id = String(line.indent_line_id);
+    const pick = picks.get(id) ?? { indentLineId: id, quantity: 0, rate: null, gstPct: null };
+    pick.quantity = roundQuantity(pick.quantity + Number(line.quantity));
+    for (const [key, field, label] of [
+      ["rate", "rate", "rates"],
+      ["gst_pct", "gstPct", "GST %s"],
+    ] as const) {
+      const price = priceOf(line, key);
+      if (price === null) continue;
+      if (pick[field] !== null && pick[field] !== price) {
+        return {
+          error: `One indent line is given two ${label}, ${pick[field]} and ${price}. Give it one.`,
+        };
+      }
+      pick[field] = price;
+    }
+    picks.set(id, pick);
+  }
+  return { picks: [...picks.values()] };
+}
+
+/** A discount is a percentage or rupees: one given clears the other, as the screen's switch does. */
+export function withDiscountSwitch(values: Values): { values: Values } | { error: string } {
+  const pct = priceOf(values, "discount_pct") !== null;
+  const rupees = priceOf(values, "discount_amount") !== null;
+  if (pct && rupees) return { error: "A discount is a percentage or rupees, not both." };
+  if (pct) return { values: { ...values, discount_amount: "" } };
+  if (rupees) return { values: { ...values, discount_pct: "" } };
+  return { values };
+}
 
 const po: Field = { key: "po_id", label: "PO", kind: "id", table: "purchase_orders", record: true };
 const poLine: Field = {
@@ -21,7 +71,7 @@ const rate: Field = { key: "rate", label: "Rate", kind: "amount", optional: true
 const gst: Field = { key: "gst_pct", label: "GST %", kind: "amount", optional: true };
 
 const PRICES =
-  "Rate is per unit before GST, in rupees; GST % is one of the active gst_rates. Either may be left for later, but every line needs both before the PO can be issued.";
+  "Rate is per unit before GST, in rupees; GST % is one of the active gst_rates, and left out it takes the item's own from Masters where it has one. A rate may be left for later, but every line needs both before the PO can be issued.";
 
 export const PURCHASE_ORDERS = defineEntries([
   {
@@ -44,7 +94,7 @@ export const PURCHASE_ORDERS = defineEntries([
     key: "po_general",
     tool: "/purchase-orders",
     title: "A PO gathering several indents",
-    description: `A bulk buy: one draft PO to one vendor, gathering lines from approved indents across villas (a general PO, plot_id left out), or for one villa. One row per indent line; rows with the same header are one PO, made with the default terms. ${PRICES}`,
+    description: `A bulk buy: one draft PO to one vendor, gathering lines from approved indents across the project's villas (a general PO, plot_id left out), or from one villa's own indents. One row per indent line; rows with the same header are one PO, made with the default terms. ${PRICES}`,
     adds: true,
     lines: { noun: "PO" },
     fields: [
@@ -102,7 +152,7 @@ export const PURCHASE_ORDERS = defineEntries([
     tool: "/purchase-orders",
     title: "A draft PO's charges",
     description:
-      "Freight, loading and the like on a draft PO: an amount in rupees above 0 with its GST % (0 to 100) and a note. An empty amount removes the charges.",
+      "Freight, loading and the like on a draft PO: an amount in rupees above 0 with its GST % (one of the active gst_rates; new charges start at 18) and a note. An empty amount removes the charges.",
     fields: [
       po,
       { key: "amount", label: "Amount", kind: "amount", optional: true },
@@ -114,7 +164,8 @@ export const PURCHASE_ORDERS = defineEntries([
     key: "po_line_change",
     tool: "/purchase-orders",
     title: "A PO line, changed",
-    description: `Changes a line on a draft PO (purchase_order_lines.id): quantity (not above what is left on its indent line), rate, GST %, a discount as a percentage OR in rupees (never both), other charges in rupees, note. ${PRICES}`,
+    description:
+      "Changes a line on a draft PO (purchase_order_lines.id): quantity (not above what is left on its indent line), rate per unit before GST in rupees, GST % (one of the active gst_rates), a discount as a percentage OR in rupees (never both), other charges in rupees, note. Each field left out keeps what the line has now, so a line with no GST % keeps none; every line needs a rate and GST % before the PO can be issued.",
     fields: [
       poLine,
       { ...quantity, optional: true, keep: true },
@@ -154,7 +205,7 @@ export const PURCHASE_ORDERS = defineEntries([
     tool: "/purchase-orders",
     title: "A PO's cancellation, asked for",
     description:
-      "Asks for an issued PO to be cancelled, with the reason; an admin's yes on the PO's own screen cancels it. Refused once its goods are received.",
+      "Asks for an issued PO to be cancelled, with the reason; an admin's yes on the PO's own screen cancels it.",
     fields: [po, { key: "reason", label: "Why", kind: "text" }],
   },
   {
