@@ -106,6 +106,15 @@ async function linesOf(rows: Values[]): Promise<Line[] | { error: string }> {
   return (await unitRefused(lines, bookUnits(book))) ?? lines;
 }
 
+/** Works' names, retired or not. */
+async function namesOf(ids: string[]): Promise<Map<string, string> | { error: string }> {
+  if (ids.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("work_items").select("id, name").in("id", ids);
+  if (error) return failed("work_items", error);
+  return new Map(data.map((one) => [one.id, one.name]));
+}
+
 /** A work's rate-book unit, which picking it on screen fills in even after it is retired. */
 const bookUnits = (book: Map<string, BookWork>) => [...book.values()].map((one) => one.uom);
 
@@ -281,6 +290,13 @@ export const WORK_ORDER_RUNNERS: Runners<Key> = {
         rows.flatMap((row) => (text(row, "work_item_id") ? [String(row.work_item_id)] : [])),
       );
       if ("error" in book) return book;
+      // The names of works being re-picked away from, so a description still saying one follows the new work.
+      const oldNames = await namesOf(
+        now.lines.flatMap((line) =>
+          line.workItemId && text(byId.get(line.id) ?? {}, "work_item_id") ? [line.workItemId] : [],
+        ),
+      );
+      if ("error" in oldNames) return oldNames;
 
       const lines: Line[] = [];
       const changed: Line[] = [];
@@ -296,17 +312,24 @@ export const WORK_ORDER_RUNNERS: Runners<Key> = {
         // Another work picked fills the line as the editor's pickWork does.
         const pickedId = text(row, "work_item_id");
         const picked = pickedId ? book.get(pickedId) : undefined;
-        const base =
-          picked && pickedId !== line.workItemId
-            ? {
-                ...bare(line),
-                workItemId: pickedId,
-                description: picked.name,
-                uom: picked.uom ?? line.uom,
-                rate: picked.labour_rate ?? line.rate,
-              }
-            : bare(line);
-        const next = workLineOf(row, undefined, base);
+        const repicked = picked && pickedId !== line.workItemId ? picked : undefined;
+        const ownWords =
+          line.description.trim() !== "" &&
+          line.description !== (line.workItemId ? oldNames.get(line.workItemId) : undefined);
+        const base = repicked
+          ? {
+              ...bare(line),
+              workItemId: pickedId,
+              description: ownWords ? line.description : repicked.name,
+              uom: repicked.uom ?? line.uom,
+              rate: repicked.labour_rate ?? line.rate,
+            }
+          : bare(line);
+        const next = workLineOf(row, repicked, base);
+        // A lump sum keeps no quantity or unit, so one given to it would be dropped unsaid.
+        if (next.isLumpSum && (text(row, "quantity") || text(row, "uom"))) {
+          return { error: "A lump sum has no quantity or unit: its rate is the whole amount." };
+        }
         lines.push(next);
         changed.push(next);
       }
