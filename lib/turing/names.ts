@@ -49,6 +49,13 @@ const NAMED_BY: Record<
     | "client_actions"
     | "client_payment_milestones"
     | "client_receipts"
+    | "birdwing_stays"
+    | "birdwing_stay_rooms"
+    | "birdwing_stay_charges"
+    | "birdwing_invoices"
+    | "birdwing_receipts"
+    | "birdwing_cross_charges"
+    | "birdwing_rate_card"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -70,6 +77,8 @@ const NAMED_BY: Record<
   uoms: "name",
   construction_stages: "name",
   progress_stages: "name",
+  birdwing_guests: "name",
+  birdwing_cost_centres: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -216,6 +225,54 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     if (villa.client_id) add("clients", villa.client_id);
   }
 
+  // A Birdwing record by its stay; a stay by its number, guest and nights.
+  const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
+    readIn(list("birdwing_stay_rooms"), (chunk) =>
+      supabase
+        .from("birdwing_stay_rooms")
+        .select("id, stay_id, room_id, from_date, to_date, released_at")
+        .in("id", chunk),
+    ),
+    readIn(list("birdwing_stay_charges"), (chunk) =>
+      supabase.from("birdwing_stay_charges").select("id, stay_id, head, qty, rate").in("id", chunk),
+    ),
+    readIn(list("birdwing_receipts"), (chunk) =>
+      supabase
+        .from("birdwing_receipts")
+        .select("id, stay_id, amount, received_on, cancel_reason")
+        .in("id", chunk),
+    ),
+    readIn(list("birdwing_cross_charges"), (chunk) =>
+      supabase
+        .from("birdwing_cross_charges")
+        .select("id, stay_id, kind, amount, cancel_reason")
+        .in("id", chunk),
+    ),
+    readIn(list("birdwing_invoices"), (chunk) =>
+      supabase.from("birdwing_invoices").select("id, stay_id, number, status").in("id", chunk),
+    ),
+    readIn(list("birdwing_rate_card"), (chunk) =>
+      supabase
+        .from("birdwing_rate_card")
+        .select("id, head, default_rate, gst_pct, is_active")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of [...bwRooms, ...bwCharges, ...bwReceipts, ...bwSettlements, ...bwInvoices])
+    add("birdwing_stays", one.stay_id);
+  const [stays, rooms] = await Promise.all([
+    readIn(list("birdwing_stays"), (chunk) =>
+      supabase
+        .from("birdwing_stays")
+        .select("id, ref, guest_id, arrival, departure, status, is_block")
+        .in("id", chunk),
+    ),
+    readIn([...new Set(bwRooms.map((one) => one.room_id))], (chunk) =>
+      supabase.from("birdwing_rooms").select("id, code").in("id", chunk),
+    ),
+  ]);
+  for (const one of stays) if (one.guest_id) add("birdwing_guests", one.guest_id);
+
   const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
     readIn(list("profiles"), (chunk) =>
       supabase.from("profiles").select("id, full_name").in("id", chunk),
@@ -285,6 +342,57 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       }
     }),
   );
+  const stayOf = new Map(
+    stays.map((one) => [
+      one.id,
+      [one.ref, one.is_block ? "Room block" : names[one.guest_id ?? ""]]
+        .filter(Boolean)
+        .join(" · "),
+    ]),
+  );
+  const nights = (from: string, to: string) => `${formatDate(from)} – ${formatDate(to)}`;
+  for (const one of stays)
+    names[one.id] =
+      `${stayOf.get(one.id)} · ${nights(one.arrival, one.departure)} (${one.status.replace(/_/g, " ")})`;
+  const codeOf = new Map(rooms.map((one) => [one.id, one.code]));
+  for (const one of bwRooms)
+    names[one.id] = [
+      stayOf.get(one.stay_id),
+      codeOf.get(one.room_id),
+      nights(one.from_date, one.to_date),
+      one.released_at ? "released" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of bwCharges)
+    names[one.id] = [
+      stayOf.get(one.stay_id),
+      one.head,
+      `${formatQuantity(one.qty)} × ${formatMoney(one.rate)}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of [...bwReceipts, ...bwSettlements])
+    names[one.id] = [
+      stayOf.get(one.stay_id),
+      formatMoney(one.amount),
+      "received_on" in one
+        ? formatDate(one.received_on)
+        : one.kind === "write_off"
+          ? "written off"
+          : "cross-charged",
+      one.cancel_reason ? "cancelled" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of bwInvoices)
+    names[one.id] = [stayOf.get(one.stay_id), `${one.number ?? "Invoice"} (${one.status})`]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of bwHeads)
+    names[one.id] =
+      `${one.head} · ${formatMoney(one.default_rate)} + ${one.gst_pct}% GST${one.is_active ? "" : " (switched off)"}`;
+
   const whose = (engagementId: string) => {
     const villa = plotOfEngagement.get(engagementId);
     return villa ? [names[villa.plot_id ?? ""], names[villa.client_id ?? ""]] : [];
