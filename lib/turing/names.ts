@@ -1,9 +1,11 @@
 import "server-only";
 
 import { formatDate, formatQuantity } from "@/lib/format";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-import type { IdTable } from "./catalogue-fields";
+import type { Entry, IdTable, Row } from "./catalogue-fields";
+import { lookAlikes, type Known } from "./look-alike";
 
 /** Ids per read: a conversation's labour logs can run to hundreds, and each id lengthens the URL. */
 const CHUNK = 100;
@@ -25,6 +27,30 @@ async function readIn<T>(
   }
   return rows;
 }
+
+/** How each table's records read to the admin: a plot by its code, a work by code and name. */
+const NAMED_BY: Record<
+  Exclude<IdTable, "profiles" | "labour_logs">,
+  "name" | "code name" | "code or name"
+> = {
+  plots: "code or name",
+  projects: "code or name",
+  units: "code or name",
+  work_groups: "code name",
+  work_items: "code name",
+  work_categories: "code name",
+  items: "name",
+  vendors: "name",
+  brands: "name",
+  item_categories: "name",
+  clients: "name",
+  companies: "name",
+  stores: "name",
+  document_terms: "name",
+  uoms: "name",
+  construction_stages: "name",
+  progress_stages: "name",
+};
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
 function labourSummary(log: {
@@ -77,26 +103,28 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("vendors", log.contractor_id);
   }
 
-  const [plots, groups, works, people, vendors] = await Promise.all([
-    readIn(list("plots"), (chunk) =>
-      supabase.from("plots").select("id, code, name").in("id", chunk),
-    ),
-    readIn(list("work_groups"), (chunk) =>
-      supabase.from("work_groups").select("id, code, name").in("id", chunk),
-    ),
-    readIn(list("work_items"), (chunk) =>
-      supabase.from("work_items").select("id, code, name").in("id", chunk),
-    ),
-    readIn(list("profiles"), (chunk) =>
-      supabase.from("profiles").select("id, full_name").in("id", chunk),
-    ),
-    readIn(list("vendors"), (chunk) => supabase.from("vendors").select("id, name").in("id", chunk)),
-  ]);
-  for (const plot of plots) names[plot.id] = plot.code || plot.name;
-  for (const group of groups) names[group.id] = `${group.code} ${group.name}`;
-  for (const work of works) names[work.id] = `${work.code} ${work.name}`;
+  const people = await readIn(list("profiles"), (chunk) =>
+    supabase.from("profiles").select("id, full_name").in("id", chunk),
+  );
   for (const person of people) names[person.id] = person.full_name || "A person";
-  for (const vendor of vendors) names[vendor.id] = vendor.name;
+  await Promise.all(
+    (Object.keys(NAMED_BY) as (keyof typeof NAMED_BY)[]).map(async (table) => {
+      const rows = await readIn(list(table), (chunk) =>
+        supabase
+          .from(table as "plots")
+          .select(NAMED_BY[table] === "name" ? "id, name" : "id, code, name")
+          .in("id", chunk),
+      );
+      for (const row of rows as unknown as { id: string; name: string; code?: string | null }[]) {
+        names[row.id] =
+          NAMED_BY[table] === "code name"
+            ? `${row.code} ${row.name}`
+            : NAMED_BY[table] === "code or name"
+              ? row.code || row.name
+              : row.name;
+      }
+    }),
+  );
   for (const log of logs) {
     names[log.id] = [
       formatDate(log.log_date),
@@ -109,4 +137,37 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       .join(" · ");
   }
   return names;
+}
+
+/**
+ * For an entry that adds a Masters record: each row's warning that it may already be there, read
+ * against the whole table as the admin. Undefined for any other entry.
+ */
+export async function alikeFor(entry: Entry, rows: Row[]): Promise<(string | null)[] | undefined> {
+  const alike = entry.alike;
+  if (!entry.adds || !alike) return undefined;
+  const columns = ["name", alike.tax, alike.phone, alike.code].filter((column): column is string =>
+    Boolean(column),
+  );
+  const supabase = await createClient();
+  const existing = await fetchAll((from, to) =>
+    supabase
+      .from(alike.table as "vendors")
+      .select(["id", ...columns].join(", "))
+      .order("id")
+      .range(from, to),
+  );
+  const known = (record: Record<string, unknown>): Known => {
+    const text = (column?: string) => (column && record[column] ? String(record[column]) : null);
+    return {
+      name: String(record.name ?? ""),
+      tax: text(alike.tax),
+      phone: text(alike.phone),
+      code: text(alike.code),
+    };
+  };
+  return lookAlikes(
+    rows.map((row) => known(row.values)),
+    (existing as unknown as Record<string, unknown>[]).map(known),
+  );
 }

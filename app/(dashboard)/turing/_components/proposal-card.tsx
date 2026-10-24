@@ -40,20 +40,37 @@ function FieldInput({
   value: Value | undefined;
   adds: boolean;
   disabled: boolean;
-  onChange: (value: Value) => void;
+  /** null puts the field back to "Keep as is". */
+  onChange: (value: Value | null) => void;
 }) {
   const kept = value === undefined && !adds;
   let input;
   switch (field.kind) {
     case "yesno":
-      input = (
-        <Checkbox
-          aria-label={field.label}
-          checked={value === true}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-      );
+      // A change's box left out keeps what is there, which an unticked box would read as "no".
+      input =
+        field.optional && !adds ? (
+          <Select
+            aria-label={field.label}
+            value={value === undefined ? "" : value === true ? "yes" : "no"}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange(event.target.value === "" ? null : event.target.value === "yes")
+            }
+            className="h-9 min-w-28"
+          >
+            <option value="">Keep as is</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </Select>
+        ) : (
+          <Checkbox
+            aria-label={field.label}
+            checked={value === true}
+            disabled={disabled}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+        );
       break;
     case "choice":
       input = (
@@ -143,8 +160,13 @@ export function ProposalCard({
 }) {
   const router = useRouter();
   const entry = entryFor(proposal.action);
-  const [ticked, setTicked] = useState(() => proposal.rows.map(() => true));
-  const [values, setValues] = useState(() => proposal.rows.map((row) => ({ ...row.values })));
+  // A row that may already exist starts unticked: saving it is the admin's choice.
+  const [ticked, setTicked] = useState(() =>
+    proposal.rows.map((_, index) => !proposal.alike?.[index]),
+  );
+  const [values, setValues] = useState(() =>
+    proposal.rows.map((row): Record<string, Value | null> => ({ ...row.values })),
+  );
   const { pending, error, run } = useActionRunner();
   if (!entry) return null;
 
@@ -241,12 +263,24 @@ export function ProposalCard({
                 />
               </TableCell>
               <TableCell className="min-w-48 text-sm">
+                {/* A new record is named by its label; what it sits under (its project, its category) follows. */}
+                {(entry.adds || about.length === 0) && (
+                  <span className="font-medium">{row.label}</span>
+                )}
                 {about.map((field, at) => (
-                  <span key={field.key} className={at === 0 ? "font-medium" : undefined}>
-                    {at > 0 && " · "}
+                  <span
+                    key={field.key}
+                    className={at === 0 && !entry.adds ? "font-medium" : undefined}
+                  >
+                    {(at > 0 || entry.adds) && " · "}
                     {nameOf(field, index)}
                   </span>
                 ))}
+                {saved === null && proposal.alike?.[index] && (
+                  <div className="mt-1">
+                    <Pill tone="warning">{proposal.alike[index]}</Pill>
+                  </div>
+                )}
                 {/* The result sits under what it is about, never in a column off the edge. */}
                 {saved?.results && (
                   <div className="mt-1">
@@ -263,7 +297,7 @@ export function ProposalCard({
                 <TableCell key={field.key}>
                   <FieldInput
                     field={field}
-                    value={shown(index)[field.key]}
+                    value={shown(index)[field.key] ?? undefined}
                     adds={entry.adds === true}
                     disabled={locked || !ticked[index]}
                     onChange={(value) =>

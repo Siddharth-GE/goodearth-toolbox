@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -9,9 +9,8 @@ import {
   entryFor,
   ENTRIES,
   idsOf,
-  LABOUR_LOG_FORM,
-  labourConflict,
 } from "./catalogue-fields";
+import { LABOUR_LOG_FORM, labourConflict } from "./entries/supervisors";
 
 const PLOT = "11111111-1111-4111-8111-111111111111";
 const GROUP = "22222222-2222-4222-8222-222222222222";
@@ -140,7 +139,9 @@ test("the labour form Turing sends is the one Supervisors reads", () => {
 });
 
 test("Turing never presses a Settings save (SECURITY.md, Turing)", () => {
-  assert.doesNotMatch(readFileSync("lib/turing/catalogue.ts", "utf8"), /@\/lib\/settings\//);
+  const runners = readdirSync("lib/turing/runners").map((file) => `lib/turing/runners/${file}`);
+  for (const file of ["lib/turing/catalogue.ts", ...runners])
+    assert.doesNotMatch(readFileSync(file, "utf8"), /@\/lib\/settings\//);
   assert.equal(
     ENTRIES.some((entry) => entry.tool === "/settings"),
     false,

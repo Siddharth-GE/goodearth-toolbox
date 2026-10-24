@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { checkProposal, idsOf } from "./catalogue-fields";
 import { pageToken, proposalToken, type ShownProposal } from "./display";
-import { namesFor } from "./names";
+import { alikeFor, namesFor } from "./names";
 import { pageTripwire } from "./page-rules";
 import { BULK_LIMIT, checkRead, checkRecipe, DIRECT_LIMIT, type RecipeRead } from "./read-rules";
 import { runRead } from "./reads";
@@ -138,10 +138,20 @@ export async function runTool(
       if (unknown.length > 0) {
         return fail(`These ids name nothing: ${unknown.slice(0, 10).join(", ")}. Read them again.`);
       }
+      let alike: (string | null)[] | undefined;
+      try {
+        alike = await alikeFor(entry, rows);
+      } catch (thrown) {
+        // The warning is a help, not a gate: the proposal still shows without it.
+        console.error("turing: look-alikes not read:", thrown);
+      }
+      const flagged = (alike ?? [])
+        .map((why, index) => (why ? `row ${index + 1} (${rows[index].label}): ${why}` : ""))
+        .filter(Boolean);
       return {
-        content: `Shown to the admin as "${title}", ${rows.length} row${rows.length === 1 ? "" : "s"} of ${entry.title.toLowerCase()} ${proposalToken(callId)}. Nothing is saved until they press Save; you are told what was saved at the start of their next message.`,
+        content: `Shown to the admin as "${title}", ${rows.length} row${rows.length === 1 ? "" : "s"} of ${entry.title.toLowerCase()} ${proposalToken(callId)}.${flagged.length > 0 ? ` These may already exist, so they start unticked: ${flagged.slice(0, 20).join("; ")}.` : ""} Nothing is saved until they press Save; you are told what was saved at the start of their next message.`,
         isError: false,
-        proposal: { id: callId, action: entry.key, title, rows, saved: null, names },
+        proposal: { id: callId, action: entry.key, title, rows, saved: null, names, alike },
       };
     }
     default:
