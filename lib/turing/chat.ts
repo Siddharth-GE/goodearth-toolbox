@@ -110,23 +110,38 @@ async function savesToReport(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("turing_saves")
-    .select("id, tool_use_id, results")
+    .select("id, tool_use_id, results, created_at")
     .eq("conversation_id", conversationId)
-    .eq("reported", false)
-    .not("results", "is", null);
+    .eq("reported", false);
   if (error) {
     console.error("turing: saves to report not read:", error);
     return null;
   }
-  if (!data || data.length === 0) return null;
+  // A save still running is left for next time; one cut off mid-way is told as such.
+  const interruptedBefore = Date.now() - 360_000;
+  const due = (data ?? []).filter(
+    (save) => save.results !== null || Date.parse(save.created_at) < interruptedBefore,
+  );
+  if (due.length === 0) return null;
   const proposals = shownProposals(stored);
-  const parts = data.map((save) => {
+  const parts = due.map((save) => {
     const proposal = proposals.get(save.tool_use_id);
-    const results = (save.results ?? []) as unknown as SaveResult[];
+    if (save.results === null) {
+      return `"${proposal?.title ?? "a proposal"}" — the save was cut off part-way, so some rows may have landed; read before proposing again`;
+    }
+    const results = save.results as unknown as SaveResult[];
     const rows = results
       .map((result) => {
-        const label = proposal?.rows[result.row]?.label ?? `row ${result.row + 1}`;
-        return result.ok ? `${label}: saved` : `${label}: refused — ${result.message}`;
+        const original = proposal?.rows[result.row];
+        const label = original?.label ?? `row ${result.row + 1}`;
+        if (!result.ok) return `${label}: refused — ${result.message}`;
+        // The admin may have changed what Claude proposed before saving.
+        const changed = Object.entries(result.values ?? {})
+          .filter(([key, value]) => original?.values[key] !== value)
+          .map(([key, value]) => `${key} ${value === "" ? "cleared" : String(value)}`);
+        return changed.length > 0
+          ? `${label}: saved with ${changed.join(", ")}`
+          : `${label}: saved`;
       })
       .join("; ");
     const left = (proposal?.rows.length ?? results.length) - results.length;
@@ -134,7 +149,7 @@ async function savesToReport(
   });
   return {
     line: `${CONTEXT_PREFIX}Since your last answer the admin pressed Save on: ${parts.join(". ")}.</context>`,
-    ids: data.map((save) => save.id),
+    ids: due.map((save) => save.id),
   };
 }
 

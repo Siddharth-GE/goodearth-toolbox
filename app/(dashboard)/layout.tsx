@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     // Column on phones, row from md up. The page body is the one scroll container;
     // min-w-0 keeps a wide table scrolling in place.
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-[calc(100dvh-var(--banner-h))] flex-col md:flex-row">
       <Sidebar
         sections={sections}
         userName={user.profile?.full_name || user.email}

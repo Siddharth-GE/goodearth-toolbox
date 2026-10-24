@@ -66,10 +66,7 @@ export function TuringShell({
   children: ReactNode;
 }) {
   return (
-    <div
-      data-bleed
-      className="space-y-6 md:flex md:h-[calc(100dvh-2rem)] md:space-y-0 md:in-data-[site=production]:h-dvh"
-    >
+    <div data-bleed className="space-y-6 md:flex md:h-[calc(100dvh-var(--banner-h))] md:space-y-0">
       <div className="space-y-4 md:hidden">
         <PageTitle
           title="Turing"

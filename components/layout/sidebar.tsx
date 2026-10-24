@@ -241,7 +241,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="ground-burgundy dark:ground-teal bg-ground text-on-ground sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start md:flex">
+      <aside className="ground-burgundy dark:ground-teal bg-ground text-on-ground sticky top-(--banner-h) hidden h-[calc(100dvh-var(--banner-h))] w-64 shrink-0 flex-col self-start md:flex">
         <SidebarContent
           sections={sections}
           userName={userName}

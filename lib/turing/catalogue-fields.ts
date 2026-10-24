@@ -6,19 +6,43 @@
 
 export type FieldKind = "id" | "date" | "whole" | "text" | "choice" | "yesno";
 
+/** Where an id points; the server turns each into a name the admin can check. */
+export type IdTable = "plots" | "work_groups" | "profiles" | "vendors";
+
+const FROM: Record<IdTable, string> = {
+  plots: "plots (the villa's plot)",
+  work_groups: "work_groups (a stage of the site sequence)",
+  profiles: "profiles (a person)",
+  vendors: "vendors (a contractor)",
+};
+
 export type Field = {
   key: string;
   label: string;
   kind: FieldKind;
-  /** Empty is allowed, and means "clear it" or "leave it to the default", as the tool's own screen does. */
+  /**
+   * May be left out or empty. Left out keeps what is there now; empty clears it (or goes back to
+   * the default), as the tool's own screen does.
+   */
   optional?: true;
   choices?: readonly string[];
-  /** Where an id comes from, for Claude. */
-  from?: string;
+  table?: IdTable;
 };
 
+export type EntryKey =
+  | "villa_start"
+  | "villa_supervisor"
+  | "first_plan"
+  | "stage_plan"
+  | "stage_dates"
+  | "stage_status"
+  | "stage_contractor"
+  | "stage_needed"
+  | "stage_follows"
+  | "sequence_days";
+
 export type Entry = {
-  key: string;
+  key: EntryKey;
   /** The tool whose save this is; its grant is checked by its own action. */
   tool: string;
   title: string;
@@ -27,44 +51,28 @@ export type Entry = {
 };
 
 export type Value = string | boolean;
+/** A field missing from `values` was left out: keep what is there. */
 export type Row = { label: string; values: Record<string, Value> };
 
-const plot: Field = {
-  key: "plot_id",
-  label: "Villa",
-  kind: "id",
-  from: "plots (the villa's plot)",
-};
-const stage: Field = {
-  key: "group_id",
-  label: "Stage",
-  kind: "id",
-  from: "work_groups (a stage of the site sequence)",
-};
+const plot: Field = { key: "plot_id", label: "Villa", kind: "id", table: "plots" };
+const stage: Field = { key: "group_id", label: "Stage", kind: "id", table: "work_groups" };
 
 export const ENTRIES: Entry[] = [
   {
     key: "villa_start",
     tool: "/supervisors",
     title: "A villa's start date",
-    description:
-      "The day the villa's first stage starts; the schedule works out the rest. Empty clears it.",
+    description: "The day the villa's first stage starts; the schedule works out the rest.",
     fields: [plot, { key: "start_on", label: "Starts", kind: "date", optional: true }],
   },
   {
     key: "villa_supervisor",
     tool: "/supervisors",
     title: "Who runs a villa",
-    description: "The site supervisor who runs the villa. Empty takes them off.",
+    description: "The site supervisor who runs the villa.",
     fields: [
       plot,
-      {
-        key: "supervisor_id",
-        label: "Supervisor",
-        kind: "id",
-        optional: true,
-        from: "profiles (a person)",
-      },
+      { key: "supervisor_id", label: "Supervisor", kind: "id", optional: true, table: "profiles" },
     ],
   },
   {
@@ -130,18 +138,11 @@ export const ENTRIES: Entry[] = [
     key: "stage_contractor",
     tool: "/supervisors",
     title: "A stage's contractor",
-    description:
-      "The contractor on a stage. Empty takes them off; only a vendor marked as a contractor is taken.",
+    description: "The contractor on a stage; only a vendor marked as a contractor is taken.",
     fields: [
       plot,
       stage,
-      {
-        key: "contractor_id",
-        label: "Contractor",
-        kind: "id",
-        optional: true,
-        from: "vendors (a contractor)",
-      },
+      { key: "contractor_id", label: "Contractor", kind: "id", optional: true, table: "vendors" },
     ],
   },
   {
@@ -166,7 +167,7 @@ export const ENTRIES: Entry[] = [
         label: "Follows",
         kind: "id",
         optional: true,
-        from: "work_groups",
+        table: "work_groups",
       },
       {
         key: "link",
@@ -195,32 +196,44 @@ export const entryFor = (key: unknown): Entry | undefined =>
   ENTRIES.find((entry) => entry.key === key);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A real calendar day, written 2026-10-24: 2026-02-30 is refused, not rolled into March. */
+const isDay = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  !Number.isNaN(Date.parse(value)) &&
+  new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 
-function checkValue(field: Field, raw: unknown): Checked<Value> {
+/** `undefined` back means the field was left out. */
+function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
+  if (raw === undefined) {
+    return field.optional
+      ? { ok: true, value: undefined }
+      : { ok: false, error: `${field.label} is missing.` };
+  }
   if (field.kind === "yesno") {
     return typeof raw === "boolean"
       ? { ok: true, value: raw }
       : { ok: false, error: `${field.label} is yes or no.` };
   }
-  const text = raw === undefined || raw === null ? "" : typeof raw === "number" ? String(raw) : raw;
+  const text = raw === null ? "" : typeof raw === "number" ? String(raw) : raw;
   if (typeof text !== "string") return { ok: false, error: `${field.label} is not readable.` };
   const value = text.trim();
-  if (!value)
+  if (!value) {
     return field.optional
       ? { ok: true, value: "" }
       : { ok: false, error: `${field.label} is missing.` };
+  }
   switch (field.kind) {
     case "id":
       return UUID.test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is not an id.` };
     case "date":
-      return DATE.test(value) && !Number.isNaN(Date.parse(value))
+      return isDay(value)
         ? { ok: true, value }
-        : { ok: false, error: `${field.label} is a date written 2026-10-24.` };
+        : { ok: false, error: `${field.label} is a real date written 2026-10-24.` };
     case "whole":
       return /^\d{1,3}$/.test(value)
         ? { ok: true, value }
@@ -251,7 +264,7 @@ export function checkRow(entry: Entry, raw: unknown): Checked<Row> {
   for (const field of entry.fields) {
     const value = checkValue(field, source[field.key]);
     if (!value.ok) return value;
-    values[field.key] = value.value;
+    if (value.value !== undefined) values[field.key] = value.value;
   }
   return { ok: true, value: { label, values } };
 }
@@ -284,8 +297,8 @@ export function checkProposal(input: unknown): Checked<Proposal> {
 }
 
 /**
- * The rows the admin saves: the ones they ticked, as they edited them. What a row is about — its
- * ids — cannot be edited on screen, so an edit that changes one is refused.
+ * The rows the admin saves: the ones they ticked, as they edited them. What a row is about and
+ * who or what it names — its ids — cannot be edited on screen, so an edit to one is refused.
  */
 export function editedRows(
   entry: Entry,
@@ -315,9 +328,7 @@ export function editedRows(
     if (!row.ok) return { ok: false, error: `${original[index].label}: ${row.error}` };
     const moved = entry.fields.find(
       (field) =>
-        field.kind === "id" &&
-        !field.optional &&
-        row.value.values[field.key] !== original[index].values[field.key],
+        field.kind === "id" && row.value.values[field.key] !== original[index].values[field.key],
     );
     if (moved)
       return {
@@ -329,24 +340,43 @@ export function editedRows(
   return { ok: true, value: rows.sort((a, b) => a.index - b.index) };
 }
 
+/** Every id the rows name, by the table it points into, for the server to turn into names. */
+export function idsOf(entry: Entry, rows: Row[]): Map<IdTable, Set<string>> {
+  const ids = new Map<IdTable, Set<string>>();
+  for (const field of entry.fields) {
+    if (field.kind !== "id" || !field.table) continue;
+    for (const row of rows) {
+      const value = row.values[field.key];
+      if (typeof value !== "string" || !value) continue;
+      if (!ids.has(field.table)) ids.set(field.table, new Set());
+      ids.get(field.table)?.add(value);
+    }
+  }
+  return ids;
+}
+
 /** The catalogue as Claude reads it, in the system prompt: stable text, so the cache holds. */
 export function catalogueText(): string {
-  return ENTRIES.map((entry) => {
+  const rows = ENTRIES.map((entry) => {
     const fields = entry.fields
       .map((field) => {
         const kind =
           field.kind === "choice"
             ? `one of ${field.choices?.join(" | ")}`
             : field.kind === "id"
-              ? `id from ${field.from}`
+              ? `id from ${field.table ? FROM[field.table] : "its table"}`
               : field.kind === "yesno"
                 ? "true or false"
                 : field.kind === "whole"
                   ? "whole number"
                   : field.kind;
-        return `${field.key} (${kind}${field.optional ? ", may be empty" : ""})`;
+        return `${field.key} (${kind}${field.optional ? ", optional" : ""})`;
       })
       .join(", ");
     return `- ${entry.key} — ${entry.title}, in ${entry.tool}. ${entry.description} Fields: ${fields}.`;
-  }).join("\n");
+  });
+  return [
+    "An optional field left out keeps what is there now; given as empty it clears it. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",
+    ...rows,
+  ].join("\n");
 }

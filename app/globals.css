@@ -11,6 +11,15 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* The practice banner's height (components/ui/practice-banner.tsx), one line from md up; none on the
+   real site. The sidebar and Turing's workspace fit the screen under it. */
+:root {
+  --banner-h: 2rem;
+}
+:root[data-site="production"] {
+  --banner-h: 0px;
+}
+
 :root {
   color-scheme: light;
 

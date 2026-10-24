@@ -25,6 +25,7 @@ import { useState } from "react";
 
 const words = (value: string) => value.replace(/_/g, " ");
 
+/** An editable value; a field left out of the row reads "keeps what is there". */
 function FieldInput({
   field,
   value,
@@ -32,31 +33,33 @@ function FieldInput({
   onChange,
 }: {
   field: Field;
-  value: Value;
+  value: Value | undefined;
   disabled: boolean;
   onChange: (value: Value) => void;
 }) {
-  const label = `${field.label}`;
+  const kept = value === undefined;
+  let input;
   switch (field.kind) {
     case "yesno":
-      return (
+      input = (
         <Checkbox
-          aria-label={label}
+          aria-label={field.label}
           checked={value === true}
           disabled={disabled}
           onChange={(event) => onChange(event.target.checked)}
         />
       );
+      break;
     case "choice":
-      return (
+      input = (
         <Select
-          aria-label={label}
-          value={String(value)}
+          aria-label={field.label}
+          value={kept ? "" : String(value)}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className="h-9 min-w-32"
         >
-          {field.optional && <option value="">—</option>}
+          {field.optional && <option value="">{kept ? "Keep as is" : "—"}</option>}
           {field.choices?.map((choice) => (
             <option key={choice} value={choice}>
               {words(choice)}
@@ -64,19 +67,29 @@ function FieldInput({
           ))}
         </Select>
       );
+      break;
     default:
-      return (
+      input = (
         <Input
-          aria-label={label}
+          aria-label={field.label}
           type={field.kind === "date" ? "date" : field.kind === "whole" ? "number" : "text"}
           min={field.kind === "whole" ? 0 : undefined}
-          value={String(value)}
+          value={kept ? "" : String(value)}
+          placeholder={kept ? "Keep as is" : "Empty — clears it"}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
-          className={field.kind === "text" ? "h-9 min-w-40" : "h-9 w-auto"}
+          className={
+            field.kind === "text" ? "h-9 w-36" : field.kind === "whole" ? "h-9 w-20" : "h-9 w-40"
+          }
         />
       );
   }
+  return (
+    <div className="space-y-0.5">
+      {input}
+      {kept && field.kind === "date" && <p className="text-muted text-xs">Keeps what is there</p>}
+    </div>
+  );
 }
 
 function Outcome({ result }: { result: SaveResult | undefined }) {
@@ -93,16 +106,19 @@ function Outcome({ result }: { result: SaveResult | undefined }) {
 }
 
 /**
- * Turing's proposed changes as a table: untick a row to leave it, edit what it would set, then
- * Save — each ticked row goes through its tool's own save, as you. What a row is about (its villa,
- * its stage) is fixed; ask Turing again to change that.
+ * Turing's proposed changes as a table: what each row is about and whom it names, looked up from
+ * the database (never only Turing's own words), then what it would set. Untick a row to leave
+ * it, edit a value, then Save — each ticked row goes through its tool's own save, as you.
  */
 export function ProposalCard({
   conversationId,
   proposal,
+  live,
 }: {
   conversationId: string;
   proposal: ShownProposal;
+  /** Still being answered: the proposal is not stored yet, so it cannot be saved. */
+  live: boolean;
 }) {
   const router = useRouter();
   const entry = entryFor(proposal.action);
@@ -111,12 +127,23 @@ export function ProposalCard({
   const { pending, error, run } = useActionRunner();
   if (!entry) return null;
 
+  // What a row is about (its villa and stage) reads as one cell; an id it sets gets its own column.
+  const about = entry.fields.filter((field) => field.kind === "id" && !field.optional);
+  const named = entry.fields.filter((field) => field.kind === "id" && field.optional);
   const editable = entry.fields.filter((field) => field.kind !== "id");
   const saved = proposal.saved;
   const results = new Map((saved?.results ?? []).map((result) => [result.row, result]));
-  const interrupted = saved?.interrupted === true;
-  const locked = saved !== null || pending;
+  const locked = saved !== null || pending || live;
   const count = ticked.filter(Boolean).length;
+  // A saved row shows what it was saved with, which may differ from what Turing proposed.
+  const shown = (index: number) => results.get(index)?.values ?? values[index];
+
+  const nameOf = (field: Field, index: number) => {
+    const id = shown(index)[field.key];
+    if (id === undefined) return <span className="text-muted">Keep as is</span>;
+    if (id === "") return <span className="text-muted">None</span>;
+    return proposal.names[String(id)] ?? <span className="text-danger">Unknown</span>;
+  };
 
   const save = async () => {
     const result = await run(() =>
@@ -141,12 +168,16 @@ export function ProposalCard({
           </p>
         </div>
         {saved === null ? (
-          <Button size="sm" onClick={() => void save()} disabled={pending || count === 0}>
-            {pending ? "Saving…" : `Save ${count} row${count === 1 ? "" : "s"}`}
+          <Button size="sm" onClick={() => void save()} disabled={locked || count === 0}>
+            {live
+              ? "Save once Turing has finished"
+              : pending
+                ? "Saving…"
+                : `Save ${count} row${count === 1 ? "" : "s"}`}
           </Button>
         ) : saved.results === null ? (
           <span className="text-muted text-xs">
-            {interrupted ? "Interrupted — check the tool's own screen" : "Saving…"}
+            {saved.interrupted ? "Interrupted — check the tool's own screen" : "Saving…"}
           </span>
         ) : (
           <span className="text-muted text-xs">
@@ -162,10 +193,12 @@ export function ProposalCard({
               <span className="sr-only">Save this row</span>
             </TableHeaderCell>
             <TableHeaderCell>Change</TableHeaderCell>
+            {named.map((field) => (
+              <TableHeaderCell key={field.key}>{field.label}</TableHeaderCell>
+            ))}
             {editable.map((field) => (
               <TableHeaderCell key={field.key}>{field.label}</TableHeaderCell>
             ))}
-            {saved !== null && <TableHeaderCell>Result</TableHeaderCell>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -183,12 +216,30 @@ export function ProposalCard({
                   }
                 />
               </TableCell>
-              <TableCell className="text-sm">{row.label}</TableCell>
+              <TableCell className="min-w-48 text-sm">
+                {about.map((field, at) => (
+                  <span key={field.key} className={at === 0 ? "font-medium" : undefined}>
+                    {at > 0 && " · "}
+                    {nameOf(field, index)}
+                  </span>
+                ))}
+                {/* The result sits under what it is about, never in a column off the edge. */}
+                {saved?.results && (
+                  <div className="mt-1">
+                    <Outcome result={results.get(index)} />
+                  </div>
+                )}
+              </TableCell>
+              {named.map((field) => (
+                <TableCell key={field.key} className="text-sm whitespace-nowrap">
+                  {nameOf(field, index)}
+                </TableCell>
+              ))}
               {editable.map((field) => (
                 <TableCell key={field.key}>
                   <FieldInput
                     field={field}
-                    value={values[index][field.key] ?? ""}
+                    value={shown(index)[field.key]}
                     disabled={locked || !ticked[index]}
                     onChange={(value) =>
                       setValues((all) =>
@@ -200,11 +251,6 @@ export function ProposalCard({
                   />
                 </TableCell>
               ))}
-              {saved !== null && (
-                <TableCell>
-                  {saved.results === null ? null : <Outcome result={results.get(index)} />}
-                </TableCell>
-              )}
             </TableRow>
           ))}
         </TableBody>

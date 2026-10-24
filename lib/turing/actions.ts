@@ -58,13 +58,19 @@ export async function saveProposal(input: {
   for (const { index, row } of rows.value) {
     try {
       const outcome = await run(row.values);
-      results.push({ row: index, ok: !outcome?.error, message: outcome?.error ?? "" });
+      results.push({
+        row: index,
+        ok: !outcome?.error,
+        message: outcome?.error ?? "",
+        values: row.values,
+      });
     } catch (thrown) {
       console.error("turing: a proposal row failed:", entry.key, thrown);
       results.push({
         row: index,
         ok: false,
         message: "Something went wrong. Try it on the tool's screen.",
+        values: row.values,
       });
     }
   }

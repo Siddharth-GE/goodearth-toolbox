@@ -11,10 +11,10 @@ export function PracticeBanner() {
     <div
       // A live region: a screen reader announces it on load.
       role="status"
-      className="bg-warning text-warning-foreground sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-4 py-1.5 text-center text-sm font-semibold in-data-[site=production]:hidden"
+      className="bg-warning text-warning-foreground sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-4 py-1.5 text-center text-sm font-semibold in-data-[site=production]:hidden md:h-(--banner-h) md:flex-nowrap md:overflow-hidden"
     >
       <span>Practice site — nothing here is real.</span>
-      <span className="font-normal opacity-90">
+      <span className="min-w-0 font-normal opacity-90 md:truncate">
         Work done here will not reach anyone. The real toolbox is{" "}
         <a
           href={`https://${PRODUCTION_SITE}`}

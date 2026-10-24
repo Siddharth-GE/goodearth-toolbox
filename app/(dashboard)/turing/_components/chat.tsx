@@ -38,18 +38,25 @@ function Answer({
   pages,
   proposals,
   conversationId,
+  live = false,
 }: {
   text: string;
   pages: { id: string; title: string }[];
   proposals: ShownProposal[];
   conversationId: string | null;
+  live?: boolean;
 }) {
   return (
     <div className="space-y-3">
       {text && <MarkdownView text={text} />}
       {conversationId &&
         proposals.map((proposal) => (
-          <ProposalCard key={proposal.id} conversationId={conversationId} proposal={proposal} />
+          <ProposalCard
+            key={proposal.id}
+            conversationId={conversationId}
+            proposal={proposal}
+            live={live}
+          />
         ))}
       {pages.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -238,9 +245,8 @@ export function Chat({
       setLive(
         answer.error ? { ...answer, text: "", pages: [], proposals: [], status: null } : null,
       );
-      // Moves the conversation up the list; a new one is then drawn from the server's copy.
-      // An error stays on screen until the next question.
-      if (!answer.error) router.refresh();
+      // The server's copy follows (the list's order, a saved proposal); an error stays on screen.
+      router.refresh();
     }
   }
 
@@ -342,6 +348,7 @@ export function Chat({
                 pages={live.pages}
                 proposals={live.proposals}
                 conversationId={conversationId}
+                live
               />
               {live.status && (
                 <p className="text-muted flex items-center gap-2 text-sm" role="status">

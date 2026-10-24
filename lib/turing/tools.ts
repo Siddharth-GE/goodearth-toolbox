@@ -2,8 +2,9 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { checkProposal } from "./catalogue-fields";
+import { checkProposal, idsOf } from "./catalogue-fields";
 import { pageToken, proposalToken, type ShownProposal } from "./display";
+import { namesFor } from "./names";
 import { pageTripwire } from "./page-rules";
 import { BULK_LIMIT, checkRead, checkRecipe, DIRECT_LIMIT, type RecipeRead } from "./read-rules";
 import { runRead } from "./reads";
@@ -130,10 +131,17 @@ export async function runTool(
       const proposal = checkProposal(args);
       if (!proposal.ok) return fail(proposal.error);
       const { entry, title, rows } = proposal.value;
+      // The admin checks names, not ids: an id that names nothing they can see is refused here.
+      const ids = idsOf(entry, rows);
+      const names = await namesFor(ids);
+      const unknown = [...ids.values()].flatMap((set) => [...set]).filter((id) => !names[id]);
+      if (unknown.length > 0) {
+        return fail(`These ids name nothing: ${unknown.slice(0, 10).join(", ")}. Read them again.`);
+      }
       return {
         content: `Shown to the admin as "${title}", ${rows.length} row${rows.length === 1 ? "" : "s"} of ${entry.title.toLowerCase()} ${proposalToken(callId)}. Nothing is saved until they press Save; you are told what was saved at the start of their next message.`,
         isError: false,
-        proposal: { id: callId, action: entry.key, title, rows, saved: null },
+        proposal: { id: callId, action: entry.key, title, rows, saved: null, names },
       };
     }
     default:

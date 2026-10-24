@@ -1,9 +1,15 @@
 /** A conversation as the admin sees it: what they asked, what Turing answered, the pages and proposals it made. Pure. */
-import { checkProposal, type Row } from "./catalogue-fields";
+import { checkProposal, type Row, type Value } from "./catalogue-fields";
 
 export type StoredMessage = { role: string; content: unknown };
 
-export type SaveResult = { row: number; ok: boolean; message: string };
+/** One row's outcome, with the values it was saved with (the admin may have changed Claude's). */
+export type SaveResult = {
+  row: number;
+  ok: boolean;
+  message: string;
+  values?: Record<string, Value>;
+};
 /** A proposal saved: when Save was pressed, and each row's result once they have all run. */
 export type Saved = { at: string; results: SaveResult[] | null; interrupted: boolean };
 
@@ -13,6 +19,8 @@ export type ShownProposal = {
   title: string;
   rows: Row[];
   saved: Saved | null;
+  /** Each id the rows name, as the admin knows it. */
+  names: Record<string, string>;
 };
 
 export type Turn =
@@ -62,9 +70,9 @@ const textOf = (content: unknown): string =>
  */
 export function shownProposals(
   messages: StoredMessage[],
-): Map<string, Omit<ShownProposal, "saved">> {
+): Map<string, Omit<ShownProposal, "saved" | "names">> {
   const calls = new Map<string, unknown>();
-  const shown = new Map<string, Omit<ShownProposal, "saved">>();
+  const shown = new Map<string, Omit<ShownProposal, "saved" | "names">>();
   for (const message of messages) {
     for (const block of blocksOf(message.content)) {
       if (
@@ -99,6 +107,7 @@ export function conversationTurns(
   fileNames: Map<string, string>,
   pageTitles: Map<string, string>,
   saves: Map<string, Saved> = new Map(),
+  names: Record<string, string> = {},
 ): Turn[] {
   const turns: Turn[] = [];
   const proposals = shownProposals(messages);
@@ -133,7 +142,7 @@ export function conversationTurns(
       }
       const proposal = proposals.get(String(result.tool_use_id));
       if (proposal) {
-        answering().proposals.push({ ...proposal, saved: saves.get(proposal.id) ?? null });
+        answering().proposals.push({ ...proposal, saved: saves.get(proposal.id) ?? null, names });
       }
     }
     if (results.length === blocks.length && blocks.length > 0) continue;

@@ -6,7 +6,9 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
-import { conversationTurns, type SaveResult, type Turn } from "./display";
+import { entryFor, idsOf, type IdTable } from "./catalogue-fields";
+import { conversationTurns, shownProposals, type SaveResult, type Turn } from "./display";
+import { namesFor } from "./names";
 
 /** Turing is the admins' own: never a grant, the way Settings is. */
 export async function requireTuring() {
@@ -62,6 +64,16 @@ export async function getConversation(
   assertRead("Turing", "the conversation's pages", pages.error);
   assertRead("Turing", "what was saved", saves.error);
 
+  const ids = new Map<IdTable, Set<string>>();
+  for (const proposal of shownProposals(messages).values()) {
+    const entry = entryFor(proposal.action);
+    if (!entry) continue;
+    for (const [table, found] of idsOf(entry, proposal.rows)) {
+      ids.set(table, new Set([...(ids.get(table) ?? []), ...found]));
+    }
+  }
+  const names = await namesFor(ids);
+
   return {
     id: conversation.id,
     title: conversation.title,
@@ -81,6 +93,7 @@ export async function getConversation(
           },
         ]),
       ),
+      names,
     ),
   };
 }
