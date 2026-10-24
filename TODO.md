@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Next — TI, the admins' assistant
 
-`plan.md`, top section: chat, dropped files, interactive pages, every operation through drafts. Fable reviews the plan first unless the founder waives, and the founder answers its two questions.
+`plan.md`, top section: a general-purpose Claude inside the toolbox (T1), then doing things in every tool behind a person's Save (T2). Fable reviews the plan and its one rule change first, unless the founder waives.
 
 ## Native apps on iPhone and Android — next build
 

@@ -1,53 +1,58 @@
 # TI, the admins' assistant `[Opus drafted; Fable reviews before T1, unless the founder waives]`
 
-**The founder's ask** (2026-10-24): an admin-only tool where you type or drag in files, to fill data across **every operation**, run analysis, and build interactive HTML docs and dashboards. Settled with them the same day: admins only; what goes into TI is sent to Anthropic, and each use costs money — both accepted. Delete or Cancel, which it waited on, is merged.
+**The founder's ask** (2026-10-24): "a Claude inside, working with us in the toolbox" — admin-only, general purpose: talk about anything, drop in files, read every tool, build interactive docs and dashboards, and fill data across **every operation**. Settled with them the same day:
 
-**Next session — start here:** Fable reviews this plan (or the founder waives it), the founder answers the two questions below, then T1.
+- admins only;
+- each admin's conversations are private to them;
+- what goes into TI is sent to Anthropic, and each use costs money — both accepted;
+- no spending cap in the app: the founder's Anthropic account and its API credits are the limit.
+
+**Next session — start here:** Fable reviews this plan, above all _the one rule change_ (or the founder waives it), then T1.
 
 ## The shape
 
 - **Admins only, the way Settings is.** In `lib/tools.ts`, left out of `GRANTABLE_TOOLS`; every query, action and route calls `requireUser` + `requireAdmin`; every TI table's policies are `(select is_admin())`. Never grantable, so neither `_app_known` CHECK changes. It opens on the chat, as Settings opens on its list — no welcome screen.
-- **No new way in.** The admin's own session and the RLS-scoped client — no admin client, no key of ours handed to anyone, no MCP door. TI sees exactly what the admin sees.
-- **Claude reads and proposes; a person saves.** The model's tools read, or propose rows that render as a table the admin edits before pressing Save. No tool the model can call writes a tool's table, and there is no web search or fetch, so a dropped file has no way to send data out.
-- **One new library, `@anthropic-ai/sdk`** — the server's only way to call Claude. `ANTHROPIC_API_KEY` from the founder's Anthropic Console account, in Vercel through `scripts/vercel-env.ts`, Preview first, never logged. `claude-opus-5-5`, effort `medium` in the chat and `high` for pages, streamed, with the server-side refusal fallback; system prompt and tool list cached. Read the `claude-api` skill's TypeScript tool-use pages before writing the loop.
-- **No spending cap in the app.** The account's prepaid API credits are the limit (founder, 2026-10-24). Each turn's tokens are kept with it; when the credits run out, TI says so in a sentence — "TI's credits have run out; top up the Anthropic account" — never a raw error.
+- **No new way in.** The admin's own session and the RLS-scoped client — no admin client, no key of ours handed to anyone, no MCP door. TI sees exactly what the admin sees, and can do exactly what the admin could do by hand.
+- **General purpose.** One system prompt says who Goodearth is, what each tool is for (from `lib/tools.ts`), and how TI works; beyond that it is Claude — drafting, explaining, checking, planning — with the toolbox's reads always at hand.
+- **Claude reads and proposes; a person saves.** No tool the model can call writes anything. A change is a proposal the admin sees as a table, edits, and saves with a press (T2).
+- **No web.** No web search or fetch, and TI's pages cannot call out, so a dropped file carrying hidden instructions has no way to send data anywhere.
+- **One new library, `@anthropic-ai/sdk`** — the server's only way to call Claude. `ANTHROPIC_API_KEY` from the founder's Anthropic account, in Vercel through `scripts/vercel-env.ts`, Preview first, never logged. `claude-opus-5-5`, effort `medium` in the chat and `high` for pages, streamed, with the server-side refusal fallback; system prompt and tool list cached. Read the `claude-api` skill's TypeScript tool-use pages before writing the loop.
+- **When the credits run out**, TI says so in a sentence — "TI's credits have run out; top up the Anthropic account" — never a raw error. Each turn's tokens are kept with it.
 - **Files** dropped on the chat, 4 MB each (the body limit). PDFs and photos go to Claude as they are, uploaded once to Anthropic's Files API and referred to by id after, so a long conversation doesn't resend them; `.xlsx` through the fflate reader, moved from `scripts/read-xlsx.ts` into a shared module (and added to CLAUDE.md's list); `.csv` through `lib/csv.ts`. Kept in a private `ti-files` bucket so a conversation reopens whole.
+
+## The one rule change — Fable decides
+
+TI acting in every tool means calling each tool's own save. Today no module may import a tool's code except `lib/overview/`, for reads. The proposal: **`lib/ti/` becomes the second sanctioned exception — it may call another tool's server actions, and only from a person's Save.**
+
+- **Why not the alternatives.** Writing the tables directly skips each tool's rules (numbering, approvals, notifications); copying those rules into TI drifts; a "From TI" step on every tool's form is a build per tool, and one tool at a time.
+- **Why it is safe.** An action already checks `requireTool`, validates, and returns `ActionState`; TI calling it after the admin's Save is the admin pressing that tool's button. Nothing new is reachable.
+- **What it costs.** CLAUDE.md's one-principle paragraph names the exception; `scripts/check-boundaries.ts` allows `lib/ti/` to import `lib/<tool>/actions.ts` only — never queries, never screens — and still refuses everything else.
+- **The weak spot.** Most actions take `FormData`, so TI fills the same fields the tool's form sends; a renamed field breaks TI silently. Each catalogue entry (T2) carries a pure test of the fields it sends, and its action's refusal comes back as the result line, word for word.
 
 ## The build — one pull request each, vetted on staging
 
-- [ ] **T1. Ask** `[Opus]`
-  - Migration (the next free number across every branch): `ti_conversations`, `ti_messages` (the API's content blocks as jsonb, tokens in and out), `ti_files`, bucket `ti-files`; one policy per command, an admin sees their own conversations only (Q1); revokes per SECURITY.md.
+- [ ] **T1. Claude in the toolbox** `[Opus; Fable reviews the page viewer's headers]`
+  - Migration (the next free number across every branch): `ti_conversations`, `ti_messages` (the API's content blocks as jsonb, tokens in and out), `ti_files`, `ti_pages` (title, owner, recipe, refreshed_at), buckets `ti-files` and `ti-pages`; one policy per command; conversations and files their owner's only, pages shared among admins; revokes per SECURITY.md.
   - `app/api/ti/route.ts`: POST, streams the reply; `maxDuration` at the plan's ceiling (check Vercel's first). Behind the proxy — not in `PUBLIC_PATHS`.
-  - The read tools, argument checks pure and tested in `lib/ti/read-rules.ts`: `list_tables`, `describe_table`, `read_rows` (a table or view, its columns, filters `eq neq gt gte lt lte in ilike is`, order, ≤ 500 rows; `fetchAll` for a count or up to 5,000). Names are checked against `lib/ti/schema.generated.ts`, written from `database.types.ts` by `npm run db:types` and pinned by a test, so a new column reaches TI on the next types run. No embeds (BUGCATCHER #2). The prompt says a cancelled row is still there, with `cancelled_at`.
-  - Screen `app/(dashboard)/ti/`: conversations, the chat, the drop zone; works on a phone; `loading.tsx`.
-  - Verify: "how many indents wait for approval?" matches Indents; a quotation PDF's total is read right; the masters workbook's vendor count is right; the probe cannot open `/ti` or POST to `/api/ti`; with a dud key on Preview, TI answers in a sentence, not an error.
-- [ ] **T2. Pages — interactive docs and dashboards** `[Opus; Fable reviews the viewer's headers]`
-  - `make_page`: Claude writes one self-contained HTML file and the list of reads behind it (the **recipe**). The server runs the recipe itself and puts the rows into the page as `<script type="application/json" id="ti-data">` — the page never asks our site for anything. **Refresh** re-runs the recipe as the refreshing admin: no Claude, no cost. A recipe whose table or column has gone says "this page's data has moved — ask TI to rebuild it".
-  - Analysis over thousands of rows runs in Claude's code execution, calling `read_rows` from inside it (programmatic tool calling), so the rows don't pass through the conversation.
-  - `ti_pages` (title, owner, recipe, refreshed_at) + bucket `ti-pages`; shared among admins; Delete as today, nothing depends on a page.
-  - Viewer `app/(dashboard)/ti/pages/[id]/view/route.ts`, admin only: Dexter's sandbox, moved out of `lib/dexter/headers.ts` into a shared module so neither tool imports the other, **without** the popup flags, plus `default-src 'none'; script-src 'unsafe-inline' <one pinned chart library URL>; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'`. A page holds money and was written partly from what a dropped file said; this is what stops it calling home. A pure test pins the header.
-  - Shown in a frame with Refresh, Download HTML and Delete.
-  - Verify: "a dashboard of this month's bills by villa" opens and its chart responds; Refresh follows a new bill; a page told to `fetch()` elsewhere is refused (the console names the CSP).
-- [ ] **T3. Masters from files** `[Opus designs the proposal, Sonnet builds, Opus vets]`
-  - `propose_rows` (vendors, items, clients, brands, companies…). `lib/masters/` is shared, so Save calls its own actions — one rule set, no copy.
-  - The proposal is an editable table: each row new, "looks like <existing>" (same GSTIN or phone, or a near name), or refused with the reason; untick, edit, Save; a result line per row.
-  - Verify: a 20-vendor sheet with two duplicates — both flagged, 18 saved, each with the admin as creator.
-- [ ] **T4. Every operation, through drafts** `[Sonnet per tool, Opus vets]`
-  - No tool's code writes another tool's table (SECURITY.md), and copying each tool's save rules into TI would drift. So TI writes only `ti_handoffs` (kind, payload jsonb, created_by, used_at), and each tool's own new-record form gains **From TI**: it opens prefilled, the person checks it and presses the tool's own Save, and the hand-off is stamped used. Numbering, approvals, guards and notifications stay where they are.
-  - `ti_handoffs` is a shared surface: its row in STATUS.md's contract table; each tool reads only its own kinds. Fable: confirm this over a shared save module per tool.
-  - One pull request per tool, in the founder's order (Q2); suggested: indents, POs, labour logs, bills, client receipts, Birdwing stays.
-  - Verify per tool: the photo of a paper indent → "draft indent ready" → open → prefilled → Save → numbered and off for approval like any other.
-
-## Questions for the founder
-
-1. Each admin's conversations private to them (recommended), or open to every admin? Pages are shared either way.
-2. T4's order — which operation first?
+  - **Reads**, argument checks pure and tested in `lib/ti/read-rules.ts`: `list_tables`, `describe_table`, `read_rows` (a table or view, its columns, filters `eq neq gt gte lt lte in ilike is`, order, ≤ 500 rows; `fetchAll` for a count or up to 5,000). Names are checked against `lib/ti/schema.generated.ts`, written from `database.types.ts` by `npm run db:types` and pinned by a test, so a new column reaches TI on the next types run. No embeds (BUGCATCHER #2). The prompt says a cancelled row is still there, with `cancelled_at`.
+  - **Analysis** over thousands of rows runs in Claude's code execution, calling `read_rows` from inside it (programmatic tool calling), so the rows don't pass through the conversation.
+  - **Pages** — `make_page`: Claude writes one self-contained HTML file and the list of reads behind it (the **recipe**). The server runs the recipe and puts the rows into the page as `<script type="application/json" id="ti-data">` — the page never asks our site for anything. **Refresh** re-runs the recipe as the refreshing admin: no Claude, no cost. A recipe whose table or column has gone says "this page's data has moved — ask TI to rebuild it".
+  - **The viewer** `app/(dashboard)/ti/pages/[id]/view/route.ts`, admin only: Dexter's sandbox, moved out of `lib/dexter/headers.ts` into a shared module so neither tool imports the other, **without** the popup flags, plus `default-src 'none'; script-src 'unsafe-inline' <one pinned chart library URL>; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'`. A page holds money and was written partly from what a dropped file said; this is what stops it calling home. A pure test pins the header. Shown in a frame with Refresh, Download HTML and Delete.
+  - **Screen** `app/(dashboard)/ti/`: conversations, the chat, the drop zone, the pages list; works on a phone; `loading.tsx`.
+  - Verify: a general question ("draft a polite reminder to a client about a late instalment") answers like Claude; "how many indents wait for approval?" matches Indents; a quotation PDF's total is read right; "a dashboard of this month's bills by villa" opens, its chart responds, and Refresh follows a new bill; a page told to `fetch()` elsewhere is refused (the console names the CSP); a second admin cannot open the first's conversation; the probe cannot open `/ti` or POST to `/api/ti`; with a dud key on Preview, TI answers in a sentence.
+- [ ] **T2. Claude does things, in every tool** `[Opus — the catalogue and the Save; Sonnet adds entries, Opus vets]` — after Fable's yes to the rule change.
+  - **The catalogue**, `lib/ti/catalogue.ts`: one entry per thing TI can do — new indent, PO from an indent, labour log, bill, client receipt, Birdwing stay, each Masters entity, and the rest — each with a plain description, the shape of its rows for Claude, how a row becomes the action's fields, and the action itself.
+  - `propose`: Claude names an entry and gives rows; the chat shows them as an editable table — each row new, "looks like <existing>" for Masters (same GSTIN or phone, or a near name), or refused with the reason. Untick, edit, **Save**.
+  - **Save** (`lib/ti/actions.ts`) re-checks the admin, then calls the entry's own action once per row, in order, and shows a result line per row: the record's number and a link to it, or the action's own refusal. Nothing is retried on its own.
+  - The first pull request carries the Save and the most-used entries; the rest follow in small batches, each entry with its field test.
+  - Verify: the photo of a paper indent → a proposed indent → Save → numbered and off for approval like any other; a 20-vendor sheet with two duplicates — both flagged, 18 saved, each with the admin as creator; a proposal the tool refuses shows the tool's own sentence.
 
 ## Risks Fable checks
 
+- The rule change above: the exception's edges, and whether `check:boundaries` holds them.
 - Vercel's function ceiling on the current plan against a long page build — streaming keeps the line open, but the ceiling is real.
 - `read_rows` sees all an admin sees. `requireAdmin` in the route and `is_admin()` on the tables keep it from anyone else; it must never be offered behind a grant.
-- A poisoned file: TI reads and proposes only, has no web, and its pages cannot send anything out, so the worst it can do is a wrong proposal the admin sees before saving.
+- A poisoned file: TI has no web, its pages cannot send anything out, and nothing saves without the admin's press — the worst it can do is a wrong proposal the admin sees before saving.
 - Saved recipes read tables by name, so a renamed column breaks a page's Refresh — it says so, and nothing else reads through TI.
 
 # Supervisors, rebuilt — the site board and its schedule (proposed 2026-10-22, schedule settled 2026-10-23, waiting for the founder's approval)
