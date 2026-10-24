@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { checkProposal, entryFor, recordsOf } from "../catalogue-fields";
+import { poolPicks, withDiscountSwitch } from "./purchase-orders";
 
 const INDENT = "11111111-1111-4111-8111-111111111111";
 const OTHER_INDENT = "22222222-2222-4222-8222-222222222222";
@@ -93,4 +94,37 @@ test("asking for a cancellation needs the reason", () => {
     false,
   );
   assert.ok(entryFor("po_cancel_withdraw"));
+});
+
+test("a bulk PO's rows for one indent line are one pick: quantities added, one price", () => {
+  const OTHER = "66666666-6666-4666-8666-666666666666";
+  const merged = poolPicks([
+    { indent_line_id: LINE, quantity: "10", rate: "410" },
+    { indent_line_id: LINE, quantity: "5", gst_pct: "28" },
+    { indent_line_id: OTHER, quantity: "2", rate: "", gst_pct: "" },
+  ]);
+  assert.ok("picks" in merged);
+  assert.deepEqual(merged.picks, [
+    { indentLineId: LINE, quantity: 15, rate: 410, gstPct: 28 },
+    // An empty price is not given: Masters' GST from the pool add stands.
+    { indentLineId: OTHER, quantity: 2, rate: null, gstPct: null },
+  ]);
+  const clash = poolPicks([
+    { indent_line_id: LINE, quantity: "1", rate: "410" },
+    { indent_line_id: LINE, quantity: "1", rate: "420" },
+  ]);
+  assert.ok("error" in clash && /two rates, 410 and 420/.test(clash.error));
+});
+
+test("a discount given clears the other kind; both at once is refused", () => {
+  assert.deepEqual(withDiscountSwitch({ line_id: LINE, discount_pct: "5" }), {
+    values: { line_id: LINE, discount_pct: "5", discount_amount: "" },
+  });
+  assert.deepEqual(withDiscountSwitch({ line_id: LINE, discount_amount: "100" }), {
+    values: { line_id: LINE, discount_amount: "100", discount_pct: "" },
+  });
+  assert.deepEqual(withDiscountSwitch({ line_id: LINE, discount_pct: "" }), {
+    values: { line_id: LINE, discount_pct: "" },
+  });
+  assert.ok("error" in withDiscountSwitch({ discount_pct: "5", discount_amount: "100" }));
 });
