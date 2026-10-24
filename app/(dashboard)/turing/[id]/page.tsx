@@ -19,7 +19,11 @@ export default async function TuringConversationPage({
   ]);
   if (!conversation) notFound();
   return (
-    <TuringShell conversations={conversations} activeId={conversation.id}>
+    <TuringShell
+      conversations={conversations}
+      activeId={conversation.id}
+      title={conversation.title}
+    >
       <Chat
         key={conversation.id}
         conversationId={conversation.id}

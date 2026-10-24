@@ -70,10 +70,6 @@ function Answer({
   );
 }
 
-function nearBottom() {
-  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 240;
-}
-
 export function Chat({
   conversationId: initialId,
   initialTurns,
@@ -103,9 +99,13 @@ export function Chat({
   const uploading = attachments.some((file) => !file.id && !file.error);
   const ready = attachments.filter((file) => file.id);
 
+  // Follows the answer only while the end is in view: on a phone the page scrolls, on a computer the chat does.
   const follow = (force = false) => {
-    if (force || nearBottom())
-      requestAnimationFrame(() => end.current?.scrollIntoView({ block: "end" }));
+    const bottom = end.current;
+    if (!bottom) return;
+    if (force || bottom.getBoundingClientRect().top <= window.innerHeight + 240) {
+      requestAnimationFrame(() => bottom.scrollIntoView({ block: "end" }));
+    }
   };
 
   async function addFiles(files: FileList | File[]) {
@@ -252,7 +252,10 @@ export function Chat({
 
   return (
     <div
-      className={cn("flex min-h-[60vh] flex-col", dragging && "ring-accent/30 rounded-2xl ring-4")}
+      className={cn(
+        "flex min-h-[60vh] flex-col md:min-h-0 md:flex-1",
+        dragging && "ring-accent/30 rounded-2xl ring-4 md:rounded-none md:ring-inset",
+      )}
       onDragOver={(event) => {
         event.preventDefault();
         setDragging(true);
@@ -260,159 +263,191 @@ export function Chat({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      <div className="flex-1 space-y-6 pb-6">
-        {turns.length === 0 && !live && (
-          <EmptyState
-            icon={Sparkles}
-            title="Ask Turing anything"
-            description="It reads every tool as you see it, takes PDFs, photos and spreadsheets, and builds pages you can keep. What you send goes to Anthropic."
-            action={
-              <div className="flex flex-wrap justify-center gap-2">
+      <div className="flex-1 md:overflow-y-auto">
+        <div className="space-y-6 pb-6 md:mx-auto md:w-full md:max-w-3xl md:px-8 md:py-8">
+          {turns.length === 0 && !live && (
+            <div className="hidden min-h-[55vh] flex-col items-center justify-center gap-5 text-center md:flex">
+              <span className="bg-accent/10 text-accent flex size-12 items-center justify-center rounded-xl">
+                <Sparkles className="size-6" aria-hidden />
+              </span>
+              <div className="space-y-2">
+                <p className="font-display text-4xl font-medium text-balance">
+                  What shall we work on?
+                </p>
+                <p className="text-muted mx-auto max-w-lg text-sm">
+                  Turing reads every tool as you see it, takes PDFs, photos and spreadsheets, builds
+                  pages you can keep, and drafts changes for you to save.
+                </p>
+              </div>
+              <div className="flex max-w-xl flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((suggestion) => (
                   <PillButton key={suggestion} onClick={() => void send(suggestion)}>
                     {suggestion}
                   </PillButton>
                 ))}
               </div>
-            }
-          />
-        )}
-
-        {turns.map((turn, index) =>
-          turn.role === "user" ? (
-            <div
-              key={index}
-              className="bg-surface border-border ml-auto max-w-[85%] space-y-2 rounded-2xl border px-4 py-3"
-            >
-              {turn.files.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {turn.files.map((name, fileIndex) => (
-                    <Pill key={fileIndex}>
-                      <Paperclip className="size-3.5" aria-hidden />
-                      <span className="truncate">{name}</span>
-                    </Pill>
+            </div>
+          )}
+          {turns.length === 0 && !live && (
+            <EmptyState
+              className="md:hidden"
+              icon={Sparkles}
+              title="Ask Turing anything"
+              description="It reads every tool as you see it, takes PDFs, photos and spreadsheets, and builds pages you can keep. What you send goes to Anthropic."
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  {SUGGESTIONS.map((suggestion) => (
+                    <PillButton key={suggestion} onClick={() => void send(suggestion)}>
+                      {suggestion}
+                    </PillButton>
                   ))}
                 </div>
-              )}
-              {turn.text && <p className="text-sm whitespace-pre-wrap">{turn.text}</p>}
-            </div>
-          ) : (
-            <Answer
-              key={index}
-              text={turn.text}
-              pages={turn.pages}
-              proposals={turn.proposals}
-              conversationId={conversationId}
+              }
             />
-          ),
-        )}
+          )}
 
-        {live && (
-          <div className="space-y-3">
-            <Answer
-              text={live.text}
-              pages={live.pages}
-              proposals={live.proposals}
-              conversationId={conversationId}
-            />
-            {live.status && (
-              <p className="text-muted flex items-center gap-2 text-sm" role="status">
-                <Spinner className="size-4 border-2" />
-                {live.status}
-              </p>
-            )}
-            <FormMessage error={live.error} />
-          </div>
-        )}
-        <div ref={end} />
+          {turns.map((turn, index) =>
+            turn.role === "user" ? (
+              <div
+                key={index}
+                className="bg-surface border-border ml-auto max-w-[85%] space-y-2 rounded-2xl border px-4 py-3"
+              >
+                {turn.files.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {turn.files.map((name, fileIndex) => (
+                      <Pill key={fileIndex}>
+                        <Paperclip className="size-3.5" aria-hidden />
+                        <span className="truncate">{name}</span>
+                      </Pill>
+                    ))}
+                  </div>
+                )}
+                {turn.text && <p className="text-sm whitespace-pre-wrap">{turn.text}</p>}
+              </div>
+            ) : (
+              <Answer
+                key={index}
+                text={turn.text}
+                pages={turn.pages}
+                proposals={turn.proposals}
+                conversationId={conversationId}
+              />
+            ),
+          )}
+
+          {live && (
+            <div className="space-y-3">
+              <Answer
+                text={live.text}
+                pages={live.pages}
+                proposals={live.proposals}
+                conversationId={conversationId}
+              />
+              {live.status && (
+                <p className="text-muted flex items-center gap-2 text-sm" role="status">
+                  <Spinner className="size-4 border-2" />
+                  {live.status}
+                </p>
+              )}
+              <FormMessage error={live.error} />
+            </div>
+          )}
+          <div ref={end} />
+        </div>
       </div>
 
-      <div className="bg-background sticky bottom-0 space-y-2 pt-2 pb-3">
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {attachments.map((file) => (
-              <Pill key={file.key} tone={file.error ? "danger" : "plain"}>
-                {!file.id && !file.error ? (
-                  <Spinner className="size-3 border-2" />
-                ) : (
-                  <Paperclip className="size-3.5" aria-hidden />
-                )}
-                <span className="max-w-48 truncate">
-                  {file.error ? `${file.name}: ${file.error}` : file.name}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${file.name}`}
-                  onClick={() => setAttachments((all) => all.filter((a) => a.key !== file.key))}
-                  className="hover:text-foreground -mr-1 rounded-full p-0.5"
-                >
-                  <X className="size-3" />
-                </button>
-              </Pill>
-            ))}
-          </div>
-        )}
-        <FormMessage error={error} />
-        <div className="border-border bg-surface-raised focus-within:border-accent focus-within:ring-accent/15 flex items-end gap-1 rounded-2xl border p-1.5 focus-within:ring-4">
-          <IconButton
-            aria-label="Attach a file"
-            onClick={() => fileInput.current?.click()}
-            className="mb-0.5"
-          >
-            <Paperclip className="size-4" />
-          </IconButton>
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            hidden
-            accept={ACCEPTED_EXTENSIONS.join(",")}
-            onChange={(event) => {
-              if (event.target.files) void addFiles(event.target.files);
-              event.target.value = "";
-            }}
-          />
-          <Textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void send();
-              }
-            }}
-            onPaste={(event) => {
-              if (event.clipboardData.files.length > 0) {
-                event.preventDefault();
-                void addFiles(event.clipboardData.files);
-              }
-            }}
-            rows={1}
-            placeholder="Ask Turing, or drop in a file…"
-            aria-label="Message to Turing"
-            className="max-h-48 min-h-10 resize-none border-0 bg-transparent px-2 py-2 focus:ring-0"
-          />
-          {busy ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => abort.current?.abort()}
-              className="mb-0.5"
-            >
-              <Square className="size-3.5" aria-hidden />
-              Stop
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => void send()}
-              disabled={uploading || (!text.trim() && ready.length === 0)}
-              className="mb-0.5"
-            >
-              <Send className="size-3.5" aria-hidden />
-              Send
-            </Button>
+      <div className="bg-background sticky bottom-0 md:static md:shrink-0">
+        <div className="space-y-2 pt-2 pb-3 md:mx-auto md:w-full md:max-w-3xl md:px-8 md:pb-5">
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {attachments.map((file) => (
+                <Pill key={file.key} tone={file.error ? "danger" : "plain"}>
+                  {!file.id && !file.error ? (
+                    <Spinner className="size-3 border-2" />
+                  ) : (
+                    <Paperclip className="size-3.5" aria-hidden />
+                  )}
+                  <span className="max-w-48 truncate">
+                    {file.error ? `${file.name}: ${file.error}` : file.name}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => setAttachments((all) => all.filter((a) => a.key !== file.key))}
+                    className="hover:text-foreground -mr-1 rounded-full p-0.5"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Pill>
+              ))}
+            </div>
           )}
+          <FormMessage error={error} />
+          <div className="border-border bg-surface-raised focus-within:border-accent focus-within:ring-accent/15 flex items-end gap-1 rounded-2xl border p-1.5 focus-within:ring-4">
+            <IconButton
+              aria-label="Attach a file"
+              onClick={() => fileInput.current?.click()}
+              className="mb-0.5"
+            >
+              <Paperclip className="size-4" />
+            </IconButton>
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              hidden
+              accept={ACCEPTED_EXTENSIONS.join(",")}
+              onChange={(event) => {
+                if (event.target.files) void addFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <Textarea
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              onPaste={(event) => {
+                if (event.clipboardData.files.length > 0) {
+                  event.preventDefault();
+                  void addFiles(event.clipboardData.files);
+                }
+              }}
+              rows={1}
+              placeholder="Ask Turing, or drop in a file…"
+              aria-label="Message to Turing"
+              className="max-h-48 min-h-10 resize-none border-0 bg-transparent px-2 py-2 focus:ring-0"
+            />
+            {busy ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => abort.current?.abort()}
+                className="mb-0.5"
+              >
+                <Square className="size-3.5" aria-hidden />
+                Stop
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => void send()}
+                disabled={uploading || (!text.trim() && ready.length === 0)}
+                className="mb-0.5"
+              >
+                <Send className="size-3.5" aria-hidden />
+                Send
+              </Button>
+            )}
+          </div>
+          <p className="text-muted hidden text-center text-xs md:block">
+            Enter sends, Shift+Enter starts a new line. Turing can be wrong — check figures that
+            matter.
+          </p>
         </div>
       </div>
     </div>

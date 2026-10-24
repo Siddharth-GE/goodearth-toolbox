@@ -6,7 +6,7 @@ export default async function TuringPage() {
   await requireTuring();
   const conversations = await listConversations();
   return (
-    <TuringShell conversations={conversations} activeId={null}>
+    <TuringShell conversations={conversations} activeId={null} title="New conversation">
       <Chat conversationId={null} initialTurns={[]} />
     </TuringShell>
   );
