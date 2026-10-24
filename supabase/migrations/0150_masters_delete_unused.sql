@@ -45,7 +45,8 @@ drop trigger if exists items_delete_guard on items;
 create trigger items_delete_guard before delete on items
   for each row execute function masters_delete_guard('item', 'item_margins', 'item_id', 'Budget margins');
 
--- "Untouched" is the cards' rule (0149): never updated more than a minute after it was made.
+-- A seeded row is made in its parent's own transaction, so it is untouched exactly while updated_at = created_at and
+-- created_at is its parent's: any later edit, or a row added later, moves one of them.
 
 -- A unit: never one reserved, sold or with a buyer, or with rooms. Its seeded Client Relations record and payment
 -- schedule go with it while nobody has changed either; that record's receipts and actions still refuse by their keys.
@@ -68,10 +69,10 @@ begin
   if v_engagement is not null then
     if exists (select 1 from client_engagements e
                 where e.id = v_engagement
-                  and e.updated_at > e.created_at + interval '1 minute')
+                  and (e.updated_at <> e.created_at or e.created_at <> old.created_at))
        or exists (select 1 from client_payment_milestones m
                    where m.engagement_id = v_engagement
-                     and m.updated_at > m.created_at + interval '1 minute') then
+                     and (m.updated_at <> m.created_at or m.created_at <> old.created_at)) then
       raise exception 'Client Relations has details on this unit, so it cannot be deleted';
     end if;
     delete from client_engagements where id = v_engagement;
@@ -82,7 +83,7 @@ end $$;
 revoke all on function units_delete_guard() from public, anon, authenticated;
 
 -- A project: never one with a store. Its seeded Relay plan and stages go with it while nobody has changed them or
--- added a stage; a trail on one of its stages still refuses by its key.
+-- added a stage.
 create or replace function projects_delete_guard()
 returns trigger
 language plpgsql
@@ -93,14 +94,15 @@ begin
   if exists (select 1 from stores where project_id = old.id) then
     raise exception 'Stores use this project, so it cannot be deleted';
   end if;
+  if exists (select 1 from pusher_chains where project_id = old.id) then
+    raise exception 'Relay trails use this project, so it cannot be deleted';
+  end if;
   if exists (select 1 from pusher_project_plans p
               where p.project_id = old.id
-                and (p.updated_at > p.created_at + interval '1 minute'
-                     or p.created_at > old.created_at + interval '1 minute'))
+                and (p.updated_at <> p.created_at or p.created_at <> old.created_at))
      or exists (select 1 from project_stages s
                  where s.project_id = old.id
-                   and (s.updated_at > s.created_at + interval '1 minute'
-                        or s.created_at > old.created_at + interval '1 minute')) then
+                   and (s.updated_at <> s.created_at or s.created_at <> old.created_at)) then
     raise exception 'Relay has a schedule on this project, so it cannot be deleted';
   end if;
   delete from project_stages where project_id = old.id;
@@ -113,8 +115,6 @@ revoke all on function projects_delete_guard() from public, anon, authenticated;
 drop trigger if exists projects_delete_guard on projects;
 create trigger projects_delete_guard before delete on projects
   for each row execute function projects_delete_guard();
-
-revoke all on function units_delete_guard() from public, anon, authenticated;
 
 drop trigger if exists units_delete_guard on units;
 create trigger units_delete_guard before delete on units
