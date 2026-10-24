@@ -8,6 +8,10 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 - **Before the switch to production:** delete the test project (Settings → Test project) — its POs and bills use real vendors.
 
+## Next — TI, the admins' assistant
+
+`plan.md`, _Piece 5_: chat, dropped files, every operation through drafts, interactive pages. Starts once Delete or Cancel is merged; Fable reviews the plan first unless the founder waives, and the founder answers its three questions.
+
 ## Native apps on iPhone and Android — next build
 
 - **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), the top section of `plan.md`.
