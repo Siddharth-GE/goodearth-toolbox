@@ -10648,6 +10648,184 @@ export type Database = {
           },
         ]
       }
+      turing_conversations: {
+        Row: {
+          container_expires_at: string | null
+          container_id: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          container_expires_at?: string | null
+          container_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          container_expires_at?: string | null
+          container_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_conversations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_files: {
+        Row: {
+          anthropic_file_id: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          media_type: string
+          name: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+        }
+        Insert: {
+          anthropic_file_id: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          media_type: string
+          name: string
+          owner_id?: string
+          size_bytes: number
+          storage_path: string
+        }
+        Update: {
+          anthropic_file_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          name?: string
+          owner_id?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_files_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_files_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_messages: {
+        Row: {
+          cache_read_tokens: number | null
+          cache_write_tokens: number | null
+          content: Json
+          conversation_id: string
+          created_at: string
+          id: number
+          input_tokens: number | null
+          output_tokens: number | null
+          role: string
+        }
+        Insert: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content: Json
+          conversation_id: string
+          created_at?: string
+          id?: never
+          input_tokens?: number | null
+          output_tokens?: number | null
+          role: string
+        }
+        Update: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content?: Json
+          conversation_id?: string
+          created_at?: string
+          id?: never
+          input_tokens?: number | null
+          output_tokens?: number | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_pages: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          recipe: Json
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          recipe: Json
+          storage_path: string
+          title: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          recipe?: Json
+          storage_path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_pages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_pages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           client_id: string | null
