@@ -278,10 +278,15 @@ export function editedRows(
       return { ok: false, error: "The rows changed. Reload and try again." };
     }
     seen.add(index);
+    const changes = ((edit as { values?: object }).values ?? {}) as Record<string, unknown>;
     const merged = {
       label: original[index].label,
-      values: { ...original[index].values, ...((edit as { values?: object }).values ?? {}) },
+      values: { ...original[index].values, ...changes } as Record<string, unknown>,
     };
+    // null is the admin's "Keep as is": the field is left out, whatever Turing proposed.
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) delete merged.values[key];
+    }
     const row = checkRow(entry, merged);
     if (!row.ok) return { ok: false, error: `${original[index].label}: ${row.error}` };
     const moved = entry.fields.find(

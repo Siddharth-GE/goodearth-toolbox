@@ -147,3 +147,27 @@ test("Claude's list says what a new record starts as", () => {
   assert.ok(text.includes("is_active (true or false, optional, true if left out)"));
   assert.ok(text.includes("- vendor_bank — "));
 });
+
+test("Keep as is, picked on screen, leaves the field out whatever Turing proposed", () => {
+  const entry = entryFor("vendor_change")!;
+  const original = [{ label: "Geo", values: { vendor_id: ID, is_active: false } }];
+  const kept = editedRows(entry, original, [{ row: 0, values: { is_active: null } }]);
+  assert.ok(kept.ok);
+  assert.equal("is_active" in kept.value[0].row.values, false);
+});
+
+test("a status or state a new record starts with can be kept on a change, never emptied", () => {
+  const plot = checkProposal({
+    action: "plot_change",
+    title: "x",
+    rows: [{ label: "P12", plot_id: ID, status: "" }],
+  });
+  assert.ok(!plot.ok && /Status can be left as it is, but not emptied/.test(plot.error));
+  const company = checkProposal({
+    action: "company_new",
+    title: "x",
+    rows: [{ label: "Kaadal", name: "Kaadal Builders" }],
+  });
+  assert.ok(company.ok);
+  assert.equal(company.value.rows[0].values.state, "Kerala");
+});

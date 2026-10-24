@@ -30,10 +30,13 @@ const words = (key: string, label: string, extra: Partial<Field> = {}): Field =>
   ...extra,
 });
 
-/** A change's fields: each left out keeps what is there, and what the tool needs can't be emptied. */
+/**
+ * A change's fields: each left out keeps what is there, and what the tool needs can't be emptied —
+ * a required field, or one a new record starts with (a status, a state).
+ */
 const changing = (fields: Field[]): Field[] =>
   fields.map((field) =>
-    field.optional || field.kind === "yesno"
+    field.kind === "yesno" || (field.optional && field.start === undefined)
       ? { ...field, optional: true }
       : { ...field, optional: true, keep: true },
   );
@@ -87,7 +90,7 @@ const company = [
   words("legal_name", "Legal name"),
   words("address", "Address"),
   words("gstin", "GSTIN"),
-  { key: "state", label: "State", kind: "text" },
+  { key: "state", label: "State", kind: "text", optional: true, start: "Kerala" },
   words("phone", "Phone"),
   words("email", "Email"),
   active,

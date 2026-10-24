@@ -1,7 +1,8 @@
 /**
  * Whether a new Masters record is one already there under another spelling: the same GSTIN, phone
- * or code, or a near name ("K Santhosh" for "Santhosh K", "Geo Bricks" for "GeoBricks", "Madhu M A"
- * for "Madhu"). Only a warning: the admin decides. Pure.
+ * or code, or a near name ("K Santhosh" for "Santhosh K", "Geo Bricks Pvt Ltd" for "GeoBricks",
+ * "Madhu M A" for "Madhu"). Names whose numbers differ are never near: "PVC pipe 20mm" is not
+ * "PVC pipe 25mm". Only a warning: the admin decides. Pure.
  */
 
 export type Known = {
@@ -14,20 +15,43 @@ export type Known = {
 /** Words that say what kind of firm, not which one. */
 const FILLER = new Set(["pvt", "private", "ltd", "limited", "llp", "co", "the", "ms"]);
 
-const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+/** A record made ready to compare, once. */
+type Keys = {
+  name: string;
+  tax: string;
+  phones: string[];
+  code: string;
+  /** The name's letters and digits run together, filler dropped: "geobricks". */
+  plain: string;
+  /** Its words sorted, initials and filler dropped: the order and the initials vary by who typed it. */
+  words: string;
+  /** Every number in the name, in order. */
+  numbers: string;
+};
 
-/** A name's words, sorted, with initials and filler dropped: the order and the initials vary by who typed it. */
-function words(name: string): string {
-  return name
+function keysOf(known: Known): Keys {
+  const tokens = known.name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .split(" ")
-    .filter((word) => word.length > 1 && !FILLER.has(word))
-    .sort()
-    .join(" ");
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token && !FILLER.has(token));
+  return {
+    name: known.name,
+    tax: (known.tax ?? "").toUpperCase().replace(/\s+/g, ""),
+    // A field may hold two numbers; each is matched on its last ten digits.
+    phones: (known.phone ?? "")
+      .split(/[,;/]/)
+      .map((phone) => phone.replace(/\D/g, "").slice(-10))
+      .filter((phone) => phone.length === 10),
+    // Dots stay: CAR.1.11 is not CAR.11.1.
+    code: (known.code ?? "").toUpperCase().replace(/\s+/g, ""),
+    plain: tokens.join(""),
+    words: tokens
+      .filter((token) => token.length > 1 || /\d/.test(token))
+      .sort()
+      .join(" "),
+    numbers: (known.name.match(/\d+/g) ?? []).join(" "),
+  };
 }
-
-const digits = (phone: string) => phone.replace(/\D/g, "").slice(-10);
 
 /** One edit apart: a typo, not a different name. */
 function oneApart(a: string, b: string): boolean {
@@ -38,32 +62,31 @@ function oneApart(a: string, b: string): boolean {
   return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
 }
 
-/** Why `row` looks like `known`, or nothing. */
-export function likeness(row: Known, known: Known): string | undefined {
-  const tax = (value?: string | null) => (value ?? "").toUpperCase().replace(/\s+/g, "");
-  if (tax(row.tax) && tax(row.tax) === tax(known.tax)) return "the same GSTIN";
-  if (row.phone && known.phone && digits(row.phone).length === 10) {
-    if (digits(row.phone) === digits(known.phone)) return "the same phone";
-  }
-  if (row.code && known.code && squash(row.code) === squash(known.code)) return "the same code";
-  const a = squash(row.name);
-  const b = squash(known.name);
-  if (!a || !b) return undefined;
-  if (a === b || (words(row.name) && words(row.name) === words(known.name))) return "a near name";
-  if (a.length >= 6 && oneApart(a, b)) return "a near name";
+function why(row: Keys, known: Keys): string | undefined {
+  if (row.tax && row.tax === known.tax) return "the same GSTIN";
+  if (row.phones.some((phone) => known.phones.includes(phone))) return "the same phone";
+  if (row.code && row.code === known.code) return "the same code";
+  if (!row.plain || !known.plain || row.numbers !== known.numbers) return undefined;
+  if (row.plain === known.plain || (row.words && row.words === known.words)) return "a near name";
+  if (row.plain.length >= 6 && oneApart(row.plain, known.plain)) return "a near name";
   return undefined;
 }
 
+/** Why `row` looks like `known`, or nothing. */
+export const likeness = (row: Known, known: Known) => why(keysOf(row), keysOf(known));
+
 /** Each row's warning, or null: first against what exists, then against the rows before it. */
 export function lookAlikes(rows: Known[], existing: Known[]): (string | null)[] {
-  return rows.map((row, index) => {
-    for (const known of existing) {
-      const why = likeness(row, known);
-      if (why) return `Looks like ${known.name} (${why})`;
+  const known = existing.map(keysOf);
+  const mine = rows.map(keysOf);
+  return mine.map((row, index) => {
+    for (const other of known) {
+      const reason = why(row, other);
+      if (reason) return `Looks like ${other.name} (${reason})`;
     }
     for (let at = 0; at < index; at += 1) {
-      const why = likeness(row, rows[at]);
-      if (why) return `Same as row ${at + 1} (${why})`;
+      const reason = why(row, mine[at]);
+      if (reason) return `Same as row ${at + 1} (${reason})`;
     }
     return null;
   });

@@ -67,6 +67,7 @@ export async function getConversation(
   const ids = new Map<IdTable, Set<string>>();
   const saved = new Set((saves.data ?? []).map((save) => save.tool_use_id));
   const alike = new Map<string, (string | null)[]>();
+  const flagging: Promise<void>[] = [];
   for (const proposal of shownProposals(messages).values()) {
     const entry = entryFor(proposal.action);
     if (!entry) continue;
@@ -75,15 +76,15 @@ export async function getConversation(
     }
     // Once saved, a new record would only look like itself.
     if (entry.alike && !saved.has(proposal.id)) {
-      try {
-        const flags = await alikeFor(entry, proposal.rows);
-        if (flags) alike.set(proposal.id, flags);
-      } catch (thrown) {
-        console.error("turing: look-alikes not read:", thrown);
-      }
+      flagging.push(
+        alikeFor(entry, proposal.rows).then(
+          (flags) => void (flags && alike.set(proposal.id, flags)),
+          (thrown) => console.error("turing: look-alikes not read:", thrown),
+        ),
+      );
     }
   }
-  const names = await namesFor(ids);
+  const [names] = await Promise.all([namesFor(ids), ...flagging]);
 
   return {
     id: conversation.id,

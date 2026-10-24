@@ -199,7 +199,17 @@ export const MASTERS_RUNNERS: Runners<Key> = {
     moveProgressStage(of(v, "progress_stage_id"), v.direction === "up" ? "up" : "down"),
 
   gst_rate_new: adding("gst_rate_new", addGstRate),
-  gst_rate_active: (v) => setGstRateActive(Number(v.rate), v.is_active === true),
+  gst_rate_active: async (v) => {
+    // A rate is a number, not an id, so nothing else checks it names one; the update alone would match nothing and say saved.
+    const now = await recordNow(
+      "gst_rates",
+      { column: "rate", id: of(v, "rate") },
+      ["rate"],
+      `There is no ${of(v, "rate")}% rate on the list.`,
+    );
+    if ("error" in now) return now;
+    return setGstRateActive(Number(v.rate), v.is_active === true);
+  },
 
   work_category_new: adding("work_category_new", addWorkCategory),
   work_category_change: changing("work_category_change", updateWorkCategory, {

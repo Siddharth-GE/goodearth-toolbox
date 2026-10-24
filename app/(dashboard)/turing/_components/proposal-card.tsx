@@ -40,7 +40,8 @@ function FieldInput({
   value: Value | undefined;
   adds: boolean;
   disabled: boolean;
-  onChange: (value: Value) => void;
+  /** null puts the field back to "Keep as is". */
+  onChange: (value: Value | null) => void;
 }) {
   const kept = value === undefined && !adds;
   let input;
@@ -53,10 +54,12 @@ function FieldInput({
             aria-label={field.label}
             value={value === undefined ? "" : value === true ? "yes" : "no"}
             disabled={disabled}
-            onChange={(event) => onChange(event.target.value === "yes")}
+            onChange={(event) =>
+              onChange(event.target.value === "" ? null : event.target.value === "yes")
+            }
             className="h-9 min-w-28"
           >
-            {kept && <option value="">Keep as is</option>}
+            <option value="">Keep as is</option>
             <option value="yes">Yes</option>
             <option value="no">No</option>
           </Select>
@@ -161,7 +164,9 @@ export function ProposalCard({
   const [ticked, setTicked] = useState(() =>
     proposal.rows.map((_, index) => !proposal.alike?.[index]),
   );
-  const [values, setValues] = useState(() => proposal.rows.map((row) => ({ ...row.values })));
+  const [values, setValues] = useState(() =>
+    proposal.rows.map((row): Record<string, Value | null> => ({ ...row.values })),
+  );
   const { pending, error, run } = useActionRunner();
   if (!entry) return null;
 
@@ -292,7 +297,7 @@ export function ProposalCard({
                 <TableCell key={field.key}>
                   <FieldInput
                     field={field}
-                    value={shown(index)[field.key]}
+                    value={shown(index)[field.key] ?? undefined}
                     adds={entry.adds === true}
                     disabled={locked || !ticked[index]}
                     onChange={(value) =>

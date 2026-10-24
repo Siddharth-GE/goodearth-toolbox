@@ -23,8 +23,33 @@ test("different firms are not flagged", () => {
     ["Asian Paints", "Berger Paints"],
     ["Raj", "Ram"],
     ["Madhu", "Madhavan"],
+    // Sizes and grades are different items, however close the names.
+    ["PVC pipe 20mm", "PVC pipe 25mm"],
+    ["TMT bar 12mm", "TMT bar 16mm"],
+    ["Cement OPC 43", "Cement OPC 53"],
+    ["GI pipe 1/2 inch", "GI pipe 3/4 inch"],
   ])
     assert.equal(likeness({ name: a }, { name: b }), undefined, `${a} / ${b}`);
+});
+
+test("a firm's Pvt Ltd and spacing don't hide it", () => {
+  assert.equal(likeness({ name: "Geo Bricks Pvt Ltd" }, { name: "GeoBricks" }), "a near name");
+  assert.equal(likeness({ name: "M/s Geo Bricks" }, { name: "Geo Bricks" }), "a near name");
+});
+
+test("codes keep their dots, and each of two phone numbers is matched", () => {
+  assert.equal(
+    likeness({ name: "A", code: "CAR.1.11" }, { name: "B", code: "CAR.11.1" }),
+    undefined,
+  );
+  assert.equal(
+    likeness({ name: "A", phone: "98470 12345, 94470 99999" }, { name: "B", phone: "9847012345" }),
+    "the same phone",
+  );
+  assert.equal(
+    likeness({ name: "A", phone: "9447099999" }, { name: "B", phone: "98470 12345 / 94470 99999" }),
+    "the same phone",
+  );
 });
 
 test("the same GSTIN, phone or code is flagged whatever the name", () => {

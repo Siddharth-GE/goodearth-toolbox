@@ -21,7 +21,7 @@ import { requireTuring } from "./queries";
 export async function saveProposal(input: {
   conversationId: string;
   proposalId: string;
-  rows: { row: number; values: Record<string, string | boolean> }[];
+  rows: { row: number; values: Record<string, string | boolean | null> }[];
 }): Promise<ActionState> {
   await requireTuring();
   const supabase = await createClient();
