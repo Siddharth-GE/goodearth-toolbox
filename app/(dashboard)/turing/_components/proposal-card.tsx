@@ -25,19 +25,24 @@ import { useState } from "react";
 
 const words = (value: string) => value.replace(/_/g, " ");
 
-/** An editable value; a field left out of the row reads "keeps what is there". */
+/**
+ * An editable value; a field left out of the row reads "keeps what is there", or is blank on a
+ * row that adds a new record.
+ */
 function FieldInput({
   field,
   value,
+  adds,
   disabled,
   onChange,
 }: {
   field: Field;
   value: Value | undefined;
+  adds: boolean;
   disabled: boolean;
   onChange: (value: Value) => void;
 }) {
-  const kept = value === undefined;
+  const kept = value === undefined && !adds;
   let input;
   switch (field.kind) {
     case "yesno":
@@ -54,7 +59,7 @@ function FieldInput({
       input = (
         <Select
           aria-label={field.label}
-          value={kept ? "" : String(value)}
+          value={value === undefined ? "" : String(value)}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className="h-9 min-w-32"
@@ -62,7 +67,7 @@ function FieldInput({
           {field.optional && <option value="">{kept ? "Keep as is" : "—"}</option>}
           {field.choices?.map((choice) => (
             <option key={choice} value={choice}>
-              {words(choice)}
+              {field.labels?.[choice] ?? words(choice)}
             </option>
           ))}
         </Select>
@@ -72,14 +77,27 @@ function FieldInput({
       input = (
         <Input
           aria-label={field.label}
-          type={field.kind === "date" ? "date" : field.kind === "whole" ? "number" : "text"}
-          min={field.kind === "whole" ? 0 : undefined}
-          value={kept ? "" : String(value)}
-          placeholder={kept ? "Keep as is" : "Empty — clears it"}
+          type={
+            field.kind === "date"
+              ? "date"
+              : field.kind === "whole" || field.kind === "amount"
+                ? "number"
+                : "text"
+          }
+          min={field.kind === "whole" || field.kind === "amount" ? 0 : undefined}
+          step={field.kind === "amount" ? "any" : undefined}
+          value={value === undefined ? "" : String(value)}
+          placeholder={kept ? "Keep as is" : adds ? "Blank" : "Empty — clears it"}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className={
-            field.kind === "text" ? "h-9 w-36" : field.kind === "whole" ? "h-9 w-20" : "h-9 w-40"
+            field.kind === "text"
+              ? "h-9 w-36"
+              : field.kind === "whole"
+                ? "h-9 w-20"
+                : field.kind === "amount"
+                  ? "h-9 w-24"
+                  : "h-9 w-40"
           }
         />
       );
@@ -240,6 +258,7 @@ export function ProposalCard({
                   <FieldInput
                     field={field}
                     value={shown(index)[field.key]}
+                    adds={entry.adds === true}
                     disabled={locked || !ticked[index]}
                     onChange={(value) =>
                       setValues((all) =>

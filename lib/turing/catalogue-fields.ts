@@ -4,16 +4,19 @@
  * each tool's action live in catalogue.ts. A new kind is a new entry here and a runner there.
  */
 
-export type FieldKind = "id" | "date" | "whole" | "text" | "choice" | "yesno";
+export type FieldKind = "id" | "date" | "whole" | "amount" | "text" | "choice" | "yesno";
 
 /** Where an id points; the server turns each into a name the admin can check. */
-export type IdTable = "plots" | "work_groups" | "profiles" | "vendors";
+export type IdTable =
+  "plots" | "work_groups" | "work_items" | "profiles" | "vendors" | "labour_logs";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
   work_groups: "work_groups (a stage of the site sequence)",
+  work_items: "work_items (a work in the works list)",
   profiles: "profiles (a person)",
   vendors: "vendors (a contractor)",
+  labour_logs: "labour_logs",
 };
 
 export type Field = {
@@ -26,6 +29,8 @@ export type Field = {
    */
   optional?: true;
   choices?: readonly string[];
+  /** A choice as the admin reads it, where its stored word is not plain English. */
+  labels?: Record<string, string>;
   table?: IdTable;
 };
 
@@ -39,7 +44,10 @@ export type EntryKey =
   | "stage_contractor"
   | "stage_needed"
   | "stage_follows"
-  | "sequence_days";
+  | "sequence_days"
+  | "labour_log_new"
+  | "labour_log_change"
+  | "labour_log_delete";
 
 export type Entry = {
   key: EntryKey;
@@ -48,6 +56,8 @@ export type Entry = {
   title: string;
   description: string;
   fields: Field[];
+  /** Makes a new record, so a field left out is blank rather than kept. */
+  adds?: true;
 };
 
 export type Value = string | boolean;
@@ -56,6 +66,53 @@ export type Row = { label: string; values: Record<string, Value> };
 
 const plot: Field = { key: "plot_id", label: "Villa", kind: "id", table: "plots" };
 const stage: Field = { key: "group_id", label: "Stage", kind: "id", table: "work_groups" };
+const log: Field = { key: "log_id", label: "Log", kind: "id", table: "labour_logs" };
+
+/** The labour form's fields, by the names Supervisors' own form sends (pinned by a test). */
+export const LABOUR_LOG_FORM = [
+  "plot_id",
+  "work_item_id",
+  "contractor_id",
+  "log_date",
+  "kind",
+  "work_class",
+  "masons",
+  "helpers",
+  "others",
+  "quantity",
+  "description",
+  "note",
+] as const;
+
+const labourDetails = (optional: boolean): Field[] => {
+  const may = optional ? ({ optional: true } as const) : {};
+  return [
+    { key: "work_item_id", label: "Work", kind: "id", table: "work_items", ...may },
+    { key: "contractor_id", label: "Contractor", kind: "id", table: "vendors", ...may },
+    { key: "log_date", label: "Date", kind: "date", ...may },
+    {
+      key: "kind",
+      label: "Paid as",
+      kind: "choice",
+      choices: ["nmr", "pw_qty", "pw_lump"],
+      labels: { nmr: "Daily wages", pw_qty: "Piece-work by quantity", pw_lump: "Lump sum" },
+      ...may,
+    },
+    {
+      key: "work_class",
+      label: "Work class",
+      kind: "choice",
+      optional: true,
+      choices: ["standard", "additional", "rework"],
+    },
+    { key: "masons", label: "Masons", kind: "whole", optional: true },
+    { key: "helpers", label: "Helpers", kind: "whole", optional: true },
+    { key: "others", label: "Others", kind: "whole", optional: true },
+    { key: "quantity", label: "Quantity", kind: "amount", optional: true },
+    { key: "description", label: "What was done", kind: "text", optional: true },
+    { key: "note", label: "Note", kind: "text", optional: true },
+  ];
+};
 
 export const ENTRIES: Entry[] = [
   {
@@ -190,6 +247,31 @@ export const ENTRIES: Entry[] = [
       { key: "value", label: "Days", kind: "whole", optional: true },
     ],
   },
+  {
+    key: "labour_log_new",
+    tool: "/supervisors",
+    title: "A day's labour",
+    description:
+      "Logs a day's labour on a villa: the work, the contractor (a vendor with is_contractor) and how it is paid — nmr is daily wages (masons, helpers, others; at least one), pw_qty is piece-work by quantity (in the work's unit from the rate book), pw_lump is a lump sum (what was done says what). Work class is standard unless it was additional work or rework. A second log for the same villa, work, contractor, day, payment and class is refused: change that one instead. Quantities and heads only, never wages.",
+    adds: true,
+    fields: [plot, ...labourDetails(false)],
+  },
+  {
+    key: "labour_log_change",
+    tool: "/supervisors",
+    title: "A labour log, corrected",
+    description:
+      "Corrects a labour log (labour_logs.id); its villa stays. A log on a bill (bill_id set) cannot be changed.",
+    fields: [log, ...labourDetails(true)],
+  },
+  {
+    key: "labour_log_delete",
+    tool: "/supervisors",
+    title: "A labour log, deleted",
+    description:
+      "Deletes a labour log entered by mistake (labour_logs.id). A log on a bill (bill_id set) cannot be deleted.",
+    fields: [log],
+  },
 ];
 
 export const entryFor = (key: unknown): Entry | undefined =>
@@ -237,7 +319,11 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
     case "whole":
       return /^\d{1,3}$/.test(value)
         ? { ok: true, value }
-        : { ok: false, error: `${field.label} is a whole number of days.` };
+        : { ok: false, error: `${field.label} is a whole number up to 999.` };
+    case "amount":
+      return /^\d{1,9}(\.\d{1,3})?$/.test(value)
+        ? { ok: true, value }
+        : { ok: false, error: `${field.label} is a number, like 12.5.` };
     case "choice":
       return field.choices?.includes(value)
         ? { ok: true, value }
@@ -369,14 +455,17 @@ export function catalogueText(): string {
                 ? "true or false"
                 : field.kind === "whole"
                   ? "whole number"
-                  : field.kind;
+                  : field.kind === "amount"
+                    ? "number"
+                    : field.kind;
         return `${field.key} (${kind}${field.optional ? ", optional" : ""})`;
       })
       .join(", ");
-    return `- ${entry.key} — ${entry.title}, in ${entry.tool}. ${entry.description} Fields: ${fields}.`;
+    const adds = entry.adds ? " Adds a new record." : "";
+    return `- ${entry.key} — ${entry.title}, in ${entry.tool}.${adds} ${entry.description} Fields: ${fields}.`;
   });
   return [
-    "An optional field left out keeps what is there now; given as empty it clears it. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",
+    "An optional field left out keeps what is there now; given as empty it clears it. On an entry that adds a new record, a field left out is blank. Give only what the admin asked to change. Every id is shown to the admin as a name, and an id that names nothing is refused.",
     ...rows,
   ].join("\n");
 }
