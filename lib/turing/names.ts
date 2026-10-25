@@ -65,6 +65,8 @@ const NAMED_BY: Record<
     | "spaces"
     | "space_views"
     | "budgets"
+    | "estimator_work_components"
+    | "estimator_mix_components"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -93,6 +95,7 @@ const NAMED_BY: Record<
   design_stages: "name",
   drawing_sets: "name",
   space_types: "name",
+  estimator_mixes: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -291,6 +294,31 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   ]);
   for (const one of [...revisions, ...spaces]) add("units", one.unit_id);
 
+  // A recipe line by its work, material or mix, and quantity; a mix's line by its mix and material.
+  const [workParts, mixParts] = await Promise.all([
+    readIn(list("estimator_work_components"), (chunk) =>
+      supabase
+        .from("estimator_work_components")
+        .select("id, work_item_id, item_id, mix_id, qty_per_unit")
+        .in("id", chunk),
+    ),
+    readIn(list("estimator_mix_components"), (chunk) =>
+      supabase
+        .from("estimator_mix_components")
+        .select("id, mix_id, item_id, qty_per_unit")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of workParts) {
+    add("work_items", one.work_item_id);
+    if (one.item_id) add("items", one.item_id);
+    if (one.mix_id) add("estimator_mixes", one.mix_id);
+  }
+  for (const one of mixParts) {
+    add("estimator_mixes", one.mix_id);
+    if (one.item_id) add("items", one.item_id);
+  }
+
   // A Birdwing record by its stay; a stay by its number, guest and nights.
   const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
     readIn(list("birdwing_stay_rooms"), (chunk) =>
@@ -435,6 +463,22 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       .join(" · ");
   for (const one of spaces)
     names[one.id] = [one.label, names[one.unit_id]].filter(Boolean).join(" · ");
+  for (const one of workParts)
+    names[one.id] = [
+      names[one.work_item_id],
+      names[one.item_id ?? one.mix_id ?? ""] ?? "An older material row",
+      `${formatQuantity(one.qty_per_unit)} per unit`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of mixParts)
+    names[one.id] = [
+      names[one.mix_id],
+      names[one.item_id ?? ""] ?? "An older material row",
+      `${formatQuantity(one.qty_per_unit)} per unit`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const revisionOf = new Map(
     revisions.map((one) => [
       one.id,
