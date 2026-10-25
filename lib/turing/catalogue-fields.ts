@@ -5,6 +5,7 @@
  */
 
 import { BILLS } from "./entries/bills";
+import { BIRDWING } from "./entries/birdwing";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
@@ -51,7 +52,16 @@ export type IdTable =
   | "bill_lines"
   | "client_actions"
   | "client_payment_milestones"
-  | "client_receipts";
+  | "client_receipts"
+  | "birdwing_stays"
+  | "birdwing_guests"
+  | "birdwing_stay_rooms"
+  | "birdwing_stay_charges"
+  | "birdwing_invoices"
+  | "birdwing_receipts"
+  | "birdwing_cross_charges"
+  | "birdwing_rate_card"
+  | "birdwing_cost_centres";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -89,6 +99,15 @@ const FROM: Record<IdTable, string> = {
   client_actions: "client_actions (an action in Client Relations)",
   client_payment_milestones: "client_payment_milestones (one stage of a plot's payment schedule)",
   client_receipts: "client_receipts (money a client paid)",
+  birdwing_stays: "birdwing_stays (a stay or room block at Birdwing)",
+  birdwing_guests: "birdwing_guests (a Birdwing guest)",
+  birdwing_stay_rooms: "birdwing_stay_rooms (a room on a stay, for some nights)",
+  birdwing_stay_charges: "birdwing_stay_charges (one charge on a stay)",
+  birdwing_invoices: "birdwing_invoices (a stay's invoice)",
+  birdwing_receipts: "birdwing_receipts (money received for a stay)",
+  birdwing_cross_charges: "birdwing_cross_charges (a stay's cross-charge or write-off)",
+  birdwing_rate_card: "birdwing_rate_card (a head of Birdwing's rate card)",
+  birdwing_cost_centres: "birdwing_cost_centres (who carries a Goodearth stay)",
 };
 
 export type Field = {
@@ -125,7 +144,13 @@ export type Field = {
  * Every name it reads is a field of the entry or listed as `ignored` by this save, which a test
  * holds, so a renamed or added form field fails CI instead of saving blank.
  */
-export type FormSource = { file: string; reader: string; ignored?: readonly string[] };
+export type FormSource = {
+  file: string;
+  reader: string;
+  ignored?: readonly string[];
+  /** What a ticked box sends: the masters' toggles "1" (the default), a plain checkbox "on". */
+  ticked?: "on";
+};
 
 /** Where a new record may already be, so a row that looks like one is flagged; each a column of the table and a field of the row. */
 export type Alike = {
@@ -165,6 +190,7 @@ export const ENTRIES = [
   ...WORK_ORDERS,
   ...BILLS,
   ...CLIENT_RELATIONS,
+  ...BIRDWING,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
@@ -177,7 +203,8 @@ export const formKeys = (entry: Entry) =>
 
 /**
  * The form as the tool's own screen sends it. A field left out of a change is sent as it is now,
- * since the tool's update replaces every field; a ticked box sends "1" and an unticked one nothing.
+ * since the tool's update replaces every field; a ticked box sends what its form's does ("1" unless
+ * said) and an unticked one nothing.
  */
 export function formOf(
   entry: Entry,
@@ -189,7 +216,7 @@ export function formOf(
     if (field.record) continue;
     const value = field.key in values ? values[field.key] : now?.[field.key];
     if (field.kind === "yesno") {
-      if (value === true) form.set(field.key, "1");
+      if (value === true) form.set(field.key, entry.form?.ticked ?? "1");
       continue;
     }
     form.set(field.key, value === null || value === undefined ? "" : String(value));

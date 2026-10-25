@@ -40,7 +40,8 @@ test("each form Turing sends is the one its tool reads, field for field", () => 
     );
     for (const field of entry.fields) {
       if (field.kind !== "yesno" || field.record) continue;
-      assert.match(body, new RegExp(`checked\\(formData, "${field.key}", "1"\\)`), entry.key);
+      const sends = entry.form.ticked ? "" : ', "1"';
+      assert.match(body, new RegExp(`checked\\(formData, "${field.key}"${sends}\\)`), entry.key);
     }
     checked += 1;
   }
