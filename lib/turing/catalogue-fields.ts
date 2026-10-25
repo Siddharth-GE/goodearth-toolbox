@@ -9,6 +9,7 @@ import { BIRDWING } from "./entries/birdwing";
 import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { DESIGN_MANAGEMENT } from "./entries/design-management";
+import { DIRECTORY } from "./entries/directory";
 import { SELECTIONS_BUDGETS } from "./entries/selections-budgets";
 import { ESTIMATOR_RATES } from "./entries/estimator-rates";
 import { ESTIMATOR_ESTIMATES } from "./entries/estimator-estimates";
@@ -16,6 +17,7 @@ import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
+import { RELAY } from "./entries/relay";
 import { SUPERVISORS } from "./entries/supervisors";
 import { WORK_ORDERS } from "./entries/work-orders";
 
@@ -86,7 +88,13 @@ export type IdTable =
   | "estimator_mix_components"
   | "estimator_estimates"
   | "estimator_estimate_lines"
-  | "estimator_estimate_line_measurements";
+  | "estimator_estimate_line_measurements"
+  | "pusher_chains"
+  | "pusher_activities"
+  | "pusher_departments"
+  | "pusher_trail_sets"
+  | "project_stages"
+  | "staff_departments";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -155,6 +163,12 @@ const FROM: Record<IdTable, string> = {
   estimator_estimate_lines: "estimator_estimate_lines (one work on an estimate)",
   estimator_estimate_line_measurements:
     "estimator_estimate_line_measurements (a row of a work's measurement sheet)",
+  pusher_chains: "pusher_chain_state.chain_id (a Relay trail)",
+  pusher_activities: "pusher_activities (an activity a Relay trail's legs are made of)",
+  pusher_departments: "pusher_departments (a department Relay trails are tagged with)",
+  pusher_trail_sets: "pusher_trail_sets (a Relay trail type)",
+  project_stages: "project_stages (a stage of a project's Relay schedule)",
+  staff_departments: "staff_departments (a department people sit in, in Directory)",
 };
 
 export type Field = {
@@ -245,6 +259,8 @@ export const ENTRIES = [
   ...SELECTIONS_BUDGETS,
   ...ESTIMATOR_RATES,
   ...ESTIMATOR_ESTIMATES,
+  ...RELAY,
+  ...DIRECTORY,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 

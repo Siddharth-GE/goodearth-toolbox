@@ -70,6 +70,8 @@ const NAMED_BY: Record<
     | "estimator_estimates"
     | "estimator_estimate_lines"
     | "estimator_estimate_line_measurements"
+    | "pusher_chains"
+    | "project_stages"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -99,6 +101,10 @@ const NAMED_BY: Record<
   drawing_sets: "name",
   space_types: "name",
   estimator_mixes: "name",
+  pusher_activities: "name",
+  pusher_departments: "name",
+  pusher_trail_sets: "name",
+  staff_departments: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -414,6 +420,23 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of bbExpenses) add("birdwing_expense_heads", one.head_id);
   for (const one of bbRules) add("birdwing_staff", one.staff_id);
 
+  // A trail by its title, villa and where its baton is; a schedule stage by its project.
+  const [trails, projectStages] = await Promise.all([
+    readIn(list("pusher_chains"), (chunk) =>
+      supabase
+        .from("pusher_chain_state")
+        .select(
+          "chain_id, title, trail_set_name, unit_name, project_name, current_leg, leg_count, holder_id, is_finished, is_queued",
+        )
+        .in("chain_id", chunk),
+    ),
+    readIn(list("project_stages"), (chunk) =>
+      supabase.from("project_stages").select("id, name, project_id").in("id", chunk),
+    ),
+  ]);
+  for (const one of trails) if (one.holder_id) add("profiles", one.holder_id);
+  for (const one of projectStages) add("projects", one.project_id);
+
   const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
     readIn(list("profiles"), (chunk) =>
       supabase.from("profiles").select("id, full_name").in("id", chunk),
@@ -493,6 +516,22 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       .join(" · ");
   for (const one of spaces)
     names[one.id] = [one.label, names[one.unit_id]].filter(Boolean).join(" · ");
+  for (const one of trails) {
+    if (!one.chain_id) continue;
+    names[one.chain_id] = [
+      one.title ?? one.trail_set_name ?? "A trail",
+      one.unit_name ?? one.project_name,
+      one.is_finished
+        ? "finished"
+        : one.is_queued
+          ? "queued"
+          : `leg ${one.current_leg} of ${one.leg_count}, with ${names[one.holder_id ?? ""] ?? "someone"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  for (const one of projectStages)
+    names[one.id] = [one.name, names[one.project_id]].filter(Boolean).join(" · ");
   for (const one of workParts)
     names[one.id] = [
       names[one.work_item_id],
