@@ -81,6 +81,8 @@ const NAMED_BY: Record<
     | "advance_recoveries"
     | "funding_facilities"
     | "funding_movements"
+    | "cash_requests"
+    | "cash_request_items"
   >,
   "name" | "code name" | "code or name"
 > = {
