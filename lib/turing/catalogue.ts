@@ -9,6 +9,7 @@ import { BIRDWING_RUNNERS } from "./runners/birdwing";
 import { BIRDWING_BOOKS_RUNNERS } from "./runners/birdwing-books";
 import { CLIENT_RELATIONS_RUNNERS } from "./runners/client-relations";
 import { DESIGN_MANAGEMENT_RUNNERS } from "./runners/design-management";
+import { SELECTIONS_BUDGETS_RUNNERS } from "./runners/selections-budgets";
 import { INDENT_RUNNERS } from "./runners/indents";
 import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
@@ -30,4 +31,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...BIRDWING_RUNNERS,
   ...BIRDWING_BOOKS_RUNNERS,
   ...DESIGN_MANAGEMENT_RUNNERS,
+  ...SELECTIONS_BUDGETS_RUNNERS,
 };
