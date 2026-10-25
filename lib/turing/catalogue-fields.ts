@@ -6,6 +6,7 @@
 
 import { BILLS } from "./entries/bills";
 import { BIRDWING } from "./entries/birdwing";
+import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
@@ -61,7 +62,11 @@ export type IdTable =
   | "birdwing_receipts"
   | "birdwing_cross_charges"
   | "birdwing_rate_card"
-  | "birdwing_cost_centres";
+  | "birdwing_cost_centres"
+  | "birdwing_expenses"
+  | "birdwing_expense_heads"
+  | "birdwing_staff"
+  | "birdwing_pay_rules";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -108,6 +113,10 @@ const FROM: Record<IdTable, string> = {
   birdwing_cross_charges: "birdwing_cross_charges (a stay's cross-charge or write-off)",
   birdwing_rate_card: "birdwing_rate_card (a head of Birdwing's rate card)",
   birdwing_cost_centres: "birdwing_cost_centres (who carries a Goodearth stay)",
+  birdwing_expenses: "birdwing_expenses (one of Birdwing's expense lines)",
+  birdwing_expense_heads: "birdwing_expense_heads (a head Birdwing's expenses are kept under)",
+  birdwing_staff: "birdwing_staff (a member of Birdwing's staff)",
+  birdwing_pay_rules: "birdwing_pay_rules (a staff member's pay from a day)",
 };
 
 export type Field = {
@@ -191,6 +200,7 @@ export const ENTRIES = [
   ...BILLS,
   ...CLIENT_RELATIONS,
   ...BIRDWING,
+  ...BIRDWING_BOOKS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
