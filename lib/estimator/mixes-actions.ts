@@ -84,7 +84,19 @@ export async function deleteMix(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Its composition goes with it; a mix used by a work recipe is refused by the FK, which is wanted.
+  // Checked before its composition goes: the FK refuses the mix only after that delete, which would leave every work using it priced at nothing.
+  const [works, lines] = await Promise.all([
+    supabase.from("estimator_work_components").select("id").eq("mix_id", id).limit(1),
+    supabase.from("estimator_estimate_line_components").select("id").eq("mix_id", id).limit(1),
+  ]);
+  if (works.error || lines.error) {
+    console.error("deleteMix (in use) read failed:", works.error ?? lines.error);
+    return { error: "Could not delete the mix. Try again." };
+  }
+  if (works.data.length > 0 || lines.data.length > 0) {
+    return { error: "This mix is in use, so it can't be deleted. Switch it off instead." };
+  }
+
   const { error: componentError } = await supabase
     .from("estimator_mix_components")
     .delete()

@@ -20,6 +20,16 @@ export async function keepFolderList(
   const read = await readWorkDriveFolder(linkId);
   if (!read.ok) return { error: read.reason };
 
+  // Read first, so a failed insert puts the last list back rather than leaving none.
+  const { data: kept, error: keptError } = await supabase
+    .from("drawing_revision_folder_sheets")
+    .select("workdrive_id, name, size_bytes, modified_at, sort_order, created_by")
+    .eq("drawing_revision_id", revisionId);
+  if (keptError) {
+    console.error("keepFolderList read failed:", keptError);
+    return { error: "Could not keep the folder's list. Try again." };
+  }
+
   const { error: clearError } = await supabase
     .from("drawing_revision_folder_sheets")
     .delete()
@@ -50,6 +60,12 @@ export async function keepFolderList(
   );
   if (error) {
     console.error("keepFolderList insert failed:", error);
+    if (kept.length > 0) {
+      const { error: restoreError } = await supabase
+        .from("drawing_revision_folder_sheets")
+        .insert(kept.map((sheet) => ({ ...sheet, drawing_revision_id: revisionId })));
+      if (restoreError) console.error("keepFolderList restore failed:", restoreError);
+    }
     return { error: dbErrorMessage(error, "Could not keep the folder's list. Try again.") };
   }
   return {};

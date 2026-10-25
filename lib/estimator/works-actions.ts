@@ -165,6 +165,47 @@ export async function removeWorkComponent(id: string): Promise<ActionState> {
   return undefined;
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Puts a copy's target back as it was: its setup (or none) and its materials. Best effort; a failure is logged. */
+async function restoreWork(
+  supabase: Supabase,
+  workItemId: string,
+  info: {
+    uom: string;
+    labour_rate: number | null;
+    model_measure: string | null;
+    created_by: string | null;
+    updated_by: string | null;
+  } | null,
+  parts: {
+    item_id: string | null;
+    material_id: string | null;
+    mix_id: string | null;
+    qty_per_unit: number;
+    created_by: string | null;
+    updated_by: string | null;
+  }[],
+): Promise<void> {
+  const { error: clearError } = await supabase
+    .from("estimator_work_components")
+    .delete()
+    .eq("work_item_id", workItemId);
+  const { error: partsError } =
+    clearError || parts.length === 0
+      ? { error: clearError }
+      : await supabase
+          .from("estimator_work_components")
+          .insert(parts.map((part) => ({ ...part, work_item_id: workItemId })));
+  const { error: infoError } = info
+    ? await supabase
+        .from("estimator_work_info")
+        .upsert({ ...info, work_item_id: workItemId }, { onConflict: "work_item_id" })
+    : await supabase.from("estimator_work_info").delete().eq("work_item_id", workItemId);
+  const failed = partsError ?? infoError;
+  if (failed) console.error("copyWorkSetup restore failed:", workItemId, failed);
+}
+
 /** Copy one work's unit, labour rate and materials onto other works; the targets' materials are REPLACED (a copy, not a merge).
  * A target on an estimate in a DIFFERENT unit is refused by name. Several writes per target, no transaction:
  * a failure says which works were done, and running it again finishes the rest. */
@@ -227,6 +268,25 @@ export async function copyWorkSetup(
   const recipe = (components.data ?? []).filter((row) => row.item_id || row.mix_id);
   let done = 0;
   for (const target of targets) {
+    // What the target had, so a failed write puts it back rather than leaving it with no materials.
+    const [beforeInfo, beforeParts] = await Promise.all([
+      supabase
+        .from("estimator_work_info")
+        .select("uom, labour_rate, model_measure, created_by, updated_by")
+        .eq("work_item_id", target)
+        .maybeSingle(),
+      supabase
+        .from("estimator_work_components")
+        .select("item_id, material_id, mix_id, qty_per_unit, created_by, updated_by")
+        .eq("work_item_id", target),
+    ]);
+    if (beforeInfo.error || beforeParts.error) {
+      console.error("copyWorkSetup (target read) failed:", beforeInfo.error ?? beforeParts.error);
+      revalidatePath("/estimator", "layout");
+      return {
+        error: `Copied to ${done} of ${targets.length} works, then something failed. Try again to finish the rest.`,
+      };
+    }
     const { error: infoError } = await supabase.from("estimator_work_info").upsert(
       {
         work_item_id: target,
@@ -255,6 +315,7 @@ export async function copyWorkSetup(
           );
     if (insertError) {
       console.error("copyWorkSetup (write) failed:", insertError);
+      await restoreWork(supabase, target, beforeInfo.data, beforeParts.data);
       revalidatePath("/estimator", "layout");
       return {
         error: `Copied to ${done} of ${targets.length} works, then something failed. Try again to finish the rest.`,
