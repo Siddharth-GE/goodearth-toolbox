@@ -72,6 +72,10 @@ const NAMED_BY: Record<
     | "estimator_estimate_line_measurements"
     | "pusher_chains"
     | "project_stages"
+    | "checklist_template_items"
+    | "site_checklists"
+    | "site_checklist_items"
+    | "stock_issue_lines"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -105,6 +109,7 @@ const NAMED_BY: Record<
   pusher_departments: "name",
   pusher_trail_sets: "name",
   staff_departments: "name",
+  checklist_templates: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -420,6 +425,47 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of bbExpenses) add("birdwing_expense_heads", one.head_id);
   for (const one of bbRules) add("birdwing_staff", one.staff_id);
 
+  // A check's answer by its check and checklist; a checklist by its template, villa and place; a check by its words.
+  const answers = await readIn(list("site_checklist_items"), (chunk) =>
+    supabase
+      .from("site_checklist_items")
+      .select("id, checklist_id, template_item_id, status")
+      .in("id", chunk),
+  );
+  for (const one of answers) {
+    add("site_checklists", one.checklist_id);
+    add("checklist_template_items", one.template_item_id);
+  }
+  const [siteChecklists, checks, issueLines] = await Promise.all([
+    readIn(list("site_checklists"), (chunk) =>
+      supabase
+        .from("site_checklists")
+        .select("id, plot_id, template_id, status, location")
+        .in("id", chunk),
+    ),
+    readIn(list("checklist_template_items"), (chunk) =>
+      supabase
+        .from("checklist_template_items")
+        .select("id, template_id, text, is_active")
+        .in("id", chunk),
+    ),
+    readIn(list("stock_issue_lines"), (chunk) =>
+      supabase
+        .from("stock_issue_lines")
+        .select("id, issue_id, item_id, quantity, uom")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of siteChecklists) {
+    add("plots", one.plot_id);
+    add("checklist_templates", one.template_id);
+  }
+  for (const one of checks) add("checklist_templates", one.template_id);
+  for (const one of issueLines) {
+    add("stock_issues", one.issue_id);
+    add("items", one.item_id);
+  }
+
   // A trail by its title, villa and where its baton is; a schedule stage by its project.
   const [trails, projectStages] = await Promise.all([
     readIn(list("pusher_chains"), (chunk) =>
@@ -533,6 +579,37 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   }
   for (const one of projectStages)
     names[one.id] = [one.name, names[one.project_id]].filter(Boolean).join(" · ");
+  const short = (words: string) => (words.length > 60 ? `${words.slice(0, 57)}…` : words);
+  for (const one of checks)
+    names[one.id] = [short(one.text), names[one.template_id], one.is_active ? null : "switched off"]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of siteChecklists)
+    names[one.id] = [
+      names[one.template_id],
+      names[one.plot_id],
+      one.location,
+      one.status === "signed_off" ? "signed off" : "open",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of answers)
+    names[one.id] = [
+      names[one.template_item_id],
+      names[one.checklist_id],
+      ({ pass: "Pass", fail: "Fail", na: "N/A" } as Record<string, string>)[one.status] ??
+        "Not checked",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const line of issueLines)
+    names[line.id] = [
+      names[line.issue_id],
+      names[line.item_id],
+      `${formatQuantity(line.quantity)} ${line.uom}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   for (const one of workParts)
     names[one.id] = [
       names[one.work_item_id],

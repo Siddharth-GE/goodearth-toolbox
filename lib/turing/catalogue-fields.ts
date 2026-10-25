@@ -19,6 +19,7 @@ import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { RELAY } from "./entries/relay";
 import { SUPERVISORS } from "./entries/supervisors";
+import { SUPERVISORS_SITE } from "./entries/supervisors-site";
 import { WORK_ORDERS } from "./entries/work-orders";
 
 export type FieldKind = "id" | "date" | "whole" | "amount" | "text" | "choice" | "yesno";
@@ -94,7 +95,12 @@ export type IdTable =
   | "pusher_departments"
   | "pusher_trail_sets"
   | "project_stages"
-  | "staff_departments";
+  | "staff_departments"
+  | "checklist_templates"
+  | "checklist_template_items"
+  | "site_checklists"
+  | "site_checklist_items"
+  | "stock_issue_lines";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -169,6 +175,11 @@ const FROM: Record<IdTable, string> = {
   pusher_trail_sets: "pusher_trail_sets (a Relay trail type)",
   project_stages: "project_stages (a stage of a project's Relay schedule)",
   staff_departments: "staff_departments (a department people sit in, in Directory)",
+  checklist_templates: "checklist_templates (a site checklist's template)",
+  checklist_template_items: "checklist_template_items (one check of a checklist template)",
+  site_checklists: "site_checklists (a checklist started on a villa)",
+  site_checklist_items: "site_checklist_items (one check of a villa's checklist, with its answer)",
+  stock_issue_lines: "stock_issue_lines (one item on an issue from a store)",
 };
 
 export type Field = {
@@ -261,6 +272,7 @@ export const ENTRIES = [
   ...ESTIMATOR_ESTIMATES,
   ...RELAY,
   ...DIRECTORY,
+  ...SUPERVISORS_SITE,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
