@@ -17,6 +17,7 @@ import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
+import { MONEY } from "./entries/money";
 import { RELAY } from "./entries/relay";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
@@ -100,7 +101,12 @@ export type IdTable =
   | "checklist_template_items"
   | "site_checklists"
   | "site_checklist_items"
-  | "stock_issue_lines";
+  | "stock_issue_lines"
+  | "bill_payments"
+  | "contractor_advances"
+  | "advance_recoveries"
+  | "funding_facilities"
+  | "funding_movements";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -180,6 +186,11 @@ const FROM: Record<IdTable, string> = {
   site_checklists: "site_checklists (a checklist started on a villa)",
   site_checklist_items: "site_checklist_items (one check of a villa's checklist, with its answer)",
   stock_issue_lines: "stock_issue_lines (one item on an issue from a store)",
+  bill_payments: "bill_payments (money paid against a bill, or its reversal)",
+  contractor_advances: "contractor_advances (an advance paid to a contractor or supplier)",
+  advance_recoveries: "advance_recoveries (part of a bill settled from an advance)",
+  funding_facilities: "funding_facilities (a bank loan, private equity or private debt)",
+  funding_movements: "funding_movements (money drawn, repaid or paid as interest on a facility)",
 };
 
 export type Field = {
@@ -211,6 +222,8 @@ export type Field = {
   signed?: true;
   /** An amount to six decimals, not three: a recipe's 0.0144 cum of mortar per sqm. */
   fine?: true;
+  /** Rupees: above zero, to the paise, up to ₹999 crore — what is shown is what the money action stores. */
+  paise?: true;
 };
 
 /**
@@ -273,6 +286,7 @@ export const ENTRIES = [
   ...RELAY,
   ...DIRECTORY,
   ...SUPERVISORS_SITE,
+  ...MONEY,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
@@ -352,6 +366,13 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a whole number up to 999.` };
     case "amount":
+      if (field.paise)
+        return /^\d{1,10}(\.\d{1,2})?$/.test(value) && Number(value) > 0
+          ? { ok: true, value }
+          : {
+              ok: false,
+              error: `${field.label} is rupees above zero, to the paise, like 25000.50.`,
+            };
       return (field.signed
         ? /^-?\d{1,9}(\.\d{1,3})?$/
         : field.fine
@@ -548,7 +569,9 @@ export function catalogueText(): string {
                   : field.kind === "amount"
                     ? field.signed
                       ? "number, below 0 to take away"
-                      : "number"
+                      : field.paise
+                        ? "rupees above 0, at most 2 decimals"
+                        : "number"
                     : field.kind;
         const starts =
           entry.adds && field.start !== undefined ? `, ${String(field.start)} if left out` : "";
