@@ -181,6 +181,13 @@ The day Turing learned to propose changes, the founder's conversation from that 
 **Rule.** Turing's requests carry `thinking.block_binding.prefix_mismatch_behavior: "drop_block"` (beta `thinking-binding-controls-2026-08-01`): reasoning that no longer matches is set aside and the conversation carries on.
 **Check.** After any change to `lib/turing/claude.ts`'s prompt or tools, send one message in a conversation started before the deploy. For a reported Turing error, read the deployment's log: `npx vercel logs <url> --since 3h --level error -x | grep turing`.
 
+### 25. A delete that empties a record before the database refuses it
+
+Deleting a mix still in use on the Estimator's Mixes page said "in use, can't be deleted" — after it had already deleted the mix's materials in a request of its own, so every work using it was priced at nothing. Supabase calls are not one transaction: each `.delete()` stands the moment it returns, and the foreign key that refused the mix came a call later. Three saves that replace a list (clear, then insert) had the same shape: a trail type's activities, a copied work's materials, a transmittal's kept sheets. Every check passes; only a refusal or a failure mid-way shows it.
+
+**Rule.** A save that deletes in steps first checks everything that would refuse the last step, and a save that clears a list to rewrite it reads the old list first and puts it back if the rewrite fails. Where that cannot hold, one database function does it in one transaction.
+**Check.** In a new or changed action, any `.delete()` followed by another write in the same function: what happens if the second call fails or is refused?
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.

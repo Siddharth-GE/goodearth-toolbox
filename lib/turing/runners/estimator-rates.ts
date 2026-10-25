@@ -18,11 +18,10 @@ import {
   updateWorkComponentQty,
 } from "@/lib/estimator/works-actions";
 import { isActiveUom } from "@/lib/masters/uoms";
-import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, formOf, type Entry } from "../catalogue-fields";
 import type { ESTIMATOR_RATES } from "../entries/estimator-rates";
-import { failed, recordNow, retired, saving, type Runners, type Values } from "./kit";
+import { recordNow, retired, saving, type Runners, type Values } from "./kit";
 
 type Key = (typeof ESTIMATOR_RATES)[number]["key"];
 type Refusal = { error: string } | null;
@@ -135,12 +134,9 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     const refused = (await retired("work_items", fromId)) ?? (await retired("work_items", toId));
     if (refused) return refused;
     const result = await copyWorkSetup(fromId, [toId]);
-    // Its write replaces the target's materials after its unit and rate, so a failure there can leave it with none.
+    // A failed write puts the work back as it was; "try again" is for the screen, whose ticks can be pressed again.
     if (result?.error?.startsWith("Copied to"))
-      return {
-        error:
-          "The copy failed part-way: the work may now have the new unit and labour rate but no materials. Check it in the rate book.",
-      };
+      return { error: "The copy failed, and the work was put back as it was." };
     return result;
   },
   est_mix_new: async (v) => {
@@ -164,16 +160,6 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     const mixId = String(v.mix_id);
     const refused = await gone("estimator_mixes", mixId, "mix");
     if (refused) return refused;
-    // The delete takes the mix's materials before the mix, which a recipe using it then refuses, leaving it empty.
-    const supabase = await createClient();
-    const [works, lines] = await Promise.all([
-      supabase.from("estimator_work_components").select("id").eq("mix_id", mixId).limit(1),
-      supabase.from("estimator_estimate_line_components").select("id").eq("mix_id", mixId).limit(1),
-    ]);
-    if (works.error) return failed("estimator_work_components", works.error);
-    if (lines.error) return failed("estimator_estimate_line_components", lines.error);
-    if (works.data?.length || lines.data?.length)
-      return { error: "This mix is in use, so it can't be deleted. Switch it off instead." };
     const done = await saving(() => deleteMix(mixId), "/estimator/mixes");
     return "error" in done ? done : undefined;
   },
