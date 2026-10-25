@@ -58,6 +58,8 @@ const NAMED_BY: Record<
     | "birdwing_rate_card"
     | "birdwing_expenses"
     | "birdwing_pay_rules"
+    | "design_actions"
+    | "transmittals"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -83,6 +85,8 @@ const NAMED_BY: Record<
   birdwing_cost_centres: "name",
   birdwing_expense_heads: "name",
   birdwing_staff: "name",
+  design_stages: "name",
+  drawing_sets: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -229,6 +233,27 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     if (villa.client_id) add("clients", villa.client_id);
   }
 
+  // A design action by its words and status; a transmittal by its number, villa and stage.
+  const [designActions, transmittals] = await Promise.all([
+    readIn(list("design_actions"), (chunk) =>
+      supabase.from("design_actions").select("id, action, status").in("id", chunk),
+    ),
+    readIn(list("transmittals"), (chunk) =>
+      supabase
+        .from("transmittals")
+        .select("id, number, status, unit_id, design_stage_id")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of designActions) {
+    const words = one.action.length > 60 ? `${one.action.slice(0, 57)}…` : one.action;
+    names[one.id] = `${words} (${one.status.replace(/_/g, " ")})`;
+  }
+  for (const one of transmittals) {
+    add("units", one.unit_id);
+    add("design_stages", one.design_stage_id);
+  }
+
   // A Birdwing record by its stay; a stay by its number, guest and nights.
   const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
     readIn(list("birdwing_stay_rooms"), (chunk) =>
@@ -363,6 +388,14 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       }
     }),
   );
+  for (const one of transmittals)
+    names[one.id] = [
+      one.number ?? "Draft transmittal",
+      names[one.unit_id],
+      names[one.design_stage_id],
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const stayOf = new Map(
     stays.map((one) => [
       one.id,
