@@ -60,6 +60,11 @@ const NAMED_BY: Record<
     | "birdwing_pay_rules"
     | "design_actions"
     | "transmittals"
+    | "selections"
+    | "selection_lines"
+    | "spaces"
+    | "space_views"
+    | "budgets"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -87,6 +92,7 @@ const NAMED_BY: Record<
   birdwing_staff: "name",
   design_stages: "name",
   drawing_sets: "name",
+  space_types: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -254,6 +260,37 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("design_stages", one.design_stage_id);
   }
 
+  // A selection line by its space, item and quantity; a photo by its space; a budget by its revision.
+  const [selLines, spaceViews, budgets] = await Promise.all([
+    readIn(list("selection_lines"), (chunk) =>
+      supabase
+        .from("selection_lines")
+        .select("id, selection_id, unit_space_id, item_id, quantity, uom")
+        .in("id", chunk),
+    ),
+    readIn(list("space_views"), (chunk) =>
+      supabase.from("space_views").select("id, space_id, caption").in("id", chunk),
+    ),
+    readIn(list("budgets"), (chunk) =>
+      supabase.from("budgets").select("id, selection_id, version, status").in("id", chunk),
+    ),
+  ]);
+  for (const one of selLines) {
+    add("spaces", one.unit_space_id);
+    add("items", one.item_id);
+  }
+  for (const one of spaceViews) add("spaces", one.space_id);
+  for (const one of budgets) add("selections", one.selection_id);
+  const [revisions, spaces] = await Promise.all([
+    readIn(list("selections"), (chunk) =>
+      supabase.from("selections").select("id, unit_id, revision_no, status").in("id", chunk),
+    ),
+    readIn(list("spaces"), (chunk) =>
+      supabase.from("spaces").select("id, label, unit_id").in("id", chunk),
+    ),
+  ]);
+  for (const one of [...revisions, ...spaces]) add("units", one.unit_id);
+
   // A Birdwing record by its stay; a stay by its number, guest and nights.
   const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
     readIn(list("birdwing_stay_rooms"), (chunk) =>
@@ -396,6 +433,29 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     ]
       .filter(Boolean)
       .join(" · ");
+  for (const one of spaces)
+    names[one.id] = [one.label, names[one.unit_id]].filter(Boolean).join(" · ");
+  const revisionOf = new Map(
+    revisions.map((one) => [
+      one.id,
+      [names[one.unit_id], `R${one.revision_no}`].filter(Boolean).join(" · "),
+    ]),
+  );
+  for (const one of revisions) names[one.id] = `${revisionOf.get(one.id)} (${one.status})`;
+  for (const one of budgets)
+    names[one.id] = [revisionOf.get(one.selection_id), `v${one.version} (${one.status})`]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of selLines)
+    names[one.id] = [
+      names[one.unit_space_id],
+      names[one.item_id],
+      `${formatQuantity(one.quantity)} ${one.uom}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of spaceViews)
+    names[one.id] = [one.caption || "Photo", names[one.space_id]].filter(Boolean).join(" · ");
   const stayOf = new Map(
     stays.map((one) => [
       one.id,

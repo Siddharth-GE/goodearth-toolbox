@@ -9,6 +9,7 @@ import { BIRDWING } from "./entries/birdwing";
 import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { DESIGN_MANAGEMENT } from "./entries/design-management";
+import { SELECTIONS_BUDGETS } from "./entries/selections-budgets";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -71,7 +72,13 @@ export type IdTable =
   | "design_stages"
   | "design_actions"
   | "drawing_sets"
-  | "transmittals";
+  | "transmittals"
+  | "selections"
+  | "selection_lines"
+  | "spaces"
+  | "space_types"
+  | "space_views"
+  | "budgets";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -126,6 +133,12 @@ const FROM: Record<IdTable, string> = {
   design_actions: "design_actions (an action for the design team)",
   drawing_sets: "drawing_sets (a named set of drawings of one design stage)",
   transmittals: "transmittals (drawings sent to site, or a draft of them)",
+  selections: "selections (a numbered design revision of a unit: R0, R1…)",
+  selection_lines: "selection_lines (one item specified into a space on a revision)",
+  spaces: "spaces (a room or area of a unit)",
+  space_types: "space_types (a kind of space: Living, Bedroom, Bath)",
+  space_views: "space_views (a photo on a space)",
+  budgets: "budgets (the pricing of an issued revision)",
 };
 
 export type Field = {
@@ -211,6 +224,7 @@ export const ENTRIES = [
   ...BIRDWING,
   ...BIRDWING_BOOKS,
   ...DESIGN_MANAGEMENT,
+  ...SELECTIONS_BUDGETS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
