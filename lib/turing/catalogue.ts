@@ -20,6 +20,7 @@ import { PO_RUNNERS } from "./runners/purchase-orders";
 import { RELAY_RUNNERS } from "./runners/relay";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
+import { SUPERVISORS_SITE_RUNNERS } from "./runners/supervisors-site";
 import { WORK_ORDER_RUNNERS } from "./runners/work-orders";
 
 /** Every entry's runner: the type refuses an entry without one. */
@@ -40,4 +41,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...ESTIMATOR_ESTIMATES_RUNNERS,
   ...RELAY_RUNNERS,
   ...DIRECTORY_RUNNERS,
+  ...SUPERVISORS_SITE_RUNNERS,
 };
