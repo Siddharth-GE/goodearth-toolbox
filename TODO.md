@@ -7,7 +7,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 `plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
 
 - **Waiting on the founder:** a look at T1 on staging. The key in Vercel's Preview may expire on 31 Oct 2026; production needs its own when Turing ships.
-- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154), 6b bills (#155), 7 Client Relations (#156), 8 Birdwing (#157), 9 Birdwing Books (#158), 10 Design Management (#159) and 11 Selections and Budgets (#160) and 12a the Estimator's rate book (#161). Next: 12b, the Estimator's estimates.
+- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154), 6b bills (#155), 7 Client Relations (#156), 8 Birdwing (#157), 9 Birdwing Books (#158), 10 Design Management (#159) and 11 Selections and Budgets (#160), 12a the Estimator's rate book (#161) and 12b the Estimator's estimates (#163). Next: batch 13, Relay, Directory and the rest of Supervisors.
 
 ## Native apps on iPhone and Android — next build
 

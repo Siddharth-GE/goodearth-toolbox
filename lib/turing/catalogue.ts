@@ -11,6 +11,7 @@ import { CLIENT_RELATIONS_RUNNERS } from "./runners/client-relations";
 import { DESIGN_MANAGEMENT_RUNNERS } from "./runners/design-management";
 import { SELECTIONS_BUDGETS_RUNNERS } from "./runners/selections-budgets";
 import { ESTIMATOR_RATES_RUNNERS } from "./runners/estimator-rates";
+import { ESTIMATOR_ESTIMATES_RUNNERS } from "./runners/estimator-estimates";
 import { INDENT_RUNNERS } from "./runners/indents";
 import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
@@ -34,4 +35,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...DESIGN_MANAGEMENT_RUNNERS,
   ...SELECTIONS_BUDGETS_RUNNERS,
   ...ESTIMATOR_RATES_RUNNERS,
+  ...ESTIMATOR_ESTIMATES_RUNNERS,
 };

@@ -39,7 +39,7 @@ async function uomRefused(uom: string | null, current: unknown): Promise<Refusal
 }
 
 /** The recipe and mix pickers offer active materials: items of kind material. */
-async function materialRefused(itemId: string): Promise<Refusal> {
+export async function materialRefused(itemId: string): Promise<Refusal> {
   const now = await recordNow(
     "items",
     { column: "id", id: itemId },
@@ -51,7 +51,7 @@ async function materialRefused(itemId: string): Promise<Refusal> {
   return now.row.is_active === false ? { error: "That material is retired in Masters." } : null;
 }
 
-async function mixRefused(mixId: string): Promise<Refusal> {
+export async function mixRefused(mixId: string): Promise<Refusal> {
   const now = await recordNow(
     "estimator_mixes",
     { column: "id", id: mixId },
