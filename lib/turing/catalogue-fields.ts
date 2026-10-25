@@ -10,6 +10,7 @@ import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { DESIGN_MANAGEMENT } from "./entries/design-management";
 import { SELECTIONS_BUDGETS } from "./entries/selections-budgets";
+import { ESTIMATOR_RATES } from "./entries/estimator-rates";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -78,7 +79,10 @@ export type IdTable =
   | "spaces"
   | "space_types"
   | "space_views"
-  | "budgets";
+  | "budgets"
+  | "estimator_mixes"
+  | "estimator_work_components"
+  | "estimator_mix_components";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -139,6 +143,9 @@ const FROM: Record<IdTable, string> = {
   space_types: "space_types (a kind of space: Living, Bedroom, Bath)",
   space_views: "space_views (a photo on a space)",
   budgets: "budgets (the pricing of an issued revision)",
+  estimator_mixes: "estimator_mixes (a named mix: M20 concrete)",
+  estimator_work_components: "estimator_work_components (a material or mix in a work's recipe)",
+  estimator_mix_components: "estimator_mix_components (a material in a mix)",
 };
 
 export type Field = {
@@ -168,6 +175,8 @@ export type Field = {
   max?: number;
   /** An amount that may be below zero (a stock count corrected down). */
   signed?: true;
+  /** An amount to six decimals, not three: a recipe's 0.0144 cum of mortar per sqm. */
+  fine?: true;
 };
 
 /**
@@ -225,6 +234,7 @@ export const ENTRIES = [
   ...BIRDWING_BOOKS,
   ...DESIGN_MANAGEMENT,
   ...SELECTIONS_BUDGETS,
+  ...ESTIMATOR_RATES,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
@@ -304,7 +314,12 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a whole number up to 999.` };
     case "amount":
-      return (field.signed ? /^-?\d{1,9}(\.\d{1,3})?$/ : /^\d{1,9}(\.\d{1,3})?$/).test(value)
+      return (field.signed
+        ? /^-?\d{1,9}(\.\d{1,3})?$/
+        : field.fine
+          ? /^\d{1,9}(\.\d{1,6})?$/
+          : /^\d{1,9}(\.\d{1,3})?$/
+      ).test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a number, like 12.5.` };
     case "choice":
