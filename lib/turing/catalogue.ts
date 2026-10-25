@@ -16,6 +16,7 @@ import { ESTIMATOR_ESTIMATES_RUNNERS } from "./runners/estimator-estimates";
 import { INDENT_RUNNERS } from "./runners/indents";
 import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
+import { MONEY_RUNNERS } from "./runners/money";
 import { PO_RUNNERS } from "./runners/purchase-orders";
 import { RELAY_RUNNERS } from "./runners/relay";
 import type { Runners } from "./runners/kit";
@@ -42,4 +43,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...RELAY_RUNNERS,
   ...DIRECTORY_RUNNERS,
   ...SUPERVISORS_SITE_RUNNERS,
+  ...MONEY_RUNNERS,
 };

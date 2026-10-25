@@ -76,6 +76,11 @@ const NAMED_BY: Record<
     | "site_checklists"
     | "site_checklist_items"
     | "stock_issue_lines"
+    | "bill_payments"
+    | "contractor_advances"
+    | "advance_recoveries"
+    | "funding_facilities"
+    | "funding_movements"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -425,6 +430,46 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of bbExpenses) add("birdwing_expense_heads", one.head_id);
   for (const one of bbRules) add("birdwing_staff", one.staff_id);
 
+  // Money out by its bill or vendor, amount and day; a funding movement by its facility.
+  const [payments, advances, recoveries, movements] = await Promise.all([
+    readIn(list("bill_payments"), (chunk) =>
+      supabase
+        .from("bill_payments")
+        .select("id, bill_id, amount, paid_on, payment_ref, reverses_id")
+        .in("id", chunk),
+    ),
+    readIn(list("contractor_advances"), (chunk) =>
+      supabase
+        .from("contractor_advances")
+        .select("id, vendor_id, project_id, amount, paid_on, reverses_id")
+        .in("id", chunk),
+    ),
+    readIn(list("advance_recoveries"), (chunk) =>
+      supabase
+        .from("advance_recoveries")
+        .select("id, bill_id, amount, recovered_on, reverses_id")
+        .in("id", chunk),
+    ),
+    readIn(list("funding_movements"), (chunk) =>
+      supabase
+        .from("funding_movements")
+        .select("id, facility_id, kind, amount, happened_on, cancelled_at")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of [...payments, ...recoveries]) add("bills", one.bill_id);
+  for (const one of advances) {
+    add("vendors", one.vendor_id);
+    add("projects", one.project_id);
+  }
+  for (const one of movements) add("funding_facilities", one.facility_id);
+  const facilities = await readIn(list("funding_facilities"), (chunk) =>
+    supabase.from("funding_facilities").select("id, party, kind, is_active").in("id", chunk),
+  );
+  for (const one of facilities)
+    names[one.id] =
+      `${one.party} (${one.kind.replace(/_/g, " ")}${one.is_active ? "" : ", closed"})`;
+
   // A check's answer by its check and checklist; a checklist by its template, villa and place; a check by its words.
   const answers = await readIn(list("site_checklist_items"), (chunk) =>
     supabase
@@ -599,6 +644,46 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       names[one.checklist_id],
       ({ pass: "Pass", fail: "Fail", na: "N/A" } as Record<string, string>)[one.status] ??
         "Not checked",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const reversal = (one: { reverses_id: string | null }) => (one.reverses_id ? "a reversal" : null);
+  for (const one of payments)
+    names[one.id] = [
+      names[one.bill_id],
+      formatMoney(one.amount),
+      formatDate(one.paid_on),
+      one.payment_ref,
+      reversal(one),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of advances)
+    names[one.id] = [
+      names[one.vendor_id],
+      names[one.project_id],
+      `advance ${formatMoney(one.amount)}`,
+      formatDate(one.paid_on),
+      reversal(one),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of recoveries)
+    names[one.id] = [
+      names[one.bill_id],
+      `from an advance ${formatMoney(one.amount)}`,
+      formatDate(one.recovered_on),
+      reversal(one),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of movements)
+    names[one.id] = [
+      names[one.facility_id],
+      one.kind,
+      formatMoney(one.amount),
+      formatDate(one.happened_on),
+      one.cancelled_at ? "cancelled" : null,
     ]
       .filter(Boolean)
       .join(" · ");
