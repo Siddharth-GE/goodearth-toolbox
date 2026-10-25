@@ -118,13 +118,29 @@ test("a new trail starts unless queued, and its legs group by its header", () =>
 
 test("department names match Relay's, ignoring case; an unknown one is refused", () => {
   const allowed = [
-    { id: "d1", name: "Design" },
-    { id: "d2", name: "Purchase" },
+    { id: "d1", name: "Design", is_active: true },
+    { id: "d2", name: "Purchase", is_active: true },
   ];
   assert.deepEqual(departmentIdsFrom("design, PURCHASE", allowed), { ids: ["d1", "d2"] });
   assert.deepEqual(departmentIdsFrom("Design, design", allowed), { ids: ["d1"] });
   assert.deepEqual(departmentIdsFrom("", allowed), { ids: [] });
   assert.ok("error" in departmentIdsFrom("Design, Site", allowed));
+});
+
+test("a switched-off department is never picked, but stays on a trail that has it", () => {
+  const departments = [
+    { id: "d1", name: "Design", is_active: false },
+    { id: "d2", name: "Purchase", is_active: true },
+  ];
+  assert.deepEqual(departmentIdsFrom("Design", departments), {
+    error: "Design is switched off in Relay.",
+  });
+  const kept = new Set(["d1", "d2"]);
+  assert.deepEqual(departmentIdsFrom("Purchase", departments, kept), { ids: ["d1", "d2"] });
+  assert.deepEqual(departmentIdsFrom("", departments, kept), { ids: ["d1"] });
+  assert.deepEqual(departmentIdsFrom("Design, Purchase", departments, kept), {
+    ids: ["d1", "d2"],
+  });
 });
 
 test("a trail type's activity is added, moved, re-timed or taken out, as its editor does", () => {

@@ -34,6 +34,7 @@ import { failed, given, recordNow, type Runners, type Values } from "./kit";
 type Failure = { error: string };
 type Trail = {
   project_id: string | null;
+  unit_id: string | null;
   current_leg: number | null;
   leg_count: number | null;
   holder_id: string | null;
@@ -48,7 +49,7 @@ async function trailNow(chainId: string): Promise<{ trail: Trail } | Failure> {
   const { data, error } = await supabase
     .from("pusher_chain_state")
     .select(
-      "project_id, current_leg, leg_count, holder_id, is_finished, is_queued, is_with_client, project_stage_id",
+      "project_id, unit_id, current_leg, leg_count, holder_id, is_finished, is_queued, is_with_client, project_stage_id",
     )
     .eq("chain_id", chainId)
     .maybeSingle();
@@ -78,15 +79,24 @@ async function listOf(
 }
 
 /** A trail type the screens offer: there and switched on. */
-async function typeOffered(typeId: string): Promise<Failure | null> {
+async function typeOffered(typeId: string): Promise<{ name: string } | Failure> {
   const now = await recordNow(
     "pusher_trail_sets",
     { column: "id", id: typeId },
-    ["is_active"],
+    ["name", "is_active"],
     "That trail type is gone.",
   );
   if ("error" in now) return now;
-  return now.row.is_active ? null : { error: "That trail type is switched off." };
+  return now.row.is_active
+    ? { name: String(now.row.name) }
+    : { error: "That trail type is switched off." };
+}
+
+/** A queued trail's Start and Remove sit on its villa's queue; one on the project as a whole has neither. */
+function notOnQueue(trail: Trail): Failure | null {
+  return trail.unit_id
+    ? null
+    : { error: "Only a trail queued on a villa can be started or removed from its queue." };
 }
 
 /** The villa's project, which every trail on it belongs to. */
@@ -110,6 +120,19 @@ async function stageNow(stageId: string) {
   );
 }
 
+/** Opening a trail tags its departments as a second step whose failure the open only logs; said here. */
+async function departmentsLanded(chainId: string): Promise<Failure | undefined> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("pusher_chain_departments")
+    .select("department_id", { count: "exact", head: true })
+    .eq("chain_id", chainId);
+  if (error) return failed("trail departments", error);
+  return count
+    ? undefined
+    : { error: "The trail is open, but its departments did not save; set them on the trail." };
+}
+
 const noteOf = (values: Values) => (typeof values.note === "string" ? values.note : "");
 
 const LIST_TABLE = {
@@ -130,9 +153,11 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
         if ("error" in unit) return unit;
         if (unit.projectId !== projectId) return { error: "That villa is in another project." };
       }
+      let typeName: string | null = null;
       if (typeId) {
-        const refused = await typeOffered(typeId);
-        if (refused) return refused;
+        const type = await typeOffered(typeId);
+        if ("error" in type) return type;
+        typeName = type.name;
       }
       const [activities, departments] = await Promise.all([
         listOf("pusher_activities"),
@@ -145,10 +170,7 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
         if (!one) return { error: "One of those activities is gone." };
         if (!one.is_active) return { error: `${one.name} is switched off in Relay.` };
       }
-      const tags = departmentIdsFrom(
-        String(header.departments ?? ""),
-        departments.rows.filter((row) => row.is_active),
-      );
+      const tags = departmentIdsFrom(String(header.departments ?? ""), departments.rows);
       if ("error" in tags) return tags;
       const legs = lines.map((line) => ({
         activityId: String(line.activity_id),
@@ -161,26 +183,30 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
         // A one-step trail records its activity, as the screen's form does.
         activityId: legs.length === 1 ? legs[0].activityId : null,
         trailSetId: typeId,
-        title: header.title ? String(header.title) : null,
+        // A trail filled from a type is named after it, as the form fills an empty title.
+        title: header.title ? String(header.title) : typeName,
         note: null,
         legs,
         departmentIds: tags.ids,
         start: header.start_now !== false,
       });
-      return opened.error ? { error: opened.error } : undefined;
+      if (opened.error) return { error: opened.error };
+      return tags.ids.length > 0 && opened.chainId ? departmentsLanded(opened.chainId) : undefined;
     },
   },
   relay_type_apply: async (v) => {
     const unit = await projectOfUnit(String(v.unit_id));
     if ("error" in unit) return unit;
-    const refused = await typeOffered(String(v.type_id));
-    if (refused) return refused;
+    const type = await typeOffered(String(v.type_id));
+    if ("error" in type) return type;
     return applyTrailSet(unit.projectId, String(v.unit_id), String(v.type_id));
   },
   relay_trail_start: async (v) => {
     const now = await trailNow(String(v.chain_id));
     if ("error" in now) return now;
     if (!now.trail.is_queued) return { error: "This trail has already started." };
+    const refused = notOnQueue(now.trail);
+    if (refused) return refused;
     return startTrail(String(v.chain_id));
   },
   relay_trail_discard: async (v) => {
@@ -188,6 +214,8 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
     if ("error" in now) return now;
     if (!now.trail.is_queued)
       return { error: "This trail has started; finish it with a note instead of removing it." };
+    const refused = notOnQueue(now.trail);
+    if (refused) return refused;
     return discardTrail(String(v.chain_id));
   },
   relay_move: async (v) => {
@@ -249,8 +277,8 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
     const chainId = String(v.chain_id);
     const now = await trailNow(chainId);
     if ("error" in now) return now;
-    if (now.trail.is_queued || now.trail.is_finished)
-      return { error: "A trail's departments change only while it is running." };
+    if (now.trail.is_finished)
+      return { error: "A finished trail keeps its departments, so past reports don't change." };
     const supabase = await createClient();
     const [departments, tagged] = await Promise.all([
       listOf("pusher_departments"),
@@ -259,11 +287,7 @@ export const RELAY_RUNNERS: Runners<(typeof RELAY)[number]["key"]> = {
     if ("error" in departments) return departments;
     if (tagged.error) return failed("trail departments", tagged.error);
     const current = new Set((tagged.data ?? []).map((row) => row.department_id));
-    // A department switched off since stays pickable on the trail that has it, as on screen.
-    const tags = departmentIdsFrom(
-      String(v.departments),
-      departments.rows.filter((row) => row.is_active || current.has(row.id)),
-    );
+    const tags = departmentIdsFrom(String(v.departments), departments.rows, current);
     if ("error" in tags) return tags;
     if (tags.ids.length === current.size && tags.ids.every((id) => current.has(id)))
       return { error: "The trail already has those departments." };

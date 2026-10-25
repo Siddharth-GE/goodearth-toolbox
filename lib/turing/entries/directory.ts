@@ -5,6 +5,18 @@ import { defineEntries } from "./define";
 /** Directory's blood groups, as `BLOOD_GROUPS` in lib/directory/people.ts has them (a test holds the two together). */
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 
+/**
+ * A phone number as Directory stores it: typed punctuation stripped, one leading + kept. Restated
+ * from `normalisePhone` in lib/directory/people.ts (a test holds the two together).
+ */
+export function storedPhone(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const digits = trimmed.replace(/[^0-9]/g, "");
+  if (!digits) return trimmed;
+  return trimmed.startsWith("+") ? `+${digits}` : digits;
+}
+
 const department: Field = {
   key: "department_id",
   label: "Department",

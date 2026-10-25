@@ -41,26 +41,30 @@ export const BOUNCE_REASONS = {
 } as const;
 
 const DEPARTMENTS =
-  "departments is their names, comma-separated, from pusher_departments (switched-on ones).";
+  "departments is their names, comma-separated, from pusher_departments (switched-on ones); a switched-off one a trail already has stays on it.";
 
 const given = (values: Record<string, Value>, key: string) => key in values && values[key] !== "";
 
 /**
- * Department names as the admin wrote them, matched to Relay's departments ignoring case. `allowed`
- * are the ones that may be picked: the switched-on ones, and any the trail already carries.
+ * Department names as the admin wrote them, matched to Relay's departments ignoring case; only a
+ * switched-on one may be picked. A switched-off one the trail already carries (`kept`) stays on it,
+ * named or not, as on screen: the picker shows no chip for it, so nothing there takes it off.
  */
 export function departmentIdsFrom(
   text: string,
-  allowed: { id: string; name: string }[],
+  departments: { id: string; name: string; is_active: boolean }[],
+  kept: Set<string> = new Set(),
 ): { ids: string[] } | { error: string } {
   const names = text
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
-  const ids: string[] = [];
+  const ids = departments.filter((one) => !one.is_active && kept.has(one.id)).map((one) => one.id);
   for (const name of names) {
-    const match = allowed.find((one) => one.name.toLowerCase() === name.toLowerCase());
-    if (!match) return { error: `There is no department called "${name}" to pick.` };
+    const match = departments.find((one) => one.name.toLowerCase() === name.toLowerCase());
+    if (!match) return { error: `There is no department called "${name}".` };
+    if (!match.is_active && !kept.has(match.id))
+      return { error: `${match.name} is switched off in Relay.` };
     if (!ids.includes(match.id)) ids.push(match.id);
   }
   return { ids };
@@ -102,7 +106,7 @@ export const RELAY = defineEntries([
     key: "relay_trail_new",
     tool: "/relay",
     title: "A trail, opened",
-    description: `Opens a trail on a project, or one villa of it (units.id): its activities in order, each with the person who carries it and their days (at least 1), each activity once. type_id records the trail type it was filled from. start_now false queues it on the villa instead of starting it. ${DEPARTMENTS}`,
+    description: `Opens a trail on a project, or one villa of it (units.id): its activities in order, each with the person who carries it and their days (at least 1), each activity once. type_id records the trail type it was filled from (and names the trail when no title is given). start_now false queues it on the villa instead of starting it. Rows with the same header are one trail's legs, so two trails opened together on one villa need different titles. ${DEPARTMENTS}`,
     adds: true,
     lines: { noun: "Trail" },
     fields: [

@@ -11,7 +11,7 @@ import {
 } from "@/lib/directory/actions";
 
 import { entryFor, formOf } from "../catalogue-fields";
-import type { DIRECTORY } from "../entries/directory";
+import { storedPhone, type DIRECTORY } from "../entries/directory";
 import { given, recordNow, type Runners, type Values } from "./kit";
 
 type Failure = { error: string };
@@ -118,7 +118,13 @@ export const DIRECTORY_RUNNERS: Runners<(typeof DIRECTORY)[number]["key"]> = {
     const next = Object.fromEntries(
       DETAILS.map((key) => [key, given(v, key, now.row[key] as string | null)]),
     );
-    if (unchanged(DETAILS, next, now.row)) return { error: "Your card already says that." };
+    // Compared as the card stores them, so a number written another way is no change.
+    const stored = {
+      ...next,
+      phone: storedPhone(next.phone),
+      emergency_contact_phone: storedPhone(next.emergency_contact_phone),
+    };
+    if (unchanged(DETAILS, stored, now.row)) return { error: "Your card already says that." };
     return updateMyDetails({
       phone: next.phone || null,
       dateOfBirth: next.date_of_birth || null,

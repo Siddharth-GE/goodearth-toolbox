@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { checkProposal } from "../catalogue-fields";
-import { BLOOD_GROUPS } from "./directory";
+import { BLOOD_GROUPS, storedPhone } from "./directory";
 
 const PERSON = "11111111-1111-4111-8111-111111111111";
 const DEPARTMENT = "22222222-2222-4222-8222-222222222222";
@@ -19,6 +19,18 @@ test("the blood groups are Directory's own", () => {
     [...theirs.matchAll(/"([^"]+)"/g)].map((m) => m[1]),
     [...BLOOD_GROUPS],
   );
+});
+
+test("a phone is compared as Directory stores it", () => {
+  const source = readFileSync("lib/directory/people.ts", "utf8");
+  const theirs = source.slice(source.indexOf("export function normalisePhone"));
+  assert.match(theirs, /const digits = trimmed\.replace\(\/\[\^0-9\]\/g, ""\);/);
+  assert.match(theirs, /if \(!digits\) return trimmed;/);
+  assert.match(theirs, /return plus \? `\+\$\{digits\}` : digits;/);
+  assert.equal(storedPhone("98765 43210"), "9876543210");
+  assert.equal(storedPhone(" +91 98765-43210 "), "+919876543210");
+  assert.equal(storedPhone("ext"), "ext");
+  assert.equal(storedPhone(""), "");
 });
 
 test("a posting says what changes; empty clears a field", () => {

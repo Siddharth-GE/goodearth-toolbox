@@ -426,7 +426,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       supabase
         .from("pusher_chain_state")
         .select(
-          "chain_id, title, trail_set_name, unit_name, project_name, current_leg, leg_count, holder_id, is_finished, is_queued",
+          "chain_id, activity_name, title, unit_name, project_name, current_leg, leg_count, holder_id, is_finished, is_queued",
         )
         .in("chain_id", chunk),
     ),
@@ -519,7 +519,8 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of trails) {
     if (!one.chain_id) continue;
     names[one.chain_id] = [
-      one.title ?? one.trail_set_name ?? "A trail",
+      // As Relay's cards name a trail: its activity (or type), then its title.
+      [one.activity_name, one.title].filter(Boolean).join(" — ") || "A trail",
       one.unit_name ?? one.project_name,
       one.is_finished
         ? "finished"
