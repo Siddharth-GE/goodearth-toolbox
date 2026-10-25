@@ -8,6 +8,7 @@ import { BILLS } from "./entries/bills";
 import { BIRDWING } from "./entries/birdwing";
 import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
+import { DESIGN_MANAGEMENT } from "./entries/design-management";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -66,7 +67,11 @@ export type IdTable =
   | "birdwing_expenses"
   | "birdwing_expense_heads"
   | "birdwing_staff"
-  | "birdwing_pay_rules";
+  | "birdwing_pay_rules"
+  | "design_stages"
+  | "design_actions"
+  | "drawing_sets"
+  | "transmittals";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -117,6 +122,10 @@ const FROM: Record<IdTable, string> = {
   birdwing_expense_heads: "birdwing_expense_heads (a head Birdwing's expenses are kept under)",
   birdwing_staff: "birdwing_staff (a member of Birdwing's staff)",
   birdwing_pay_rules: "birdwing_pay_rules (a staff member's pay from a day)",
+  design_stages: "design_stages (a stage of Design Management's list)",
+  design_actions: "design_actions (an action for the design team)",
+  drawing_sets: "drawing_sets (a named set of drawings of one design stage)",
+  transmittals: "transmittals (drawings sent to site, or a draft of them)",
 };
 
 export type Field = {
@@ -201,6 +210,7 @@ export const ENTRIES = [
   ...CLIENT_RELATIONS,
   ...BIRDWING,
   ...BIRDWING_BOOKS,
+  ...DESIGN_MANAGEMENT,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
