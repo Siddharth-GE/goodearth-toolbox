@@ -97,3 +97,17 @@ test("a new pay rule has both ends of its shift or neither", () => {
   assert.equal(form.get("shift_start"), "08:00");
   assert.equal(form.get("shift_end"), "18:00");
 });
+
+test("an order of 0 is refused, since Books would store it as 100", () => {
+  const proposal = checkProposal({
+    action: "bb_head_change",
+    title: "x",
+    rows: [
+      { label: "a", head_id: ID, sort_order: 0 },
+      { label: "b", head_id: ID, sort_order: 5 },
+    ],
+  });
+  assert.ok(!proposal.ok);
+  assert.match(proposal.error, /Row 1: An order on the list starts at 1/);
+  assert.doesNotMatch(proposal.error, /Row 2/);
+});

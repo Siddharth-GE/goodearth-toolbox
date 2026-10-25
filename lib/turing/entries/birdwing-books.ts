@@ -52,6 +52,9 @@ const order = (start?: string): Field => ({
   optional: true,
   ...(start === undefined ? {} : { start }),
 });
+/** Books stores an order of 0 as 100, so 0 is refused rather than changed unsaid. */
+const orderCheck = (values: Record<string, Value>) =>
+  values.sort_order === "0" ? "An order on the list starts at 1." : undefined;
 const active = (start?: true): Field => ({
   key: "is_active",
   label: "In use",
@@ -90,8 +93,8 @@ const expenseFields = (adding: boolean): Field[] => [
   { key: "spent_on", label: "Paid on", kind: "date", optional: true },
   { key: "vendor_id", label: "Vendor", kind: "id", table: "vendors", optional: true },
   words("payee", "Paid to", 120),
-  words("bill_ref", "Bill no.", 80),
-  words("payment_details", "How paid", 300),
+  words("bill_ref", "Bill no.", 60),
+  words("payment_details", "How paid", 200),
 ];
 const ruleFields = (adding: boolean): Field[] => [
   {
@@ -163,7 +166,7 @@ export const BIRDWING_BOOKS = defineEntries([
     form: { ...BOOKS, reader: "saveAttendance" },
     title: "A day's attendance",
     description:
-      "Marks one person's day (birdwing_staff.id, never a day still to come): present, half_day, leave, holiday_leave or absent; for a day worked, the time in and out (both, 24-hour, 08:30) and the break in minutes; a note. A day already marked keeps what is left out; an unmarked one needs its status. A month whose salary is confirmed is closed.",
+      "Marks one person's day (birdwing_staff.id, never a day still to come): present, half_day, leave, holiday_leave or absent; for a day worked, the time in and out (both, 24-hour, 08:30) and the break in minutes; a note. A day already marked keeps what is left out; an unmarked one needs its status. Someone who has left is marked only in a month they already have days in. A month whose salary is confirmed is closed.",
     fields: [
       ...staffDay,
       {
@@ -194,8 +197,8 @@ export const BIRDWING_BOOKS = defineEntries([
     tool: "/birdwing-books",
     title: "Everyone present",
     description:
-      "Marks everyone working present on a day (today or earlier), as the morning's one press does; nobody already marked that day is changed.",
-    fields: [{ key: "on_date", label: "Day", kind: "date" }],
+      "Marks everyone working present today, as the morning's one press does; nobody already marked today is changed. Only today: an earlier day is marked person by person (bb_attendance).",
+    fields: [{ key: "on_date", label: "Day", kind: "date", optional: true }],
   },
   {
     key: "bb_staff_new",
@@ -219,6 +222,7 @@ export const BIRDWING_BOOKS = defineEntries([
       order("100"),
       active(true),
     ],
+    check: orderCheck,
   },
   {
     key: "bb_staff_change",
@@ -242,6 +246,7 @@ export const BIRDWING_BOOKS = defineEntries([
       order(),
       active(),
     ],
+    check: orderCheck,
   },
   {
     key: "bb_pay_rule_new",
@@ -281,6 +286,7 @@ export const BIRDWING_BOOKS = defineEntries([
       "Adds an expense head (an admin's): its name, order on the list (100 if left out) and whether it is in use (true if left out).",
     adds: true,
     fields: [{ key: "name", label: "Name", kind: "text", max: 60 }, order("100"), active(true)],
+    check: orderCheck,
   },
   {
     key: "bb_head_change",
@@ -295,5 +301,6 @@ export const BIRDWING_BOOKS = defineEntries([
       order(),
       active(),
     ],
+    check: orderCheck,
   },
 ]);

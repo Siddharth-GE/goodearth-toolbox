@@ -10,6 +10,7 @@ import {
   updateExpense,
 } from "@/lib/birdwing-books/actions";
 import { saveHead, savePayRule, saveStaff } from "@/lib/birdwing-books/settings-actions";
+import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, formOf, type Entry } from "../catalogue-fields";
@@ -52,6 +53,47 @@ async function lineNow(id: string, columns: string[] = []) {
   if (now.row.salary_run_id)
     return { error: "That is a confirmed salary's line; it never changes." };
   return now;
+}
+
+/** The grid lists someone who has left only in a month they already have days in; a new day elsewhere would bring them back onto Salaries. */
+async function leaverRefused(staffId: string, onDate: string): Promise<Refusal> {
+  const person = await recordNow(
+    "birdwing_staff",
+    { column: "id", id: staffId },
+    ["is_active"],
+    "That person is gone.",
+  );
+  if ("error" in person) return person;
+  if (person.row.is_active !== false) return null;
+  const first = `${onDate.slice(0, 7)}-01`;
+  const next = new Date(`${first}T00:00:00Z`);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("birdwing_attendance")
+    .select("id", { count: "exact", head: true })
+    .eq("staff_id", staffId)
+    .gte("on_date", first)
+    .lt("on_date", next.toISOString().slice(0, 10));
+  if (error) return failed("birdwing_attendance", error);
+  return count
+    ? null
+    : { error: "That person no longer works at Birdwing, and has no days that month." };
+}
+
+/** The account picker offers only active accounts with a name, and keeps the one a person has. */
+async function accountRefused(id: string | null, current: unknown = null): Promise<Refusal> {
+  if (!id || id === current) return null;
+  const account = await recordNow(
+    "profiles",
+    { column: "id", id },
+    ["is_active", "full_name"],
+    "That account is gone.",
+  );
+  if ("error" in account) return account;
+  return account.row.is_active && account.row.full_name
+    ? null
+    : { error: "That toolbox account is switched off." };
 }
 
 export const BIRDWING_BOOKS_RUNNERS: Runners<Key> = {
@@ -114,14 +156,16 @@ export const BIRDWING_BOOKS_RUNNERS: Runners<Key> = {
       .eq("on_date", onDate)
       .maybeSingle();
     if (error) return failed("birdwing_attendance", error);
+    if (!day) {
+      const refused = await leaverRefused(staffId, onDate);
+      if (refused) return refused;
+    }
     const status = given(v, "status", day?.status);
     if (!status)
       return { error: "Give the day's status: present, half_day, leave, holiday_leave or absent." };
     // The day sheet shows times and a break only for a day worked; the save drops them otherwise.
-    if (
-      !WORKED.includes(status) &&
-      ["in_at", "out_at", "break_minutes"].some((key) => text(v, key))
-    )
+    const timed = text(v, "in_at") || text(v, "out_at") || Number(text(v, "break_minutes")) > 0;
+    if (!WORKED.includes(status) && timed)
       return { error: "A day not worked has no times or break." };
     const form = formOf(entry("bb_attendance"), v, {
       ...day,
@@ -145,8 +189,20 @@ export const BIRDWING_BOOKS_RUNNERS: Runners<Key> = {
     if (!data) return { error: "That day is not marked." };
     return clearAttendance(staffId, onDate);
   },
-  bb_all_present: (v) => markAllPresent(String(v.on_date)),
-  bb_staff_new: (v) => saveStaff(null, undefined, formOf(entry("bb_staff_new"), v)),
+  bb_all_present: (v) => {
+    // The morning's press is today's only: on an earlier day it would mark people not yet joined.
+    const today = todayInIndia();
+    if (text(v, "on_date") && v.on_date !== today)
+      return Promise.resolve({
+        error: "Everyone present is for today; mark an earlier day person by person.",
+      });
+    return markAllPresent(today);
+  },
+  bb_staff_new: async (v) => {
+    const refused = await accountRefused(text(v, "profile_id"));
+    if (refused) return refused;
+    return saveStaff(null, undefined, formOf(entry("bb_staff_new"), v));
+  },
   bb_staff_change: async (v) => {
     const id = String(v.staff_id);
     const now = await recordNow(
@@ -156,6 +212,8 @@ export const BIRDWING_BOOKS_RUNNERS: Runners<Key> = {
       "That person is gone.",
     );
     if ("error" in now) return now;
+    const refused = await accountRefused(text(v, "profile_id"), now.row.profile_id);
+    if (refused) return refused;
     return saveStaff(id, undefined, formOf(entry("bb_staff_change"), v, now.row));
   },
   bb_pay_rule_new: (v) => savePayRule(null, undefined, formOf(entry("bb_pay_rule_new"), v)),
