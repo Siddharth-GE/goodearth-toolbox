@@ -67,6 +67,9 @@ const NAMED_BY: Record<
     | "budgets"
     | "estimator_work_components"
     | "estimator_mix_components"
+    | "estimator_estimates"
+    | "estimator_estimate_lines"
+    | "estimator_estimate_line_measurements"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -319,6 +322,31 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     if (one.item_id) add("items", one.item_id);
   }
 
+  // A measurement row by its work; a work on an estimate by its estimate and work; an estimate by its number or name.
+  const sheetRows = await readIn(list("estimator_estimate_line_measurements"), (chunk) =>
+    supabase
+      .from("estimator_estimate_line_measurements")
+      .select("id, line_id, description, nos, length, breadth, depth, is_deduction")
+      .in("id", chunk),
+  );
+  for (const one of sheetRows) add("estimator_estimate_lines", one.line_id);
+  const estLines = await readIn(list("estimator_estimate_lines"), (chunk) =>
+    supabase
+      .from("estimator_estimate_lines")
+      .select("id, estimate_id, work_item_id, qty")
+      .in("id", chunk),
+  );
+  for (const one of estLines) {
+    add("estimator_estimates", one.estimate_id);
+    add("work_items", one.work_item_id);
+  }
+  const estimates = await readIn(list("estimator_estimates"), (chunk) =>
+    supabase
+      .from("estimator_estimates")
+      .select("id, name, reference, status, is_working")
+      .in("id", chunk),
+  );
+
   // A Birdwing record by its stay; a stay by its number, guest and nights.
   const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
     readIn(list("birdwing_stay_rooms"), (chunk) =>
@@ -479,6 +507,30 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     ]
       .filter(Boolean)
       .join(" · ");
+  for (const one of estimates)
+    names[one.id] =
+      `${one.reference ?? one.name} (${one.is_working ? "working" : one.status === "submitted" ? "official" : one.status === "cancelled" ? "withdrawn" : one.status})`;
+  for (const one of estLines)
+    names[one.id] = [
+      names[one.estimate_id],
+      names[one.work_item_id],
+      one.qty === null ? "to measure" : formatQuantity(one.qty),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of sheetRows) {
+    const boxes = [one.nos, one.length, one.breadth, one.depth]
+      .filter((value): value is number => value !== null)
+      .map((value) => formatQuantity(value))
+      .join(" × ");
+    names[one.id] = [
+      names[one.line_id],
+      one.description,
+      `${one.is_deduction ? "less " : ""}${boxes}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   const revisionOf = new Map(
     revisions.map((one) => [
       one.id,

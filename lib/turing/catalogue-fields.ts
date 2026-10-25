@@ -11,6 +11,7 @@ import { CLIENT_RELATIONS } from "./entries/client-relations";
 import { DESIGN_MANAGEMENT } from "./entries/design-management";
 import { SELECTIONS_BUDGETS } from "./entries/selections-budgets";
 import { ESTIMATOR_RATES } from "./entries/estimator-rates";
+import { ESTIMATOR_ESTIMATES } from "./entries/estimator-estimates";
 import { INDENTS } from "./entries/indents";
 import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
@@ -82,7 +83,10 @@ export type IdTable =
   | "budgets"
   | "estimator_mixes"
   | "estimator_work_components"
-  | "estimator_mix_components";
+  | "estimator_mix_components"
+  | "estimator_estimates"
+  | "estimator_estimate_lines"
+  | "estimator_estimate_line_measurements";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -146,6 +150,11 @@ const FROM: Record<IdTable, string> = {
   estimator_mixes: "estimator_mixes (a named mix: M20 concrete)",
   estimator_work_components: "estimator_work_components (a material or mix in a work's recipe)",
   estimator_mix_components: "estimator_mix_components (a material in a mix)",
+  estimator_estimates:
+    "estimator_estimates (a villa's estimate: working, official, superseded or withdrawn)",
+  estimator_estimate_lines: "estimator_estimate_lines (one work on an estimate)",
+  estimator_estimate_line_measurements:
+    "estimator_estimate_line_measurements (a row of a work's measurement sheet)",
 };
 
 export type Field = {
@@ -235,6 +244,7 @@ export const ENTRIES = [
   ...DESIGN_MANAGEMENT,
   ...SELECTIONS_BUDGETS,
   ...ESTIMATOR_RATES,
+  ...ESTIMATOR_ESTIMATES,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
