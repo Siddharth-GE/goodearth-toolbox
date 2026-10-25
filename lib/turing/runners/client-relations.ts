@@ -16,6 +16,7 @@ import {
   updatePlot,
 } from "@/lib/client-relations/next-steps-actions";
 import { todayInIndia } from "@/lib/format";
+import { actionRemoval } from "@/lib/next-steps/rules";
 import { createClient } from "@/lib/supabase/server";
 
 import { BOTTLENECK_VALUES, type CLIENT_RELATIONS } from "../entries/client-relations";
@@ -381,5 +382,32 @@ export const CLIENT_RELATIONS_RUNNERS: Runners<Key> = {
     });
   },
   crm_action_delete: (v) => deleteNextStep(String(v.action_id)),
-  crm_action_cancel: (v) => cancelNextStep(String(v.action_id), String(v.reason)),
+  crm_action_cancel: async (v) => {
+    const now = await recordNow(
+      "client_actions",
+      { column: "id", id: String(v.action_id) },
+      ["created_by", "owner_id", "status", "created_at", "updated_at"],
+      "That action is gone.",
+    );
+    if ("error" in now) return now;
+    const row = now.row as Record<string, string>;
+    // As on screen: one nobody has changed is deleted, not cancelled; a closed one neither.
+    const way = actionRemoval(
+      {
+        createdBy: row.created_by,
+        ownerId: row.owner_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      },
+      { id: "", isManager: true },
+    );
+    if (way === null) return { error: "That action is already closed." };
+    if (way === "delete")
+      return {
+        error:
+          "Nobody has changed that action since it was added, so it is deleted instead (crm_action_delete).",
+      };
+    return cancelNextStep(String(v.action_id), String(v.reason));
+  },
 };

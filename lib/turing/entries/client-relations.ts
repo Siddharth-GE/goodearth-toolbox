@@ -292,7 +292,7 @@ export const CLIENT_RELATIONS = defineEntries([
     tool: "/client-relations",
     title: "An action, cancelled",
     description:
-      "Cancels an action for good, with the reason; it is closed as done and stays among the done, struck through. Its setter or an admin.",
+      "Cancels an action for good, with the reason; it is closed as done and stays among the done, struck through. Its setter or an admin; only one changed since it was added — one nobody has touched is deleted instead.",
     fields: [action, { key: "reason", label: "Why", kind: "text" }],
   },
 ]);

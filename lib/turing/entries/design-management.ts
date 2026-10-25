@@ -215,7 +215,7 @@ export const DESIGN_MANAGEMENT = defineEntries([
     tool: "/design-management",
     title: "A design action, cancelled",
     description:
-      "Cancels a design action for good, with the reason; it is closed as done and stays among the done, struck through.",
+      "Cancels a design action for good, with the reason; it is closed as done and stays among the done, struck through. Only one changed since it was added; one nobody has touched is deleted instead.",
     fields: [action, { key: "reason", label: "Why", kind: "text" }],
   },
   {
@@ -223,7 +223,7 @@ export const DESIGN_MANAGEMENT = defineEntries([
     tool: "/design-management",
     title: "A design stage",
     description:
-      "Adds a stage to Design Management's stage list, placed at the end unless at_start or after_stage_id says otherwise. It starts on the board and in use; design_stage_change gives it a short code.",
+      "Adds a stage to Design Management's stage list, placed at the end unless at_start or after_stage_id says otherwise. It starts in use but off the board (no column, no steps) until design_stage_change sets on_board true; that also gives it a short code.",
     adds: true,
     fields: [{ key: "name", label: "Name", kind: "text", max: 120 }, ...placed],
     check: onePlace,
@@ -264,7 +264,7 @@ export const DESIGN_MANAGEMENT = defineEntries([
     tool: "/design-management",
     title: "A transmittal, started",
     description:
-      "Starts a draft transmittal for a villa: one stage in use and one drawing set of that stage — one of this villa's sets (set_id: its next revision, or the draft no transmittal carries) or a new one by name (set_name). The number is given when it is issued. Its note, revision, what changed and WorkDrive link follow with design_transmittal_change.",
+      "Starts a draft transmittal for a villa: one stage in use and one drawing set of that stage — one of this villa's sets (set_id: its next revision, or the draft no transmittal carries) or a new one by name (set_name). The number is given when it is issued; read transmittals (status draft, this villa) for the new one's id. Its note, revision, what changed and WorkDrive link follow with design_transmittal_change.",
     adds: true,
     fields: [
       villa,
@@ -300,7 +300,7 @@ export const DESIGN_MANAGEMENT = defineEntries([
     tool: "/design-management",
     title: "A draft transmittal's works",
     description:
-      "Sets which works (work_items) a draft transmittal's drawings cover: one row per work, and the rows are the complete new list, replacing the ticks.",
+      "Sets which works (work_items) a draft transmittal's drawings cover: one row per work, and the rows are the complete new list, replacing the ticks — so give the works already ticked that stay too. It cannot empty the list; that is done on the transmittal.",
     lines: { noun: "Transmittal" },
     fields: [
       { ...transmittal, header: true },

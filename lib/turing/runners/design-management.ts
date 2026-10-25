@@ -34,11 +34,12 @@ import {
   startTransmittal,
 } from "@/lib/design-management/transmittal-actions";
 import type { ActionState } from "@/lib/action-state";
+import { actionRemoval } from "@/lib/next-steps/rules";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 import { movedStage, passTargetIds, type DESIGN_MANAGEMENT } from "../entries/design-management";
-import { failed, recordNow, retired, saving, type Runners, type Values } from "./kit";
+import { failed, recordNow, saving, type Runners, type Values } from "./kit";
 
 type Key = (typeof DESIGN_MANAGEMENT)[number]["key"];
 type Failure = { error: string };
@@ -149,8 +150,10 @@ async function stillDraft(transmittalId: string): Promise<Refusal> {
   return null;
 }
 
-/** A draft transmittal's one drawing revision, which its note, number, link and works belong to. */
-async function draftOf(transmittalId: string): Promise<{ revisionId: string } | Failure> {
+type Draft = { revisionId: string; revisionNo: number; link: string | null };
+
+/** A draft transmittal's drawing revision, still a draft, which its number, what changed, link and works belong to. */
+async function draftOf(transmittalId: string): Promise<Draft | Failure> {
   const refused = await stillDraft(transmittalId);
   if (refused) return refused;
   const line = await recordNow(
@@ -160,7 +163,26 @@ async function draftOf(transmittalId: string): Promise<{ revisionId: string } | 
     "That transmittal carries no drawing set.",
   );
   if ("error" in line) return line;
-  return { revisionId: String(line.row.drawing_revision_id) };
+  const revisionId = String(line.row.drawing_revision_id);
+  const revision = await recordNow(
+    "drawing_revisions",
+    { column: "id", id: revisionId },
+    ["status", "revision_no", "drawings_url"],
+    "That transmittal's drawings are gone.",
+  );
+  if ("error" in revision) return revision;
+  // The page shows no editor for one already released: its saves would match nothing and still say done.
+  if (revision.row.status !== "draft") {
+    return {
+      error:
+        "That transmittal's drawings have already gone to site; delete this draft and start a new transmittal.",
+    };
+  }
+  return {
+    revisionId,
+    revisionNo: Number(revision.row.revision_no),
+    link: (revision.row.drawings_url as string | null) ?? null,
+  };
 }
 
 /** Several saves for one row, in order: one that refuses after others stood says what already saved. */
@@ -347,7 +369,34 @@ export const DESIGN_MANAGEMENT_RUNNERS: Runners<Key> = {
     });
   },
   design_action_delete: (v) => deleteDesignAction(String(v.action_id)),
-  design_action_cancel: (v) => cancelDesignAction(String(v.action_id), String(v.reason)),
+  design_action_cancel: async (v) => {
+    const now = await recordNow(
+      "design_actions",
+      { column: "id", id: String(v.action_id) },
+      ["created_by", "owner_id", "status", "created_at", "updated_at"],
+      "That action is gone.",
+    );
+    if ("error" in now) return now;
+    const row = now.row as Record<string, string>;
+    // As on screen: one nobody has changed is deleted, not cancelled; a closed one neither.
+    const way = actionRemoval(
+      {
+        createdBy: row.created_by,
+        ownerId: row.owner_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      },
+      { id: "", isManager: true },
+    );
+    if (way === null) return { error: "That action is already closed." };
+    if (way === "delete")
+      return {
+        error:
+          "Nobody has changed that action since it was added, so it is deleted instead (design_action_delete).",
+      };
+    return cancelDesignAction(String(v.action_id), String(v.reason));
+  },
   design_stage_new: async (v) => {
     const after = await placeOf(v);
     if (typeof after !== "string") return after;
@@ -372,8 +421,13 @@ export const DESIGN_MANAGEMENT_RUNNERS: Runners<Key> = {
       steps.push(["The code", () => setDesignStageCode(id, String(v.code))]);
     if ("is_active" in v && v.is_active !== now.row.is_active)
       steps.push(["In use", () => setDesignStageActive(id, v.is_active === true)]);
-    if ("on_board" in v && v.on_board !== now.row.on_board)
+    if ("on_board" in v && v.on_board !== now.row.on_board) {
+      // The board switch is off for a retired stage.
+      const inUse = "is_active" in v ? v.is_active === true : now.row.is_active === true;
+      if (!inUse)
+        return { error: "A retired stage goes on or off the board only once it is in use." };
       steps.push(["On the board", () => setDesignStageOnBoard(id, v.on_board === true)]);
+    }
     return inTurn(steps);
   },
   design_stage_move: async (v) => {
@@ -411,33 +465,32 @@ export const DESIGN_MANAGEMENT_RUNNERS: Runners<Key> = {
   },
   design_transmittal_change: async (v) => {
     const transmittalId = String(v.transmittal_id);
-    const draft = await draftOf(transmittalId);
-    if ("error" in draft) return draft;
-    const now = await recordNow(
-      "drawing_revisions",
-      { column: "id", id: draft.revisionId },
-      ["revision_no", "note", "drawings_url"],
-      "That transmittal's drawings are gone.",
-    );
-    if ("error" in now) return now;
     const steps: [string, () => Promise<ActionState>][] = [];
-    if ("revision_no" in v && Number(v.revision_no) !== now.row.revision_no)
-      steps.push([
-        "The revision number",
-        () => setDraftRevisionNumber(draft.revisionId, Number(v.revision_no)),
-      ]);
-    if ("what_changed" in v)
-      steps.push([
-        "What changed",
-        () => updateDraftRevisionNote(draft.revisionId, String(v.what_changed)),
-      ]);
+    // The note is the transmittal's own, so it changes on any draft, even one with no drawing set.
+    if (["revision_no", "what_changed", "drawings_url"].some((key) => key in v)) {
+      const draft = await draftOf(transmittalId);
+      if ("error" in draft) return draft;
+      if ("revision_no" in v && Number(v.revision_no) !== draft.revisionNo)
+        steps.push([
+          "The revision number",
+          () => setDraftRevisionNumber(draft.revisionId, Number(v.revision_no)),
+        ]);
+      if ("what_changed" in v)
+        steps.push([
+          "What changed",
+          () => updateDraftRevisionNote(draft.revisionId, String(v.what_changed)),
+        ]);
+      if ("drawings_url" in v && (text(v, "drawings_url") ?? null) !== draft.link)
+        steps.push([
+          "The link",
+          () => setDraftDrawingsLink(draft.revisionId, String(v.drawings_url)),
+        ]);
+    } else {
+      const refused = await stillDraft(transmittalId);
+      if (refused) return refused;
+    }
     if ("note" in v)
-      steps.push(["The note", () => setDraftTransmittalNote(transmittalId, String(v.note))]);
-    if ("drawings_url" in v && (text(v, "drawings_url") ?? null) !== now.row.drawings_url)
-      steps.push([
-        "The link",
-        () => setDraftDrawingsLink(draft.revisionId, String(v.drawings_url)),
-      ]);
+      steps.unshift(["The note", () => setDraftTransmittalNote(transmittalId, String(v.note))]);
     return inTurn(steps);
   },
   design_transmittal_works: {
@@ -447,11 +500,6 @@ export const DESIGN_MANAGEMENT_RUNNERS: Runners<Key> = {
       const works = lines.map((line) => String(line.work_item_id));
       if (new Set(works).size < works.length)
         return { error: "One work is named twice; give it one row." };
-      // The works tree offers works in use only.
-      for (const work of works) {
-        const refused = await retired("work_items", work);
-        if (refused) return refused;
-      }
       return setDrawingRevisionWorks(draft.revisionId, works);
     },
   },

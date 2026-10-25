@@ -236,7 +236,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   // A design action by its words and status; a transmittal by its number, villa and stage.
   const [designActions, transmittals] = await Promise.all([
     readIn(list("design_actions"), (chunk) =>
-      supabase.from("design_actions").select("id, action, status").in("id", chunk),
+      supabase.from("design_actions").select("id, action, status, cancel_reason").in("id", chunk),
     ),
     readIn(list("transmittals"), (chunk) =>
       supabase
@@ -247,7 +247,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   ]);
   for (const one of designActions) {
     const words = one.action.length > 60 ? `${one.action.slice(0, 57)}…` : one.action;
-    names[one.id] = `${words} (${one.status.replace(/_/g, " ")})`;
+    names[one.id] = `${words} (${one.cancel_reason ? "cancelled" : one.status.replace(/_/g, " ")})`;
   }
   for (const one of transmittals) {
     add("units", one.unit_id);
