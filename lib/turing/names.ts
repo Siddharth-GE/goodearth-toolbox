@@ -1,6 +1,6 @@
 import "server-only";
 
-import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import { formatDate, formatMoney, formatMonthMark, formatQuantity } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
@@ -56,6 +56,8 @@ const NAMED_BY: Record<
     | "birdwing_receipts"
     | "birdwing_cross_charges"
     | "birdwing_rate_card"
+    | "birdwing_expenses"
+    | "birdwing_pay_rules"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -79,6 +81,8 @@ const NAMED_BY: Record<
   progress_stages: "name",
   birdwing_guests: "name",
   birdwing_cost_centres: "name",
+  birdwing_expense_heads: "name",
+  birdwing_staff: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -272,6 +276,23 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     ),
   ]);
   for (const one of stays) if (one.guest_id) add("birdwing_guests", one.guest_id);
+  // A Books line by its head, words, amount and month; a pay rule by its person and first day.
+  const [bbExpenses, bbRules] = await Promise.all([
+    readIn(list("birdwing_expenses"), (chunk) =>
+      supabase
+        .from("birdwing_expenses")
+        .select("id, head_id, description, amount, accounting_month, status, salary_run_id")
+        .in("id", chunk),
+    ),
+    readIn(list("birdwing_pay_rules"), (chunk) =>
+      supabase
+        .from("birdwing_pay_rules")
+        .select("id, staff_id, effective_from, base_salary")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of bbExpenses) add("birdwing_expense_heads", one.head_id);
+  for (const one of bbRules) add("birdwing_staff", one.staff_id);
 
   const [people, indents, orders, receipts, issues, workOrders, bills] = await Promise.all([
     readIn(list("profiles"), (chunk) =>
@@ -392,6 +413,24 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of bwHeads)
     names[one.id] =
       `${one.head} · ${formatMoney(one.default_rate)} + ${one.gst_pct}% GST${one.is_active ? "" : " (switched off)"}`;
+
+  for (const one of bbExpenses)
+    names[one.id] = [
+      names[one.head_id],
+      one.description,
+      formatMoney(one.amount),
+      `${formatMonthMark(one.accounting_month)} (${one.salary_run_id ? "salary" : one.status})`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of bbRules)
+    names[one.id] = [
+      names[one.staff_id],
+      `from ${formatDate(one.effective_from)}`,
+      `${formatMoney(one.base_salary)} a month`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   const whose = (engagementId: string) => {
     const villa = plotOfEngagement.get(engagementId);
