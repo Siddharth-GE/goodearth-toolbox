@@ -9,6 +9,7 @@ import { BIRDWING_RUNNERS } from "./runners/birdwing";
 import { BIRDWING_BOOKS_RUNNERS } from "./runners/birdwing-books";
 import { CLIENT_RELATIONS_RUNNERS } from "./runners/client-relations";
 import { DESIGN_MANAGEMENT_RUNNERS } from "./runners/design-management";
+import { DIRECTORY_RUNNERS } from "./runners/directory";
 import { SELECTIONS_BUDGETS_RUNNERS } from "./runners/selections-budgets";
 import { ESTIMATOR_RATES_RUNNERS } from "./runners/estimator-rates";
 import { ESTIMATOR_ESTIMATES_RUNNERS } from "./runners/estimator-estimates";
@@ -16,6 +17,7 @@ import { INDENT_RUNNERS } from "./runners/indents";
 import { INVENTORY_RUNNERS } from "./runners/inventory";
 import { MASTERS_RUNNERS } from "./runners/masters";
 import { PO_RUNNERS } from "./runners/purchase-orders";
+import { RELAY_RUNNERS } from "./runners/relay";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
 import { WORK_ORDER_RUNNERS } from "./runners/work-orders";
@@ -36,4 +38,6 @@ export const RUNNERS: Runners<EntryKey> = {
   ...SELECTIONS_BUDGETS_RUNNERS,
   ...ESTIMATOR_RATES_RUNNERS,
   ...ESTIMATOR_ESTIMATES_RUNNERS,
+  ...RELAY_RUNNERS,
+  ...DIRECTORY_RUNNERS,
 };
