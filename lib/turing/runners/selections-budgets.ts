@@ -246,7 +246,7 @@ export const SELECTIONS_BUDGETS_RUNNERS: Runners<Key> = {
           return {
             error:
               done.length > 0
-                ? `${done.join(", ")} saved, then ${label.get(spaceId) ?? "a space"}: ${result.error}`
+                ? `${done.join(", ")} saved, then ${label.get(spaceId) ?? "a space"}: ${result.error} Propose only the spaces not saved: adding an item again raises its quantity.`
                 : result.error,
           };
         }
@@ -380,14 +380,17 @@ export const SELECTIONS_BUDGETS_RUNNERS: Runners<Key> = {
     ]);
     if (priced.error) return failed("budget_lines", priced.error);
     if (margin.error) return failed("item_margins", margin.error);
-    // What the grid shows for a line before it is priced: the designer's quantity and the item's margin.
-    const now = priced.data ?? {
-      quantity: selected.row.quantity as number,
-      expected_vendor_id: null,
-      unit_cost: null,
-      margin_pct: margin.data?.margin_pct ?? null,
-      notes: null,
-    };
+    // What the grid shows: the line's own figures, or the designer's quantity, and the item's margin wherever the line has none.
+    const itemMargin = margin.data?.margin_pct ?? null;
+    const now = priced.data
+      ? { ...priced.data, margin_pct: priced.data.margin_pct ?? itemMargin }
+      : {
+          quantity: selected.row.quantity as number,
+          expected_vendor_id: null,
+          unit_cost: null,
+          margin_pct: itemMargin,
+          notes: null,
+        };
 
     const vendorId = given(v, "vendor_id", now.expected_vendor_id) || null;
     // The grid offers active vendors, and keeps the one already on the line.
@@ -412,7 +415,20 @@ export const SELECTIONS_BUDGETS_RUNNERS: Runners<Key> = {
     if (budget.status !== "approved") return { error: "That budget is still pricing." };
     return reopenBudget(String(v.budget_id));
   },
-  budget_margin: (v) => setItemMargin(String(v.item_id), numberOf(v, "margin_pct")),
+  budget_margin: async (v) => {
+    const itemId = String(v.item_id);
+    // The margins screen finds items through the catalogue, active ones only.
+    const refused = await retired("items", itemId);
+    if (refused) return refused;
+    const marginPct = numberOf(v, "margin_pct");
+    if (marginPct === null) {
+      const now = await recordNow("item_margins", { column: "item_id", id: itemId }, ["id"], null);
+      if ("error" in now) return now;
+      // Clearing deletes the row, so with none it would change nothing and say done.
+      if (!now.row.id) return { error: "That item has no default margin to clear." };
+    }
+    return setItemMargin(itemId, marginPct);
+  },
   budget_delete: async (v) => {
     const budget = await budgetOf(String(v.budget_id));
     if ("error" in budget) return budget;

@@ -175,7 +175,7 @@ export const SELECTIONS_BUDGETS = defineEntries([
     tool: "/budgets",
     title: "A budget line, priced",
     description:
-      "Prices one item line (selection_lines of the budget's revision) on a budget still pricing: the quantity (above 0; left out, the budget's own or the designer's), the expected vendor (active), the unit cost in rupees before margin and the margin % (left out, the line's own or the item's default margin; a cost with no margin is charged at cost). Empty clears the vendor, cost, margin or notes. Pricing a line marks it reviewed.",
+      "Prices one item line (selection_lines of the budget's revision) on a budget still pricing: the quantity (above 0; left out, the budget's own or the designer's), the expected vendor (active), the unit cost in rupees before margin and the margin % (left out, the line's own, or the item's default where the line has none; a cost with no margin at all is charged at cost). Empty clears the vendor, cost, margin or notes. Pricing a line marks it reviewed.",
     fields: [
       budget,
       line,
