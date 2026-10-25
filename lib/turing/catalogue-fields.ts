@@ -175,6 +175,8 @@ export type Field = {
   max?: number;
   /** An amount that may be below zero (a stock count corrected down). */
   signed?: true;
+  /** An amount to six decimals, not three: a recipe's 0.0144 cum of mortar per sqm. */
+  fine?: true;
 };
 
 /**
@@ -312,7 +314,12 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a whole number up to 999.` };
     case "amount":
-      return (field.signed ? /^-?\d{1,9}(\.\d{1,3})?$/ : /^\d{1,9}(\.\d{1,3})?$/).test(value)
+      return (field.signed
+        ? /^-?\d{1,9}(\.\d{1,3})?$/
+        : field.fine
+          ? /^\d{1,9}(\.\d{1,6})?$/
+          : /^\d{1,9}(\.\d{1,3})?$/
+      ).test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a number, like 12.5.` };
     case "choice":

@@ -18,10 +18,11 @@ import {
   updateWorkComponentQty,
 } from "@/lib/estimator/works-actions";
 import { isActiveUom } from "@/lib/masters/uoms";
+import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, formOf, type Entry } from "../catalogue-fields";
 import type { ESTIMATOR_RATES } from "../entries/estimator-rates";
-import { recordNow, retired, saving, type Runners, type Values } from "./kit";
+import { failed, recordNow, retired, saving, type Runners, type Values } from "./kit";
 
 type Key = (typeof ESTIMATOR_RATES)[number]["key"];
 type Refusal = { error: string } | null;
@@ -102,6 +103,15 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
       (itemId ? await materialRefused(itemId) : null) ??
       (mixId ? await mixRefused(mixId) : null);
     if (refused) return refused;
+    // The work page offers its recipe only once the work has a unit.
+    const info = await recordNow(
+      "estimator_work_info",
+      { column: "work_item_id", id: workId },
+      ["uom"],
+      null,
+    );
+    if ("error" in info) return info;
+    if (!info.row.uom) return { error: "Set the work's unit first (est_work_setup)." };
     const form = new FormData();
     form.set("component", itemId ? `material:${itemId}` : `mix:${mixId}`);
     form.set("qty_per_unit", String(v.qty_per_unit));
@@ -117,20 +127,21 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     if (refused) return refused;
     return removeWorkComponent(String(v.component_id));
   },
-  est_work_copy: {
-    lines: async (header, lines) => {
-      const fromId = String(header.from_work_item_id);
-      const targets = lines.map((one) => String(one.to_work_item_id));
-      if (new Set(targets).size < targets.length)
-        return { error: "One work is named twice; give it one row." };
-      if (targets.includes(fromId)) return { error: "A work cannot be copied onto itself." };
-      // The copy picker offers active works only.
-      for (const id of [fromId, ...targets]) {
-        const refused = await retired("work_items", id);
-        if (refused) return refused;
-      }
-      return copyWorkSetup(fromId, targets);
-    },
+  est_work_copy: async (v) => {
+    const fromId = String(v.from_work_item_id);
+    const toId = String(v.to_work_item_id);
+    if (toId === fromId) return { error: "A work cannot be copied onto itself." };
+    // The copy picker offers active works only.
+    const refused = (await retired("work_items", fromId)) ?? (await retired("work_items", toId));
+    if (refused) return refused;
+    const result = await copyWorkSetup(fromId, [toId]);
+    // Its write replaces the target's materials after its unit and rate, so a failure there can leave it with none.
+    if (result?.error?.startsWith("Copied to"))
+      return {
+        error:
+          "The copy failed part-way: the work may now have the new unit and labour rate but no materials. Check it in the rate book.",
+      };
+    return result;
   },
   est_mix_new: async (v) => {
     const refused = await uomRefused(text(v, "uom"), null);
@@ -150,9 +161,20 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     return updateMix(String(v.mix_id), undefined, formOf(entry("est_mix_change"), v, now.row));
   },
   est_mix_delete: async (v) => {
-    const refused = await gone("estimator_mixes", String(v.mix_id), "mix");
+    const mixId = String(v.mix_id);
+    const refused = await gone("estimator_mixes", mixId, "mix");
     if (refused) return refused;
-    const done = await saving(() => deleteMix(String(v.mix_id)), "/estimator/mixes");
+    // The delete takes the mix's materials before the mix, which a recipe using it then refuses, leaving it empty.
+    const supabase = await createClient();
+    const [works, lines] = await Promise.all([
+      supabase.from("estimator_work_components").select("id").eq("mix_id", mixId).limit(1),
+      supabase.from("estimator_estimate_line_components").select("id").eq("mix_id", mixId).limit(1),
+    ]);
+    if (works.error) return failed("estimator_work_components", works.error);
+    if (lines.error) return failed("estimator_estimate_line_components", lines.error);
+    if (works.data?.length || lines.data?.length)
+      return { error: "This mix is in use, so it can't be deleted. Switch it off instead." };
+    const done = await saving(() => deleteMix(mixId), "/estimator/mixes");
     return "error" in done ? done : undefined;
   },
   est_mix_material: async (v) => {
@@ -172,10 +194,22 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     if (refused) return refused;
     return removeMixComponent(String(v.component_id));
   },
-  est_indent_answer: (v) =>
-    decideIndentLine({
+  est_indent_answer: async (v) => {
+    const now = await recordNow(
+      "indent_lines",
+      { column: "id", id: String(v.line_id) },
+      ["estimator_decision"],
+      "That indent line is gone.",
+    );
+    if ("error" in now) return now;
+    // The screen offers only the other answer, and approves with no note.
+    if (now.row.estimator_decision === v.decision)
+      return { error: `That line is already ${String(v.decision)}.` };
+    const refusing = v.decision === "refused";
+    return decideIndentLine({
       lineId: String(v.line_id),
-      decision: v.decision === "refused" ? "refused" : "approved",
-      note: text(v, "note") ?? "",
-    }),
+      decision: refusing ? "refused" : "approved",
+      note: refusing ? (text(v, "note") ?? "") : "",
+    });
+  },
 };

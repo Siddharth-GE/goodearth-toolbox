@@ -50,6 +50,21 @@ test("refusing an indent line needs the reason the approver reads", () => {
     true,
   );
   assert.equal(ok("est_indent_answer", { line_id: LINE, decision: "approved" }), true);
+  assert.equal(
+    ok("est_indent_answer", { line_id: LINE, decision: "approved", note: "Fine" }),
+    false,
+  );
+});
+
+test("a recipe quantity keeps six decimals, as the screens take it", () => {
+  assert.equal(
+    ok("est_work_material", { work_item_id: WORK, item_id: ITEM, qty_per_unit: 0.0144 }),
+    true,
+  );
+  assert.equal(
+    ok("est_mix_material", { mix_id: MIX, item_id: ITEM, qty_per_unit: "0.0000001" }),
+    false,
+  );
 });
 
 test("a new mix starts in use, as its form does", () => {
