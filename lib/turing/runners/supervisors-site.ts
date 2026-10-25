@@ -22,6 +22,7 @@ import {
   updateSequenceStage,
 } from "@/lib/supervisors/sequence-actions";
 import { confirmSiteReceipt } from "@/lib/supervisors/site-receipt-actions";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, formOf } from "../catalogue-fields";
@@ -79,13 +80,45 @@ async function groupActive(groupId: string): Promise<Failure | null> {
 
 async function sequenceNow() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("site_sequence")
-    .select("work_group_id, follows_group_id, link, wait_days, typical_days")
-    .order("position")
-    .order("id");
-  if (error) return failed("site sequence", error);
-  return { rows: data ?? [] };
+  try {
+    const rows = await fetchAll((from, to) =>
+      supabase
+        .from("site_sequence")
+        .select("work_group_id, follows_group_id, link, wait_days, typical_days")
+        .order("position")
+        .order("id")
+        .range(from, to),
+    );
+    return { rows };
+  } catch (error) {
+    return failed("site sequence", error);
+  }
+}
+
+/**
+ * Whether the material needs a reason, as the request decides it: the villa has an official estimate,
+ * and that estimate does not list this material for this work.
+ */
+async function offEstimate(plotId: string, workItemId: string, itemId: string) {
+  const supabase = await createClient();
+  const unit = await recordNow("units", { column: "plot_id", id: plotId }, ["id"], null);
+  if ("error" in unit) return unit;
+  if (!unit.row.id) return { off: false };
+  const [planned, listed] = await Promise.all([
+    supabase
+      .from("estimate_takeoff_facts")
+      .select("unit_id", { count: "exact", head: true })
+      .eq("unit_id", String(unit.row.id)),
+    supabase
+      .from("estimate_takeoff_facts")
+      .select("unit_id", { count: "exact", head: true })
+      .eq("unit_id", String(unit.row.id))
+      .eq("work_item_id", workItemId)
+      .eq("item_id", itemId),
+  ]);
+  if (planned.error) return failed("estimate", planned.error);
+  if (listed.error) return failed("estimate", listed.error);
+  return { off: (planned.count ?? 0) > 0 && (listed.count ?? 0) === 0 };
 }
 
 /** A stage the site checks: which templates inspect it. */
@@ -117,11 +150,39 @@ async function confirming(
     lines.map((line) => ({ lineId: String(line.line_id), received: Number(line.received) })),
   );
   if ("error" in received) return received;
+  // A confirmation cut off part-way is finished with the lines still missing; the landed ones stay as they are.
+  const confirmation = await recordNow(
+    "site_receipt_confirmations",
+    { column: kind === "issue" ? "issue_id" : "receipt_id", id },
+    ["id"],
+    null,
+  );
+  if ("error" in confirmation) return confirmation;
+  if (confirmation.row.id) {
+    const landed = await supabase
+      .from("site_receipt_confirmation_lines")
+      .select("issue_line_id, receipt_line_id, received_quantity")
+      .eq("confirmation_id", String(confirmation.row.id));
+    if (landed.error) return failed("confirmed lines", landed.error);
+    const changed = (landed.data ?? []).some((line) => {
+      const lineId = line.issue_line_id ?? line.receipt_line_id ?? "";
+      return lineId in received.received && received.received[lineId] !== line.received_quantity;
+    });
+    if (changed)
+      return {
+        error:
+          "Some lines of this were already confirmed, and a confirmed line never changes; give those as they were confirmed.",
+      };
+  }
+  // The dialog asks why only when something is short.
+  const short = (sent.data ?? []).some((line) => received.received[line.id] < line.quantity);
+  if (!short && header.note)
+    return { error: "Nothing is short, so there is no shortage to explain; leave the note out." };
   return confirmSiteReceipt({
     kind,
     id,
     received: received.received,
-    note: header.note ? String(header.note) : null,
+    note: short && header.note ? String(header.note) : null,
   });
 }
 
@@ -134,6 +195,16 @@ export const SUPERVISORS_SITE_RUNNERS: Runners<(typeof SUPERVISORS_SITE)[number]
       retired("items", String(v.item_id)),
     ]);
     if (refused) return refused;
+    // The form asks why only for material off the estimate; a reason it would not ask for is never kept.
+    if (v.off_estimate_reason) {
+      const off = await offEstimate(String(v.plot_id), String(v.work_item_id), String(v.item_id));
+      if ("error" in off) return off;
+      if (!off.off)
+        return {
+          error:
+            "That material is on the estimate for this work, or the villa has no official estimate, so no reason is needed; leave it out.",
+        };
+    }
     return createIssueRequest(undefined, formFor("sup_request_new", v));
   },
   sup_request_withdraw: async (v) => {
@@ -161,13 +232,26 @@ export const SUPERVISORS_SITE_RUNNERS: Runners<(typeof SUPERVISORS_SITE)[number]
     if (!template.row.is_active) return { error: "That checklist template is switched off." };
     const stageId = v.work_group_id ? String(v.work_group_id) : null;
     if (stageId) {
+      // A stage's Start sits on it only while it is being worked.
+      const supabase = await createClient();
+      const { data: worked, error: workedError } = await supabase
+        .from("site_stages")
+        .select("status, not_needed")
+        .eq("plot_id", plotId)
+        .eq("work_group_id", stageId)
+        .maybeSingle();
+      if (workedError) return failed("stage", workedError);
+      if (!worked || worked.not_needed || !["working", "waiting"].includes(worked.status))
+        return {
+          error:
+            "That stage isn't being worked on this villa — start the checklist on the villa instead, or mark the stage Working first.",
+        };
       // A stage's Start offers only its own checklists, and only while none of them is open there.
       const links = await linksOf("work_group_id", stageId);
       if ("error" in links) return links;
       const inspecting = links.rows.map((row) => row.template_id);
       if (!inspecting.includes(templateId))
         return { error: "That checklist is not set to inspect that stage." };
-      const supabase = await createClient();
       const { data, error } = await supabase
         .from("site_checklists")
         .select("id")
@@ -326,6 +410,8 @@ export const SUPERVISORS_SITE_RUNNERS: Runners<(typeof SUPERVISORS_SITE)[number]
     if (!now) return { error: "That stage is not in the site sequence." };
     const follows = given(v, "follows_group_id", now.follows_group_id);
     // A villa's first stage follows nothing, so how it follows is "after", as the editor sends it.
+    if (!follows && "link" in v)
+      return { error: "A first stage follows nothing, so there is no after or alongside." };
     const link = follows ? given(v, "link", now.link) : "after";
     if (follows === (now.follows_group_id ?? "") && link === now.link)
       return { error: "That stage already follows that, that way." };
@@ -374,7 +460,7 @@ export const SUPERVISORS_SITE_RUNNERS: Runners<(typeof SUPERVISORS_SITE)[number]
     if ("error" in now) return now;
     const sqft = String(v.sqft);
     const current = now.row.typical_sqft;
-    if (sqft === "" ? current === null : Number(sqft) === Number(current))
+    if (sqft === "" ? current === null : current !== null && Number(sqft) === Number(current))
       return { error: "The typical villa is already that size." };
     return setTypicalSqft({ sqft });
   },
@@ -405,7 +491,10 @@ export const SUPERVISORS_SITE_RUNNERS: Runners<(typeof SUPERVISORS_SITE)[number]
         "That delivery is gone.",
       );
       if ("error" in receipt) return receipt;
-      if (!receipt.row.to_site || !receipt.row.plot_id)
+      // A site delivery named by its unit, not its plot, is not on any villa's page to confirm.
+      if (receipt.row.to_site && !receipt.row.plot_id)
+        return { error: "That delivery is not on a villa's page, so the site can't confirm it." };
+      if (!receipt.row.to_site)
         return {
           error:
             "That delivery went to a store, not a villa; only a villa confirms what reached it.",

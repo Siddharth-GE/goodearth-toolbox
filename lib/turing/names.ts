@@ -597,7 +597,8 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     names[one.id] = [
       names[one.template_item_id],
       names[one.checklist_id],
-      one.status === "not_checked" ? "not checked" : one.status === "na" ? "N/A" : one.status,
+      ({ pass: "Pass", fail: "Fail", na: "N/A" } as Record<string, string>)[one.status] ??
+        "Not checked",
     ]
       .filter(Boolean)
       .join(" · ");

@@ -1,5 +1,5 @@
 /** The rest of Supervisors: material requests, checklists and their templates, the site sequence, and what reached site. */
-import { WORK_CLASSES } from "@/lib/masters/work-classes";
+import { WORK_CLASS_LABEL, WORK_CLASSES } from "@/lib/masters/work-classes";
 
 import type { Field, Value } from "../catalogue-fields";
 import { defineEntries } from "./define";
@@ -64,7 +64,7 @@ export const SUPERVISORS_SITE = defineEntries([
     tool: "/supervisors",
     title: "Material asked of the store",
     description:
-      "A supervisor's request to the store for material for a villa's work: the work (an active works-list work), the material (an active catalogue item) and the quantity in its unit, above zero. Work class is standard unless it is for additional work or rework. If the villa's official estimate lists other materials for that work, off_estimate_reason says why this one is needed.",
+      "A supervisor's request to the store for material for a villa's work: the work (an active works-list work), the material (an active catalogue item) and the quantity in its unit, above zero. Work class is standard unless it is for additional work or rework. If the villa has an official estimate and it does not list this material for this work (a work with no materials on it included), off_estimate_reason says why it is needed; otherwise leave it out.",
     adds: true,
     form: { file: "lib/supervisors/actions.ts", reader: "createIssueRequest" },
     fields: [
@@ -78,7 +78,7 @@ export const SUPERVISORS_SITE = defineEntries([
         kind: "choice",
         optional: true,
         choices: WORK_CLASSES,
-        labels: { standard: "Standard work", additional: "Additional work", rework: "Rework" },
+        labels: WORK_CLASS_LABEL,
         start: "standard",
       },
       { ...note, label: "Note for the store" },
@@ -100,7 +100,7 @@ export const SUPERVISORS_SITE = defineEntries([
     tool: "/supervisors",
     title: "A site checklist, started",
     description:
-      "Starts a checklist on a villa from a switched-on checklist template with checks in it, every check unanswered. work_group_id is the stage it inspects, only for a template set to inspect that stage and only when no checklist of that stage is open on the villa; left out, it is the villa's own.",
+      "Starts a checklist on a villa from a switched-on checklist template with checks in it, every check unanswered. work_group_id is the stage it inspects, only for a template set to inspect that stage, only while the stage is being worked (working or waiting) and only when no checklist of that stage is open on the villa; left out, it is the villa's own.",
     adds: true,
     form: { file: FILE, reader: "startChecklist" },
     fields: [
@@ -313,7 +313,7 @@ export const SUPERVISORS_SITE = defineEntries([
     tool: "/supervisors",
     title: "What reached site, from the store",
     description:
-      "The site's confirmation of an issue from a store to a villa (stock_issues with a villa): one row per line of the issue (stock_issue_lines of it), every line, with what arrived — at most what was sent, 0 if none came. Anything short needs why.",
+      "The site's confirmation of an issue from a store to a villa (stock_issues with a villa): one row per line of the issue (stock_issue_lines of it), every line, with what arrived — at most what was sent, 0 if none came. Only something short takes a note saying why.",
     lines: { noun: "Confirmation" },
     fields: confirmLines(
       { key: "issue_id", label: "Issue", kind: "id", table: "stock_issues" },
@@ -325,7 +325,7 @@ export const SUPERVISORS_SITE = defineEntries([
     tool: "/supervisors",
     title: "What reached site, from a vendor",
     description:
-      "The site's confirmation of a vendor's delivery straight to a villa (goods_receipts to site): one row per line of the delivery (goods_receipt_lines of it), every line, with what arrived — at most what was sent, 0 if none came. Anything short needs why.",
+      "The site's confirmation of a vendor's delivery straight to a villa (goods_receipts to site): one row per line of the delivery (goods_receipt_lines of it), every line, with what arrived — at most what was sent, 0 if none came. Only something short takes a note saying why.",
     lines: { noun: "Confirmation" },
     fields: confirmLines(
       { key: "receipt_id", label: "Delivery", kind: "id", table: "goods_receipts" },
