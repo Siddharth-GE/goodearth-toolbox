@@ -32,11 +32,11 @@ const FACILITY = [
 ] as const;
 
 /** A bill the screen takes money on: approved (its panel shows only then). */
-async function billTakesMoney(billId: string): Promise<{ vendorId: string | null } | Failure> {
+async function billTakesMoney(billId: string): Promise<Failure | null> {
   const bill = await recordNow(
     "bills",
     { column: "id", id: billId },
-    ["status", "vendor_id"],
+    ["status"],
     "That bill is gone.",
   );
   if ("error" in bill) return bill;
@@ -47,7 +47,34 @@ async function billTakesMoney(billId: string): Promise<{ vendorId: string | null
           ? "That bill is paid in full."
           : "Money goes out only against an approved bill.",
     };
-  return { vendorId: (bill.row.vendor_id as string | null) ?? null };
+  return null;
+}
+
+/**
+ * The same reference twice on one bill, not reversed, is one payment entered twice — a statement read
+ * twice. Refused here; a real second payment with that reference is recorded on the bill's own screen.
+ */
+export async function referenceTaken(billId: string, reference: string): Promise<Failure | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bill_payments")
+    .select("id")
+    .eq("bill_id", billId)
+    .eq("payment_ref", reference)
+    .is("reverses_id", null);
+  if (error) return failed("payments", error);
+  const ids = (data ?? []).map((row) => row.id);
+  if (ids.length === 0) return null;
+  const { count, error: reversedError } = await supabase
+    .from("bill_payments")
+    .select("id", { count: "exact", head: true })
+    .in("reverses_id", ids);
+  if (reversedError) return failed("payments", reversedError);
+  return (count ?? 0) < ids.length
+    ? {
+        error: `A payment with reference ${reference} is already on this bill. If it really is a second payment, record it on the bill's own page.`,
+      }
+    : null;
 }
 
 const REVERSIBLE = {
@@ -60,29 +87,9 @@ const REVERSIBLE = {
 export const MONEY_RUNNERS: Runners<(typeof MONEY)[number]["key"]> = {
   bill_payment: async (v) => {
     const billId = String(v.bill_id);
-    const bill = await billTakesMoney(billId);
-    if ("error" in bill) return bill;
-    // The same reference twice on one bill is one payment entered twice, as a statement read twice would give.
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("bill_payments")
-      .select("id")
-      .eq("bill_id", billId)
-      .eq("payment_ref", String(v.reference))
-      .is("reverses_id", null);
-    if (error) return failed("payments", error);
-    const ids = (data ?? []).map((row) => row.id);
-    if (ids.length > 0) {
-      const { count, error: reversedError } = await supabase
-        .from("bill_payments")
-        .select("id", { count: "exact", head: true })
-        .in("reverses_id", ids);
-      if (reversedError) return failed("payments", reversedError);
-      if ((count ?? 0) < ids.length)
-        return {
-          error: `A payment with reference ${String(v.reference)} is already on this bill.`,
-        };
-    }
+    const refused =
+      (await billTakesMoney(billId)) ?? (await referenceTaken(billId, String(v.reference)));
+    if (refused) return refused;
     return recordBillPayment(billId, {
       amount: Number(v.amount),
       paidOn: String(v.paid_on),
@@ -91,8 +98,8 @@ export const MONEY_RUNNERS: Runners<(typeof MONEY)[number]["key"]> = {
     });
   },
   bill_recovery: async (v) => {
-    const bill = await billTakesMoney(String(v.bill_id));
-    if ("error" in bill) return bill;
+    const refused = await billTakesMoney(String(v.bill_id));
+    if (refused) return refused;
     return recoverAdvance(String(v.bill_id), {
       advanceId: String(v.advance_id),
       amount: Number(v.amount),

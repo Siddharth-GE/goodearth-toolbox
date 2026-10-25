@@ -463,6 +463,29 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("projects", one.project_id);
   }
   for (const one of movements) add("funding_facilities", one.facility_id);
+  // Money already reversed says so, so a second reversal or a recovery from it is seen before Save.
+  const reversedMoney = new Set(
+    (
+      await Promise.all([
+        readIn(
+          payments.map((one) => one.id),
+          (chunk) => supabase.from("bill_payments").select("reverses_id").in("reverses_id", chunk),
+        ),
+        readIn(
+          advances.map((one) => one.id),
+          (chunk) =>
+            supabase.from("contractor_advances").select("reverses_id").in("reverses_id", chunk),
+        ),
+        readIn(
+          recoveries.map((one) => one.id),
+          (chunk) =>
+            supabase.from("advance_recoveries").select("reverses_id").in("reverses_id", chunk),
+        ),
+      ])
+    )
+      .flat()
+      .map((one) => one.reverses_id),
+  );
   const facilities = await readIn(list("funding_facilities"), (chunk) =>
     supabase.from("funding_facilities").select("id, party, kind, is_active").in("id", chunk),
   );
@@ -647,7 +670,8 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     ]
       .filter(Boolean)
       .join(" · ");
-  const reversal = (one: { reverses_id: string | null }) => (one.reverses_id ? "a reversal" : null);
+  const reversal = (one: { id: string; reverses_id: string | null }) =>
+    one.reverses_id ? "a reversal" : reversedMoney.has(one.id) ? "reversed" : null;
   for (const one of payments)
     names[one.id] = [
       names[one.bill_id],
@@ -680,7 +704,12 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of movements)
     names[one.id] = [
       names[one.facility_id],
-      one.kind,
+      (
+        { drawdown: "Drawdown", repayment: "Repayment", interest: "Interest paid" } as Record<
+          string,
+          string
+        >
+      )[one.kind] ?? one.kind,
       formatMoney(one.amount),
       formatDate(one.happened_on),
       one.cancelled_at ? "cancelled" : null,

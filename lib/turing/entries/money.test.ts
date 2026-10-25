@@ -51,3 +51,30 @@ test("a facility's rate is at most 100% a year, and a change says what changes",
   assert.equal(ok("facility_change", { facility_id: FACILITY, party: "" }), false);
   assert.equal(ok("facility_change", { facility_id: FACILITY, terms: "" }), true);
 });
+
+test("money is rupees above zero, to the paise, as the money actions store it", () => {
+  const pay = { bill_id: BILL, paid_on: "2026-10-24", reference: "UTR123" };
+  assert.equal(ok("bill_payment", { ...pay, amount: "25000.50" }), true);
+  assert.equal(ok("bill_payment", { ...pay, amount: "100.005" }), false);
+  assert.equal(ok("bill_payment", { ...pay, amount: "0" }), false);
+  assert.equal(ok("bill_payment", { ...pay, amount: "0.00" }), false);
+  assert.equal(ok("bill_payment", { ...pay, amount: "25,000" }), false);
+  assert.equal(ok("bill_payment", { ...pay, amount: 2500000000 }), true);
+  assert.equal(
+    ok("funding_movement", {
+      facility_id: FACILITY,
+      kind: "drawdown",
+      amount: "0.004",
+      happened_on: "2026-10-24",
+    }),
+    false,
+  );
+  assert.equal(
+    ok("facility_new", { party: "Federal Bank", kind: "bank_loan", sanctioned_amount: "" }),
+    true,
+  );
+  assert.equal(
+    ok("facility_new", { party: "Federal Bank", kind: "bank_loan", sanctioned_amount: "0" }),
+    false,
+  );
+});

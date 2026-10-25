@@ -222,6 +222,8 @@ export type Field = {
   signed?: true;
   /** An amount to six decimals, not three: a recipe's 0.0144 cum of mortar per sqm. */
   fine?: true;
+  /** Rupees: above zero, to the paise, up to ₹999 crore — what is shown is what the money action stores. */
+  paise?: true;
 };
 
 /**
@@ -364,6 +366,13 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a whole number up to 999.` };
     case "amount":
+      if (field.paise)
+        return /^\d{1,10}(\.\d{1,2})?$/.test(value) && Number(value) > 0
+          ? { ok: true, value }
+          : {
+              ok: false,
+              error: `${field.label} is rupees above zero, to the paise, like 25000.50.`,
+            };
       return (field.signed
         ? /^-?\d{1,9}(\.\d{1,3})?$/
         : field.fine
@@ -560,7 +569,9 @@ export function catalogueText(): string {
                   : field.kind === "amount"
                     ? field.signed
                       ? "number, below 0 to take away"
-                      : "number"
+                      : field.paise
+                        ? "rupees above 0, at most 2 decimals"
+                        : "number"
                     : field.kind;
         const starts =
           entry.adds && field.start !== undefined ? `, ${String(field.start)} if left out` : "";

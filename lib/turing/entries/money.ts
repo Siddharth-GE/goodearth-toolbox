@@ -44,7 +44,13 @@ const facilityFields = (change: boolean): Field[] => {
       optional: true,
     },
     { key: "start_date", label: "Starts", kind: "date", optional: true },
-    { key: "sanctioned_amount", label: "Sanctioned (₹)", kind: "amount", optional: true },
+    {
+      key: "sanctioned_amount",
+      label: "Sanctioned (₹)",
+      kind: "amount",
+      optional: true,
+      paise: true,
+    },
     { key: "terms", label: "Terms", kind: "text", optional: true, max: 2000 },
   ];
 };
@@ -65,7 +71,7 @@ export const MONEY = defineEntries([
     adds: true,
     fields: [
       bill,
-      { key: "amount", label: "Amount (₹)", kind: "amount" },
+      { key: "amount", label: "Amount (₹)", kind: "amount", paise: true },
       { key: "paid_on", label: "Paid on", kind: "date" },
       { key: "reference", label: "UTR / cheque / UPI ref", kind: "text", max: 120 },
       note,
@@ -80,7 +86,7 @@ export const MONEY = defineEntries([
     fields: [
       bill,
       { key: "advance_id", label: "Advance", kind: "id", table: "contractor_advances" },
-      { key: "amount", label: "Amount (₹)", kind: "amount" },
+      { key: "amount", label: "Amount (₹)", kind: "amount", paise: true },
       { key: "recovered_on", label: "On", kind: "date" },
       note,
     ],
@@ -137,7 +143,7 @@ export const MONEY = defineEntries([
     tool: "/financial-management",
     title: "A funding facility, changed",
     description:
-      "Changes a facility's terms. A changed rate recomputes its whole interest history.",
+      "Changes a facility: who it is from, its kind, yearly interest, start, sanctioned amount or terms. A changed rate recomputes its whole interest history.",
     check: (values) =>
       rateCheck(values) ??
       (["party", "kind", "interest_rate_pct", "start_date", "sanctioned_amount", "terms"].some(
@@ -180,7 +186,7 @@ export const MONEY = defineEntries([
         choices: MOVEMENT_KINDS,
         labels: { drawdown: "Drawdown", repayment: "Repayment", interest: "Interest paid" },
       },
-      { key: "amount", label: "Amount (₹)", kind: "amount" },
+      { key: "amount", label: "Amount (₹)", kind: "amount", paise: true },
       { key: "happened_on", label: "On", kind: "date" },
       { key: "reference", label: "Reference", kind: "text", optional: true, max: 2000 },
       { ...note, max: 2000 },
