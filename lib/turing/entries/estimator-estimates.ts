@@ -48,6 +48,41 @@ const oneTarget = (values: Record<string, unknown>) =>
     : undefined;
 const DRAFT =
   "Only a draft changes: the villa's working estimate (estimator_estimates.is_working) or an older draft; an official one is frozen.";
+const SET_UP =
+  "Only for a work set up in the rate book (it has a unit); one not set up is set up first (est_work_setup).";
+
+/** A box given is above zero, as the Estimator's sheet takes it; a blank box is simply not used. */
+const boxesRefused = (values: Record<string, unknown>) =>
+  ["nos", "length", "breadth", "depth"].some(
+    (key) => values[key] !== undefined && values[key] !== "" && !(Number(values[key]) > 0),
+  )
+    ? "A box is more than zero, or left blank."
+    : undefined;
+
+export type SheetRow = {
+  nos: number | null;
+  length: number | null;
+  breadth: number | null;
+  depth: number | null;
+  deduct: boolean;
+};
+
+/**
+ * The Estimator's sheet total, restated (Turing may not import its arithmetic): each row the product
+ * of its boxes given, a deduction taken off, rounded to six decimals.
+ */
+export function sheetTotal(rows: readonly SheetRow[]): number {
+  const round = (value: number) => Math.round(value * 1e6) / 1e6;
+  return round(
+    rows.reduce((sum, row) => {
+      const boxes = [row.nos, row.length, row.breadth, row.depth].filter(
+        (value): value is number => value !== null,
+      );
+      const measured = boxes.length === 0 ? 0 : round(boxes.reduce((a, b) => a * b, 1));
+      return sum + (row.deduct ? -measured : measured);
+    }, 0),
+  );
+}
 
 export const ESTIMATOR_ESTIMATES = defineEntries([
   {
@@ -140,7 +175,7 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_line_labour",
     tool: "/estimator",
     title: "This villa's labour rate for a work",
-    description: `Sets this villa's own labour rate in ₹ per unit for a work on a draft estimate (0 is a real rate); empty follows the rate book. ${DRAFT}`,
+    description: `Sets this villa's own labour rate in ₹ per unit for a work on a draft estimate (0 is a real rate); empty follows the rate book. ${SET_UP} ${DRAFT}`,
     fields: [
       line,
       { key: "labour_rate", label: "Labour ₹ per unit", kind: "amount", optional: true },
@@ -152,7 +187,7 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_line_material",
     tool: "/estimator",
     title: "This villa's materials for a work: how much",
-    description: `Sets how much of a material (item_id, items of kind material, active) or a mix (mix_id, active) one unit of a work on a draft estimate uses for this villa — added if the work's list doesn't have it, changed if it does. The first change copies the rate book's list onto the work for this villa; it follows the rate book until then. ${DRAFT}`,
+    description: `Sets how much of a material (item_id, items of kind material, active) or a mix (mix_id, active) one unit of a work on a draft estimate uses for this villa — added if the work's list doesn't have it, changed if it does. The first change copies the rate book's list onto the work for this villa; it follows the rate book until then. ${SET_UP} ${DRAFT}`,
     fields: [
       line,
       ...target,
@@ -164,7 +199,7 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_line_material_swap",
     tool: "/estimator",
     title: "This villa's materials for a work: one swapped",
-    description: `Swaps a material or mix in a work's list for this villa (item_id or mix_id) for another (to_item_id or to_mix_id), keeping its quantity — a finish chosen for this villa. ${DRAFT}`,
+    description: `Swaps a material or mix in a work's list for this villa (item_id or mix_id) for another (to_item_id or to_mix_id), keeping its quantity — a finish chosen for this villa. ${SET_UP} ${DRAFT}`,
     fields: [
       line,
       ...target,
@@ -187,7 +222,7 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_line_material_remove",
     tool: "/estimator",
     title: "This villa's materials for a work: one taken out",
-    description: `Takes a material or mix out of a work's list for this villa; taking out the last one puts the work back on the rate book's list. ${DRAFT}`,
+    description: `Takes a material or mix out of a work's list for this villa; taking out the last one puts the work back on the rate book's list, so a work cannot be made labour-only this way. ${SET_UP} ${DRAFT}`,
     fields: [line, ...target],
     check: oneTarget,
   },
@@ -195,14 +230,14 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_line_reset",
     tool: "/estimator",
     title: "A work back on the rate book's materials",
-    description: `Drops this villa's own list of materials for a work, so it follows the rate book again. ${DRAFT}`,
+    description: `Drops this villa's own list of materials for a work, so it follows the rate book again. ${SET_UP} ${DRAFT}`,
     fields: [line],
   },
   {
     key: "est_item_price",
     tool: "/estimator",
     title: "This villa's price for a material",
-    description: `Sets this villa's own price in ₹ per unit for a material its estimate uses (one price per estimate, so every work agrees); empty goes back to the Masters price. ${DRAFT}`,
+    description: `Sets this villa's own price in ₹ per unit for a material its estimate uses (one price per estimate, so every work agrees); empty goes back to the Masters price. Only for materials of works set up in the rate book. ${DRAFT}`,
     fields: [
       estimate,
       { key: "item_id", label: "Material", kind: "id", table: "items", record: true },
@@ -215,9 +250,10 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     key: "est_measure_add",
     tool: "/estimator",
     title: "A measurement row",
-    description: `Adds a row to a work's measurement sheet on a draft estimate: a description and Nos × Length × Breadth × Depth (a blank box is not used; boxes are never below zero); deduct true takes it off the total (a door or window in a wall). The work's quantity becomes the sheet's total, in the work's unit — nothing converts, so measure in that unit. ${DRAFT}`,
+    description: `Adds a row to a work's measurement sheet on a draft estimate: a description and Nos × Length × Breadth × Depth (each box given is above zero; a blank box is not used); deduct true takes it off the total (a door or window in a wall), and a sheet never totals zero or less, so give the measured rows before their deductions. The work's quantity becomes the sheet's total, in the work's unit — nothing converts, so measure in that unit. ${DRAFT}`,
     adds: true,
     fields: [line, ...BOXES],
+    check: boxesRefused,
   },
   {
     key: "est_measure_change",
@@ -225,6 +261,7 @@ export const ESTIMATOR_ESTIMATES = defineEntries([
     title: "A measurement row, changed",
     description: `Changes a typed row of a measurement sheet (a row from the SketchUp model changes in the model); each left out stays as it is, a box given empty is not used. ${DRAFT}`,
     fields: [row, ...BOXES],
+    check: boxesRefused,
   },
   {
     key: "est_measure_remove",

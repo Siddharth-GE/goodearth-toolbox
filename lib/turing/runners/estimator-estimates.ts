@@ -23,7 +23,11 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 import { entryFor, formOf, type Entry } from "../catalogue-fields";
-import type { ESTIMATOR_ESTIMATES } from "../entries/estimator-estimates";
+import {
+  sheetTotal,
+  type ESTIMATOR_ESTIMATES,
+  type SheetRow,
+} from "../entries/estimator-estimates";
 import { failed, given, recordNow, retired, saving, type Runners, type Values } from "./kit";
 import { materialRefused, mixRefused } from "./estimator-rates";
 
@@ -74,6 +78,9 @@ const STATE: Record<string, string> = {
 async function draftOf(id: string): Promise<Estimate | Failure> {
   const found = await estimateOf(id);
   if ("error" in found) return found;
+  // A template from before villa estimates is on no screen any more.
+  if (found.unitId === null)
+    return { error: "That estimate is an old template; no screen keeps it." };
   return found.status === "draft"
     ? found
     : {
@@ -81,48 +88,111 @@ async function draftOf(id: string): Promise<Estimate | Failure> {
       };
 }
 
-type Line = { estimateId: string; workItemId: string };
+type Line = {
+  estimateId: string;
+  workItemId: string;
+  qty: number | null;
+  labourRate: number | null;
+};
 
 async function draftLine(lineId: string): Promise<Line | Failure> {
   const now = await recordNow(
     "estimator_estimate_lines",
     { column: "id", id: lineId },
-    ["estimate_id", "work_item_id"],
+    ["estimate_id", "work_item_id", "qty", "labour_rate"],
     "That work is no longer on the estimate.",
   );
   if ("error" in now) return now;
   const draft = await draftOf(String(now.row.estimate_id));
   if ("error" in draft) return draft;
-  return { estimateId: String(now.row.estimate_id), workItemId: String(now.row.work_item_id) };
+  return {
+    estimateId: String(now.row.estimate_id),
+    workItemId: String(now.row.work_item_id),
+    qty: now.row.qty === null ? null : Number(now.row.qty),
+    labourRate: now.row.labour_rate === null ? null : Number(now.row.labour_rate),
+  };
 }
 
-type Part = { item_id: string | null; mix_id: string | null };
-const refOf = (part: Part) =>
-  part.item_id ? `material:${part.item_id}` : part.mix_id ? `mix:${part.mix_id}` : null;
+/** The rate dialog opens only on a work set up in the rate book; anything saved on another shows nowhere. */
+async function setUpRefused(workItemId: string): Promise<Refusal> {
+  const info = await recordNow(
+    "estimator_work_info",
+    { column: "work_item_id", id: workItemId },
+    ["uom"],
+    null,
+  );
+  if ("error" in info) return info;
+  return info.row.uom
+    ? null
+    : { error: "That work is not set up in the rate book yet; set it up first (est_work_setup)." };
+}
 
-/** What a work uses for this villa: its own list once it has one, else the rate book's. */
+/** A work on a draft estimate, set up in the rate book: where this villa's rates and materials are offered. */
+async function rateLine(lineId: string): Promise<Line | Failure> {
+  const line = await draftLine(lineId);
+  if ("error" in line) return line;
+  const refused = await setUpRefused(line.workItemId);
+  return refused ?? line;
+}
+
+type Part = { item_id: string | null; mix_id: string | null; qty_per_unit: number };
+const refOf = (part: Omit<Part, "qty_per_unit">) =>
+  part.item_id ? `material:${part.item_id}` : part.mix_id ? `mix:${part.mix_id}` : null;
+const quantities = (parts: Part[]) =>
+  new Map(
+    parts.flatMap((part) => {
+      const ref = refOf(part);
+      return ref ? [[ref, Number(part.qty_per_unit)] as const] : [];
+    }),
+  );
+
+/** What a work uses for this villa, each with how much: its own list once it has one, else the rate book's. */
 async function listOf(
   line: Line,
   lineId: string,
-): Promise<{ own: boolean; refs: Set<string> } | Failure> {
+): Promise<{ own: boolean; refs: Map<string, number> } | Failure> {
   const supabase = await createClient();
   const own = await supabase
     .from("estimator_estimate_line_components")
-    .select("item_id, mix_id")
+    .select("item_id, mix_id, qty_per_unit")
     .eq("line_id", lineId);
   if (own.error) return failed("estimator_estimate_line_components", own.error);
-  if ((own.data ?? []).length > 0) {
-    return { own: true, refs: new Set(own.data.map(refOf).filter((ref): ref is string => !!ref)) };
-  }
+  if ((own.data ?? []).length > 0) return { own: true, refs: quantities(own.data) };
   const book = await supabase
     .from("estimator_work_components")
-    .select("item_id, mix_id")
+    .select("item_id, mix_id, qty_per_unit")
     .eq("work_item_id", line.workItemId);
   if (book.error) return failed("estimator_work_components", book.error);
-  return {
-    own: false,
-    refs: new Set((book.data ?? []).map(refOf).filter((ref): ref is string => !!ref)),
-  };
+  return { own: false, refs: quantities(book.data ?? []) };
+}
+
+type SheetChange = { remove?: string; change?: { id: string; row: SheetRow }; add?: SheetRow[] };
+
+/**
+ * The sheet a work would have after a change, refused before it is saved if it totals zero or
+ * less: the save would stand and only then put the work back to "to measure".
+ */
+async function sheetRefused(lineId: string, change: SheetChange): Promise<Refusal> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("id, nos, length, breadth, depth, is_deduction")
+    .eq("line_id", lineId);
+  if (error) return failed("estimator_estimate_line_measurements", error);
+  const rows: SheetRow[] = [
+    ...(data ?? [])
+      .filter((row) => row.id !== change.remove)
+      .map((row) =>
+        row.id === change.change?.id ? change.change.row : { ...row, deduct: row.is_deduction },
+      ),
+    ...(change.add ?? []),
+  ];
+  return rows.length > 0 && !(sheetTotal(rows) > 0)
+    ? {
+        error:
+          "That would take the work's measurements to nothing or less. Give the measured rows before their deductions.",
+      }
+    : null;
 }
 
 const refFrom = (values: Values, item: string, mix: string) =>
@@ -138,7 +208,7 @@ async function partRefused(values: Values, item: string, mix: string): Promise<R
 async function materialsUsed(estimateId: string): Promise<Set<string> | Failure> {
   const supabase = await createClient();
   try {
-    const lines = await fetchAll<{ id: string; work_item_id: string }>((from, to) =>
+    const allLines = await fetchAll<{ id: string; work_item_id: string }>((from, to) =>
       supabase
         .from("estimator_estimate_lines")
         .select("id, work_item_id")
@@ -146,8 +216,20 @@ async function materialsUsed(estimateId: string): Promise<Set<string> | Failure>
         .order("id")
         .range(from, to),
     );
+    if (allLines.length === 0) return new Set();
+    // A work not set up in the rate book prices nothing, so the screen shows no price for its materials.
+    const setUp = await fetchAll<{ work_item_id: string }>((from, to) =>
+      supabase
+        .from("estimator_work_info")
+        .select("work_item_id")
+        .in("work_item_id", [...new Set(allLines.map((one) => one.work_item_id))])
+        .order("work_item_id")
+        .range(from, to),
+    );
+    const priced = new Set(setUp.map((one) => one.work_item_id));
+    const lines = allLines.filter((one) => priced.has(one.work_item_id));
     if (lines.length === 0) return new Set();
-    const own = await fetchAll<Part & { line_id: string }>((from, to) =>
+    const own = await fetchAll<Omit<Part, "qty_per_unit"> & { line_id: string }>((from, to) =>
       supabase
         .from("estimator_estimate_line_components")
         .select("line_id, item_id, mix_id")
@@ -164,7 +246,7 @@ async function materialsUsed(estimateId: string): Promise<Set<string> | Failure>
     ];
     const book =
       following.length > 0
-        ? await fetchAll<Part>((from, to) =>
+        ? await fetchAll<Omit<Part, "qty_per_unit">>((from, to) =>
             supabase
               .from("estimator_work_components")
               .select("item_id, mix_id")
@@ -327,7 +409,10 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
   est_line_qty: async (v) => {
     const line = await draftLine(String(v.line_id));
     if ("error" in line) return line;
-    return updateEstimateLineQty(String(v.line_id), numberOf(v, "qty"));
+    const qty = numberOf(v, "qty");
+    // The box is cleared only where there is a quantity; with none it would change nothing and say done.
+    if (qty === null && line.qty === null) return { error: "That work is already to measure." };
+    return updateEstimateLineQty(String(v.line_id), qty);
   },
   est_line_remove: async (v) => {
     const line = await draftLine(String(v.line_id));
@@ -335,28 +420,36 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
     return removeEstimateLine(String(v.line_id));
   },
   est_line_labour: async (v) => {
-    const line = await draftLine(String(v.line_id));
+    const line = await rateLine(String(v.line_id));
     if ("error" in line) return line;
-    return updateEstimateLineLabourRate(String(v.line_id), numberOf(v, "labour_rate"));
+    const rate = numberOf(v, "labour_rate");
+    // ↺ shows only where this villa has its own rate.
+    if (rate === null && line.labourRate === null)
+      return { error: "That work already follows the rate book's labour rate." };
+    return updateEstimateLineLabourRate(String(v.line_id), rate);
   },
   est_line_material: async (v) => {
     const lineId = String(v.line_id);
-    const line = await draftLine(lineId);
+    const line = await rateLine(lineId);
     if ("error" in line) return line;
-    const refused = await partRefused(v, "item_id", "mix_id");
-    if (refused) return refused;
     const list = await listOf(line, lineId);
     if ("error" in list) return list;
     const ref = refFrom(v, "item_id", "mix_id");
-    return changeLineRecipe(lineId, {
-      op: list.refs.has(ref) ? "qty" : "add",
-      ref,
-      qty: Number(v.qty_per_unit),
-    });
+    const qty = Number(v.qty_per_unit);
+    const now = list.refs.get(ref);
+    if (now !== undefined) {
+      // An unchanged quantity is never saved on screen; saving it would still give the work its own list.
+      if (now === qty) return { error: `That work already uses ${qty} per unit of it.` };
+      return changeLineRecipe(lineId, { op: "qty", ref, qty });
+    }
+    // The picker offers active materials and mixes to add; one already listed keeps its place even if retired.
+    const refused = await partRefused(v, "item_id", "mix_id");
+    if (refused) return refused;
+    return changeLineRecipe(lineId, { op: "add", ref, qty });
   },
   est_line_material_swap: async (v) => {
     const lineId = String(v.line_id);
-    const line = await draftLine(lineId);
+    const line = await rateLine(lineId);
     if ("error" in line) return line;
     const list = await listOf(line, lineId);
     if ("error" in list) return list;
@@ -371,17 +464,23 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
   },
   est_line_material_remove: async (v) => {
     const lineId = String(v.line_id);
-    const line = await draftLine(lineId);
+    const line = await rateLine(lineId);
     if ("error" in line) return line;
     const list = await listOf(line, lineId);
     if ("error" in list) return list;
     const ref = refFrom(v, "item_id", "mix_id");
     if (!list.refs.has(ref)) return { error: "That is not in this work's list." };
+    // Taking the only material out of a work that follows the rate book leaves it following the same list.
+    if (!list.own && list.refs.size === 1)
+      return {
+        error:
+          "That is the only material the rate book gives this work, and taking it out leaves the work on the rate book's list; change it in the rate book instead.",
+      };
     return changeLineRecipe(lineId, { op: "remove", ref });
   },
   est_line_reset: async (v) => {
     const lineId = String(v.line_id);
-    const line = await draftLine(lineId);
+    const line = await rateLine(lineId);
     if ("error" in line) return line;
     const list = await listOf(line, lineId);
     if ("error" in list) return list;
@@ -415,6 +514,18 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
     const lineId = String(v.line_id);
     const line = await draftLine(lineId);
     if ("error" in line) return line;
+    const refused = await sheetRefused(lineId, {
+      add: [
+        {
+          nos: numberOf(v, "nos"),
+          length: numberOf(v, "length"),
+          breadth: numberOf(v, "breadth"),
+          depth: numberOf(v, "depth"),
+          deduct: v.deduct === true,
+        },
+      ],
+    });
+    if (refused) return refused;
     const form = new FormData();
     for (const key of ["description", "nos", "length", "breadth", "depth"])
       form.set(key, text(v, key) ?? "");
@@ -429,25 +540,34 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
       const value = given(v, key, now[key]);
       return value === "" ? null : Number(value);
     };
-    return updateLineMeasurement(String(v.row_id), {
+    const fields = {
       description: given(v, "description", now.description) || null,
       nos: boxOf("nos"),
       length: boxOf("length"),
       breadth: boxOf("breadth"),
       depth: boxOf("depth"),
       deduct: "deduct" in v ? v.deduct === true : now.deduct,
+    };
+    const refused = await sheetRefused(now.lineId, {
+      change: { id: String(v.row_id), row: fields },
     });
+    if (refused) return refused;
+    return updateLineMeasurement(String(v.row_id), fields);
   },
   est_measure_remove: async (v) => {
     const now = await rowOf(String(v.row_id));
     if ("error" in now) return now;
     if (now.fromModel) return { error: MODEL_ROW };
+    const refused = await sheetRefused(now.lineId, { remove: String(v.row_id) });
+    if (refused) return refused;
     return removeLineMeasurement(String(v.row_id));
   },
   est_measure_duplicate: async (v) => {
     const now = await rowOf(String(v.row_id));
     if ("error" in now) return now;
     if (now.fromModel) return { error: MODEL_ROW };
+    const refused = await sheetRefused(now.lineId, { add: [now] });
+    if (refused) return refused;
     return duplicateLineMeasurement(String(v.row_id));
   },
   est_measure_copy: async (v) => {
@@ -456,6 +576,16 @@ export const ESTIMATOR_ESTIMATES_RUNNERS: Runners<Key> = {
     const to = await draftLine(String(v.to_line_id));
     if ("error" in to) return to;
     if (from.estimateId !== to.estimateId) return { error: "Both works must be on one estimate." };
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("estimator_estimate_line_measurements")
+      .select("nos, length, breadth, depth, is_deduction")
+      .eq("line_id", String(v.from_line_id));
+    if (error) return failed("estimator_estimate_line_measurements", error);
+    const refused = await sheetRefused(String(v.to_line_id), {
+      add: (data ?? []).map((row) => ({ ...row, deduct: row.is_deduction })),
+    });
+    if (refused) return refused;
     return copyMeasurementRows(String(v.from_line_id), String(v.to_line_id));
   },
 };

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { checkProposal, entryFor, recordsOf } from "../catalogue-fields";
+import { sheetTotal, type SheetRow } from "./estimator-estimates";
 
 const ESTIMATE = "11111111-1111-4111-8111-111111111111";
 const LINE = "22222222-2222-4222-8222-222222222222";
@@ -84,4 +85,28 @@ test("a measurement row sends the fields the Estimator's add reads, the deductio
     readFileSync("lib/turing/runners/estimator-estimates.ts", "utf8"),
     /form\.set\("deduct", "1"\)/,
   );
+});
+
+test("a sheet's total is the Estimator's: each row the product of its boxes, deductions taken off", () => {
+  const row = (values: Partial<SheetRow>): SheetRow => ({
+    nos: null,
+    length: null,
+    breadth: null,
+    depth: null,
+    deduct: false,
+    ...values,
+  });
+  // A wall 4 × 3 m, less a door 0.9 × 2.1 m.
+  assert.equal(
+    sheetTotal([row({ length: 4, breadth: 3 }), row({ length: 0.9, breadth: 2.1, deduct: true })]),
+    10.11,
+  );
+  assert.equal(sheetTotal([row({ nos: 4, length: 3, depth: 0.15 })]), 1.8);
+  assert.equal(sheetTotal([row({ length: 0.9, breadth: 2.1, deduct: true })]) > 0, false);
+});
+
+test("a box given is above zero; a rate on a work wants it set up", () => {
+  assert.equal(ok("est_measure_add", { line_id: LINE, nos: 0, length: 2 }), false);
+  assert.equal(ok("est_measure_change", { row_id: LINE, nos: "" }), true);
+  assert.match(String(entryFor("est_line_labour")?.description), /set up in the rate book/);
 });

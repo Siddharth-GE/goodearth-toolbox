@@ -343,9 +343,11 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   const estimates = await readIn(list("estimator_estimates"), (chunk) =>
     supabase
       .from("estimator_estimates")
-      .select("id, name, reference, status, is_working")
+      .select("id, name, reference, status, is_working, unit_id")
       .in("id", chunk),
   );
+  // An estimate's number names its project, not its villa, so the villa is named too.
+  for (const one of estimates) if (one.unit_id) add("units", one.unit_id);
 
   // A Birdwing record by its stay; a stay by its number, guest and nights.
   const [bwRooms, bwCharges, bwReceipts, bwSettlements, bwInvoices, bwHeads] = await Promise.all([
@@ -508,8 +510,12 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       .filter(Boolean)
       .join(" · ");
   for (const one of estimates)
-    names[one.id] =
-      `${one.reference ?? one.name} (${one.is_working ? "working" : one.status === "submitted" ? "official" : one.status === "cancelled" ? "withdrawn" : one.status})`;
+    names[one.id] = [
+      names[one.unit_id ?? ""],
+      `${one.reference ?? one.name} (${one.is_working ? "working" : one.status === "submitted" ? "official" : one.status === "cancelled" ? "withdrawn" : one.status})`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   for (const one of estLines)
     names[one.id] = [
       names[one.estimate_id],
