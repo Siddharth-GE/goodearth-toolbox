@@ -736,6 +736,13 @@ export async function setTrailSetActivities(
   const supabase = await createClient();
   const user = await getCurrentUser();
 
+  // Read first, so a failed insert puts the old list back rather than leaving the type empty.
+  const { data: before, error: readError } = await supabase
+    .from("pusher_trail_set_items")
+    .select("activity_id, expected_days, sort_order, created_by, updated_by")
+    .eq("set_id", setId);
+  if (readError) return { error: "Could not update this trail type." };
+
   const { error: clearError } = await supabase
     .from("pusher_trail_set_items")
     .delete()
@@ -753,7 +760,21 @@ export async function setTrailSetActivities(
         updated_by: user?.id,
       })),
     );
-    if (error) return { error: "Could not update this trail type." };
+    if (error) {
+      if (before.length > 0) {
+        const { error: restoreError } = await supabase
+          .from("pusher_trail_set_items")
+          .insert(before.map((row) => ({ ...row, set_id: setId })));
+        if (restoreError) {
+          console.error("setTrailSetActivities restore failed:", restoreError);
+          return {
+            error:
+              "Could not update this trail type, and its activities were lost. Add them again.",
+          };
+        }
+      }
+      return { error: "Could not update this trail type. It is as it was." };
+    }
   }
 
   revalidateRelay();

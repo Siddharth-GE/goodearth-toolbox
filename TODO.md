@@ -107,7 +107,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 
 ## Known limits
 
-- **Deleting a mix in use on the Estimator's Mixes page empties it first.** `deleteMix` deletes the mix's materials, then the mix, which a recipe using it refuses; the page says it is in use, but every work using the mix now prices it at nothing. Turing checks before it calls; the screen's own Delete needs the same check (one function in `lib/estimator/mixes-actions.ts`).
+- **Dexter's Replace file removes the deck's old files before uploading the new ones**, so an upload that fails leaves the deck's link empty until it is replaced again (the page says so). Doing it safely means the new files go to a new folder and the deck then points at it: a folder column on `dexter_decks`, so a migration.
 
 - **The Supervisors board reads every official estimate line** (`lib/supervisors/board-queries.ts`) to know which stages each villa has. Fine at today's handful of estimates; at ~100 villas it is ~80 sequential pages, so give it a small view of distinct (unit, work group) before then — with its revokes, and a Fable review.
 
