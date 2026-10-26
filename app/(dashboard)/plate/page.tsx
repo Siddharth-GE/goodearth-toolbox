@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { getMyPlate } from "@/lib/overview/plate";
+import { PlateCountSync } from "@/components/layout/plate-count-sync";
+import { getMyPlate, plateCount } from "@/lib/overview/plate";
 import { CircleCheck } from "lucide-react";
 import { PlateLines } from "../_components/plate-lines";
 
@@ -12,6 +13,7 @@ export default async function PlatePage() {
 
   return (
     <div className="space-y-4">
+      <PlateCountSync count={plateCount(plate)} />
       <PageTitle
         title="My plate"
         description="What is waiting on you: the stages, actions and batons that are yours, then what waits in the tools you use. Tap a line to deal with it."

@@ -14,10 +14,10 @@ import { ThemeMenuItem } from "@/components/ui/theme-toggle";
 import { biometricStatus, forgetBiometricSignIn } from "@/lib/native/biometric-sign-in";
 import { pushToken, startPush } from "@/lib/native/push";
 import { isInTool, sectionOfPage, type ToolSection } from "@/lib/nav/arrange";
-import { readPlateCount } from "@/lib/overview/plate-actions";
 import { registerPushDevice } from "@/lib/push/actions";
 import { TOOL_ICONS, TURING } from "@/lib/tools";
 import { cn } from "@/lib/utils";
+import { PLATE_COUNT_EVENT } from "./plate-count-sync";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Bell, Fingerprint, LayoutGrid, LogOut, Menu, Sparkles, X } from "lucide-react";
 import Link from "next/link";
@@ -256,13 +256,28 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  // Read after the page shows, then again on a later page at most once a minute: the plate reads every tool.
   const [plate, setPlate] = useState<number | null>(null);
   const plateReadAt = useRef(0);
+  // The home page and My plate read the plate themselves and hand the count over.
   useEffect(() => {
+    const take = (event: Event) => {
+      plateReadAt.current = Date.now();
+      setPlate((event as CustomEvent<number>).detail);
+    };
+    window.addEventListener(PLATE_COUNT_EVENT, take);
+    return () => window.removeEventListener(PLATE_COUNT_EVENT, take);
+  }, []);
+  // Elsewhere it is read after the page shows, at most once a minute: the plate reads every tool.
+  useEffect(() => {
+    if (pathname === "/" || pathname === "/plate") return;
     if (Date.now() - plateReadAt.current < 60_000) return;
     plateReadAt.current = Date.now();
-    void readPlateCount().then(setPlate);
+    fetch("/api/plate-count", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { count: number } | null) => {
+        if (body) setPlate(body.count);
+      })
+      .catch(() => {});
   }, [pathname]);
 
   // In the phone app, once per signed-in launch (lib/native/push.ts); nothing on the website.

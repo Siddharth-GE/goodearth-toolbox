@@ -1,6 +1,7 @@
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getMyPlate } from "@/lib/overview/plate";
+import { PlateCountSync } from "@/components/layout/plate-count-sync";
+import { getMyPlate, plateCount } from "@/lib/overview/plate";
 import { PlateLines } from "./plate-lines";
 
 const LINES_SHOWN = 5;
@@ -27,6 +28,7 @@ export async function PlateCard() {
 
   return (
     <Card className="space-y-3 p-5">
+      <PlateCountSync count={plateCount(plate)} />
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">My plate</h2>
         <LinkButton href="/plate" variant="ghost" size="sm">

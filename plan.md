@@ -134,7 +134,17 @@ Built on `feature/team-additions-e`, no migration.
   - the top five on the home page, in its own Suspense;
   - **My plate** with a count under Overview on the rail;
   - a bell with the count on the phone's top bar.
-- [x] The count is read after the page shows, at most once a minute.
+- [x] **The bell counts what is late, and what is the person's to do now** (approve, confirm, issue, answer, a baton, a sent-back indent). A standing backlog shows on the page but not on the bell: POs awaiting delivery, bills to pay, indents to order, stages starting this week, design stages under way.
+- [x] The home page and My plate hand their count to the bell. Elsewhere it is read through `GET /api/plate-count`, after the page shows and at most once a minute. A server action would queue ahead of the person's own saves.
+
+The independent Opus review found no blocker. Its findings are fixed:
+
+- the count no longer queues ahead of saves, and no longer reads twice;
+- the bell is lean;
+- skipped stages never read as starting;
+- indents waiting on the estimator are not counted as approvable;
+- sent-back indents are counted in full;
+- a late stage links to the villas.
 - [ ] [Founder] Vet on staging:
   - Open the home page: My plate sits first. Open it.
   - As an indent approver with an indent submitted: "Indents waiting for your approval" shows, and tapping it opens the list.
