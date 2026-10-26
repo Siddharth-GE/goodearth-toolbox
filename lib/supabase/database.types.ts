@@ -6586,6 +6586,7 @@ export type Database = {
           unit_id: string | null
           updated_at: string
           updated_by: string | null
+          work_group_id: string | null
           work_item_id: string | null
         }
         Insert: {
@@ -6612,6 +6613,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
           work_item_id?: string | null
         }
         Update: {
@@ -6638,6 +6640,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
           work_item_id?: string | null
         }
         Relationships: [
@@ -9105,6 +9108,33 @@ export type Database = {
           },
         ]
       }
+      site_category_owners: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string | null
+          owner_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          owner_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          owner_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       site_checklist_items: {
         Row: {
           checklist_id: string
@@ -9560,6 +9590,7 @@ export type Database = {
           id: string
           link: string | null
           not_needed: boolean
+          owner_id: string | null
           pinned_start: string | null
           plot_id: string
           started_on: string | null
@@ -9583,6 +9614,7 @@ export type Database = {
           id?: string
           link?: string | null
           not_needed?: boolean
+          owner_id?: string | null
           pinned_start?: string | null
           plot_id: string
           started_on?: string | null
@@ -9606,6 +9638,7 @@ export type Database = {
           id?: string
           link?: string | null
           not_needed?: boolean
+          owner_id?: string | null
           pinned_start?: string | null
           plot_id?: string
           started_on?: string | null

@@ -1768,6 +1768,7 @@ export const TURING_SCHEMA: Schema = {
       "unit_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null",
+      "work_group_id": "string | null",
       "work_item_id": "string | null"
     }
   },
@@ -2375,6 +2376,17 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string"
     }
   },
+  "site_category_owners": {
+    "kind": "table",
+    "columns": {
+      "category_id": "string",
+      "created_at": "string",
+      "created_by": "string | null",
+      "owner_id": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "site_checklist_items": {
     "kind": "table",
     "columns": {
@@ -2492,6 +2504,7 @@ export const TURING_SCHEMA: Schema = {
       "id": "string",
       "link": "string | null",
       "not_needed": "boolean",
+      "owner_id": "string | null",
       "pinned_start": "string | null",
       "plot_id": "string",
       "started_on": "string | null",
