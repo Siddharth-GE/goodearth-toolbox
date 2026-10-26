@@ -67,6 +67,7 @@ async function lineNow(itemId: string) {
       "bill_id",
       "vendor_id",
       "project_id",
+      "labour_contract_id",
       "requested_amount",
       "released_amount",
       "note",
@@ -242,11 +243,11 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
         cashRequestItemId: itemId,
       });
     }
-    // As the board gives an advance: the line's vendor, project and note.
+    // As the board gives an advance: the line's vendor, project, work order and note.
     return recordAdvance({
       vendorId: String(now.line.vendor_id ?? ""),
       projectId: String(now.line.project_id ?? ""),
-      labourContractId: null,
+      labourContractId: (now.line.labour_contract_id as string | null) ?? null,
       amount,
       paidOn: String(v.paid_on),
       reference,
