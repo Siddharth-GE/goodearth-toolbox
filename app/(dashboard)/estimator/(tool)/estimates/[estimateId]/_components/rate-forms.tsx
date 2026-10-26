@@ -47,17 +47,20 @@ function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null })
 }
 
 /** The rate of one work on this villa, built up: labour, what one unit uses, what each material costs.
- * An edit gives the villa its own figure (black, with Back to the rate book); a figure following the rate book says so. */
+ * An edit gives the villa its own figure (black, with Back to the rate book); a figure following the rate book says so.
+ * Opened from the rate itself, or from the row's "Mix & labour" button. */
 export function LineRateDialog({
   estimateId,
   view,
   options,
   canEditMasters,
+  trigger = "rate",
 }: {
   estimateId: string;
   view: LineRateView;
   options: RateOptions;
   canEditMasters: boolean;
+  trigger?: "rate" | "button";
 }) {
   const { pending, error, run } = useActionRunner();
   const change = (next: RecipeChange) => run(() => changeLineRecipe(view.lineId, next));
@@ -69,8 +72,21 @@ export function LineRateDialog({
 
   return (
     <Dialog>
-      <RateTrigger rate={view.rate} uom={view.workUom} />
-      <DialogContent>
+      {trigger === "rate" ? (
+        <RateTrigger rate={view.rate} uom={view.workUom} />
+      ) : (
+        <DialogTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Mix & labour, ${view.workName}`}
+          >
+            Mix &amp; labour
+          </Button>
+        </DialogTrigger>
+      )}
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{view.workName} — rate for this villa</DialogTitle>
         </DialogHeader>
@@ -113,10 +129,15 @@ export function LineRateDialog({
             )}
           </div>
 
+          <AddComponentForm
+            options={options}
+            unit={unit}
+            pending={pending}
+            onAdd={(ref, qty) => change({ op: "add", ref, qty })}
+          />
           {view.components.length === 0 ? (
             <p className="text-muted text-sm">
-              Labour only — nothing listed. Add a material below if this villa&apos;s version uses
-              one.
+              Labour only — nothing listed yet. Add a mix such as W3, or a material, above.
             </p>
           ) : (
             <ul className="divide-border divide-y">
@@ -132,12 +153,6 @@ export function LineRateDialog({
               ))}
             </ul>
           )}
-          <AddComponentForm
-            options={options}
-            unit={unit}
-            pending={pending}
-            onAdd={(ref, qty) => change({ op: "add", ref, qty })}
-          />
           <p className="text-muted text-xs">
             {view.own
               ? "This villa's list stands on its own — later changes to the rate book don't reach it. Removing every material puts it back on the rate book's."
@@ -415,7 +430,7 @@ function AddComponentForm({
           value={qty}
           onChange={(event) => setQty(event.target.value)}
           inputMode="decimal"
-          placeholder="Qty"
+          placeholder={`per ${unit}`}
           aria-label={`How much per ${unit}`}
           className="w-24"
         />
