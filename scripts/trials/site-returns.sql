@@ -80,17 +80,19 @@ begin
   end if;
 
   -- 2. Never more than is still at the villa.
-  insert into site_returns (plot_id, store_id, reason, created_by, updated_by)
-  values (v_plot, v_store, 'A second return', v_user, v_user) returning id into v_return;
+  --    Through record_site_return, as the screen saves: a refused line leaves no empty return behind.
   v_refused := false;
   begin
-    insert into site_return_lines (return_id, item_id, quantity, uom, created_by, updated_by)
-    values (v_return, v_item, 3, v_uom, v_user, v_user);
+    perform record_site_return(v_plot, v_store, current_date, 'Too much',
+      jsonb_build_array(jsonb_build_object('item_id', v_item, 'quantity', 3)));
   exception when raise_exception then v_refused := true;
   end;
   if not v_refused then raise exception 'TRIAL 2 FAILED: more came back than was at the villa'; end if;
-  insert into site_return_lines (return_id, item_id, quantity, uom, created_by, updated_by)
-  values (v_return, v_item, 2, v_uom, v_user, v_user);
+  if (select count(*) from site_returns where plot_id = v_plot) <> 1 then
+    raise exception 'TRIAL 2 FAILED: a refused return left a header behind';
+  end if;
+  v_return := record_site_return(v_plot, v_store, current_date, 'A second return',
+    jsonb_build_array(jsonb_build_object('item_id', v_item, 'quantity', 2)));
   -- The second return empties the villa back into the first store, at the batch the villa drew.
   select quantity into v_n from batch_on_hand where store_id = v_store and receipt_line_id = v_grl;
   if v_n is distinct from 6 then raise exception 'TRIAL 2 FAILED: the first store''s batch is %, expected 6', v_n; end if;

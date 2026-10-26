@@ -81,6 +81,38 @@ drop trigger if exists site_return_lines_immutable on site_return_lines;
 create trigger site_return_lines_immutable before update or delete on site_return_lines
   for each row execute function site_returns_immutable();
 
+-- A return and its lines in one go, so a refused line leaves no empty return behind (a return cannot be deleted).
+-- Invoker: RLS and the guards below still decide.
+create or replace function record_site_return(
+  p_plot_id uuid, p_store_id uuid, p_returned_on date, p_reason text, p_lines jsonb
+)
+returns uuid
+language plpgsql
+set search_path to 'public'
+as $$
+declare
+  v_id uuid;
+begin
+  if not has_app('/inventory') then
+    raise exception 'Only the store records material coming back from a villa';
+  end if;
+  if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'Add at least one item coming back';
+  end if;
+  insert into site_returns (plot_id, store_id, returned_on, reason, created_by, updated_by)
+  values (p_plot_id, p_store_id, coalesce(p_returned_on, current_date), trim(p_reason), auth.uid(), auth.uid())
+  returning id into v_id;
+  -- The unit is the item's own, set by the line guard.
+  insert into site_return_lines (return_id, item_id, quantity, uom, created_by, updated_by)
+  select v_id, x.item_id, x.quantity, i.default_uom, auth.uid(), auth.uid()
+    from jsonb_to_recordset(p_lines) as x(item_id uuid, quantity numeric)
+    join items i on i.id = x.item_id;
+  return v_id;
+end $$;
+
+revoke all on function record_site_return(uuid, uuid, date, text, jsonb) from public, anon;
+grant execute on function record_site_return(uuid, uuid, date, text, jsonb) to authenticated;
+
 -- 2 ------------------------------------------------------------------------------------------------------
 create or replace function site_return_lines_qty_guard()
 returns trigger
