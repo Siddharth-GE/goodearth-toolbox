@@ -1518,6 +1518,7 @@ export const TURING_SCHEMA: Schema = {
       "created_at": "string",
       "created_by": "string | null",
       "description": "string | null",
+      "group_name": "string | null",
       "id": "string",
       "is_active": "boolean",
       "name": "string",

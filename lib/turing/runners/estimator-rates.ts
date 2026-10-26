@@ -148,7 +148,7 @@ export const ESTIMATOR_RATES_RUNNERS: Runners<Key> = {
     const now = await recordNow(
       "estimator_mixes",
       { column: "id", id: String(v.mix_id) },
-      ["name", "uom", "description", "is_active"],
+      ["name", "uom", "group_name", "description", "is_active"],
       "That mix is gone.",
     );
     if ("error" in now) return now;

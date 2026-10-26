@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { mixGroupNames } from "./mix-list";
 import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
 export type MixRow = {
@@ -10,9 +11,12 @@ export type MixRow = {
   name: string;
   uom: string;
   description: string | null;
+  groupName: string | null;
   isActive: boolean;
   componentCount: number;
   useCount: number;
+  /** What is in it, so a search for "cement" finds every mix using cement. */
+  materialNames: string[];
 };
 
 export async function listMixes(): Promise<MixRow[]> {
@@ -25,17 +29,22 @@ export async function listMixes(): Promise<MixRow[]> {
       name: string;
       uom: string;
       description: string | null;
+      group_name: string | null;
       is_active: boolean;
     }>((from, to) =>
       supabase
         .from("estimator_mixes")
-        .select("id, name, uom, description, is_active")
+        .select("id, name, uom, description, group_name, is_active")
         .order("name")
         .order("id")
         .range(from, to),
     ),
-    fetchAll<{ mix_id: string }>((from, to) =>
-      supabase.from("estimator_mix_components").select("mix_id").order("id").range(from, to),
+    fetchAll<{ mix_id: string; item_id: string | null }>((from, to) =>
+      supabase
+        .from("estimator_mix_components")
+        .select("mix_id, item_id")
+        .order("id")
+        .range(from, to),
     ),
     fetchAll<{ mix_id: string | null }>((from, to) =>
       supabase
@@ -47,8 +56,16 @@ export async function listMixes(): Promise<MixRow[]> {
     ),
   ]);
 
+  const itemDefs = await itemDefsByIds(supabase, [
+    ...new Set(components.flatMap((c) => (c.item_id ? [c.item_id] : []))),
+  ]);
   const counts = new Map<string, number>();
-  for (const row of components) counts.set(row.mix_id, (counts.get(row.mix_id) ?? 0) + 1);
+  const names = new Map<string, string[]>();
+  for (const row of components) {
+    counts.set(row.mix_id, (counts.get(row.mix_id) ?? 0) + 1);
+    const name = row.item_id ? itemDefs.get(row.item_id)?.name : undefined;
+    if (name) names.set(row.mix_id, [...(names.get(row.mix_id) ?? []), name]);
+  }
   const uses = new Map<string, number>();
   for (const row of workUses) {
     if (row.mix_id) uses.set(row.mix_id, (uses.get(row.mix_id) ?? 0) + 1);
@@ -59,10 +76,27 @@ export async function listMixes(): Promise<MixRow[]> {
     name: mix.name,
     uom: mix.uom,
     description: mix.description,
+    groupName: mix.group_name,
     isActive: mix.is_active,
     componentCount: counts.get(mix.id) ?? 0,
     useCount: uses.get(mix.id) ?? 0,
+    materialNames: names.get(mix.id) ?? [],
   }));
+}
+
+/** The groups in use, for the mix form to offer. */
+export async function listMixGroups(): Promise<string[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const rows = await fetchAll<{ group_name: string | null }>((from, to) =>
+    supabase
+      .from("estimator_mixes")
+      .select("group_name")
+      .not("group_name", "is", null)
+      .order("id")
+      .range(from, to),
+  );
+  return mixGroupNames(rows.map((row) => ({ groupName: row.group_name })));
 }
 
 export type MixComponentRow = {
@@ -82,6 +116,7 @@ export type MixDetail = {
   name: string;
   uom: string;
   description: string | null;
+  groupName: string | null;
   isActive: boolean;
   components: MixComponentRow[];
 };
@@ -92,7 +127,7 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
 
   const { data: mix, error } = await supabase
     .from("estimator_mixes")
-    .select("id, name, uom, description, is_active")
+    .select("id, name, uom, description, group_name, is_active")
     .eq("id", mixId)
     .maybeSingle();
   if (error) fail("the mix", error);
@@ -119,6 +154,7 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
     name: mix.name,
     uom: mix.uom,
     description: mix.description,
+    groupName: mix.group_name,
     isActive: mix.is_active,
     components: components
       .map((component) => {
