@@ -374,6 +374,8 @@ export type CashRequestItem = {
   vendor_name: string;
   project_id: string | null;
   project_name: string;
+  /** The work order an advance is asked against, kept on the advance when it is paid. */
+  labour_contract_id: string | null;
   work_order: string | null;
   bill_total: number | null;
   bill_pending: number | null;
@@ -459,6 +461,7 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
       vendor_name: item.bills?.vendors?.name ?? item.vendors?.name ?? "Direct labour",
       project_id: item.bills?.project_id ?? item.project_id,
       project_name: item.bills?.projects?.name ?? item.projects?.name ?? "—",
+      labour_contract_id: item.labour_contract_id,
       work_order: item.labour_contracts?.reference ?? null,
       bill_total: bill?.total ?? null,
       bill_pending: bill?.pending ?? null,
