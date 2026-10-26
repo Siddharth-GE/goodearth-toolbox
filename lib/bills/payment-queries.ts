@@ -146,6 +146,7 @@ export type OpenAdvance = {
   payment_ref: string;
   project_name: string;
   work_order: string | null;
+  same_project: boolean;
   /** Given in the same company as the bill: only such an advance is suggested against it, as companies keep separate books. */
   same_company: boolean;
 };
@@ -214,7 +215,6 @@ export async function getOpenAdvances(
           Number(b.same_project) - Number(a.same_project) ||
           Number(b.same_company) - Number(a.same_company),
       )
-      .map(({ same_project: _sameProject, ...advance }) => advance)
   );
 }
 
