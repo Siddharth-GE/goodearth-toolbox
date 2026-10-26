@@ -81,6 +81,8 @@ const NAMED_BY: Record<
     | "advance_recoveries"
     | "funding_facilities"
     | "funding_movements"
+    | "cash_requests"
+    | "cash_request_items"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -463,6 +465,54 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     add("projects", one.project_id);
   }
   for (const one of movements) add("funding_facilities", one.facility_id);
+  // A cash request line by its request, and its bill or its advance's vendor, project and work order.
+  const cashLines = await readIn(list("cash_request_items"), (chunk) =>
+    supabase
+      .from("cash_request_items")
+      .select(
+        "id, cash_request_id, item_kind, bill_id, vendor_id, project_id, labour_contract_id, requested_amount, released_amount, note",
+      )
+      .in("id", chunk),
+  );
+  // What is paid on each line so far, reversals netting out, as the board's Paid column shows.
+  const cashPaid = new Map<string, number>();
+  for (const one of (
+    await Promise.all([
+      readIn(
+        cashLines.map((line) => line.id),
+        (chunk) =>
+          supabase
+            .from("bill_payments")
+            .select("cash_request_item_id, amount")
+            .in("cash_request_item_id", chunk),
+      ),
+      readIn(
+        cashLines.map((line) => line.id),
+        (chunk) =>
+          supabase
+            .from("contractor_advances")
+            .select("cash_request_item_id, amount")
+            .in("cash_request_item_id", chunk),
+      ),
+    ])
+  ).flat())
+    if (one.cash_request_item_id)
+      cashPaid.set(
+        one.cash_request_item_id,
+        (cashPaid.get(one.cash_request_item_id) ?? 0) + one.amount,
+      );
+  for (const one of cashLines) {
+    add("cash_requests", one.cash_request_id);
+    if (one.bill_id) add("bills", one.bill_id);
+    if (one.vendor_id) add("vendors", one.vendor_id);
+    if (one.project_id) add("projects", one.project_id);
+    if (one.labour_contract_id) add("labour_contracts", one.labour_contract_id);
+  }
+  const cashRequests = await readIn(list("cash_requests"), (chunk) =>
+    supabase.from("cash_requests").select("id, week_of, status").in("id", chunk),
+  );
+  for (const one of cashRequests)
+    names[one.id] = `Cash request, week of ${formatDate(one.week_of)} (${one.status})`;
   // Money already reversed says so, so a second reversal or a recovery from it is seen before Save.
   const reversedMoney = new Set(
     (
@@ -698,6 +748,24 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       `from an advance ${formatMoney(one.amount)}`,
       formatDate(one.recovered_on),
       reversal(one),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  for (const one of cashLines)
+    names[one.id] = [
+      names[one.cash_request_id],
+      one.item_kind === "bill"
+        ? names[one.bill_id ?? ""]
+        : [`Advance — ${names[one.vendor_id ?? ""] ?? "a vendor"}`, names[one.project_id ?? ""]]
+            .filter(Boolean)
+            .join(", "),
+      one.labour_contract_id ? names[one.labour_contract_id] : null,
+      `asked ${formatMoney(one.requested_amount, { paise: true })}`,
+      one.released_amount === null
+        ? null
+        : `released ${formatMoney(one.released_amount, { paise: true })}`,
+      cashPaid.get(one.id) ? `paid ${formatMoney(cashPaid.get(one.id), { paise: true })}` : null,
+      one.note ? `“${one.note.length > 60 ? `${one.note.slice(0, 57)}…` : one.note}”` : null,
     ]
       .filter(Boolean)
       .join(" · ");

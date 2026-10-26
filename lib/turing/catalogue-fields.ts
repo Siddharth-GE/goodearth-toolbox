@@ -18,6 +18,7 @@ import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { MONEY } from "./entries/money";
+import { CASH_REQUESTS } from "./entries/cash-requests";
 import { RELAY } from "./entries/relay";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
@@ -106,7 +107,9 @@ export type IdTable =
   | "contractor_advances"
   | "advance_recoveries"
   | "funding_facilities"
-  | "funding_movements";
+  | "funding_movements"
+  | "cash_requests"
+  | "cash_request_items";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -191,6 +194,8 @@ const FROM: Record<IdTable, string> = {
   advance_recoveries: "advance_recoveries (part of a bill settled from an advance)",
   funding_facilities: "funding_facilities (a bank loan, private equity or private debt)",
   funding_movements: "funding_movements (money drawn, repaid or paid as interest on a facility)",
+  cash_requests: "cash_requests (a week's request for money to pay bills and advances)",
+  cash_request_items: "cash_request_items (a bill or advance on a cash request)",
 };
 
 export type Field = {
@@ -287,6 +292,7 @@ export const ENTRIES = [
   ...DIRECTORY,
   ...SUPERVISORS_SITE,
   ...MONEY,
+  ...CASH_REQUESTS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
