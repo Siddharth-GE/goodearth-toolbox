@@ -36,6 +36,8 @@ export type PlateLine = {
   href: string;
   /** Late, overdue or sent back: shown first, in warning. */
   urgent: boolean;
+  /** Something to do now (approve, confirm, issue, answer): it counts on the bell. A standing backlog does not. */
+  act: boolean;
   /** Up to five, by name, when the line is about things rather than a queue. */
   items: PlateItem[];
 };
@@ -65,7 +67,7 @@ function line(
   label: string,
   count: number,
   href: string,
-  options: { urgent?: boolean; items?: PlateItem[] } = {},
+  options: { urgent?: boolean; act?: boolean; items?: PlateItem[] } = {},
 ): PlateLine[] {
   if (count <= 0) return [];
   return [
@@ -76,6 +78,7 @@ function line(
       count,
       href,
       urgent: options.urgent ?? false,
+      act: options.act ?? true,
       items: (options.items ?? []).slice(0, ITEMS_SHOWN),
     },
   ];
@@ -95,12 +98,21 @@ const QUEUES: {
     read: async (_user, supabase) => {
       const { isApprover } = await isCurrentUserApprover();
       if (!isApprover) return [];
-      const waiting = await headCount(
+      // An indent with a line outside the estimate waits for the estimator's yes before it can be approved (0113).
+      const [submitted, held] = await Promise.all([
+        supabase.from("indents").select("id").eq("status", "submitted"),
         supabase
-          .from("indents")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "submitted"),
-      );
+          .from("indent_lines")
+          .select("indent_id, indents!indent_lines_indent_id_fkey!inner(status)")
+          .eq("indents.status", "submitted")
+          .is("budget_id", null)
+          .is("construction_line_id", null)
+          .is("estimate_id", null)
+          .or("estimator_decision.is.null,estimator_decision.neq.approved"),
+      ]);
+      if (submitted.error || held.error) throw new Error((submitted.error ?? held.error)!.message);
+      const blocked = new Set((held.data ?? []).map((row) => row.indent_id));
+      const waiting = (submitted.data ?? []).filter((row) => !blocked.has(row.id)).length;
       return line(
         "indents-approve",
         "Indents",
@@ -133,6 +145,7 @@ const QUEUES: {
         "Approved indents with something still to order",
         rows.length,
         "/purchase-orders/from-indent",
+        { act: false },
       );
     },
   },
@@ -163,6 +176,7 @@ const QUEUES: {
           "Purchase orders awaiting delivery",
           awaiting,
           "/inventory/receive",
+          { act: false },
         ),
       ];
     },
@@ -216,7 +230,7 @@ const QUEUES: {
         ...line(
           "bills-cash",
           "Bills",
-          "A cash request waiting to be released",
+          "Cash requests waiting to be released",
           cash,
           "/bills/cash-requests?status=submitted",
         ),
@@ -233,6 +247,7 @@ const QUEUES: {
           "Approved bills still to pay",
           approved,
           "/bills/list?status=approved",
+          { act: false },
         ),
       ];
     },
@@ -275,8 +290,12 @@ const MINE: {
       for (const villa of villas) {
         const runs = villa.card.supervisor?.id === user.id;
         if (runs) toConfirm += villa.card.toConfirm;
-        for (const stage of villa.stages) {
+        // A stage never begun that sits before one already begun was skipped: the forecast would start it today, every
+        // day, so it is not "starting" (stagesAhead in Supervisors' look ahead).
+        const furthest = villa.stages.findLastIndex((stage) => stage.status !== "not_started");
+        for (const [index, stage] of villa.stages.entries()) {
           if (stage.status === "done") continue;
+          if (stage.status === "not_started" && index < furthest) continue;
           if (!runs && stageOwner(stage, leads, new Map())?.id !== user.id) continue;
           const item = {
             label: `${villa.card.villaName} · ${stage.code} ${stage.name}`,
@@ -302,7 +321,7 @@ const MINE: {
           "Supervisors",
           "Stages of yours running late",
           late.length,
-          "/supervisors/plan",
+          "/supervisors/villas?who=mine",
           { urgent: true, items: late },
         ),
         ...line(
@@ -319,7 +338,7 @@ const MINE: {
           "Stages of yours starting this week",
           soon.length,
           "/supervisors/plan",
-          { items: soon },
+          { act: false, items: soon },
         ),
         ...line(
           "site-confirm",
@@ -382,13 +401,13 @@ const MINE: {
           "Design stages you are on, under way",
           items.length,
           "/design-management/villas?who=mine",
-          { items },
+          { act: false, items },
         ),
         ...line(
-          "design-open",
+          "design-week",
           "Design Management",
-          "Design actions of yours open",
-          board.myLoad.open - board.myLoad.overdue,
+          "Design actions of yours due this week",
+          board.myLoad.week,
           "/design-management/actions",
         ),
         ...line(
@@ -416,10 +435,10 @@ const MINE: {
           { urgent: true },
         ),
         ...line(
-          "crm-open",
+          "crm-week",
           "Client Relations",
-          "Client actions of yours open",
-          board.myLoad.open - board.myLoad.overdue,
+          "Client actions of yours due this week",
+          board.myLoad.week,
           "/client-relations/actions",
         ),
         ...line(
@@ -455,14 +474,16 @@ const MINE: {
     tool: "Indents",
     slug: "/indents",
     read: async (user, supabase) => {
-      const { data, error } = await supabase
-        .from("indents")
-        .select("id, reference, rejection_note")
-        .eq("status", "draft")
-        .eq("created_by", user.id)
-        .not("rejection_note", "is", null)
+      const sentBack = () =>
+        supabase
+          .from("indents")
+          .select("id, reference, rejection_note", { count: "exact" })
+          .eq("status", "draft")
+          .eq("created_by", user.id)
+          .not("rejection_note", "is", null);
+      const { data, count, error } = await sentBack()
         .order("updated_at", { ascending: false })
-        .limit(ITEMS_SHOWN + 1);
+        .limit(ITEMS_SHOWN);
       if (error) throw new Error(error.message);
       const items = (data ?? []).map((row) => ({
         label: row.reference ?? "An indent",
@@ -473,7 +494,7 @@ const MINE: {
         "indents-sent-back",
         "Indents",
         "Your indents sent back to change",
-        items.length,
+        count ?? items.length,
         "/indents/list?status=draft",
         {
           urgent: true,
@@ -518,7 +539,9 @@ export const getMyPlate = cache(async (): Promise<Plate> => {
   return { queues, mine, failed: [...new Set(failed)] };
 });
 
-/** How many things wait on the person: the sidebar's count. */
+/** What the bell counts: what is late, and what is the person's to do now — not a standing backlog. */
 export function plateCount(plate: Plate): number {
-  return [...plate.queues, ...plate.mine].reduce((sum, entry) => sum + entry.count, 0);
+  return [...plate.queues, ...plate.mine]
+    .filter((entry) => entry.urgent || entry.act)
+    .reduce((sum, entry) => sum + entry.count, 0);
 }

@@ -124,24 +124,31 @@ Settled while building: indent lines carry no work of their own. The estimator's
 
 ## E. My plate — the shell, likely no migration
 
-- [ ] A **My plate** page and a bell with a count in the sidebar. They read through `lib/overview/`, the shell's sanctioned reader of other tools' queries, with each read wrapped so one tool's failure shows as a note.
-- [ ] **Level 1, tools you hold** (work nobody owns):
-  - indents waiting your approval;
-  - lines waiting the estimator;
-  - approved indents with no PO;
-  - POs awaiting delivery;
-  - site requests;
-  - bills waiting your approval;
-  - approved bills unpaid;
-  - a cash request to release;
-  - item requests.
-- [ ] **Level 2, what is yours:**
-  - stages you own or on villas you run: starting within 7 days, due, late;
-  - design steps you are on, and design actions you own;
-  - Client Relations actions you own;
-  - Relay batons you hold;
-  - your indents sent back.
-- [ ] Each line opens the screen where it is done. Lean: counts and names, never rupees.
+Built on `feature/team-additions-e`, no migration.
+
+- [x] **My plate** (`/plate`):
+  - "Yours" first: stages owned or on villas run (late, waiting, starting this week), deliveries to confirm, design steps under way and design actions, client actions, Relay batons, and indents sent back;
+  - then "Waiting in your tools": indents to approve, estimator answers, indents to order, site requests, POs awaiting delivery, bills, cash requests and work orders to approve, bills to pay, and item requests.
+- [x] Read through `lib/overview/plate.ts`. Each tool is gated on its grant, then wrapped, so one failing shows as a note.
+- [x] Shown three ways:
+  - the top five on the home page, in its own Suspense;
+  - **My plate** with a count under Overview on the rail;
+  - a bell with the count on the phone's top bar.
+- [x] **The bell counts what is late, and what is the person's to do now** (approve, confirm, issue, answer, a baton, a sent-back indent). A standing backlog shows on the page but not on the bell: POs awaiting delivery, bills to pay, indents to order, stages starting this week, design stages under way.
+- [x] The home page and My plate hand their count to the bell. Elsewhere it is read through `GET /api/plate-count`, after the page shows and at most once a minute. A server action would queue ahead of the person's own saves.
+
+The independent Opus review found no blocker. Its findings are fixed:
+
+- the count no longer queues ahead of saves, and no longer reads twice;
+- the bell is lean;
+- skipped stages never read as starting;
+- indents waiting on the estimator are not counted as approvable;
+- sent-back indents are counted in full;
+- a late stage links to the villas.
+- [ ] [Founder] Vet on staging:
+  - Open the home page: My plate sits first. Open it.
+  - As an indent approver with an indent submitted: "Indents waiting for your approval" shows, and tapping it opens the list.
+  - On a phone, the bell in the top bar shows the same count.
 
 ## F. Return from a villa to a store — migration (reviewed before apply)
 
