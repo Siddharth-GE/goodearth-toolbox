@@ -67,7 +67,13 @@ const labourDetails = (optional: boolean): Field[] => {
   return [
     // A work, or for Additional work or Rework a typed name instead (Supervisors refuses neither or a quantity on a name).
     { key: "work_item_id", label: "Work", kind: "id", table: "work_items", optional: true },
-    { key: "custom_name", label: "Named work (Additional or Rework)", kind: "text", optional: true, max: 120 },
+    {
+      key: "custom_name",
+      label: "Named work (Additional or Rework)",
+      kind: "text",
+      optional: true,
+      max: 120,
+    },
     { key: "contractor_id", label: "Contractor", kind: "id", table: "vendors", ...may },
     { key: "log_date", label: "Date", kind: "date", ...may },
     {

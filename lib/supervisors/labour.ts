@@ -157,7 +157,8 @@ export function labourWork(input: {
   }
   if (input.kind === "pw_qty") {
     return {
-      error: "Work with a typed name is paid as daily wages or a lump sum — a quantity needs a work's unit.",
+      error:
+        "Work with a typed name is paid as daily wages or a lump sum — a quantity needs a work's unit.",
     };
   }
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };

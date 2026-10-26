@@ -10,7 +10,7 @@ import { SearchSelect, type SearchOption } from "@/components/ui/search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createBillWithLines } from "@/lib/bills/line-actions";
-import type { DeliveryInvoice } from "@/lib/bills/line-queries";
+import type { DeliveryForBill } from "@/lib/bills/line-queries";
 import {
   billLinesProblem,
   lineMoneyOf,
@@ -22,7 +22,7 @@ import { rollUpBill } from "@/lib/bills/math";
 import type { BillFormOptions } from "@/lib/bills/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { useRouter } from "next/navigation";
@@ -50,8 +50,10 @@ export function BillForm({
     lines: BillLineDraft[];
     poLines?: PoLineForBill[];
     workLines?: WorkOrderLineForBill[];
-    /** The supplier invoices this PO's deliveries carried, not yet billed (0132). */
-    invoices: DeliveryInvoice[];
+    /** This PO's deliveries, each with the supplier invoice it carried (0132) and what it brought. */
+    deliveries: DeliveryForBill[];
+    /** The delivery this bill is for, or "" for everything received and not yet billed. */
+    deliveryId: string;
   };
   gstRates: number[];
   uoms: string[];
@@ -61,20 +63,29 @@ export function BillForm({
   const [nmrVendorId, setNmrVendorId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [scope, setScope] = useState("");
-  // One unbilled invoice from the deliveries fills itself in; several are offered below the box.
-  const onlyInvoice = prefill.invoices.length === 1 ? prefill.invoices[0] : null;
-  const [invoiceNo, setInvoiceNo] = useState(onlyInvoice?.invoiceNo ?? "");
-  const [invoiceDate, setInvoiceDate] = useState(onlyInvoice?.invoiceDate ?? "");
+  // The picked delivery's invoice fills itself in; with none picked, so does the one unbilled invoice when there is only one.
+  const unbilled = prefill.deliveries.filter((delivery) => delivery.invoiceNo && !delivery.billed);
+  const fromDelivery =
+    prefill.deliveries.find((delivery) => delivery.id === prefill.deliveryId) ??
+    (unbilled.length === 1 ? unbilled[0] : null);
+  const [invoiceNo, setInvoiceNo] = useState(fromDelivery?.invoiceNo ?? "");
+  const [invoiceDate, setInvoiceDate] = useState(fromDelivery?.invoiceDate ?? "");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<EditorLine[]>(() =>
     prefill.lines.map((draft) => toEditorLine(draft)),
   );
   const { pending: recording, error, run } = useActionRunner();
 
-  const go = (next: { kind: FormKind; vendorId?: string; anchorId?: string }) => {
+  const go = (next: {
+    kind: FormKind;
+    vendorId?: string;
+    anchorId?: string;
+    deliveryId?: string;
+  }) => {
     const params = new URLSearchParams({ kind: next.kind });
     if (next.vendorId) params.set("vendor", next.vendorId);
     if (next.anchorId) params.set(next.kind === "po" ? "po" : "contract", next.anchorId);
+    if (next.deliveryId) params.set("delivery", next.deliveryId);
     router.replace(`/bills/new?${params}`, { scroll: false });
   };
 
@@ -226,6 +237,36 @@ export function BillForm({
                 </p>
               )}
             </div>
+            {kind === "po" && anchorId !== "" && prefill.deliveries.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="bill-delivery">Which delivery is this bill for?</Label>
+                <Select
+                  id="bill-delivery"
+                  value={prefill.deliveryId}
+                  onChange={(event) =>
+                    go({ kind, vendorId: anchorVendorId, anchorId, deliveryId: event.target.value })
+                  }
+                >
+                  <option value="">Everything received and not yet billed</option>
+                  {prefill.deliveries.map((delivery) => (
+                    <option key={delivery.id} value={delivery.id}>
+                      {[
+                        delivery.grn,
+                        formatDate(delivery.receivedAt),
+                        delivery.invoiceNo ? `invoice ${delivery.invoiceNo}` : "no invoice no.",
+                        delivery.billed ? "already billed" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-muted text-xs">
+                  Its invoice number and date, and what it brought, fill the bill. Only what arrived
+                  can be billed.
+                </p>
+              </div>
+            )}
             {anchorId !== "" && (
               <div className="space-y-1.5">
                 <p className="text-muted text-xs font-medium">
@@ -323,23 +364,8 @@ export function BillForm({
               placeholder={kind === "nmr" ? "e.g. Misc week 32" : "As printed on the bill"}
               autoComplete="off"
             />
-            {kind === "po" && prefill.invoices.length > 0 && (
-              <p className="text-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                <span>From the deliveries:</span>
-                {prefill.invoices.map((invoice) => (
-                  <button
-                    key={invoice.invoiceNo}
-                    type="button"
-                    className="text-accent font-medium hover:underline"
-                    onClick={() => {
-                      setInvoiceNo(invoice.invoiceNo);
-                      if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate);
-                    }}
-                  >
-                    {invoice.invoiceNo} ({invoice.grn})
-                  </button>
-                ))}
-              </p>
+            {kind === "po" && fromDelivery?.invoiceNo && (
+              <p className="text-muted text-xs">{`From the delivery ${fromDelivery.grn}.`}</p>
             )}
           </div>
           <div className="space-y-1.5">

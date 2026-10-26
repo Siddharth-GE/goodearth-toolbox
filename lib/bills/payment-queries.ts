@@ -271,7 +271,11 @@ export async function listPayableBills(): Promise<PayableBill[]> {
   const [bills, advances, recovered] = await Promise.all([
     billsWithSettlement(supabase),
     fetchAll((from, to) =>
-      supabase.from("contractor_advances").select("id, vendor_id, amount").order("id").range(from, to),
+      supabase
+        .from("contractor_advances")
+        .select("id, vendor_id, amount")
+        .order("id")
+        .range(from, to),
     ),
     recoveredByAdvance(supabase),
   ]);
@@ -670,7 +674,8 @@ export type ContractorRow = {
 /** Who is a contractor and their number, for the vendors a money list names. */
 async function vendorFacts(supabase: Client, ids: string[]) {
   const unique = [...new Set(ids)];
-  if (unique.length === 0) return new Map<string, { is_contractor: boolean; contractor_no: string | null }>();
+  if (unique.length === 0)
+    return new Map<string, { is_contractor: boolean; contractor_no: string | null }>();
   const rows = await fetchAll((from, to) =>
     supabase
       .from("vendors")
@@ -782,7 +787,9 @@ export async function getContractorLedger(
     fetchAll((from, to) =>
       supabase
         .from("bills")
-        .select("id, reference, status, project_id, invoice_date, total_amount, vendor_seq, projects(name)")
+        .select(
+          "id, reference, status, project_id, invoice_date, total_amount, vendor_seq, projects(name)",
+        )
         .eq("vendor_id", vendorId)
         .order("id")
         .range(from, to),
@@ -826,7 +833,9 @@ export async function getContractorLedger(
   const billById = new Map(owed.map((bill) => [bill.id, bill]));
   const billLabel = (id: string) => {
     const bill = billById.get(id);
-    return bill ? `${bill.reference ?? "—"}${bill.vendor_seq ? ` (their bill ${bill.vendor_seq})` : ""}` : "—";
+    return bill
+      ? `${bill.reference ?? "—"}${bill.vendor_seq ? ` (their bill ${bill.vendor_seq})` : ""}`
+      : "—";
   };
   const entries = [
     ...owed.map((bill) => ({

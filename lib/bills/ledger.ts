@@ -149,7 +149,12 @@ export type LedgerEntry = {
 };
 
 /** A day's bill comes before what paid it, so the balance never dips below what is owed on the way. */
-const KIND_ORDER: Record<LedgerEntryKind, number> = { bill: 0, advance: 1, payment: 2, recovery: 3 };
+const KIND_ORDER: Record<LedgerEntryKind, number> = {
+  bill: 0,
+  advance: 1,
+  payment: 2,
+  recovery: 3,
+};
 
 /** One contractor's account, oldest first: a bill adds what is owed, a payment or an advance takes it away, and a
  * recovery only moves an advance onto a bill, so it leaves the balance alone. A balance below zero is advance
@@ -157,7 +162,9 @@ const KIND_ORDER: Record<LedgerEntryKind, number> = { bill: 0, advance: 1, payme
 export function contractorLedger<T extends LedgerEntry>(entries: T[]): (T & { balance: number })[] {
   const sorted = [...entries].sort(
     (a, b) =>
-      a.on.localeCompare(b.on) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.id.localeCompare(b.id),
+      a.on.localeCompare(b.on) ||
+      KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+      a.id.localeCompare(b.id),
   );
   let balance = 0;
   return sorted.map((entry) => {

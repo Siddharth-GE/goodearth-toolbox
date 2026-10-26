@@ -192,3 +192,18 @@ export function dayRatesFromLines(lines: { description: string; rate: number }[]
   }
   return rates;
 }
+
+/** The bill for one delivery: each PO line at what that delivery brought, never past what is left to bill. */
+export function linesFromDelivery(
+  poLines: PoLineForBill[],
+  delivered: Record<string, number>,
+): BillLineDraft[] {
+  return linesFromPo(
+    poLines.map((line) => {
+      const brought = delivered[line.po_line_id] ?? 0;
+      // Narrow what is left to this delivery's share; linesFromPo then prices it and drops a line at zero.
+      const left = Math.min(leftToBill(line), brought);
+      return { ...line, billed: line.received - left };
+    }),
+  );
+}

@@ -114,9 +114,11 @@ test("a log is on a work, or Additional work or Rework is on a typed name", () =
     { work_item_id: null, custom_name: "Sump shift" },
   );
   assert.match(
-    (labourWork({ ...base, customName: "By qty", workClass: "rework", kind: "pw_qty" }) as {
-      error: string;
-    }).error,
+    (
+      labourWork({ ...base, customName: "By qty", workClass: "rework", kind: "pw_qty" }) as {
+        error: string;
+      }
+    ).error,
     /daily wages or a lump sum/,
   );
 });
