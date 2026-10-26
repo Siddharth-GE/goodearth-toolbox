@@ -17,11 +17,12 @@ import { isInTool, sectionOfPage, type ToolSection } from "@/lib/nav/arrange";
 import { registerPushDevice } from "@/lib/push/actions";
 import { TOOL_ICONS, TURING } from "@/lib/tools";
 import { cn } from "@/lib/utils";
+import { PLATE_COUNT_EVENT } from "./plate-count-sync";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Fingerprint, LayoutGrid, LogOut, Menu, Sparkles, X } from "lucide-react";
+import { Bell, Fingerprint, LayoutGrid, LogOut, Menu, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // The rail is a brand ground: everything on it is drawn in its on-ground colour.
 const rowBase =
@@ -125,17 +126,29 @@ function Brand() {
   );
 }
 
+/** What waits on the person, as a number on the rail and the phone's bell; nothing until it has been read. */
+function PlateCount({ count }: { count: number | null }) {
+  if (!count) return null;
+  return (
+    <span className="bg-on-ground text-ground ml-auto min-w-5 rounded-full px-1.5 text-center text-[11px] leading-5 font-semibold tabular-nums">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 function SidebarContent({
   sections,
   userName,
   turing,
   pathname,
+  plate,
   onNavigate,
 }: {
   sections: ToolSection[];
   userName: string;
   turing: boolean;
   pathname: string;
+  plate: number | null;
   onNavigate?: () => void;
 }) {
   const inTuring = isInTool(TURING.href, pathname);
@@ -168,6 +181,20 @@ function SidebarContent({
         >
           <LayoutGrid className={cn("size-4 shrink-0", pathname === "/" && "text-ground-mark")} />
           Overview
+        </Link>
+        <Link
+          href="/plate"
+          onClick={onNavigate}
+          aria-current={pathname === "/plate" ? "page" : undefined}
+          className={cn(
+            rowBase,
+            "mt-0.5 h-10 text-sm",
+            pathname === "/plate" ? rowActive : rowIdle,
+          )}
+        >
+          <Bell className={cn("size-4 shrink-0", pathname === "/plate" && "text-ground-mark")} />
+          My plate
+          <PlateCount count={plate} />
         </Link>
 
         {sections.length > 0 && (
@@ -229,6 +256,29 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [plate, setPlate] = useState<number | null>(null);
+  const plateReadAt = useRef(0);
+  // The home page and My plate read the plate themselves and hand the count over.
+  useEffect(() => {
+    const take = (event: Event) => {
+      plateReadAt.current = Date.now();
+      setPlate((event as CustomEvent<number>).detail);
+    };
+    window.addEventListener(PLATE_COUNT_EVENT, take);
+    return () => window.removeEventListener(PLATE_COUNT_EVENT, take);
+  }, []);
+  // Elsewhere it is read after the page shows, at most once a minute: the plate reads every tool.
+  useEffect(() => {
+    if (pathname === "/" || pathname === "/plate") return;
+    if (Date.now() - plateReadAt.current < 60_000) return;
+    plateReadAt.current = Date.now();
+    fetch("/api/plate-count", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { count: number } | null) => {
+        if (body) setPlate(body.count);
+      })
+      .catch(() => {});
+  }, [pathname]);
 
   // In the phone app, once per signed-in launch (lib/native/push.ts); nothing on the website.
   useEffect(
@@ -247,6 +297,7 @@ export function Sidebar({
           userName={userName}
           turing={turing}
           pathname={pathname}
+          plate={plate}
         />
       </aside>
 
@@ -260,6 +311,14 @@ export function Sidebar({
           <Menu className="size-5" />
         </button>
         <Brand />
+        <Link
+          href="/plate"
+          aria-label={plate ? `My plate, ${plate} waiting` : "My plate"}
+          className="text-on-ground focus-visible:ring-on-ground/60 hover:bg-on-ground/[0.08] ml-auto flex h-9 items-center gap-1.5 rounded-xl px-2 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Bell className="size-5" />
+          <PlateCount count={plate} />
+        </Link>
       </header>
 
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -282,6 +341,7 @@ export function Sidebar({
               userName={userName}
               turing={turing}
               pathname={pathname}
+              plate={plate}
               onNavigate={() => setOpen(false)}
             />
           </DialogPrimitive.Content>
