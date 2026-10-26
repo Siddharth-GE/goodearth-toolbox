@@ -364,7 +364,11 @@ export function planImport(
 ): ImportPlan {
   const byCode = new Map(works.map((work) => [work.code, work]));
   const byId = new Map(works.map((work) => [work.workItemId, work]));
-  const onEstimate = new Map((estimate?.lines ?? []).map((line) => [line.workItemId, line]));
+  // A work may have several rows (0157); the model measures the first one listed for it.
+  const onEstimate = new Map<string, NonNullable<typeof estimate>["lines"][number]>();
+  for (const line of estimate?.lines ?? []) {
+    if (!onEstimate.has(line.workItemId)) onEstimate.set(line.workItemId, line);
+  }
   const codeCounts = new Map<string, number>();
   for (const line of takeoff.lines) {
     if (line.workCode) codeCounts.set(line.workCode, (codeCounts.get(line.workCode) ?? 0) + 1);

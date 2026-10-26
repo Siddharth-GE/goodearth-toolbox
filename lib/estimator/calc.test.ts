@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  applyEstimateOverrides,
   applyRateOverrides,
   computeEstimateTotals,
   computeLine,
@@ -10,6 +9,7 @@ import {
   frozenLineCosts,
   frozenRateBuildUp,
   aggregateFrozenTakeoff,
+  lineRecipes,
   expandRecipe,
   mixUnitCost,
   rateBuildUp,
@@ -492,30 +492,99 @@ test("a villa's component list replaces the standard whole, not as a delta", () 
       components: [{ materialId: "sand", mixId: null, qtyPerUnit: 2 }],
     },
   ];
-  const applied = applyEstimateOverrides(
+  const applied = lineRecipes(
     recipes,
-    new Map([["w1", [{ materialId: "steel", mixId: null, qtyPerUnit: 3 }]]]),
+    [
+      { id: "a", workItemId: "w1" },
+      { id: "b", workItemId: "w2" },
+    ],
+    new Map([["a", [{ materialId: "steel", mixId: null, qtyPerUnit: 3 }]]]),
     new Map(),
   );
-  assert.deepEqual(applied[0].components, [{ materialId: "steel", mixId: null, qtyPerUnit: 3 }]);
-  assert.equal(applied[0].labourRate, 100, "labour untouched when only the recipe varies");
-  assert.deepEqual(applied[1], recipes[1], "an untouched work keeps following the standard");
+  assert.deepEqual(applied.get("a")?.components, [
+    { materialId: "steel", mixId: null, qtyPerUnit: 3 },
+  ]);
+  assert.equal(applied.get("a")?.labourRate, 100, "labour untouched when only the recipe varies");
+  assert.deepEqual(applied.get("b"), recipes[1], "an untouched work keeps following the standard");
+});
+
+test("two rows of one work each keep their own list and labour (0157)", () => {
+  const recipes = [
+    {
+      workItemId: "shutter",
+      uom: "sqm",
+      labourRate: 300,
+      components: [{ materialId: "teak", mixId: null, qtyPerUnit: 1 }],
+    },
+  ];
+  const applied = lineRecipes(
+    recipes,
+    [
+      { id: "w1", workItemId: "shutter" },
+      { id: "w2", workItemId: "shutter" },
+      { id: "unset", workItemId: "not-set-up" },
+    ],
+    new Map([["w2", [{ materialId: null, mixId: "louvre", qtyPerUnit: 1 }]]]),
+    new Map([["w1", 450]]),
+  );
+  assert.equal(applied.get("w1")?.labourRate, 450);
+  assert.equal(applied.get("w2")?.labourRate, 300);
+  assert.deepEqual(applied.get("w1")?.components, recipes[0].components);
+  assert.deepEqual(applied.get("w2")?.components, [
+    { materialId: null, mixId: "louvre", qtyPerUnit: 1 },
+  ]);
+  assert.equal(applied.has("unset"), false, "a work with no setup stays without a recipe");
+  // The takeoff finds each row by its own key and adds them up per material.
+  const teak: MaterialDef = { id: "teak", name: "Teak", uom: "cft", rate: 3000 };
+  const takeoff = computeTakeoff(
+    [
+      { workItemId: "shutter", qty: 2, key: "w1" },
+      { workItemId: "shutter", qty: 3, key: "w2" },
+    ],
+    applied,
+    new Map([
+      [
+        "louvre",
+        {
+          id: "louvre",
+          name: "Louvre",
+          uom: "sqm",
+          components: [{ materialId: "teak", qtyPerUnit: 0.5 }],
+        },
+      ],
+    ]),
+    new Map([["teak", teak]]),
+  );
+  assert.deepEqual(
+    takeoff.map((row) => [row.materialId, row.quantity]),
+    [["teak", 3.5]],
+  );
 });
 
 test("a villa labour rate of zero is a real rate, not 'unpriced'", () => {
   const recipes = [{ workItemId: "w1", uom: "cum", labourRate: 100, components: [] }];
-  const applied = applyEstimateOverrides(recipes, new Map(), new Map([["w1", 0]]));
-  assert.equal(applied[0].labourRate, 0);
+  const applied = lineRecipes(
+    recipes,
+    [{ id: "a", workItemId: "w1" }],
+    new Map(),
+    new Map([["a", 0]]),
+  );
+  assert.equal(applied.get("a")?.labourRate, 0);
   // And it must reach the money: labour-only line, zero rate, zero cost.
-  const cost = computeLine({ workItemId: "w1", qty: 5 }, applied[0], new Map(), new Map());
+  const cost = computeLine({ workItemId: "w1", qty: 5 }, applied.get("a"), new Map(), new Map());
   assert.equal(cost.labourCost, 0);
   assert.equal(cost.totalCost, 0);
 });
 
 test("a villa labour rate overrides the standard and flows into the cost", () => {
   const recipes = [{ workItemId: "w1", uom: "cum", labourRate: 100, components: [] }];
-  const applied = applyEstimateOverrides(recipes, new Map(), new Map([["w1", 250]]));
-  const cost = computeLine({ workItemId: "w1", qty: 4 }, applied[0], new Map(), new Map());
+  const applied = lineRecipes(
+    recipes,
+    [{ id: "a", workItemId: "w1" }],
+    new Map(),
+    new Map([["a", 250]]),
+  );
+  const cost = computeLine({ workItemId: "w1", qty: 4 }, applied.get("a"), new Map(), new Map());
   assert.equal(cost.labourCost, 1000);
 });
 

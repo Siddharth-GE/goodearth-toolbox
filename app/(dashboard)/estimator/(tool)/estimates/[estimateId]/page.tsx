@@ -11,7 +11,7 @@ import {
 } from "@/lib/estimator/estimate-queries";
 import { buildEstimateView } from "@/lib/estimator/estimate-view";
 import { listMixes } from "@/lib/estimator/mixes-queries";
-import { listMaterialItems } from "@/lib/estimator/shared";
+import { listMaterialItems, listUomNames } from "@/lib/estimator/shared";
 import { listWorkStatus } from "@/lib/estimator/works-queries";
 import { notFound } from "next/navigation";
 import { EstimateHeader } from "./_components/estimate-header";
@@ -28,7 +28,7 @@ export default async function EstimatePage({
   params: Promise<{ estimateId: string }>;
 }) {
   const { estimateId } = await params;
-  const [user, estimate, book, works, variations, materialItems, mixRows, measurements] =
+  const [user, estimate, book, works, variations, materialItems, mixRows, measurements, uoms] =
     await Promise.all([
       requireUser(),
       getEstimate(estimateId),
@@ -40,6 +40,7 @@ export default async function EstimatePage({
       listMixes(),
       // A line present here is MEASURED: its quantity is the sheet's total (0096).
       getEstimateMeasurements(estimateId),
+      listUomNames(),
     ]);
   if (!estimate) notFound();
   // Whoever holds Masters can set a missing Masters price here; everyone else sets this villa's price only.
@@ -85,6 +86,7 @@ export default async function EstimatePage({
         variations={variations}
         measurements={measurements}
         canEditMasters={canEditMasters}
+        uoms={uoms}
       />
       {view.takeoffRows.length > 0 && (
         <EstimateMaterials estimate={estimate} view={view} variations={variations} />

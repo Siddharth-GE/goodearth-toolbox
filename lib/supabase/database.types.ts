@@ -4956,10 +4956,12 @@ export type Database = {
       }
       estimator_estimate_lines: {
         Row: {
+          copied_from: string | null
           created_at: string
           created_by: string | null
           estimate_id: string
           id: string
+          label: string | null
           labour_rate: number | null
           note: string | null
           qty: number | null
@@ -4968,10 +4970,12 @@ export type Database = {
           work_item_id: string
         }
         Insert: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           estimate_id: string
           id?: string
+          label?: string | null
           labour_rate?: number | null
           note?: string | null
           qty?: number | null
@@ -4980,10 +4984,12 @@ export type Database = {
           work_item_id: string
         }
         Update: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           estimate_id?: string
           id?: string
+          label?: string | null
           labour_rate?: number | null
           note?: string | null
           qty?: number | null
