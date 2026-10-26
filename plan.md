@@ -384,11 +384,11 @@ Next free number on every remote branch is `0131` (`origin/staging` and `origin/
 
 # Native apps on iPhone and Android
 
-**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2, A4, B and D's camera are on staging (#112, #113, #115, #116); C (push) is built on `feature/native-apps`. **Next, unless the founder says otherwise: the iPhone (A3)**, once Apple's enrolment is through. Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\kaadal-toolbox\toolbox-native`, beside the main folder), brought level with `staging` first; each piece ends in a pull request, merged only on the founder's word. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2, A4, B, C (push) and D's camera are on staging (#112–#117), and the Android app is **live on Google Play** since 2026-10-26 (`android/PLAN.md`). **Next, unless the founder says otherwise: the iPhone (A3)**, once Apple's enrolment is through. Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\kaadal-toolbox\toolbox-native`, beside the main folder), brought level with `staging` first; each piece ends in a pull request, merged only on the founder's word. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
-Why this shape: every tool works on day one, a website fix still reaches both apps with no store release, and the native features are what Apple's "more than a website" rule (4.2) asks for. The Android version replaces the Play wrapper (`android/PLAN.md`) as an ordinary update: same package, same upload key. Version 1 of the wrapper ships first, so staff have an app meanwhile.
+Why this shape: every tool works on day one, a website fix still reaches both apps with no store release, and the native features are what Apple's "more than a website" rule (4.2) asks for.
 
 ## The risks, said once
 
@@ -400,7 +400,6 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 ## Founder first
 
 - [ ] [Founder] Apple Developer Program as an **Organization** (in progress), then App Store Connect: create the app `com.kaadalgroup.toolbox`, and an **App Store Connect API key** (Users and Access → Integrations) for the build machine.
-- [ ] [Founder] Send version 1 of the Android wrapper to Play (`android/PLAN.md`), so staff are not waiting on this.
 - [x] [Founder] A **Firebase** project (free) for Android push: `kaadal-toolbox`, under `admin@kaadal.co.in`, done 2026-10-20; its two files are in `android-signing` (`android/PLAN.md`).
 - [ ] [Founder] An **APNs key** (.p8) from the Apple account for iPhone push.
 - [ ] [Founder] An iPhone with **TestFlight** and an Android phone, for trying each phase.
@@ -449,7 +448,8 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 ## E. The stores
 
 - [ ] [Opus] Draft the App Store listing, privacy labels and review notes (the reviewer Gmail with Google sign-in, the 4.8 exemption, the native features to try); screenshots from TestFlight.
-- [ ] [Founder] Submit to the App Store; send the Android update to Play.
+- [x] [Founder] Android: live on Google Play, 2026-10-26 (`android/PLAN.md`).
+- [ ] [Founder] Submit to the App Store.
 - [ ] [Fable] Approval pass over the full diff before each merge, as `MODELS.md` says.
 
 # The refactor before production — done

@@ -18,10 +18,9 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. On staging, a tool the founder makes `scoped` (Client Relations) shows each person only their own rows, and admins and its team leads everything (`0122`, `is_lead()`). Every read asks for the emailed code, not just the password, and the public key can call nothing (`0129`).
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
-- **Phone app** (`mobile/PLAN.md`, Android): today's screens, Google and fingerprint sign-in, the camera on picture uploads, and push notifications (staging, `0130`) for an approved indent, a baton reaching its holder, and a design stage handed over.
+- **Phone app** (`mobile/PLAN.md`): the Android app is **live on Google Play** since 2026-10-26, version 2.3.0 (`android/PLAN.md`); the iPhone is next. Today's screens, Google and fingerprint sign-in, the camera on picture uploads, and push notifications (staging, `0130`) for an approved indent, a baton reaching its holder, and a design stage handed over.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
 - **Look:** the Kaadal look (on staging), rules in `DESIGN.md`.
-- **Phone app** (staging): `mobile/`, a Capacitor 8 Android app around `toolbox.kaadalgroup.com`, with prints opened in the phone's viewer and Google sign-in through a Chrome tab; version 2.0.0 is built and side-loaded, not yet on Play (`mobile/PLAN.md`). The simpler Play wrapper, version 1, waits for the founder's upload (`android/PLAN.md`).
 
 ## Tools
 

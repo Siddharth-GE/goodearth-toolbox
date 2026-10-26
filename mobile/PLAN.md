@@ -1,6 +1,6 @@
 # The phone app
 
-Kaadal Toolbox for Android (and later iPhone), `com.kaadalgroup.toolbox`: a **Capacitor 8** shell that opens `https://toolbox.kaadalgroup.com` in the app's own web view. Every screen is the website's, so **a website deploy reaches the app at once**; a new store version is needed only for the shell itself (name, icon, native features, Android target). It replaces the Play wrapper (`android/PLAN.md`) as an ordinary update: same package, same upload key, version code 2 on.
+Kaadal Toolbox for Android (and later iPhone), `com.kaadalgroup.toolbox`: a **Capacitor 8** shell that opens `https://toolbox.kaadalgroup.com` in the app's own web view. Every screen is the website's, so **a website deploy reaches the app at once**; a new store version is needed only for the shell itself (name, icon, native features, Android target). It is the app on Google Play; the Play side is `android/PLAN.md`.
 
 ## How it works
 
