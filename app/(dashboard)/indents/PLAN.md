@@ -32,6 +32,7 @@ Founder, 2026-10-11: an indent may be made direct, but it is "the first thing re
 - **Submit needs a reason on each** ("Why is it needed?", saved with the line, `off_estimate_reason`); **approve needs the estimator's yes on each** (`estimator_decision`). Both are in `indents_guard`; `estimatorHold` / `approvalBlocker` mirror them for the page, which locks Approve and says why. Send back stays open: a refusal is the approver's cue to return it.
 - **The estimator answers in Estimator → Site check** through `decide_indent_line()` (the cross-tool write in `SECURITY.md`), only while the indent is submitted, and may change its answer until the indent moves. In a draft the answer can only be emptied — and a change to the line's item, quantity, unit or reason empties it, so an answer never outlives its question. A note edit keeps it.
 - **The reason and the answer are on the line, the page and the print.**
+- **A stage indent's yes covers the item on every active work of that stage** (`0158`): the estimator's reconciliation keys on a work, and the site draws the item against one of them.
 - **Rows from before `0113` are not rewritten.** An already-submitted indent with direct lines waits for the estimator like any other; an approved one is untouched.
 
 ## Revision safety — the double-buy bug
@@ -48,4 +49,5 @@ Every issued revision of a unit's design gets its own budget, and **`line_key` i
 - **Drift reads must throw, not fall through** — every lookup feeding `classifyDesignDrift` returns good news when empty.
 - **It reads other tools' tables directly, never their query modules** (the STATUS.md contract row).
 - **Line pulls insert row by row, deliberately** (settled 2026-08-17) — `addDirectLines`, `addBudgetPullLines`, `addEstimatePullLines` and Purchase Orders' `addPoolLines`. The quantity guard refuses per line with that item's own figure; a batch would discard nine good lines for one bad one. Each reports partial success honestly ("Added 3, then stopped: …"). If atomicity is ever needed, the shape is one database function returning a per-row summary.
+- **A stage indent reads as its stage everywhere an older one reads as its work** — the PO picker, a PO line's and a delivery line's "bought for", the print and the Estimator's site check; Budget against actual files its purchases under the whole stage (`villa_cost_facts.work_group_id`). Its pull shows the villa-wide "already requested", not a per-stage figure.
 - **Approvers are a named list** (`indent_approvers`) managed from Settings; admins always may; the tick doesn't grant the app.

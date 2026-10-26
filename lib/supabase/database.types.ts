@@ -6715,6 +6715,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "indents_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "indents_work_item_id_fkey"
             columns: ["work_item_id"]
             isOneToOne: false
@@ -9111,32 +9118,61 @@ export type Database = {
       site_category_owners: {
         Row: {
           category_id: string
-          id: string
           created_at: string
           created_by: string | null
+          id: string
           owner_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           category_id: string
-          id?: string
           created_at?: string
           created_by?: string | null
+          id?: string
           owner_id: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           category_id?: string
-          id?: string
           created_at?: string
           created_by?: string | null
+          id?: string
           owner_id?: string
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "site_category_owners_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "work_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_checklist_items: {
         Row: {
@@ -9673,6 +9709,13 @@ export type Database = {
             columns: ["follows_group_id"]
             isOneToOne: false
             referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -12561,6 +12604,7 @@ export type Database = {
           plot_id: string | null
           unit_id: string | null
           unpriced: boolean | null
+          work_group_id: string | null
           work_item_id: string | null
         }
         Relationships: []

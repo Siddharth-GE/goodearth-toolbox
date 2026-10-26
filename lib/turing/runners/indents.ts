@@ -200,6 +200,8 @@ export const INDENT_RUNNERS: Runners<Key> = {
     // Naming a stage drops an older indent's work, and naming a work drops the stage: never both.
     const stageGiven = "work_group_id" in v && Boolean(v.work_group_id);
     const workGiven = "work_item_id" in v && Boolean(v.work_item_id);
+    if (stageGiven && workGiven)
+      return { error: "An indent is for a stage or one work, not both." };
     return updateIndentHeader(String(v.indent_id), {
       workItemId: stageGiven ? null : given(v, "work_item_id", row.work_item_id) || null,
       workGroupId: workGiven ? null : given(v, "work_group_id", row.work_group_id) || null,

@@ -284,7 +284,7 @@ export async function getIndentApprovalsFor(
   if (error) fail("the approvers' names", error);
   const nameById = new Map((approvers ?? []).map((row) => [row.id, row.full_name]));
 
-  // A stage indent's yes covers the item on every work of that stage (0158).
+  // A stage indent's yes covers the item on every active work of that stage (0158): the site draws it against one of them.
   const stageIds = [
     ...new Set(indents.map((indent) => indent.work_group_id).filter((id) => id !== null)),
   ] as string[];
@@ -294,6 +294,7 @@ export async function getIndentApprovalsFor(
           .from("work_items")
           .select("id, group_id")
           .in("group_id", stageIds)
+          .eq("is_active", true)
           .order("id")
           .range(from, to),
       )

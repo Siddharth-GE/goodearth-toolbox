@@ -2,7 +2,12 @@ import "server-only";
 
 import { hasApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
-import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
+import {
+  listWorkCategories,
+  listWorkGroups,
+  listWorkItems,
+  workCategoryLabel,
+} from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
@@ -51,6 +56,7 @@ export async function getVillaBudget(unitId: string): Promise<VillaBudget | null
     facts,
     works,
     categories,
+    groups,
   ] = await Promise.all([
     supabase.from("plots").select("name").eq("id", unit.plot_id).maybeSingle(),
     supabase.from("projects").select("name").eq("id", unit.project_id).maybeSingle(),
@@ -68,7 +74,7 @@ export async function getVillaBudget(unitId: string): Promise<VillaBudget | null
     fetchAll((from, to) =>
       supabase
         .from("villa_cost_facts")
-        .select("work_item_id, kind, amount, unpriced")
+        .select("work_item_id, work_group_id, kind, amount, unpriced")
         .eq("unit_id", unitId)
         .order("work_item_id")
         .order("kind")
@@ -76,28 +82,44 @@ export async function getVillaBudget(unitId: string): Promise<VillaBudget | null
     ),
     listWorkItems(),
     listWorkCategories(),
+    listWorkGroups(),
   ]);
   if (plotError) fail("the villa's plot", plotError);
   if (projectError) fail("the villa's project", projectError);
   if (official.error) fail("the official estimate", official.error);
 
+  // A purchase for a stage indent (0158) names its stage, not a work: it shows as the whole stage, under its category.
   const report = budgetReport(
     facts.map((row) => ({
-      workItemId: row.work_item_id,
+      workItemId: row.work_item_id ?? (row.work_group_id ? `stage:${row.work_group_id}` : null),
       kind: row.kind ?? "",
       amount: row.amount ?? 0,
       unpriced: row.unpriced ?? false,
     })),
-    new Map(
-      works.map((work) => [
-        work.id,
-        {
-          label: `${work.code} — ${work.name}`,
-          categoryId: work.category_id,
-          sortOrder: work.sort_order,
-        },
-      ]),
-    ),
+    new Map([
+      ...works.map(
+        (work) =>
+          [
+            work.id,
+            {
+              label: `${work.code} — ${work.name}`,
+              categoryId: work.category_id,
+              sortOrder: work.sort_order,
+            },
+          ] as const,
+      ),
+      ...groups.map(
+        (group) =>
+          [
+            `stage:${group.id}`,
+            {
+              label: `${group.code} — ${group.name} (the whole stage)`,
+              categoryId: group.category_id,
+              sortOrder: Number.MAX_SAFE_INTEGER - 1,
+            },
+          ] as const,
+      ),
+    ]),
     new Map(
       categories.map((category) => [
         category.id,

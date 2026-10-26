@@ -487,7 +487,12 @@ export async function updateIndentHeader(
     .from("indents")
     .update({
       work_item_id: input.workItemId || null,
-      ...(input.workGroupId === undefined ? {} : { work_group_id: input.workGroupId || null }),
+      // A work given replaces a stage; a stage left out stays as it is.
+      ...(input.workGroupId === undefined
+        ? input.workItemId
+          ? { work_group_id: null }
+          : {}
+        : { work_group_id: input.workGroupId || null }),
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
       is_urgent: input.isUrgent,

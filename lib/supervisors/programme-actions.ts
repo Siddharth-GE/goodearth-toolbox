@@ -337,7 +337,6 @@ async function writeVilla(
   return undefined;
 }
 
-/** Who runs the villa — the board's Mine / Everyone. A filter, not a permission. */
 /** Who owns this stage on this villa (0158); empty goes back to the stage's category lead. */
 export async function setStageOwner(input: {
   plotId: string;
@@ -380,6 +379,7 @@ export async function setCategoryLead(input: {
   return undefined;
 }
 
+/** Who runs the villa — the board's Mine / Everyone. A filter, not a permission. */
 export async function setVillaSupervisor(input: {
   plotId: string;
   supervisorId: string;
