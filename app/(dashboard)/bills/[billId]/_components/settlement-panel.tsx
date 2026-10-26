@@ -28,7 +28,7 @@ export function SettlementPanel({
   const router = useRouter();
   // An advance still out with this contractor is suggested first, oldest first, up to what the bill owes;
   // a person presses Recover it, or Cancel to pay in full instead.
-  const suggested = advances[0] ? Math.min(pending, advances[0].outstanding) : 0;
+  const suggested = advances[0]?.same_company ? Math.min(pending, advances[0].outstanding) : 0;
   const [mode, setMode] = useState<"pay" | "recover" | null>(suggested > 0 ? "recover" : null);
   const [amount, setAmount] = useState(String(suggested > 0 ? suggested : pending));
   const [paidOn, setPaidOn] = useState(today);
@@ -110,6 +110,9 @@ export function SettlementPanel({
           {`This contractor still holds ${formatMoney(
             advances.reduce((sum, candidate) => sum + candidate.outstanding, 0),
           )} of advances. Take it off this bill before paying the rest, or Cancel to pay the bill in full.`}
+          {advance &&
+            !advance.same_company &&
+            " This advance was given in another company's project."}
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-4">

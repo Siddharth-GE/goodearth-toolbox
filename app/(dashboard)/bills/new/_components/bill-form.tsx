@@ -51,7 +51,7 @@ export function BillForm({
     poLines?: PoLineForBill[];
     workLines?: WorkOrderLineForBill[];
     /** This PO's deliveries, each with the supplier invoice it carried (0132) and what it brought. */
-    deliveries: DeliveryForBill[];
+    deliveries: (DeliveryForBill & { open: boolean })[];
     /** The delivery this bill is for, or "" for everything received and not yet billed. */
     deliveryId: string;
   };
@@ -64,7 +64,7 @@ export function BillForm({
   const [projectId, setProjectId] = useState("");
   const [scope, setScope] = useState("");
   // The picked delivery's invoice fills itself in; with none picked, so does the one unbilled invoice when there is only one.
-  const unbilled = prefill.deliveries.filter((delivery) => delivery.invoiceNo && !delivery.billed);
+  const unbilled = prefill.deliveries.filter((delivery) => delivery.invoiceNo && delivery.open);
   const fromDelivery =
     prefill.deliveries.find((delivery) => delivery.id === prefill.deliveryId) ??
     (unbilled.length === 1 ? unbilled[0] : null);
@@ -249,12 +249,16 @@ export function BillForm({
                 >
                   <option value="">Everything received and not yet billed</option>
                   {prefill.deliveries.map((delivery) => (
-                    <option key={delivery.id} value={delivery.id}>
+                    <option key={delivery.id} value={delivery.id} disabled={!delivery.open}>
                       {[
                         delivery.grn,
                         formatDate(delivery.receivedAt),
                         delivery.invoiceNo ? `invoice ${delivery.invoiceNo}` : "no invoice no.",
-                        delivery.billed ? "already billed" : null,
+                        delivery.billed
+                          ? "already billed"
+                          : !delivery.open
+                            ? "nothing left to bill"
+                            : null,
                       ]
                         .filter(Boolean)
                         .join(" · ")}

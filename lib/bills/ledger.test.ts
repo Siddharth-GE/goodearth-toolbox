@@ -107,3 +107,18 @@ test("a contractor's ledger: bills add, payments and advances take away, a recov
     ],
   );
 });
+
+test("filtered to one project, a recovery across projects pays the bill or brings the advance back", () => {
+  // ₹10k advanced on project A, recovered on a ₹15k bill on project B, ₹5k paid.
+  const onB = contractorLedger([
+    { id: "b", kind: "bill", on: "2026-10-05", amount: 15000 },
+    { id: "r", kind: "recovery", on: "2026-10-06", amount: 10000, crossing: "pays" },
+    { id: "p", kind: "payment", on: "2026-10-07", amount: 5000 },
+  ]);
+  assert.equal(onB.at(-1)?.balance, 0);
+  const onA = contractorLedger([
+    { id: "a", kind: "advance", on: "2026-10-01", amount: 10000 },
+    { id: "r", kind: "recovery", on: "2026-10-06", amount: 10000, crossing: "returns" },
+  ]);
+  assert.equal(onA.at(-1)?.balance, 0);
+});

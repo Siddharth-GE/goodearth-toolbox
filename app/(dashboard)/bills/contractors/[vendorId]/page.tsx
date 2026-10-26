@@ -143,7 +143,11 @@ export default async function ContractorLedgerPage({
                   )}
                   {row.kind === "recovery" && (
                     <span className="text-muted block text-xs">
-                      {formatMoney(row.amount)} of an advance, so the balance does not move
+                      {row.crossing === "pays"
+                        ? `${formatMoney(row.amount)} settled from an advance shown elsewhere`
+                        : row.crossing === "returns"
+                          ? `${formatMoney(row.amount)} of this advance used up elsewhere`
+                          : `${formatMoney(row.amount)} of an advance, so the balance does not move`}
                     </span>
                   )}
                 </TableCell>
@@ -152,7 +156,11 @@ export default async function ContractorLedgerPage({
                   {row.kind === "bill" ? formatMoney(row.amount) : ""}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {row.kind === "payment" || row.kind === "advance" ? formatMoney(row.amount) : ""}
+                  {row.kind === "payment" || row.kind === "advance" || row.crossing === "pays"
+                    ? formatMoney(row.amount)
+                    : row.crossing === "returns"
+                      ? formatMoney(-row.amount)
+                      : ""}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {formatMoney(row.balance)}
