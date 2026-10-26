@@ -1,3 +1,110 @@
+# The team's additions (asked 2026-10-26) `[Opus plans, builds and independently reviews]`
+
+**The ask:** the team's list across the Estimator, Supervisors, Indents, Bills and Inventory, plus "a person must always know what is sitting on their plate". **Settled with the founder, 2026-10-26:**
+
+- several rows of one work on an estimate, each with its own name, mix, materials and labour;
+- a stage's owner comes from its work category's lead, and can be changed on one villa;
+- an advance is suggested against each bill, and a person confirms it;
+- extra material from site means a return from a villa to a store;
+- an indent picks a stage instead of a work;
+- a labour bill with no work order is a miscellaneous one;
+- Additional or Rework labour takes a typed name instead of a Masters work;
+- "My plate" is a page plus a bell, with no new pushes.
+
+**Six pull requests, in this order**, each merged to `staging` and vetted there before the next. Migrations take the next free number across every branch, and each one gets an independent Opus review before `db:apply`.
+
+## A. Quick wins — Estimator mixes and rate book, labour in halves, search, miscellaneous labour bills
+
+- [ ] **Duplicate a mix:** a Duplicate button on the mix page copies its materials under "<name> (copy)" and opens the copy.
+- [ ] **The rate book moves onto `ListToolbar`:**
+  - search also finds a work by a material or mix inside it;
+  - filters by category, and by Not set up / Used but not priced / Priced.
+- [ ] **Labour in decimals:** a migration turns `labour_logs.masons/helpers/others` into numeric (two places, ≥ 0); the count fields, `lib/supervisors/labour.ts`, its test and Turing's fields follow. Views and functions that read the columns are found and kept.
+- [ ] **Search and filters — the audit's call.** Add search or filters where an operations list has none:
+  - Receive's PO finder gains vendor and villa;
+  - Bills: Labour, Contractors, Contracts and Cash requests;
+  - the Estimator's Estimates;
+  - Client Relations' Dues.
+
+  Masters' own search forms work, so they stay.
+
+- [ ] **Miscellaneous labour:** New bill offers "Miscellaneous labour — no work order", with a contractor and free lines. It is today's no-anchor bill, so no migration.
+
+## B. Bills and contractors — migration (money: reviewed before apply)
+
+- [ ] **Contractor number:** `vendors.contractor_no` (CON/001…) is given automatically when a vendor is marked a contractor, and existing contractors are backfilled in name order. It shows in Masters, on bills, on work orders and on the ledger.
+- [ ] **Each contractor's bill count:** `bills.vendor_seq` is set by the database when a bill is made, and existing bills are backfilled by date. Shown as "Bill 4 to this contractor" on the bill and its print.
+- [ ] **The contractor's ledger:** Bills → Contractors → one contractor. It lists advances, bills (with their count), recoveries and payments by date, with a running balance, and filters by project and company. The summary lists contractors only and gains company and search.
+- [ ] **Advances suggested:**
+  - an approved bill's settlement panel opens with the recovery filled in: the outstanding advance, oldest first, up to what the bill owes;
+  - adding a bill to a cash request shows the advance and the net;
+  - a person always confirms. No schema change.
+- [ ] **Additional work and Rework by name:**
+  - new column `labour_logs.custom_name`;
+  - `work_item_id` may be empty only for Additional or Rework, and then a name is required (CHECK);
+  - the stage-start trigger skips a log with no work, and Send to Bill uses the name;
+  - every reader of `labour_logs.work_item_id` is checked for the empty case.
+- [ ] **A PO bill from a delivery:**
+  - pick the delivery, and its invoice number, date and not-yet-billed lines fill the bill (`bills.goods_receipt_id`);
+  - the database refuses billing a PO line beyond what was received, checked only when a line's quantity rises, so today's bills stand.
+
+## C. The Estimator — several rows per work — migration
+
+- [ ] Drop `unique (estimate_id, work_item_id)` on estimate lines and add a row `label`. Adding a work already on the estimate adds another row, and **Duplicate row** copies a row with its quantity, measurements, materials and labour.
+- [ ] A work not set up in the rate book can be priced on the row: the row asks for the work's unit (saved for the work) and a labour rate, then takes a mix or materials of its own.
+- [ ] Re-key by line instead of by work:
+  - `estimate-view.ts`, `getEstimateVariations`, `applyEstimateOverrides`;
+  - Make official: line costs per line, takeoff still one row per work and item;
+  - the copy functions, and the SketchUp import (it fills a work's first unlabelled row);
+  - `estimate_work_facts` sums per work (its manifest row changes).
+
+  Indents, Inventory and Supervisors keep reading the same shapes.
+
+## D. Stage owners, and indents by stage — migration
+
+- [ ] **Stage owners:**
+  - `site_category_owners` (work category → person) is set on Supervisors → Sequence;
+  - `site_stages.owner_id` overrides it on one villa's stage;
+  - a stage's owner is the override, else the category's lead;
+  - the villa page, board and look ahead show the owner, and Mine includes stages I own.
+- [ ] **Indents by stage:**
+  - the indent records a stage (`indents.work_group_id`), and its pull offers every work's materials in that stage;
+  - each line records the work it came from (`indent_lines.work_item_id`), backfilled from the indent's work;
+  - the Estimator's approvals key on the line's work;
+  - old indents keep their work, and Turing's indent entries take the stage.
+
+## E. My plate — the shell, likely no migration
+
+- [ ] A **My plate** page and a bell with a count in the sidebar. They read through `lib/overview/`, the shell's sanctioned reader of other tools' queries, with each read wrapped so one tool's failure shows as a note.
+- [ ] **Level 1, tools you hold** (work nobody owns):
+  - indents waiting your approval;
+  - lines waiting the estimator;
+  - approved indents with no PO;
+  - POs awaiting delivery;
+  - site requests;
+  - bills waiting your approval;
+  - approved bills unpaid;
+  - a cash request to release;
+  - item requests.
+- [ ] **Level 2, what is yours:**
+  - stages you own or on villas you run: starting within 7 days, due, late;
+  - design steps you are on, and design actions you own;
+  - Client Relations actions you own;
+  - Relay batons you hold;
+  - your indents sent back.
+- [ ] Each line opens the screen where it is done. Lean: counts and names, never rupees.
+
+## F. Return from a villa to a store — migration (reviewed before apply)
+
+- [ ] Inventory → **Return from site:** a villa, a store, items and quantities, and a reason.
+  - The villa's reached-site total goes down and the store's stock goes up.
+  - Never more than reached that villa.
+- [ ] **The rate:**
+  - returned material goes back into the batches it was issued from, newest issue first, so it keeps their rate;
+  - material that reached the villa straight from a PO delivery comes back as a batch at that delivery's rate.
+
+  `stock_by_location` and `batch_on_hand` follow (manifest rows).
+
 # Turing, the admins' assistant `[Opus drafted; Fable's review of T1 waived by the founder, 2026-10-24]`
 
 **The founder's ask** (2026-10-24): "a Claude inside, working with us in the toolbox" — admin-only, general purpose: talk about anything, drop in files, read every tool, build interactive docs and dashboards, and fill data across **every operation**. Settled with them the same day:
