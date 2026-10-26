@@ -49,7 +49,7 @@ export const CASH_REQUESTS = defineEntries([
     fields: [
       request,
       { key: "bill_id", label: "Bill", kind: "id", table: "bills" },
-      { key: "amount", label: "Asked for (₹)", kind: "amount" },
+      { key: "amount", label: "Asked for (₹)", kind: "amount", paise: true },
     ],
   },
   {
@@ -70,7 +70,7 @@ export const CASH_REQUESTS = defineEntries([
         table: "labour_contracts",
         optional: true,
       },
-      { key: "amount", label: "Asked for (₹)", kind: "amount" },
+      { key: "amount", label: "Asked for (₹)", kind: "amount", paise: true },
       { key: "note", label: "Note", kind: "text", optional: true },
     ],
   },
@@ -80,6 +80,11 @@ export const CASH_REQUESTS = defineEntries([
     title: "A cash request line's amount",
     description:
       "On a draft request, what a line asks for (above zero). On a submitted one, what is released for it (zero to what was asked): the approver's cut.",
+    // A release may be cut to zero, so this is not a paise field; the two decimals are held here.
+    check: (values) =>
+      /^\d+(\.\d{1,2})?$/.test(String(values.amount))
+        ? undefined
+        : "The amount is rupees to the paise, like 25000.50.",
     fields: [line, { key: "amount", label: "Amount (₹)", kind: "amount" }],
   },
   {
@@ -145,7 +150,7 @@ export const CASH_REQUESTS = defineEntries([
     adds: true,
     fields: [
       line,
-      { key: "amount", label: "Amount (₹)", kind: "amount" },
+      { key: "amount", label: "Amount (₹)", kind: "amount", paise: true },
       { key: "paid_on", label: "Paid on", kind: "date" },
       { key: "reference", label: "UTR / cheque / UPI ref", kind: "text", max: 120 },
     ],

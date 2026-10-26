@@ -18,6 +18,7 @@ import { INVENTORY } from "./entries/inventory";
 import { PURCHASE_ORDERS } from "./entries/purchase-orders";
 import { MASTERS } from "./entries/masters";
 import { MONEY } from "./entries/money";
+import { CASH_REQUESTS } from "./entries/cash-requests";
 import { RELAY } from "./entries/relay";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
@@ -291,6 +292,7 @@ export const ENTRIES = [
   ...DIRECTORY,
   ...SUPERVISORS_SITE,
   ...MONEY,
+  ...CASH_REQUESTS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 

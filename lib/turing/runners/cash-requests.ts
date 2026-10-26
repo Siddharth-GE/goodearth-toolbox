@@ -15,10 +15,12 @@ import {
   setCashRequestNote,
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
+import { formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { leftToPay, STEPS, type CASH_REQUESTS } from "../entries/cash-requests";
-import { failed, recordNow, saving, type Runners } from "./kit";
+import { idFrom } from "../redirects";
+import { failed, recordNow, retired, saving, type Runners } from "./kit";
 import { referenceTaken } from "./money";
 
 type Failure = { error: string };
@@ -37,11 +39,13 @@ const DONE: Record<keyof typeof STEPS, string> = {
   close: "closed",
 };
 
+const REQUESTS = "/bills/cash-requests/";
+
 async function requestNow(requestId: string) {
   return recordNow(
     "cash_requests",
     { column: "id", id: requestId },
-    ["status", "note"],
+    ["status", "note", "week_of"],
     "That cash request is gone.",
   );
 }
@@ -81,7 +85,7 @@ async function lineNow(itemId: string) {
 }
 
 /** What a bill still has pending: its total less every payment and recovery, reversals included. */
-async function pendingOf(billId: string): Promise<{ pending: number } | Failure> {
+async function pendingOf(billId: string): Promise<{ status: string; pending: number } | Failure> {
   const supabase = await createClient();
   const [bill, payments, recoveries] = await Promise.all([
     supabase.from("bills").select("status, total_amount").eq("id", billId).maybeSingle(),
@@ -92,13 +96,14 @@ async function pendingOf(billId: string): Promise<{ pending: number } | Failure>
   if (payments.error) return failed("payments", payments.error);
   if (recoveries.error) return failed("recoveries", recoveries.error);
   if (!bill.data) return { error: "That bill is gone." };
-  if (bill.data.status !== "approved")
-    return { error: "Only an approved bill goes on a cash request." };
   const settled = [...(payments.data ?? []), ...(recoveries.data ?? [])].reduce(
     (sum, row) => sum + Number(row.amount),
     0,
   );
-  return { pending: Math.round((Number(bill.data.total_amount) - settled) * 100) / 100 };
+  return {
+    status: bill.data.status,
+    pending: Math.round((Number(bill.data.total_amount) - settled) * 100) / 100,
+  };
 }
 
 /** What is paid against a line already: its payments or advances, reversals included. */
@@ -121,8 +126,13 @@ async function paidOn(itemId: string): Promise<{ paid: number } | Failure> {
 /** Each cash request entry, run through Bills' own action, as the admin. */
 export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]> = {
   cash_request_new: async (v) => {
-    const done = await saving(() => createCashRequest(String(v.week_of)), "/bills/cash-requests/");
-    return "error" in done ? done : undefined;
+    const done = await saving(() => createCashRequest(String(v.week_of)), REQUESTS);
+    if ("error" in done) return done;
+    const id = idFrom(done.path, REQUESTS);
+    const made = id ? await requestNow(id) : null;
+    return made && "row" in made
+      ? { saved: `the request for the week of ${formatDate(String(made.row.week_of))}` }
+      : undefined;
   },
   cash_request_bill: async (v) => {
     const refused = await draft(String(v.request_id));
@@ -130,13 +140,17 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
     // The board lists only approved bills with something pending.
     const bill = await pendingOf(String(v.bill_id));
     if ("error" in bill) return bill;
+    if (bill.status !== "approved")
+      return { error: "Only an approved bill goes on a cash request." };
     if (bill.pending <= 0) return { error: "That bill has nothing pending." };
     return addBillsToCashRequest(String(v.request_id), [
       { billId: String(v.bill_id), amount: Number(v.amount) },
     ]);
   },
   cash_request_advance: async (v) => {
-    const refused = await draft(String(v.request_id));
+    // The board offers active vendors only.
+    const refused =
+      (await draft(String(v.request_id))) ?? (await retired("vendors", String(v.vendor_id)));
     if (refused) return refused;
     if (v.work_order_id) {
       // The board offers only that vendor's approved work orders on that project.
@@ -171,6 +185,10 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
     if (now.status === "submitted") {
       const released = Number(now.line.released_amount ?? now.line.requested_amount);
       if (amount === released) return { error: "That line is already released at that." };
+      if (amount > Number(now.line.requested_amount))
+        return {
+          error: `Release no more than was asked for (₹${Number(now.line.requested_amount).toFixed(2)}).`,
+        };
       return setCashRequestAmount(String(v.item_id), { released: amount });
     }
     return {
@@ -233,6 +251,17 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
     const reference = String(v.reference);
     if (now.line.item_kind === "bill") {
       const billId = String(now.line.bill_id);
+      // The board pays a bill at most what it still has pending, as well as the line's cap.
+      const bill = await pendingOf(billId);
+      if ("error" in bill) return bill;
+      if (bill.status === "paid") return { error: "That bill is paid in full." };
+      if (bill.status !== "approved")
+        return { error: "Money goes out only against an approved bill." };
+      if (bill.pending <= 0) return { error: "That bill has nothing pending; it is settled." };
+      if (amount > bill.pending + 0.005)
+        return {
+          error: `That is more than the bill has pending (₹${bill.pending.toFixed(2)} left).`,
+        };
       const taken = await referenceTaken(billId, reference);
       if (taken) return taken;
       return recordBillPayment(billId, {
