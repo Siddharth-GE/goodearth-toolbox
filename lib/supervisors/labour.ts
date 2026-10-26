@@ -17,6 +17,16 @@ export function isLabourKind(value: string): value is LabourKind {
 const COUNT_LIMIT = 999;
 const DESCRIPTION_LIMIT = 500;
 
+/** Half and quarter days count: two decimals at most, as labour_logs holds them (0155). */
+function isCount(value: number): boolean {
+  return (
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= COUNT_LIMIT &&
+    Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
+  );
+}
+
 export type LabourShapeInput = {
   kind: string;
   masons: number;
@@ -46,9 +56,9 @@ export function labourShape(input: LabourShapeInput): LabourShape | { error: str
       ["helpers", input.helpers],
       ["others", input.others],
     ] as const) {
-      if (!Number.isInteger(value) || value < 0 || value > COUNT_LIMIT) {
+      if (!isCount(value)) {
         return {
-          error: `The ${label} count must be a whole number between 0 and ${COUNT_LIMIT}.`,
+          error: `The ${label} count must be between 0 and ${COUNT_LIMIT}, to two decimals — 0.5 for half a day.`,
         };
       }
     }

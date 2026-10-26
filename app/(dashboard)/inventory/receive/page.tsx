@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatDate } from "@/lib/format";
 import { getInventoryFilterOptions } from "@/lib/inventory/queries";
-import { listGoodsReceipts, listReceivablePos } from "@/lib/inventory/receipts-queries";
+import {
+  listGoodsReceipts,
+  listReceivablePos,
+  listReceivableVendors,
+} from "@/lib/inventory/receipts-queries";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { PackageCheck } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +39,8 @@ export default async function InventoryPage({
     to?: string;
     poq?: string;
     poproject?: string;
+    povendor?: string;
+    poplot?: string;
   }>;
 }) {
   const raw = await searchParams;
@@ -47,20 +53,34 @@ export default async function InventoryPage({
   const to = dateParam(raw.to);
   const poq = searchParam(raw.poq);
   const poProject = idParam(raw.poproject);
+  const poVendor = idParam(raw.povendor);
+  const poPlot = idParam(raw.poplot);
+  const poFiltered = Boolean(poq || poProject || poVendor || poPlot);
 
-  const [{ orders, total, page: currentPage, pageCount, pageSize }, deliveries, filterOptions] =
-    await Promise.all([
-      listReceivablePos({ page: awaitingPage, q: poq, projectId: poProject }),
-      listGoodsReceipts({
-        page: deliveriesPage,
-        projectId: project,
-        storeId: store,
-        q,
-        from,
-        to,
-      }),
-      getInventoryFilterOptions(),
-    ]);
+  const [
+    { orders, total, page: currentPage, pageCount, pageSize },
+    deliveries,
+    filterOptions,
+    poVendors,
+  ] = await Promise.all([
+    listReceivablePos({
+      page: awaitingPage,
+      q: poq,
+      projectId: poProject,
+      vendorId: poVendor,
+      plotId: poPlot,
+    }),
+    listGoodsReceipts({
+      page: deliveriesPage,
+      projectId: project,
+      storeId: store,
+      q,
+      from,
+      to,
+    }),
+    getInventoryFilterOptions(),
+    listReceivableVendors(),
+  ]);
   const { receipts } = deliveries;
 
   const filtered = Boolean(project || store || q || from || to);
@@ -77,6 +97,8 @@ export default async function InventoryPage({
     if (to) params.set("to", to);
     if (poq) params.set("poq", poq);
     if (poProject) params.set("poproject", poProject);
+    if (poVendor) params.set("povendor", poVendor);
+    if (poPlot) params.set("poplot", poPlot);
     const query = params.toString();
     return query ? `/inventory/receive?${query}` : "/inventory/receive";
   };
@@ -96,7 +118,7 @@ export default async function InventoryPage({
           Awaiting delivery
         </h2>
 
-        {(total > 0 || poq || poProject) && (
+        {(total > 0 || poFiltered) && (
           <form action="/inventory/receive" className="flex flex-wrap items-end gap-2">
             {/* The deliveries list's filters ride along, as its toolbar keeps these. */}
             {Object.entries({ q, from, to, project, store }).map(([name, value]) =>
@@ -124,10 +146,32 @@ export default async function InventoryPage({
                 ))}
               </Select>
             </div>
+            <div className="w-full space-y-1.5 sm:w-48">
+              <Label htmlFor="povendor">Vendor</Label>
+              <Select id="povendor" name="povendor" defaultValue={poVendor ?? ""}>
+                <option value="">All vendors</option>
+                {poVendors.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="w-full space-y-1.5 sm:w-48">
+              <Label htmlFor="poplot">Villa</Label>
+              <Select id="poplot" name="poplot" defaultValue={poPlot ?? ""}>
+                <option value="">Any villa or general</option>
+                {filterOptions.plots.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button type="submit" variant="secondary">
               Find
             </Button>
-            {(poq || poProject) && (
+            {poFiltered && (
               <LinkButton href="/inventory/receive" variant="ghost">
                 Clear
               </LinkButton>
@@ -136,7 +180,7 @@ export default async function InventoryPage({
         )}
 
         {orders.length === 0 ? (
-          poq || poProject ? (
+          poFiltered ? (
             <EmptyState
               icon={PackageCheck}
               title="No purchase order matches"
@@ -218,6 +262,8 @@ export default async function InventoryPage({
               page: awaitingPage > 1 ? String(awaitingPage) : undefined,
               poq,
               poproject: poProject,
+              povendor: poVendor,
+              poplot: poPlot,
             }}
             search={{ placeholder: "Delivery note or challan no.…" }}
             dates={{ label: "Received" }}

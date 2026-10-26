@@ -76,7 +76,15 @@ export async function listReceivablePos({
   page = 1,
   q,
   projectId,
-}: { page?: number; q?: string; projectId?: string } = {}): Promise<ReceivablePoPage> {
+  vendorId,
+  plotId,
+}: {
+  page?: number;
+  q?: string;
+  projectId?: string;
+  vendorId?: string;
+  plotId?: string;
+} = {}): Promise<ReceivablePoPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
@@ -105,6 +113,8 @@ export async function listReceivablePos({
     })
     .eq("status", "issued");
   if (projectId) query = query.eq("project_id", projectId);
+  if (vendorId) query = query.eq("vendor_id", vendorId);
+  if (plotId) query = query.eq("plot_id", plotId);
   if (q) {
     const clauses = [`reference.ilike.*${q}*`];
     if (vendorIds.length) clauses.push(`vendor_id.in.(${vendorIds.join(",")})`);
@@ -181,6 +191,28 @@ export async function listReceivablePos({
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
   };
+}
+
+/** The vendors with a PO still awaiting delivery, A–Z: the Receive finder offers only these. */
+export async function listReceivableVendors(): Promise<{ id: string; name: string }[]> {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+  const rows = await fetchAll<{ vendor_id: string | null }>((from, to) =>
+    supabase
+      .from("po_facts")
+      .select("vendor_id")
+      .eq("status", "issued")
+      .order("id")
+      .range(from, to),
+  );
+  const names = await labelsById(
+    supabase,
+    "vendors",
+    rows.map((row) => row.vendor_id),
+  );
+  return [...names]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function receivedProgressForPos(

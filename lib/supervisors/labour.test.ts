@@ -29,7 +29,12 @@ test("daily wages keep the heads and clear the piece-work fields", () => {
     (labourShape(input({ masons: 0, helpers: 0 })) as { error: string }).error,
     /at least one worker/,
   );
-  assert.match((labourShape(input({ masons: 1.5 })) as { error: string }).error, /whole number/);
+  assert.equal(
+    (labourShape(input({ masons: 1.5, helpers: 0.25 })) as { masons: number }).masons,
+    1.5,
+  );
+  assert.match((labourShape(input({ masons: 0.125 })) as { error: string }).error, /two decimals/);
+  assert.match((labourShape(input({ masons: -0.5 })) as { error: string }).error, /between 0/);
 });
 
 test("piece-work by quantity takes the work's unit and needs a quantity", () => {

@@ -58,10 +58,10 @@ function CountField({
         id={name}
         name={name}
         type="number"
-        inputMode="numeric"
+        inputMode="decimal"
         min={0}
         max={999}
-        step={1}
+        step="any"
         defaultValue={defaultValue ?? 0}
       />
     </div>
