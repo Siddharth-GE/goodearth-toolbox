@@ -258,6 +258,15 @@ export function EstimateWorks({
                                   uom: uomByWork.get(other.workItemId) ?? null,
                                 }))}
                             />
+                            {cost.isSetUp && (
+                              <LineRateDialog
+                                estimateId={estimate.id}
+                                view={rateViewFor(line, uom)}
+                                options={rateOptions}
+                                canEditMasters={canEditMasters}
+                                trigger="button"
+                              />
+                            )}
                             <DuplicateLineButton id={line.id} label={rowName(line)} />
                             <RemoveLineButton id={line.id} label={rowName(line)} />
                           </div>
