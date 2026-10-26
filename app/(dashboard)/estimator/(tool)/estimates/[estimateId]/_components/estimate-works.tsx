@@ -189,24 +189,45 @@ export function EstimateWorks({
                           />
                         ) : frozenLineById.has(line.id) ? (
                           (() => {
-                            // A work with several rows froze its materials per work, not per row: show labour and the rate.
+                            // A work with several rows froze its materials per work, not per row: the row shows its own
+                            // material cost as one line, so labour and materials still add up to the rate.
+                            const frozenLine = frozenLineById.get(line.id)!;
                             const frozen = frozenRateBuildUp(
-                              frozenLineById.get(line.id)!,
+                              frozenLine,
                               severalRows ? [] : (estimate.frozen?.takeoff ?? []),
                             );
+                            const materialsPerUnit =
+                              frozenLine.materialCost === null || frozenLine.qty === 0
+                                ? null
+                                : frozenLine.materialCost / frozenLine.qty;
                             return (
                               <FrozenRateDialog
                                 workName={rowName(line)}
                                 workUom={uom}
                                 labourRate={frozen.labourRate}
                                 rate={frozen.rate}
-                                prices={frozen.materials.map((row) => ({
-                                  name: frozenNameById.get(row.materialId)?.name ?? "Material",
-                                  uom: frozenNameById.get(row.materialId)?.uom ?? "",
-                                  qtyPerUnit: row.qtyPerUnit,
-                                  price: row.price,
-                                  cost: row.cost,
-                                }))}
+                                prices={
+                                  severalRows
+                                    ? materialsPerUnit
+                                      ? [
+                                          {
+                                            name: "Materials (kept for the whole work)",
+                                            uom: uom ?? "",
+                                            qtyPerUnit: 1,
+                                            price: materialsPerUnit,
+                                            cost: materialsPerUnit,
+                                          },
+                                        ]
+                                      : []
+                                    : frozen.materials.map((row) => ({
+                                        name:
+                                          frozenNameById.get(row.materialId)?.name ?? "Material",
+                                        uom: frozenNameById.get(row.materialId)?.uom ?? "",
+                                        qtyPerUnit: row.qtyPerUnit,
+                                        price: row.price,
+                                        cost: row.cost,
+                                      }))
+                                }
                               />
                             );
                           })()

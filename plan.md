@@ -74,15 +74,28 @@ Settled while building: a delivery is picked on the form and nothing is stored o
 
 ## C. The Estimator — several rows per work — migration
 
-- [ ] Drop `unique (estimate_id, work_item_id)` on estimate lines and add a row `label`. Adding a work already on the estimate adds another row, and **Duplicate row** copies a row with its quantity, measurements, materials and labour.
-- [ ] A work not set up in the rate book can be priced on the row: the row asks for the work's unit (saved for the work) and a labour rate, then takes a mix or materials of its own.
-- [ ] Re-key by line instead of by work:
-  - `estimate-view.ts`, `getEstimateVariations`, `applyEstimateOverrides`;
-  - Make official: line costs per line, takeoff still one row per work and item;
-  - the copy functions, and the SketchUp import (it fills a work's first unlabelled row);
-  - `estimate_work_facts` sums per work (its manifest row changes).
+Built on `feature/team-additions-c`, `0157` drafted (trial `scripts/trials/estimate-rows.sql`, proven against two broken copies). The rules now live in the Estimator's `PLAN.md`.
 
-  Indents, Inventory and Supervisors keep reading the same shapes.
+The independent Opus review cleared `0157` for staging. Its findings are fixed:
+
+- Make official still works between the migration and the deploy;
+- the model stays on the row it measured;
+- copies keep a work's rows in order;
+- an official row shows its own materials line;
+- Turing names a row by its label;
+- the row's name box is full size on a phone.
+
+Settled while building: adding works still skips a work already on the estimate, and **Duplicate** makes the second row.
+
+- [x] Several rows per work, each named, with its own quantity, measurements, mix or materials and labour; **Duplicate**.
+- [x] **Set up here** for a work the rate book has not set up.
+- [x] Make official, the copies, the SketchUp import and `estimate_work_facts` follow rows. Indents, Inventory and Supervisors read the same shapes.
+- [ ] [Founder] Vet on staging:
+  - Estimator → a villa → add a carpentry work (Shutter) and press **Duplicate**. Name the rows "W1 1.2 × 1.5" and "W2 0.9 × 1.2".
+  - Tap W2's rate and give it its own mix and labour rate: W1 is unchanged.
+  - A work showing **Set up here**: give it a unit, then its rate opens.
+  - Make the estimate official: both rows show with their own totals.
+  - Indents → raise one for that villa: the shutter material is the two rows added up.
 
 ## D. Stage owners, and indents by stage — migration
 

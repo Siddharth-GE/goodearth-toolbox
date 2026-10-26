@@ -356,7 +356,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   const estLines = await readIn(list("estimator_estimate_lines"), (chunk) =>
     supabase
       .from("estimator_estimate_lines")
-      .select("id, estimate_id, work_item_id, qty")
+      .select("id, estimate_id, work_item_id, label, qty")
       .in("id", chunk),
   );
   for (const one of estLines) {
@@ -838,6 +838,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     names[one.id] = [
       names[one.estimate_id],
       names[one.work_item_id],
+      one.label,
       one.qty === null ? "to measure" : formatQuantity(one.qty),
     ]
       .filter(Boolean)

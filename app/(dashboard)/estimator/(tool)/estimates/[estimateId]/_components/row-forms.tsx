@@ -61,7 +61,7 @@ export function LineLabelField({ id, label }: { id: string; label: string | null
         placeholder="Name this row — W1 1.2 × 1.5"
         maxLength={120}
         disabled={pending}
-        className="h-8 max-w-xs text-xs"
+        className="max-w-xs"
       />
       <FormMessage error={error} size="xs" />
     </div>
