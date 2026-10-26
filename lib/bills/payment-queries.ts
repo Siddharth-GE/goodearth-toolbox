@@ -260,14 +260,33 @@ async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
   });
 }
 
-export type PayableBill = BillMoney;
+export type PayableBill = BillMoney & {
+  /** Advances the vendor still holds, across their projects, net of recoveries and reversals: worth recovering first. */
+  advance_out: number;
+};
 
 export async function listPayableBills(): Promise<PayableBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
-  return (await billsWithSettlement(supabase)).filter(
-    (bill) => bill.status === "approved" && bill.pending > 0,
-  );
+  const [bills, advances, recovered] = await Promise.all([
+    billsWithSettlement(supabase),
+    fetchAll((from, to) =>
+      supabase.from("contractor_advances").select("id, vendor_id, amount").order("id").range(from, to),
+    ),
+    recoveredByAdvance(supabase),
+  ]);
+  // A reversal row is the same amount below zero, so the plain sums already net it.
+  const out = new Map<string, number>();
+  for (const advance of advances) {
+    const left = advance.amount - (recovered.get(advance.id) ?? 0);
+    out.set(advance.vendor_id, (out.get(advance.vendor_id) ?? 0) + left);
+  }
+  return bills
+    .filter((bill) => bill.status === "approved" && bill.pending > 0)
+    .map((bill) => ({
+      ...bill,
+      advance_out: Math.max(0, roundPaise(bill.vendor_id ? (out.get(bill.vendor_id) ?? 0) : 0)),
+    }));
 }
 
 export type CashRequestRow = {
