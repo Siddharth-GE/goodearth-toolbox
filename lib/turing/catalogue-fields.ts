@@ -5,6 +5,7 @@
  */
 
 import { BILLS } from "./entries/bills";
+import { BUSINESS_PLANNING } from "./entries/business-planning";
 import { BIRDWING } from "./entries/birdwing";
 import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
@@ -20,6 +21,7 @@ import { MASTERS } from "./entries/masters";
 import { MONEY } from "./entries/money";
 import { CASH_REQUESTS } from "./entries/cash-requests";
 import { RELAY } from "./entries/relay";
+import { REPORTER_DEXTER } from "./entries/reporter-dexter";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
 import { WORK_ORDERS } from "./entries/work-orders";
@@ -110,7 +112,11 @@ export type IdTable =
   | "funding_movements"
   | "cash_requests"
   | "cash_request_items"
-  | "item_requests";
+  | "item_requests"
+  | "business_plans"
+  | "reports"
+  | "dexter_projects"
+  | "dexter_decks";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -199,6 +205,10 @@ const FROM: Record<IdTable, string> = {
   cash_request_items: "cash_request_items (a bill or advance on a cash request)",
   item_requests:
     "item_requests (a designer's item the catalogue lacked, already in use as a provisional item)",
+  business_plans: "business_plans (a business plan)",
+  reports: "reports (a saved Reporter report)",
+  dexter_projects: "dexter_projects (a Dexter project: a folder of pitch decks)",
+  dexter_decks: "dexter_decks (a Dexter deck: an uploaded pitch with a client link)",
 };
 
 export type Field = {
@@ -232,6 +242,8 @@ export type Field = {
   fine?: true;
   /** Rupees: above zero, to the paise, up to ₹999 crore — what is shown is what the money action stores. */
   paise?: true;
+  /** A business plan's number, which its editor takes as typed: up to ₹99,999 crore, six decimals. */
+  wide?: true;
 };
 
 /**
@@ -270,6 +282,8 @@ export type Entry<K extends string = string> = {
   alike?: Alike;
   /** A record with lines: one row per line, its `header` fields saying which record (`recordsOf`); `noun` names one ("Indent"). */
   lines?: { noun: string };
+  /** Said on the proposal card, above Save: what the admin must know before pressing it. */
+  warning?: string;
 };
 
 export type Value = string | boolean;
@@ -296,6 +310,8 @@ export const ENTRIES = [
   ...SUPERVISORS_SITE,
   ...MONEY,
   ...CASH_REQUESTS,
+  ...BUSINESS_PLANNING,
+  ...REPORTER_DEXTER,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
@@ -386,7 +402,9 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? /^-?\d{1,9}(\.\d{1,3})?$/
         : field.fine
           ? /^\d{1,9}(\.\d{1,6})?$/
-          : /^\d{1,9}(\.\d{1,3})?$/
+          : field.wide
+            ? /^\d{1,12}(\.\d{1,6})?$/
+            : /^\d{1,9}(\.\d{1,3})?$/
       ).test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a number, like 12.5.` };

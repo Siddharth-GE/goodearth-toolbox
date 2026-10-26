@@ -226,6 +226,7 @@ export function ProposalCard({
           <p className="text-muted text-xs">
             {entry.title} · {proposal.rows.length} row{proposal.rows.length === 1 ? "" : "s"}
           </p>
+          {entry.warning ? <p className="text-warning mt-1 text-xs">{entry.warning}</p> : null}
         </div>
         {saved === null ? (
           <Button size="sm" onClick={() => void save()} disabled={locked || count === 0}>
