@@ -2,7 +2,11 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Building now — Turing, the admins' assistant
+## Building now — the team's additions
+
+`plan.md`, top section: six pull requests, A to F, each vetted on staging before the next.
+
+## Turing, the admins' assistant
 
 `plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
 

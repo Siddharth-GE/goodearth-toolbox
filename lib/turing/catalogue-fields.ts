@@ -244,6 +244,8 @@ export type Field = {
   paise?: true;
   /** A business plan's number, which its editor takes as typed: up to ₹99,999 crore, six decimals. */
   wide?: true;
+  /** A day's head count: up to 999, two decimals (0.5 for half a day), as labour_logs holds it. */
+  heads?: true;
 };
 
 /**
@@ -398,6 +400,10 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
               ok: false,
               error: `${field.label} is rupees above zero, to the paise, like 25000.50.`,
             };
+      if (field.heads)
+        return /^\d{1,3}(\.\d{1,2})?$/.test(value)
+          ? { ok: true, value }
+          : { ok: false, error: `${field.label} is a head count up to 999, like 2 or 0.5.` };
       return (field.signed
         ? /^-?\d{1,9}(\.\d{1,3})?$/
         : field.fine
@@ -598,7 +604,9 @@ export function catalogueText(): string {
                       ? "number, below 0 to take away"
                       : field.paise
                         ? "rupees above 0, at most 2 decimals"
-                        : "number"
+                        : field.heads
+                          ? "head count, 0.5 for half a day"
+                          : "number"
                     : field.kind;
         const starts =
           entry.adds && field.start !== undefined ? `, ${String(field.start)} if left out` : "";

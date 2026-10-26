@@ -2,7 +2,7 @@
 
 Grant `/bills`. Migrations `0025`, `0026`, `0104`–`0107`, `0111`, `0133`, `0136`.
 
-The accounts-facing record of what Goodearth owes and has paid. A bill is one of **three kinds** — against an issued purchase order, against an **approved** work order, or **NMR (daily wages)** with no anchor at all — numbered `BILL/<project>/<plot-or-unit-or-GEN>/NNN`, moving recorded → approved → paid, with send-back carrying a mandatory note.
+The accounts-facing record of what Goodearth owes and has paid. A bill is one of **three kinds** — against an issued purchase order, against an **approved** work order, or **labour with no work order** (kind `nmr`: miscellaneous work or a muster roll, its contractor optional) with no anchor at all — numbered `BILL/<project>/<plot-or-unit-or-GEN>/NNN`, moving recorded → approved → paid, with send-back carrying a mandatory note.
 
 **A bill has lines** (`0106`, founder 2026-10-08 — reversing 0025's "a bill has no line items": "2 cum at ₹4,000 should show ₹8,000"). A line is a material from the bill's PO, daily wages by trade, piece-work by quantity or lump sum, or anything else; its money is the shared line formula (`lib/line-money.ts`, as a PO line). **The header follows the lines**: `bill_lines_roll_up` rewrites taxable, GST and total from them to the paisa, so every money view keeps reading the header. A bill from before lines keeps its typed figures (and can be given lines while recorded). The rules are `lib/bills/lines.ts` and `lib/bills/math.ts` (pure, tested).
 

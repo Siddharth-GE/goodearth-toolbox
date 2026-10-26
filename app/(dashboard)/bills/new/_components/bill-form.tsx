@@ -36,7 +36,7 @@ import {
 
 export type FormKind = "po" | "contract" | "nmr";
 
-// Daily wages logged on site are billed from Bills → Labour (Send to Bill); this NMR form is for a muster roll that never went through the log. Over-billing warns, never blocks.
+// Labour logged on site is billed from Bills → Labour (Send to Bill); kind nmr here is labour with no work order: miscellaneous work or an unlogged muster roll. Over-billing warns, never blocks.
 export function BillForm({
   options,
   initial,
@@ -184,12 +184,12 @@ export function BillForm({
           >
             <option value="po">A purchase order — materials</option>
             <option value="contract">A work order — labour</option>
-            <option value="nmr">NMR — a muster roll not logged on site</option>
+            <option value="nmr">Labour, no work order — miscellaneous or a muster roll</option>
           </Select>
           {kind === "nmr" && (
             <p className="text-muted text-xs">
-              Daily wages logged by the supervisors are billed from Bills → Labour, with Send to
-              Bill.
+              For labour with no work order: miscellaneous work, or a muster roll not logged on
+              site. Labour the supervisors logged is billed from Bills → Labour, with Send to Bill.
             </p>
           )}
         </div>
@@ -294,13 +294,13 @@ export function BillForm({
               )
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="bill-nmr-vendor">Labour contractor (optional)</Label>
+              <Label htmlFor="bill-nmr-vendor">Contractor (optional)</Label>
               <Select
                 id="bill-nmr-vendor"
                 value={nmrVendorId}
                 onChange={(event) => setNmrVendorId(event.target.value)}
               >
-                <option value="">No vendor — paid directly</option>
+                <option value="">No contractor — paid directly</option>
                 {options.vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
                     {vendor.name}
@@ -314,13 +314,13 @@ export function BillForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="bill-invoice-no">
-              {kind === "nmr" ? "Muster roll / bill reference" : "Invoice number"}
+              {kind === "nmr" ? "Contractor's bill or muster roll reference" : "Invoice number"}
             </Label>
             <Input
               id="bill-invoice-no"
               value={invoiceNo}
               onChange={(event) => setInvoiceNo(event.target.value)}
-              placeholder={kind === "nmr" ? "e.g. NMR week 32" : "As printed on the bill"}
+              placeholder={kind === "nmr" ? "e.g. Misc week 32" : "As printed on the bill"}
               autoComplete="off"
             />
             {kind === "po" && prefill.invoices.length > 0 && (

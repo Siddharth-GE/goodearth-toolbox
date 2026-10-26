@@ -13,6 +13,7 @@ import {
   addMixComponent,
   createMix,
   deleteMix,
+  duplicateMix,
   removeMixComponent,
   updateMix,
   updateMixComponentQty,
@@ -253,6 +254,24 @@ export function RemoveComponentButton({
         }
       >
         {pending ? "Removing…" : "Remove"}
+      </Button>
+    </div>
+  );
+}
+
+export function DuplicateMixButton({ mixId }: { mixId: string }) {
+  const { pending, error, run } = useActionRunner();
+
+  return (
+    <div className="flex items-center gap-2">
+      <FormMessage error={error} />
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={pending}
+        onClick={() => run(() => duplicateMix(mixId))}
+      >
+        {pending ? "Copying…" : "Duplicate"}
       </Button>
     </div>
   );

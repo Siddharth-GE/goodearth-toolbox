@@ -83,7 +83,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
 
   const anchorLabel =
     bill.kind === "nmr"
-      ? "for daily wages (NMR)"
+      ? "for labour with no work order"
       : bill.po_reference
         ? `against ${bill.po_reference}`
         : bill.contract_description
@@ -101,7 +101,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.vendor_name ?? "Direct labour — no vendor"}
             {` · ${bill.project_name}`}
             {bill.scope_name ? ` · ${bill.scope_name}` : " · General"}
-            {bill.kind === "nmr" ? " · NMR daily wages" : ""}
+            {bill.kind === "nmr" ? " · Labour, no work order" : ""}
             {bill.po_reference ? ` · ${bill.po_reference}` : ""}
             {bill.contract_reference ? ` · ${bill.contract_reference}` : ""}
           </>

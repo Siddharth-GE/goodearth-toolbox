@@ -180,6 +180,7 @@ test("a day's labour: each way of paying passes, and a quantity is a plain numbe
 test("a value the way of paying would drop is refused, not saved as nothing", () => {
   assert.match(labourConflict({ kind: "nmr", quantity: "12" }) ?? "", /not a quantity/);
   assert.match(labourConflict({ kind: "pw_qty", masons: "2" }) ?? "", /Heads are for daily/);
+  assert.equal(labourConflict({ kind: "pw_qty", masons: "0.00", quantity: "4" }), undefined);
   assert.match(labourConflict({ kind: "pw_lump", quantity: "3" }) ?? "", /not a quantity/);
   assert.equal(labourConflict({ kind: "pw_qty", masons: "0", quantity: "4" }), undefined);
   // A change takes the log's own way of paying when the row doesn't give one.

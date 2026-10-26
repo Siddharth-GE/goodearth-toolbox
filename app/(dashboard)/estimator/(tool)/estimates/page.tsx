@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import {
   Table,
   TableBody,
@@ -12,13 +13,42 @@ import {
 } from "@/components/ui/table";
 import { listVillas, type VillaEstimates } from "@/lib/estimator/estimate-queries";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
+import { idParam, searchParam } from "@/lib/list-params";
 import { Calculator } from "lucide-react";
 import Link from "next/link";
 import { StartVillaDialog, type StartSource } from "./_components/estimate-forms";
 
 /** Every villa and what the Estimator holds for it (0098): the working estimate and the official, frozen one. Each villa is estimated on its own. */
-export default async function VillasPage() {
+const SHOWS = {
+  none: "Not started",
+  working: "Working, not official",
+  official: "Official",
+  measure: "Works to measure",
+} as const;
+
+export default async function VillasPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const raw = await searchParams;
+  const q = searchParam(raw.q);
+  const project = idParam(raw.project);
+  const show =
+    raw.show && Object.hasOwn(SHOWS, raw.show) ? (raw.show as keyof typeof SHOWS) : undefined;
   const villas = await listVillas();
+
+  const words = (q ?? "").toLowerCase().split(" ").filter(Boolean);
+  const shown = villas.filter((villa) => {
+    if (project && villa.projectId !== project) return false;
+    if (show === "none" && (villa.working || villa.official)) return false;
+    if (show === "working" && (!villa.working || villa.official)) return false;
+    if (show === "official" && !villa.official) return false;
+    if (show === "measure" && !villa.working?.toMeasureCount) return false;
+    const haystack = `${villa.unitName} ${villa.projectName} ${villa.official?.reference ?? ""}`;
+    return words.every((word) => haystack.toLowerCase().includes(word));
+  });
+  const projects = [...new Map(villas.map((villa) => [villa.projectId, villa.projectName]))];
 
   // What a villa can start from: every other villa's working and official estimate.
   const sourcesFor = (villa: VillaEstimates): StartSource[] => [
@@ -48,7 +78,7 @@ export default async function VillasPage() {
   ];
 
   const byProject = new Map<string, VillaEstimates[]>();
-  for (const villa of villas) {
+  for (const villa of shown) {
     byProject.set(villa.projectName, [...(byProject.get(villa.projectName) ?? []), villa]);
   }
   const started = villas.filter((villa) => villa.working || villa.official).length;
@@ -70,11 +100,39 @@ export default async function VillasPage() {
         </LinkButton>
       </div>
 
+      {villas.length > 0 && (
+        <ListToolbar
+          action="/estimator/estimates"
+          values={{ q, project, show }}
+          search={{ placeholder: "Villa, project or estimate no." }}
+          filters={[
+            {
+              param: "project",
+              label: "Project",
+              allLabel: "All projects",
+              options: projects.map(([value, label]) => ({ value, label })),
+            },
+            {
+              param: "show",
+              label: "Show",
+              allLabel: "Every villa",
+              options: Object.entries(SHOWS).map(([value, label]) => ({ value, label })),
+            },
+          ]}
+        />
+      )}
+
       {villas.length === 0 ? (
         <EmptyState
           icon={Calculator}
           title="No villas yet"
           description="Villas come from Masters → Units. Add them there first."
+        />
+      ) : shown.length === 0 ? (
+        <EmptyState
+          icon={Calculator}
+          title="Nothing matches"
+          description="Try another search or filter."
         />
       ) : (
         [...byProject].map(([projectName, rows]) => (

@@ -94,7 +94,7 @@ const columns: Column<BillLineRow>[] = [
 const KIND_LABEL: Record<BillDetail["kind"], string> = {
   po: "Material bill",
   contract: "Work-order bill",
-  nmr: "Daily wages (NMR)",
+  nmr: "Labour bill, no work order",
 };
 
 export function BillDocument({ data }: { data: BillPdfData }) {
