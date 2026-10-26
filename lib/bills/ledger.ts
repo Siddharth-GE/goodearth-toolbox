@@ -146,6 +146,9 @@ export type LedgerEntry = {
   on: string;
   /** A bill's total, or money paid out; a reversal is the same amount below zero. */
   amount: number;
+  /** A recovery whose advance or bill lies outside the project or company shown: it then settles the bill like a
+   * payment ("pays"), or brings the advance back onto this account ("returns"). Absent, it moves nothing. */
+  crossing?: "pays" | "returns";
 };
 
 /** A day's bill comes before what paid it, so the balance never dips below what is owed on the way. */
@@ -170,6 +173,8 @@ export function contractorLedger<T extends LedgerEntry>(entries: T[]): (T & { ba
   return sorted.map((entry) => {
     if (entry.kind === "bill") balance += entry.amount;
     else if (entry.kind !== "recovery") balance -= entry.amount;
+    else if (entry.crossing === "pays") balance -= entry.amount;
+    else if (entry.crossing === "returns") balance += entry.amount;
     balance = roundPaise(balance);
     return { ...entry, balance };
   });

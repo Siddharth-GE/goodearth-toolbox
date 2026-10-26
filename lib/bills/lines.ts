@@ -207,3 +207,26 @@ export function linesFromDelivery(
     }),
   );
 }
+
+/** Before anything is written: would these lines bill a PO line past what arrived (0156 refuses it in the database)?
+ * `billedElsewhere` is each PO line's billed quantity on other bills. Names the first line over, by its description. */
+export function receivedCapProblem(
+  lines: Pick<BillLineDraft, "kind" | "poLineId" | "quantity" | "description">[],
+  received: Map<string, number>,
+  billedElsewhere: Map<string, number>,
+): string | undefined {
+  const wanted = new Map<string, { quantity: number; description: string }>();
+  for (const line of lines) {
+    if (line.kind !== "material" || !line.poLineId) continue;
+    const entry = wanted.get(line.poLineId) ?? { quantity: 0, description: line.description };
+    entry.quantity += line.quantity ?? 0;
+    wanted.set(line.poLineId, entry);
+  }
+  for (const [poLineId, { quantity, description }] of wanted) {
+    const left = (received.get(poLineId) ?? 0) - (billedElsewhere.get(poLineId) ?? 0);
+    if (quantity > left + 0.0005) {
+      return `Only ${Math.max(0, Math.round(left * 1000) / 1000)} of ${description.trim()} has arrived and is not yet billed — bill what was received.`;
+    }
+  }
+  return undefined;
+}

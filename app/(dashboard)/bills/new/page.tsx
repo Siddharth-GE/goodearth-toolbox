@@ -50,7 +50,7 @@ export default async function NewBillPage({
   const poId = kind === "po" ? idParam(raw.po) : undefined;
   const contractId = kind === "contract" ? idParam(raw.contract) : undefined;
 
-  const [options, gstRates, uoms, poLines, workLines, deliveries] = await Promise.all([
+  const [options, gstRates, uoms, poLines, workLines, received] = await Promise.all([
     getBillFormOptions(),
     listActiveGstRates(),
     listActiveUomNames(),
@@ -58,8 +58,13 @@ export default async function NewBillPage({
     contractId ? getWorkOrderLinesForBill(contractId) : Promise.resolve(undefined),
     poId ? getPoDeliveriesForBill(poId) : Promise.resolve([]),
   ]);
+  // A delivery is offered while it has something left to bill and its invoice is not on a bill yet.
+  const deliveries = received.map((row) => ({
+    ...row,
+    open: !row.billed && !!poLines && linesFromDelivery(poLines, row.quantities).length > 0,
+  }));
   // A bill for one delivery takes its invoice and what it brought; with none picked, everything received and unbilled.
-  const delivery = deliveries.find((row) => row.id === idParam(raw.delivery));
+  const delivery = deliveries.find((row) => row.open && row.id === idParam(raw.delivery));
   const lines = poLines
     ? delivery
       ? linesFromDelivery(poLines, delivery.quantities)

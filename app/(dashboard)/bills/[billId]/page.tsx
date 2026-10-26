@@ -60,7 +60,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
     getBillSettlement(bill.id, bill.total_amount),
     getBillMoneyEvents(bill.id),
     canTakePayment(bill.status) && bill.vendor_id
-      ? getOpenAdvances(bill.vendor_id)
+      ? getOpenAdvances(bill.vendor_id, bill.project_id)
       : Promise.resolve([]),
   ]);
   const hasMoney = events.length > 0;

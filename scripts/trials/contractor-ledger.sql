@@ -142,6 +142,15 @@ begin
   insert into bill_lines (bill_id, sort_order, line_kind, po_line_id, item_id, description, uom, quantity, rate, gst_pct, created_by, updated_by)
   values (v_bill2, 0, 'material', v_pl, v_item, 'Trial material', v_uom, 1, 400, 18, v_user, v_user);
 
+  -- A deleted bill's count is never handed out again.
+  delete from bill_lines where bill_id = v_bill2;
+  delete from bills where id = v_bill2;
+  if found is not true then raise exception 'TRIAL 4 SETUP: the recorded bill was not deleted'; end if;
+  v_bill2 := create_bill(v_po, null, 'INV-0156-C', current_date, 100, 0, 100, null);
+  if (select vendor_seq from bills where id = v_bill2) is distinct from v_seq + 2 then
+    raise exception 'TRIAL 4 FAILED: a deleted bill''s count was reused';
+  end if;
+
   -- 5. Send to Bill puts the name on the line and bills the half day.
   v_bill := send_labour_logs_to_bill(array[v_named], null, 'MISC 0156', current_date,
     jsonb_build_object('mason', 1000, 'helper', 800, 'gst_pct', 0), null, null, null);

@@ -1,9 +1,11 @@
 -- 0156 — Bills and contractors (plan.md, the team's additions, B).
 --
 -- 1. vendors.contractor_no: CON/001… given by the database when a vendor is marked a contractor, kept for good
---    once given (unticking keeps it), never typed. Existing contractors numbered in name order.
+--    once given (unticking keeps it), never typed, never given twice (a sequence). Existing contractors numbered in
+--    name order.
 -- 2. bills.vendor_seq: the vendor's own running bill count (their 4th bill is 4), given on insert and permanent.
---    Existing bills numbered by when they were made; a deleted recorded bill leaves its number unused.
+--    Counted in bill_vendor_counters, as bill_counters counts bill numbers, so a deleted recorded bill's number is
+--    never handed out again. Existing bills numbered by when they were made.
 -- 3. Labour logged as Additional work or Rework may carry a typed name instead of a Masters work
 --    (labour_logs.custom_name). Such a log is daily wages or a lump sum: piece-work by quantity needs the work's unit.
 --    The billed-entry guard freezes the name too, and Send to Bill puts the name on the bill line.
@@ -16,6 +18,8 @@ alter table vendors add column if not exists contractor_no text;
 create unique index if not exists vendors_contractor_no_unique on vendors (contractor_no)
   where contractor_no is not null;
 
+-- updated_at should not claim every contractor changed today. The audit trigger stays on.
+alter table vendors disable trigger set_updated_at;
 with numbered as (
   select id, row_number() over (order by lower(name), id) as n
     from vendors
@@ -27,13 +31,20 @@ update vendors v
        ), 0))::text, 3, '0')
   from numbered
  where v.id = numbered.id;
+alter table vendors enable trigger set_updated_at;
+
+create sequence if not exists vendors_contractor_no_seq;
+select setval('vendors_contractor_no_seq',
+              greatest(1, coalesce((select max(substring(contractor_no from 5)::int)
+                                      from vendors where contractor_no ~ '^CON/[0-9]+$'), 0)),
+              exists (select 1 from vendors where contractor_no ~ '^CON/[0-9]+$'));
+revoke all on sequence vendors_contractor_no_seq from public, anon;
+grant usage on sequence vendors_contractor_no_seq to authenticated;
 
 create or replace function vendors_contractor_no()
 returns trigger
 language plpgsql
 as $$
-declare
-  v_next int;
 begin
   if tg_op = 'UPDATE' and old.contractor_no is not null then
     new.contractor_no := old.contractor_no;
@@ -41,10 +52,7 @@ begin
   end if;
   new.contractor_no := null;
   if new.is_contractor then
-    perform pg_advisory_xact_lock(hashtextextended('vendors_contractor_no', 0));
-    select coalesce(max(substring(contractor_no from 5)::int), 0) + 1 into v_next
-      from vendors where contractor_no ~ '^CON/[0-9]+$';
-    new.contractor_no := 'CON/' || lpad(v_next::text, 3, '0');
+    new.contractor_no := 'CON/' || lpad(nextval('vendors_contractor_no_seq')::text, 3, '0');
   end if;
   return new;
 end $$;
@@ -74,6 +82,28 @@ alter table bills enable trigger set_updated_at;
 create unique index if not exists bills_vendor_seq_unique on bills (vendor_id, vendor_seq)
   where vendor_id is not null;
 
+create table if not exists bill_vendor_counters (
+  vendor_id uuid primary key references vendors (id),
+  last_seq int not null default 0
+);
+alter table bill_vendor_counters enable row level security;
+revoke all on bill_vendor_counters from public, anon;
+
+drop policy if exists "bill_vendor_counters readable by bills app" on bill_vendor_counters;
+create policy "bill_vendor_counters readable by bills app"
+  on bill_vendor_counters for select to authenticated using ((select has_app('/bills')));
+drop policy if exists "bill_vendor_counters writable by bills app" on bill_vendor_counters;
+create policy "bill_vendor_counters writable by bills app"
+  on bill_vendor_counters for insert to authenticated with check ((select has_app('/bills')));
+drop policy if exists "bill_vendor_counters updatable by bills app" on bill_vendor_counters;
+create policy "bill_vendor_counters updatable by bills app"
+  on bill_vendor_counters for update to authenticated
+  using ((select has_app('/bills'))) with check ((select has_app('/bills')));
+
+insert into bill_vendor_counters (vendor_id, last_seq)
+select vendor_id, max(vendor_seq) from bills where vendor_id is not null group by vendor_id
+on conflict (vendor_id) do update set last_seq = greatest(bill_vendor_counters.last_seq, excluded.last_seq);
+
 create or replace function bills_vendor_seq()
 returns trigger
 language plpgsql
@@ -87,9 +117,10 @@ begin
   end if;
   new.vendor_seq := null;
   if new.vendor_id is not null then
-    perform pg_advisory_xact_lock(hashtextextended('bills_vendor_seq:' || new.vendor_id::text, 0));
-    select coalesce(max(vendor_seq), 0) + 1 into new.vendor_seq
-      from bills where vendor_id = new.vendor_id;
+    insert into bill_vendor_counters (vendor_id, last_seq)
+    values (new.vendor_id, 1)
+    on conflict (vendor_id) do update set last_seq = bill_vendor_counters.last_seq + 1
+    returning last_seq into new.vendor_seq;
   end if;
   return new;
 end $$;
@@ -424,6 +455,19 @@ begin
   end if;
   if exists (select 1 from bills where vendor_id is not null and vendor_seq is null) then
     raise exception '0156: a bill with a vendor has no count';
+  end if;
+  if exists (
+    select 1 from bills b
+     where b.vendor_id is not null
+       and b.vendor_seq > coalesce((select c.last_seq from bill_vendor_counters c where c.vendor_id = b.vendor_id), 0)
+  ) then
+    raise exception '0156: a vendor''s counter is behind their bills';
+  end if;
+  if (select count(*) from pg_trigger where tgrelid = 'vendors'::regclass and not tgisinternal and tgenabled = 'D') > 0 then
+    raise exception '0156: a vendors trigger was left disabled';
+  end if;
+  if not exists (select 1 from pg_class where relname = 'bill_vendor_counters' and relrowsecurity) then
+    raise exception '0156: bill_vendor_counters has RLS off';
   end if;
   if (select count(*) from pg_trigger where tgrelid = 'bills'::regclass and not tgisinternal and tgenabled = 'D') > 0 then
     raise exception '0156: a bills trigger was left disabled';
