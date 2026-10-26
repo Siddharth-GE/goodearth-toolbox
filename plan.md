@@ -45,21 +45,32 @@ Built on `feature/team-additions`, `0155` on staging. An independent Opus review
 
 ## B. Bills and contractors — migration (money: reviewed before apply)
 
-- [ ] **Contractor number:** `vendors.contractor_no` (CON/001…) is given automatically when a vendor is marked a contractor, and existing contractors are backfilled in name order. It shows in Masters, on bills, on work orders and on the ledger.
-- [ ] **Each contractor's bill count:** `bills.vendor_seq` is set by the database when a bill is made, and existing bills are backfilled by date. Shown as "Bill 4 to this contractor" on the bill and its print.
-- [ ] **The contractor's ledger:** Bills → Contractors → one contractor. It lists advances, bills (with their count), recoveries and payments by date, with a running balance, and filters by project and company. The summary lists contractors only and gains company and search.
-- [ ] **Advances suggested:**
-  - an approved bill's settlement panel opens with the recovery filled in: the outstanding advance, oldest first, up to what the bill owes;
-  - adding a bill to a cash request shows the advance and the net;
-  - a person always confirms. No schema change.
-- [ ] **Additional work and Rework by name:**
-  - new column `labour_logs.custom_name`;
-  - `work_item_id` may be empty only for Additional or Rework, and then a name is required (CHECK);
-  - the stage-start trigger skips a log with no work, and Send to Bill uses the name;
-  - every reader of `labour_logs.work_item_id` is checked for the empty case.
-- [ ] **A PO bill from a delivery:**
-  - pick the delivery, and its invoice number, date and not-yet-billed lines fill the bill (`bills.goods_receipt_id`);
-  - the database refuses billing a PO line beyond what was received, checked only when a line's quantity rises, so today's bills stand.
+Built on `feature/team-additions-b`, `0156` on staging (trial `scripts/trials/contractor-ledger.sql`, proven against two broken copies). The rules now live in Bills' `PLAN.md` (rule 11).
+
+The independent Opus review cleared `0156` for staging and production. Its seven findings are fixed:
+
+- a bill past what arrived is refused before anything saves, and lines save removals first;
+- a cross-project recovery moves a filtered ledger;
+- the suggested advance is the bill's own project's, then its company's, never another company's;
+- a cash request counts a contractor's advance once;
+- contractor numbers come from a sequence and bill counts from a counter, so neither is ever reused;
+- a delivery already billed is not offered;
+- the backfill leaves `updated_at` alone.
+
+Settled while building: a delivery is picked on the form and nothing is stored on the bill, so there is no `goods_receipt_id`.
+
+- [x] **Contractor number** — CON/001…, shown and searchable in Masters, on bills and on the ledger.
+- [x] **Each vendor's bill count** — "Their bill no." on the bill and its print.
+- [x] **The contractor's ledger**, and the summary (contractors by default, company, project, search).
+- [x] **Advances suggested**, a person confirms.
+- [x] **Additional work and Rework by name.**
+- [x] **A material bill from a delivery**, and never past what arrived.
+- [ ] [Founder] Vet on staging:
+  - Masters → Vendors: contractors show CON numbers; search "CON/0".
+  - Supervisors → a villa → Log labour → Rework → tick "Not on the works list", type a name, 1.5 masons. Bills → Labour shows it by its name; send it to a bill.
+  - Bills → New bill → a PO with a delivery: pick the delivery, and the invoice and quantities fill in. Raise a quantity past what arrived: it is refused, and nothing is saved.
+  - Give a contractor an advance in a cash request and pay it. Approve one of their bills: the bill opens on "Recover from an advance". Recover it, then pay the rest.
+  - Bills → Contractors → open the contractor: the advance, the bill ("their bill 1"), the recovery and the payment, owing ₹0 at the end; filter by company.
 
 ## C. The Estimator — several rows per work — migration
 

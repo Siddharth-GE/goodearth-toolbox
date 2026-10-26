@@ -188,6 +188,13 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "bill_vendor_counters": {
+    "kind": "table",
+    "columns": {
+      "last_seq": "number",
+      "vendor_id": "string"
+    }
+  },
   "bills": {
     "kind": "table",
     "columns": {

@@ -542,6 +542,29 @@ export type Database = {
           },
         ]
       }
+      bill_vendor_counters: {
+        Row: {
+          last_seq: number
+          vendor_id: string
+        }
+        Insert: {
+          last_seq?: number
+          vendor_id: string
+        }
+        Update: {
+          last_seq?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_vendor_counters_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           approved_at: string | null
