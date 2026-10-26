@@ -123,6 +123,30 @@ async function paidOn(itemId: string): Promise<{ paid: number } | Failure> {
   };
 }
 
+/** The same reference twice on one advance line, not reversed, is one advance entered twice. */
+async function advanceReferenceTaken(itemId: string, reference: string): Promise<Failure | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("contractor_advances")
+    .select("id")
+    .eq("cash_request_item_id", itemId)
+    .eq("payment_ref", reference)
+    .is("reverses_id", null);
+  if (error) return failed("advances", error);
+  const ids = (data ?? []).map((row) => row.id);
+  if (ids.length === 0) return null;
+  const { count, error: reversedError } = await supabase
+    .from("contractor_advances")
+    .select("id", { count: "exact", head: true })
+    .in("reverses_id", ids);
+  if (reversedError) return failed("advances", reversedError);
+  return (count ?? 0) < ids.length
+    ? {
+        error: `An advance with reference ${reference} is already given on this line. If it really is a second one, give it on this cash request's page.`,
+      }
+    : null;
+}
+
 /** Each cash request entry, run through Bills' own action, as the admin. */
 export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]> = {
   cash_request_new: async (v) => {
@@ -173,27 +197,32 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
       note: v.note ? String(v.note) : null,
     });
   },
-  cash_request_amount: async (v) => {
+  cash_request_asked: async (v) => {
     const now = await lineNow(String(v.item_id));
     if ("error" in now) return now;
+    if (now.status !== "draft")
+      return {
+        error: `That cash request is ${STATUS_WORDS[now.status] ?? now.status}; what a line asks for changes only on a draft.`,
+      };
     const amount = Number(v.amount);
-    if (now.status === "draft") {
-      if (amount === Number(now.line.requested_amount))
-        return { error: "That line already asks for that." };
-      return setCashRequestAmount(String(v.item_id), { requested: amount });
-    }
-    if (now.status === "submitted") {
-      const released = Number(now.line.released_amount ?? now.line.requested_amount);
-      if (amount === released) return { error: "That line is already released at that." };
-      if (amount > Number(now.line.requested_amount))
-        return {
-          error: `Release no more than was asked for (₹${Number(now.line.requested_amount).toFixed(2)}).`,
-        };
-      return setCashRequestAmount(String(v.item_id), { released: amount });
-    }
-    return {
-      error: `That cash request is ${STATUS_WORDS[now.status] ?? "closed"}; its amounts no longer change.`,
-    };
+    if (amount === Number(now.line.requested_amount))
+      return { error: "That line already asks for that." };
+    return setCashRequestAmount(String(v.item_id), { requested: amount });
+  },
+  cash_request_release: async (v) => {
+    const now = await lineNow(String(v.item_id));
+    if ("error" in now) return now;
+    if (now.status !== "submitted")
+      return {
+        error: `That cash request is ${STATUS_WORDS[now.status] ?? now.status}; what is released is decided only while it is with the approver.`,
+      };
+    const amount = Number(v.amount);
+    const asked = Number(now.line.requested_amount);
+    if (amount === Number(now.line.released_amount ?? asked))
+      return { error: "That line is already released at that." };
+    if (amount > asked)
+      return { error: `Release no more than was asked for (₹${asked.toFixed(2)}).` };
+    return setCashRequestAmount(String(v.item_id), { released: amount });
   },
   cash_request_line_remove: async (v) => {
     const now = await lineNow(String(v.item_id));
@@ -227,10 +256,16 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
   },
   cash_request_delete: async (v) => {
     const id = String(v.request_id);
-    const refused = await draft(id);
-    if (refused)
+    const now = await requestNow(id);
+    if ("error" in now) return now;
+    if (now.row.status === "submitted")
       return {
-        error: "Only a draft cash request is deleted; a submitted one is sent back to draft first.",
+        error:
+          "Only a draft cash request is deleted; this one is with the approver, who can send it back to draft first.",
+      };
+    if (now.row.status !== "draft")
+      return {
+        error: `That cash request is ${STATUS_WORDS[String(now.row.status)] ?? String(now.row.status)}; money may have moved on it, so it is never deleted.`,
       };
     const done = await saving(() => deleteCashRequest(id), "/bills/cash-requests");
     return "error" in done ? done : undefined;
@@ -245,7 +280,13 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
     if ("error" in paid) return paid;
     const amount = Number(v.amount);
     const cap = leftToPay(now.line.released_amount as number | null, paid.paid);
-    if (cap <= 0) return { error: "That line is paid in full." };
+    if (cap <= 0)
+      return {
+        error:
+          Number(now.line.released_amount ?? 0) === 0
+            ? "Nothing was released for this line."
+            : "That line is paid in full.",
+      };
     if (amount > cap + 0.005)
       return { error: `That is more than is left to pay on this line (₹${cap.toFixed(2)}).` };
     const reference = String(v.reference);
@@ -262,7 +303,8 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
         return {
           error: `That is more than the bill has pending (₹${bill.pending.toFixed(2)} left).`,
         };
-      const taken = await referenceTaken(billId, reference);
+      // A payment made on the bill's own page is not counted against this line, so the second one goes here.
+      const taken = await referenceTaken(billId, reference, "this cash request's page");
       if (taken) return taken;
       return recordBillPayment(billId, {
         amount,
@@ -272,6 +314,8 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
         cashRequestItemId: itemId,
       });
     }
+    const taken = await advanceReferenceTaken(itemId, reference);
+    if (taken) return taken;
     // As the board gives an advance: the line's vendor, project, work order and note.
     return recordAdvance({
       vendorId: String(now.line.vendor_id ?? ""),

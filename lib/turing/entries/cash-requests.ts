@@ -75,17 +75,24 @@ export const CASH_REQUESTS = defineEntries([
     ],
   },
   {
-    key: "cash_request_amount",
+    key: "cash_request_asked",
     tool: "/bills",
-    title: "A cash request line's amount",
+    title: "What a cash request line asks for",
+    description: "On a draft request, what a bill or advance line asks for, above zero.",
+    fields: [line, { key: "amount", label: "Asked for (₹)", kind: "amount", paise: true }],
+  },
+  {
+    key: "cash_request_release",
+    tool: "/bills",
+    title: "What a cash request line releases",
     description:
-      "On a draft request, what a line asks for (above zero). On a submitted one, what is released for it (zero to what was asked): the approver's cut.",
+      "On a submitted request, the approver's cut: what is released for a line, from zero to what was asked. Lines not cut are released as asked.",
     // A release may be cut to zero, so this is not a paise field; the two decimals are held here.
     check: (values) =>
       /^\d+(\.\d{1,2})?$/.test(String(values.amount))
         ? undefined
         : "The amount is rupees to the paise, like 25000.50.",
-    fields: [line, { key: "amount", label: "Amount (₹)", kind: "amount" }],
+    fields: [line, { key: "amount", label: "Released (₹)", kind: "amount" }],
   },
   {
     key: "cash_request_line_remove",

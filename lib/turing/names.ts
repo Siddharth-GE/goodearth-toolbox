@@ -470,10 +470,37 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     supabase
       .from("cash_request_items")
       .select(
-        "id, cash_request_id, item_kind, bill_id, vendor_id, project_id, labour_contract_id, requested_amount, released_amount",
+        "id, cash_request_id, item_kind, bill_id, vendor_id, project_id, labour_contract_id, requested_amount, released_amount, note",
       )
       .in("id", chunk),
   );
+  // What is paid on each line so far, reversals netting out, as the board's Paid column shows.
+  const cashPaid = new Map<string, number>();
+  for (const one of (
+    await Promise.all([
+      readIn(
+        cashLines.map((line) => line.id),
+        (chunk) =>
+          supabase
+            .from("bill_payments")
+            .select("cash_request_item_id, amount")
+            .in("cash_request_item_id", chunk),
+      ),
+      readIn(
+        cashLines.map((line) => line.id),
+        (chunk) =>
+          supabase
+            .from("contractor_advances")
+            .select("cash_request_item_id, amount")
+            .in("cash_request_item_id", chunk),
+      ),
+    ])
+  ).flat())
+    if (one.cash_request_item_id)
+      cashPaid.set(
+        one.cash_request_item_id,
+        (cashPaid.get(one.cash_request_item_id) ?? 0) + one.amount,
+      );
   for (const one of cashLines) {
     add("cash_requests", one.cash_request_id);
     if (one.bill_id) add("bills", one.bill_id);
@@ -733,8 +760,12 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
             .filter(Boolean)
             .join(", "),
       one.labour_contract_id ? names[one.labour_contract_id] : null,
-      `asked ${formatMoney(one.requested_amount)}`,
-      one.released_amount === null ? null : `released ${formatMoney(one.released_amount)}`,
+      `asked ${formatMoney(one.requested_amount, { paise: true })}`,
+      one.released_amount === null
+        ? null
+        : `released ${formatMoney(one.released_amount, { paise: true })}`,
+      cashPaid.get(one.id) ? `paid ${formatMoney(cashPaid.get(one.id), { paise: true })}` : null,
+      one.note ? `“${one.note.length > 60 ? `${one.note.slice(0, 57)}…` : one.note}”` : null,
     ]
       .filter(Boolean)
       .join(" · ");

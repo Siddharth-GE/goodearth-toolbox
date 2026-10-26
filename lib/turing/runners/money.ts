@@ -52,9 +52,13 @@ async function billTakesMoney(billId: string): Promise<Failure | null> {
 
 /**
  * The same reference twice on one bill, not reversed, is one payment entered twice — a statement read
- * twice. Refused here; a real second payment with that reference is recorded on the bill's own screen.
+ * twice. Refused here; a real second payment with that reference is recorded on a screen (`where`).
  */
-export async function referenceTaken(billId: string, reference: string): Promise<Failure | null> {
+export async function referenceTaken(
+  billId: string,
+  reference: string,
+  where = "the bill's own page",
+): Promise<Failure | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bill_payments")
@@ -72,7 +76,7 @@ export async function referenceTaken(billId: string, reference: string): Promise
   if (reversedError) return failed("payments", reversedError);
   return (count ?? 0) < ids.length
     ? {
-        error: `A payment with reference ${reference} is already on this bill. If it really is a second payment, record it on the bill's own page.`,
+        error: `A payment with reference ${reference} is already on this bill. If it really is a second payment, record it on ${where}.`,
       }
     : null;
 }

@@ -42,11 +42,13 @@ test("only sending back takes a note, and it needs one", () => {
   assert.equal(ok("cash_request_step", { ...step, step: "approve" }), false);
 });
 
-test("a line's amount may be cut to zero, to the paise", () => {
-  assert.equal(ok("cash_request_amount", { item_id: LINE, amount: "0" }), true);
-  assert.equal(ok("cash_request_amount", { item_id: LINE, amount: "25000.50" }), true);
-  assert.equal(ok("cash_request_amount", { item_id: LINE, amount: "100.005" }), false);
-  assert.equal(ok("cash_request_amount", { item_id: LINE, amount: "-5" }), false);
+test("a release may be cut to zero, to the paise; what is asked for is above zero", () => {
+  assert.equal(ok("cash_request_release", { item_id: LINE, amount: "0" }), true);
+  assert.equal(ok("cash_request_release", { item_id: LINE, amount: "25000.50" }), true);
+  assert.equal(ok("cash_request_release", { item_id: LINE, amount: "100.005" }), false);
+  assert.equal(ok("cash_request_release", { item_id: LINE, amount: "-5" }), false);
+  assert.equal(ok("cash_request_asked", { item_id: LINE, amount: "0" }), false);
+  assert.equal(ok("cash_request_asked", { item_id: LINE, amount: "25000.50" }), true);
 });
 
 test("money asked for or paid is rupees above zero, to the paise", () => {
