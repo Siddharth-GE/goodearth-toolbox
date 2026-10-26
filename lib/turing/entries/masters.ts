@@ -283,7 +283,7 @@ export const MASTERS = defineEntries([
     tool: "/masters",
     title: "An item request, accepted",
     description:
-      "Accepts a designer's item request (item_requests.status pending) as a new catalogue item, with a code or none; its provisional item stops being provisional. Most requests are an item already in the catalogue under another name: read items first and merge instead (item_request_merge).",
+      "Accepts a designer's item request (item_requests.status pending) as a new catalogue item; its provisional item stops being provisional. A code given replaces the item's, left out keeps it, empty clears it. Refused while the item is switched off in Masters. Most requests are an item already in the catalogue under another name: read items first and merge instead (item_request_merge).",
     fields: [record("request_id", "Request", "item_requests"), words("code", "Code", { max: 100 })],
   },
   {

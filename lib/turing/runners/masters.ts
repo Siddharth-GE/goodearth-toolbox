@@ -59,7 +59,7 @@ import {
 
 import { entryFor, formKeys, formOf } from "../catalogue-fields";
 import type { MASTERS } from "../entries/masters";
-import { recordNow, retired, type Runners, type Values } from "./kit";
+import { given, recordNow, retired, type Runners, type Values } from "./kit";
 
 type Key = (typeof MASTERS)[number]["key"];
 type Save = (state: ActionState, form: FormData) => Promise<ActionState>;
@@ -138,8 +138,26 @@ export const MASTERS_RUNNERS: Runners<Key> = {
   item_request_accept: async (v) => {
     const request = await pendingRequest(of(v, "request_id"));
     if ("error" in request) return request;
-    const code = typeof v.code === "string" && v.code ? v.code : null;
-    return approveItemRequest(of(v, "request_id"), request.itemId, code);
+    const item = await recordNow(
+      "items",
+      { column: "id", id: request.itemId },
+      ["code", "is_active"],
+      "That request's item is gone.",
+    );
+    if ("error" in item) return item;
+    // Accepted while switched off, it would be in no picker yet read as saved.
+    if (item.row.is_active === false) {
+      return {
+        error:
+          "Its item is switched off in Masters. Switch it back on first, or merge or reject the request.",
+      };
+    }
+    // The accept writes the code whole, so one left out is sent as it stands.
+    return approveItemRequest(
+      of(v, "request_id"),
+      request.itemId,
+      given(v, "code", item.row.code as string | null) || null,
+    );
   },
   item_request_merge: async (v) => {
     const request = await pendingRequest(of(v, "request_id"));
