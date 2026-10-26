@@ -315,7 +315,7 @@ function PayForm({
                 : recordAdvance({
                     vendorId: item.vendor_id ?? "",
                     projectId: item.project_id ?? "",
-                    labourContractId: null,
+                    labourContractId: item.labour_contract_id,
                     amount: value,
                     paidOn,
                     reference,
