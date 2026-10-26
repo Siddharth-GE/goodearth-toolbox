@@ -7,9 +7,9 @@ import { requireTool } from "@/lib/auth/access";
 import { checked, parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import {
-  applyEstimateOverrides,
   applyRateOverrides,
   computeLine,
+  lineRecipes,
   computeWorkTakeoff,
 } from "./calc";
 import { getEstimateVariations, getRecipeBook } from "./estimate-queries";
@@ -828,15 +828,21 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     ).map((m) => [m.id, m]),
   );
   const mixesById = new Map(book.mixes.map((m) => [m.id, m]));
-  const recipesByWork = new Map(
-    applyEstimateOverrides(book.recipes, variations.byWork, variations.labourRateByWork).map(
-      (r) => [r.workItemId, r],
-    ),
+  // Each row is priced on its own recipe (0157); the takeoff still adds up per work and material.
+  const recipesByLine = lineRecipes(
+    book.recipes,
+    lines.data.map((line) => ({ id: line.id, workItemId: line.work_item_id })),
+    variations.componentsByLine,
+    variations.labourRateByLine,
   );
 
-  const lineInputs = lines.data.map((line) => ({ workItemId: line.work_item_id, qty: line.qty }));
+  const lineInputs = lines.data.map((line) => ({
+    workItemId: line.work_item_id,
+    qty: line.qty,
+    key: line.id,
+  }));
   const costs = lines.data.map((line) => {
-    const recipe = recipesByWork.get(line.work_item_id);
+    const recipe = recipesByLine.get(line.id);
     const cost = computeLine(
       { workItemId: line.work_item_id, qty: line.qty },
       recipe,
@@ -844,7 +850,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
       materialsById,
     );
     return {
-      work_item_id: line.work_item_id,
+      line_id: line.id,
       qty: line.qty,
       uom: recipe?.uom ?? null,
       labour_rate: recipe?.labourRate ?? null,
@@ -854,7 +860,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     };
   });
   // Every recipe material is a master item (0086), so the snapshot anchors on item_id.
-  const takeoff = computeWorkTakeoff(lineInputs, recipesByWork, mixesById).map((row) => {
+  const takeoff = computeWorkTakeoff(lineInputs, recipesByLine, mixesById).map((row) => {
     const material = materialsById.get(row.materialId);
     return {
       work_item_id: row.workItemId,

@@ -152,9 +152,10 @@ export type LineVariationRow = {
 export type EstimateVariations = {
   /** A line present here IS customised: its list replaces the standard whole (0087). */
   byLine: Map<string, LineVariationRow[]>;
-  byWork: Map<string, WorkRecipe["components"]>;
-  /** work_item_id → this villa's labour rate (0088). Absent = standard. */
-  labourRateByWork: Map<string, number>;
+  /** Row id → its own list, in recipe form (0087); a work may sit on an estimate more than once (0157). */
+  componentsByLine: Map<string, WorkRecipe["components"]>;
+  /** Row id → this villa's labour rate for it (0088). Absent = standard. */
+  labourRateByLine: Map<string, number>;
   /** item id → this villa's price (0088). Absent = Masters'. */
   rateByMaterialId: Map<string, number>;
   extraMaterials: MaterialDef[];
@@ -162,8 +163,8 @@ export type EstimateVariations = {
 
 const NO_VARIATIONS: EstimateVariations = {
   byLine: new Map(),
-  byWork: new Map(),
-  labourRateByWork: new Map(),
+  componentsByLine: new Map(),
+  labourRateByLine: new Map(),
   rateByMaterialId: new Map(),
   extraMaterials: [],
 };
@@ -196,9 +197,9 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
   for (const row of itemRates) {
     if (row.item_id) rateByMaterialId.set(row.item_id, row.rate);
   }
-  const labourRateByWork = new Map<string, number>();
+  const labourRateByLine = new Map<string, number>();
   for (const line of lines) {
-    if (line.labour_rate !== null) labourRateByWork.set(line.work_item_id, line.labour_rate);
+    if (line.labour_rate !== null) labourRateByLine.set(line.id, line.labour_rate);
   }
 
   if (lines.length === 0) {
@@ -240,13 +241,10 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     byLine.set(row.line_id, bucket);
   }
 
-  const workByLine = new Map(lines.map((line) => [line.id, line.work_item_id]));
-  const byWork = new Map<string, WorkRecipe["components"]>();
+  const componentsByLine = new Map<string, WorkRecipe["components"]>();
   for (const [lineId, rows] of byLine) {
-    const workItemId = workByLine.get(lineId);
-    if (!workItemId) continue;
-    byWork.set(
-      workItemId,
+    componentsByLine.set(
+      lineId,
       rows.map((row) => ({
         materialId: row.itemId,
         mixId: row.mixId,
@@ -257,8 +255,8 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
 
   return {
     byLine,
-    byWork,
-    labourRateByWork,
+    componentsByLine,
+    labourRateByLine,
     rateByMaterialId,
     extraMaterials: [...itemDefs.values()],
   };
@@ -467,6 +465,8 @@ export type EstimateLineRow = {
   workItemId: string;
   code: string;
   name: string;
+  /** What tells this row from another row of the same work, like "W1 1.2 × 1.5" (0157). */
+  label: string | null;
   categoryCode: string;
   /** Null = listed but not yet measured (0097). */
   qty: number | null;
@@ -525,13 +525,15 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     fetchAll<{
       id: string;
       work_item_id: string;
+      label: string | null;
+      created_at: string;
       qty: number | null;
       note: string | null;
       labour_rate: number | null;
     }>((from, to) =>
       supabase
         .from("estimator_estimate_lines")
-        .select("id, work_item_id, qty, note, labour_rate")
+        .select("id, work_item_id, label, created_at, qty, note, labour_rate")
         .eq("estimate_id", estimateId)
         .order("id")
         .range(from, to),
@@ -582,6 +584,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
         : Promise.resolve({ data: [], error: null }),
       estimate.status !== "draft"
         ? fetchAll<{
+            line_id: string;
             work_item_id: string;
             qty: number;
             uom: string | null;
@@ -591,7 +594,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           }>((from, to) =>
             supabase
               .from("estimator_estimate_line_costs")
-              .select("work_item_id, qty, uom, labour_cost, material_cost, total_cost")
+              .select("line_id, work_item_id, qty, uom, labour_cost, material_cost, total_cost")
               .eq("estimate_id", estimateId)
               .order("id")
               .range(from, to),
@@ -685,6 +688,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
         : {
             lineCosts: frozenCosts.map((row) => ({
               workItemId: row.work_item_id,
+              lineId: row.line_id,
               qty: row.qty,
               uom: row.uom,
               labourCost: row.labour_cost,
@@ -710,14 +714,22 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           workItemId: line.work_item_id,
           code: item?.code ?? "?",
           name: item?.name ?? "Unknown work",
+          label: line.label,
           categoryCode: item ? (categoryById.get(item.category_id)?.code ?? "") : "",
           qty: line.qty,
           labourRate: line.labour_rate,
           note: line.note,
+          createdAt: line.created_at,
         };
       })
-      // Sorted by work code, the order the site team reads.
-      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
+      // Sorted by work code, the order the site team reads; a work's rows in the order they were added.
+      .sort(
+        (a, b) =>
+          a.code.localeCompare(b.code, undefined, { numeric: true }) ||
+          a.createdAt.localeCompare(b.createdAt) ||
+          a.id.localeCompare(b.id),
+      )
+      .map(({ createdAt: _createdAt, ...line }) => line),
   };
 }
 

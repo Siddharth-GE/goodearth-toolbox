@@ -25,26 +25,32 @@ export type WorkRecipe = {
   components: { materialId: string | null; mixId: string | null; qtyPerUnit: number }[];
 };
 
-/** A line of an estimate. qty null = listed but not yet measured (0097). */
-export type LineInput = { workItemId: string; qty: number | null };
+/** A line of an estimate. qty null = listed but not yet measured (0097). `key` finds its recipe — the row's id since a
+ * work may sit on an estimate more than once (0157); the work's id where recipes are the rate book's own. */
+export type LineInput = { workItemId: string; qty: number | null; key?: string };
 
-/** The estimate's recipe book: the standard with this villa's variations laid over it (0087, 0088). An override REPLACES, it is not a delta. Applied before any arithmetic. */
-export function applyEstimateOverrides(
+/** Each row's recipe: the rate book's for its work with the row's own list and labour rate laid over it (0087, 0088),
+ * keyed by row id. An override REPLACES, it is not a delta. A work with no setup has no recipe, so it stays not set up. */
+export function lineRecipes(
   recipes: WorkRecipe[],
-  componentsByWork: Map<string, WorkRecipe["components"]>,
-  labourRateByWork: Map<string, number>,
-): WorkRecipe[] {
-  return recipes.map((recipe) => {
-    const components = componentsByWork.get(recipe.workItemId);
-    const labourRate = labourRateByWork.get(recipe.workItemId);
-    if (components === undefined && labourRate === undefined) return recipe;
-    return {
-      ...recipe,
-      components: components ?? recipe.components,
+  lines: { id: string; workItemId: string }[],
+  componentsByLine: Map<string, WorkRecipe["components"]>,
+  labourRateByLine: Map<string, number>,
+): Map<string, WorkRecipe> {
+  const byWork = new Map(recipes.map((recipe) => [recipe.workItemId, recipe]));
+  const byLine = new Map<string, WorkRecipe>();
+  for (const line of lines) {
+    const standard = byWork.get(line.workItemId);
+    if (!standard) continue;
+    const labourRate = labourRateByLine.get(line.id);
+    byLine.set(line.id, {
+      ...standard,
+      components: componentsByLine.get(line.id) ?? standard.components,
       // A villa rate of 0 is real (labour included in a contract), so do not fall back on falsy.
-      labourRate: labourRate === undefined ? recipe.labourRate : labourRate,
-    };
-  });
+      labourRate: labourRate === undefined ? standard.labourRate : labourRate,
+    });
+  }
+  return byLine;
 }
 
 /** This villa's prices (0088) over Masters': one price per material per estimate. */
@@ -88,6 +94,8 @@ export function expandRecipe(
 
 export type LineCost = {
   workItemId: string;
+  /** The estimate row it prices, where the caller knows it. */
+  lineId?: string;
   qty: number | null;
   toMeasure: boolean;
   /** false = no estimator_work_info row: no unit, no labour rate, nothing. */
@@ -256,7 +264,7 @@ export function computeTakeoff(
   const quantities = new Map<string, number>();
 
   for (const line of lines) {
-    const recipe = recipesByWork.get(line.workItemId);
+    const recipe = recipesByWork.get(line.key ?? line.workItemId);
     if (!recipe || recipe.uom === null || line.qty === null) continue;
     const qty = line.qty;
     for (const need of expandRecipe(recipe, mixesById)) {
@@ -297,7 +305,7 @@ export function computeWorkTakeoff(
   >();
 
   for (const line of lines) {
-    const recipe = recipesByWork.get(line.workItemId);
+    const recipe = recipesByWork.get(line.key ?? line.workItemId);
     if (!recipe || recipe.uom === null || line.qty === null) continue;
     const qty = line.qty;
     for (const need of expandRecipe(recipe, mixesById)) {
@@ -377,6 +385,7 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
 
 export type FrozenLineRow = {
   workItemId: string;
+  lineId?: string;
   qty: number;
   /** null = the work had no setup when the estimate was submitted. */
   uom: string | null;
@@ -412,6 +421,7 @@ export function frozenLineCosts(lines: FrozenLineRow[], takeoff: FrozenTakeoffRo
     const rows = takeoffByWork.get(line.workItemId) ?? [];
     return {
       workItemId: line.workItemId,
+      ...(line.lineId ? { lineId: line.lineId } : {}),
       qty: line.qty,
       toMeasure: false,
       isSetUp: line.uom !== null,
