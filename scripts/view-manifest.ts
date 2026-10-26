@@ -150,7 +150,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: false,
     invoker: false,
     money: false,
-    why: "A quantity per store. Inventory carries no money, so there is none to leak.",
+    why: "A quantity per store, material back from a villa included (0159). Inventory carries no money, so there is none to leak.",
   },
   stock_by_location: {
     columns: ["location_kind", "location_id", "item_id", "quantity"],
@@ -158,7 +158,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: false,
     invoker: false,
     money: false,
-    why: "The same quantity, per store or per plot.",
+    why: "The same quantity, per store or per plot; a villa's total is less what went back to a store (0159).",
   },
   pusher_chain_state: {
     columns: [

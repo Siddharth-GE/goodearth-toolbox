@@ -210,7 +210,7 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
 
 export type MovementRow = {
   id: string;
-  kind: "receipt" | "issue" | "transfer_in" | "adjustment";
+  kind: "receipt" | "issue" | "transfer_in" | "adjustment" | "return";
   quantity: number;
   uom: string;
   at: string;
@@ -259,7 +259,7 @@ export async function getItemMovements(
   const unitId = plotUnit?.id ?? null;
 
   // Each source read to completion so the list adds up to the balance; the !inner join pushes the location filter into the query.
-  const [receiptLines, issueLines, adjustments] = await Promise.all([
+  const [receiptLines, issueLines, adjustments, returnLines] = await Promise.all([
     fetchAll((from, to) => {
       let query = supabase
         .from("goods_receipt_lines")
@@ -305,6 +305,22 @@ export async function getItemMovements(
             .range(from, to),
         )
       : Promise.resolve([] as never[]),
+    // Material back from a villa (0159): into a store, out of a plot.
+    fetchAll((from, to) => {
+      const query = supabase
+        .from("site_return_lines")
+        .select(
+          "id, quantity, uom, created_by, return_id, site_returns!inner(id, plot_id, store_id, returned_on, reason)",
+        )
+        .eq("item_id", itemId);
+      return (
+        isStore
+          ? query.eq("site_returns.store_id", locationId)
+          : query.eq("site_returns.plot_id", locationId)
+      )
+        .order("id")
+        .range(from, to);
+    }),
   ]);
 
   type ReceiptParent = {
@@ -325,6 +341,17 @@ export async function getItemMovements(
     plot_id: string | null;
     issued_at: string;
   };
+  type ReturnParent = {
+    id: string;
+    plot_id: string;
+    store_id: string;
+    returned_on: string;
+    reason: string;
+  };
+  const returns = returnLines.filter((line) => {
+    const parent = line.site_returns as ReturnParent | null;
+    return parent && (isStore ? parent.store_id : parent.plot_id) === locationId;
+  });
 
   const receivedHere = (parent: ReceiptParent | null) => {
     if (!parent) return false;
@@ -356,15 +383,18 @@ export async function getItemMovements(
     labelsById(supabase, "stores", [
       ...issuesOut.map((line) => (line.stock_issues as IssueParent).to_store_id),
       ...transfersIn.map((line) => (line.stock_issues as IssueParent).store_id),
+      ...returns.map((line) => (line.site_returns as ReturnParent).store_id),
     ]),
     labelsById(supabase, "plots", [
       ...issuesOut.map((line) => (line.stock_issues as IssueParent).plot_id),
+      ...returns.map((line) => (line.site_returns as ReturnParent).plot_id),
     ]),
     profileNames(supabase, [
       ...receipts.map((l) => l.created_by),
       ...issuesOut.map((l) => l.created_by),
       ...transfersIn.map((l) => l.created_by),
       ...adjustments.map((a) => a.created_by),
+      ...returns.map((l) => l.created_by),
     ]),
   ]);
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
@@ -429,6 +459,23 @@ export async function getItemMovements(
         note: null,
         actor_name: nameOf(row.created_by),
         href: null,
+      };
+    }),
+    ...returns.map((line): MovementRow => {
+      const parent = line.site_returns as ReturnParent;
+      return {
+        id: line.id,
+        kind: "return",
+        quantity: isStore ? line.quantity : -line.quantity,
+        uom: line.uom,
+        at: parent.returned_on,
+        reference: "Return",
+        counterparty: isStore
+          ? `${plots.get(parent.plot_id) ?? "a villa"} (back from site)`
+          : `${otherStores.get(parent.store_id) ?? "a store"} (back to store)`,
+        note: parent.reason,
+        actor_name: nameOf(line.created_by),
+        href: "/inventory/returns",
       };
     }),
   ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));

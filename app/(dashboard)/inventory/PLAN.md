@@ -1,6 +1,6 @@
 # Inventory — the rules
 
-The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`, `0108`, `0112`.
+The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`, `0108`, `0112`, `0159`.
 
 ## The shape of it
 
@@ -19,7 +19,7 @@ Rates are for `/inventory` holders only (founder, 2026-10-08): a store-keeper va
 ## Two stock views, deliberately
 
 - **`stock_on_hand`** — a **store's live balance**, which both negative-stock guards read. **A plot must never enter it**: a plot has no balance to protect.
-- **`stock_by_location`** — **where material is**, stores and plots. For a plot it is a running total that only grows — nothing leaves a site through this system. The Stock screen reads it.
+- **`stock_by_location`** — **where material is**, stores and plots. For a plot it is what reached it, less what went back to a store (**Returns**, `0159`). The Stock screen reads it.
 
 ## Settled decisions
 
@@ -50,7 +50,7 @@ The quantity guards serialise on an **advisory transaction lock**, not `select �
 
 ## Things that will bite
 
-- **A delivery or issue something has used is corrected by an adjustment** — and adjustments apply only to stores, so **a used site delivery cannot be corrected at all**. The founder chose deleting the untouched ones over return entries (2026-10-23); build returns only if that bites.
+- **A delivery or issue something has used is corrected by an adjustment** — and adjustments apply only to stores, so **a used site delivery cannot be corrected at all**. Material a villa did not use **goes back through Returns** (`0159`, team's additions 2026-10-26): a villa, a store, a reason and the items, saved in one go by `record_site_return`, never more than is still at the villa. It goes back into the batches the villa drew, newest issue first, so it keeps their rate; a delivery straight to the site is a batch of its own at its delivery's rate, and only stock issued before batches comes back with none. A return is never changed or deleted — put a mistake right by issuing the material again — and once an item has come back from a villa, an issue or a direct delivery of it to that villa can no longer be deleted. Budget against actual takes a return's value off the villa's material issued, **naming no work**: a return records what came back, not which job left it over, so the villa's total is right but the per-work split is not reduced. Asking for the work on every return was judged more friction than it is worth at the store.
 - **Units are not reconciled across movements** — stock sums quantities whatever unit each recorded. If an item's unit changes, the fix belongs in `stock_on_hand`.
 - **History from before batches is replayed** (`0112`, `replay_pre_batch_history()`): every issue line and removal recorded before `0108` was applied draws its batches oldest first, but only from batches that existed at the time — receipt lines and movements recorded no later than the event — so an old issue never draws a later delivery. Owner-only, invoker, re-runnable (a second run writes nothing). **Apply `0108` and `0112` together**: an issue recorded between them drew batches the replay would draw again, and the replay refuses rather than leave a batch below zero.
 - **`stores` has no `updated_at` or actor columns** (`0004`).
