@@ -10,7 +10,8 @@
 
 -- 1 ------------------------------------------------------------------------------------------------------
 create table if not exists site_category_owners (
-  category_id uuid primary key references work_categories (id),
+  id uuid primary key default gen_random_uuid(),
+  category_id uuid not null unique references work_categories (id),
   owner_id uuid not null references profiles (id),
   created_by uuid references profiles (id),
   updated_by uuid references profiles (id),

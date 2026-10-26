@@ -9111,6 +9111,7 @@ export type Database = {
       site_category_owners: {
         Row: {
           category_id: string
+          id: string
           created_at: string
           created_by: string | null
           owner_id: string
@@ -9119,6 +9120,7 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          id?: string
           created_at?: string
           created_by?: string | null
           owner_id: string
@@ -9127,6 +9129,7 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          id?: string
           created_at?: string
           created_by?: string | null
           owner_id?: string

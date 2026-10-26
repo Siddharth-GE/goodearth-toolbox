@@ -2382,6 +2382,7 @@ export const TURING_SCHEMA: Schema = {
       "category_id": "string",
       "created_at": "string",
       "created_by": "string | null",
+      "id": "string",
       "owner_id": "string",
       "updated_at": "string",
       "updated_by": "string | null"
