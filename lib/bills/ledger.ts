@@ -137,3 +137,45 @@ export function paymentProblem(input: {
   }
   return undefined;
 }
+
+export type LedgerEntryKind = "bill" | "payment" | "advance" | "recovery";
+
+export type LedgerEntry = {
+  id: string;
+  kind: LedgerEntryKind;
+  on: string;
+  /** A bill's total, or money paid out; a reversal is the same amount below zero. */
+  amount: number;
+  /** A recovery whose advance or bill lies outside the project or company shown: it then settles the bill like a
+   * payment ("pays"), or brings the advance back onto this account ("returns"). Absent, it moves nothing. */
+  crossing?: "pays" | "returns";
+};
+
+/** A day's bill comes before what paid it, so the balance never dips below what is owed on the way. */
+const KIND_ORDER: Record<LedgerEntryKind, number> = {
+  bill: 0,
+  advance: 1,
+  payment: 2,
+  recovery: 3,
+};
+
+/** One contractor's account, oldest first: a bill adds what is owed, a payment or an advance takes it away, and a
+ * recovery only moves an advance onto a bill, so it leaves the balance alone. A balance below zero is advance
+ * the contractor still holds. */
+export function contractorLedger<T extends LedgerEntry>(entries: T[]): (T & { balance: number })[] {
+  const sorted = [...entries].sort(
+    (a, b) =>
+      a.on.localeCompare(b.on) ||
+      KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+      a.id.localeCompare(b.id),
+  );
+  let balance = 0;
+  return sorted.map((entry) => {
+    if (entry.kind === "bill") balance += entry.amount;
+    else if (entry.kind !== "recovery") balance -= entry.amount;
+    else if (entry.crossing === "pays") balance -= entry.amount;
+    else if (entry.crossing === "returns") balance += entry.amount;
+    balance = roundPaise(balance);
+    return { ...entry, balance };
+  });
+}

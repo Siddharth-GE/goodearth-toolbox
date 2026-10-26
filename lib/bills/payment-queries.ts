@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 
 import {
   cashRequestFigures,
+  contractorLedger,
   contractorPosition,
+  type LedgerEntry,
   type CashRequestStatus,
   type ContractorPosition,
   type MoneyKind,
@@ -144,45 +146,76 @@ export type OpenAdvance = {
   payment_ref: string;
   project_name: string;
   work_order: string | null;
+  same_project: boolean;
+  /** Given in the same company as the bill: only such an advance is suggested against it, as companies keep separate books. */
+  same_company: boolean;
 };
 
-export async function getOpenAdvances(vendorId: string): Promise<OpenAdvance[]> {
+/** The vendor's advances still to recover: the bill's own project first, then its company, each oldest first. */
+export async function getOpenAdvances(
+  vendorId: string,
+  billProjectId?: string,
+): Promise<OpenAdvance[]> {
   await requireTool("/bills");
   const supabase = await createClient();
-  const advances = await fetchAll((from, to) =>
-    supabase
-      .from("contractor_advances")
-      .select(
-        "id, amount, paid_on, payment_ref, reverses_id, projects(name), labour_contracts(reference)",
-      )
-      .eq("vendor_id", vendorId)
-      .order("paid_on")
-      .order("id")
-      .range(from, to),
-  );
+  const [advances, billProject] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_advances")
+        .select(
+          "id, amount, paid_on, payment_ref, reverses_id, project_id, projects(name, company_id), labour_contracts(reference)",
+        )
+        .eq("vendor_id", vendorId)
+        .order("paid_on")
+        .order("id")
+        .range(from, to),
+    ),
+    billProjectId
+      ? supabase.from("projects").select("company_id").eq("id", billProjectId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (billProject.error) {
+    console.error("getOpenAdvances project failed:", billProject.error);
+    throw new Error("Could not read the bill's project.", { cause: billProject.error });
+  }
   if (advances.length === 0) return [];
+  const billCompany = billProject.data?.company_id ?? null;
   const recovered = await recoveredByAdvance(
     supabase,
     advances.map((advance) => advance.id),
   );
   const reversed = new Set(advances.map((advance) => advance.reverses_id));
-  return advances
-    .filter((advance) => advance.reverses_id === null && !reversed.has(advance.id))
-    .map((advance) => {
-      const back = recovered.get(advance.id) ?? 0;
-      return {
-        id: advance.id,
-        amount: advance.amount,
-        recovered: back,
-        outstanding: Math.max(0, roundPaise(advance.amount - back)),
-        paid_on: advance.paid_on,
-        payment_ref: advance.payment_ref,
-        project_name: (advance.projects as { name: string } | null)?.name ?? "—",
-        work_order:
-          (advance.labour_contracts as { reference: string | null } | null)?.reference ?? null,
-      };
-    })
-    .filter((advance) => advance.outstanding > 0);
+  return (
+    advances
+      .filter((advance) => advance.reverses_id === null && !reversed.has(advance.id))
+      .map((advance) => {
+        const back = recovered.get(advance.id) ?? 0;
+        return {
+          id: advance.id,
+          amount: advance.amount,
+          recovered: back,
+          outstanding: Math.max(0, roundPaise(advance.amount - back)),
+          paid_on: advance.paid_on,
+          payment_ref: advance.payment_ref,
+          project_name: (advance.projects as { name: string } | null)?.name ?? "—",
+          work_order:
+            (advance.labour_contracts as { reference: string | null } | null)?.reference ?? null,
+          same_project: advance.project_id === billProjectId,
+          same_company:
+            advance.project_id === billProjectId ||
+            (billCompany !== null &&
+              (advance.projects as { company_id: string | null } | null)?.company_id ===
+                billCompany),
+        };
+      })
+      .filter((advance) => advance.outstanding > 0)
+      // Stable: within each band they stay oldest first.
+      .sort(
+        (a, b) =>
+          Number(b.same_project) - Number(a.same_project) ||
+          Number(b.same_company) - Number(a.same_company),
+      )
+  );
 }
 
 async function recoveredByAdvance(supabase: Client, advanceIds?: string[]) {
@@ -258,14 +291,41 @@ async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
   });
 }
 
-export type PayableBill = BillMoney;
+export type PayableBill = BillMoney & {
+  /** The share of the vendor's advances still out that this bill could take: spread oldest bill first, so a vendor's
+   * advance is counted once across their bills. Net of recoveries and reversals. */
+  advance_out: number;
+};
 
 export async function listPayableBills(): Promise<PayableBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
-  return (await billsWithSettlement(supabase)).filter(
-    (bill) => bill.status === "approved" && bill.pending > 0,
-  );
+  const [bills, advances, recovered] = await Promise.all([
+    billsWithSettlement(supabase),
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_advances")
+        .select("id, vendor_id, amount")
+        .order("id")
+        .range(from, to),
+    ),
+    recoveredByAdvance(supabase),
+  ]);
+  // A reversal row is the same amount below zero, so the plain sums already net it.
+  const out = new Map<string, number>();
+  for (const advance of advances) {
+    const left = advance.amount - (recovered.get(advance.id) ?? 0);
+    out.set(advance.vendor_id, (out.get(advance.vendor_id) ?? 0) + left);
+  }
+  // billsWithSettlement reads oldest invoice first, so each vendor's advance goes to their oldest bills.
+  return bills
+    .filter((bill) => bill.status === "approved" && bill.pending > 0)
+    .map((bill) => {
+      const left = Math.max(0, roundPaise(bill.vendor_id ? (out.get(bill.vendor_id) ?? 0) : 0));
+      const share = Math.min(left, bill.pending);
+      if (bill.vendor_id) out.set(bill.vendor_id, left - share);
+      return { ...bill, advance_out: roundPaise(share) };
+    });
 }
 
 export type CashRequestRow = {
@@ -641,10 +701,29 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
 export type ContractorRow = {
   vendor_id: string;
   vendor_name: string;
+  is_contractor: boolean;
+  contractor_no: string | null;
   position: ContractorPosition;
 };
 
-export async function listContractorPositions(projectId?: string): Promise<ContractorRow[]> {
+/** Who is a contractor and their number, for the vendors a money list names. */
+async function vendorFacts(supabase: Client, ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0)
+    return new Map<string, { is_contractor: boolean; contractor_no: string | null }>();
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from("vendors")
+      .select("id, is_contractor, contractor_no")
+      .in("id", unique)
+      .order("id")
+      .range(from, to),
+  );
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+/** projectIds narrows to those projects (one project, or a company's); undefined is every project. */
+export async function listContractorPositions(projectIds?: string[]): Promise<ContractorRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
   const [bills, advances, recovered] = await Promise.all([
@@ -675,7 +754,7 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     return fresh;
   };
   for (const bill of bills) {
-    if (!bill.vendor_id || (projectId && bill.project_id !== projectId)) continue;
+    if (!bill.vendor_id || (projectIds && !projectIds.includes(bill.project_id))) continue;
     entry(bill.vendor_id, bill.vendor_name).bills.push({
       total: bill.total,
       paid: bill.paid,
@@ -683,7 +762,7 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     });
   }
   for (const advance of advances) {
-    if (projectId && advance.project_id !== projectId) continue;
+    if (projectIds && !projectIds.includes(advance.project_id)) continue;
     entry(
       advance.vendor_id,
       (advance.vendors as { name: string } | null)?.name ?? "—",
@@ -693,11 +772,182 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     });
   }
 
+  const facts = await vendorFacts(supabase, [...byVendor.keys()]);
   return [...byVendor.entries()]
     .map(([vendorId, value]) => ({
       vendor_id: vendorId,
       vendor_name: value.name,
+      is_contractor: facts.get(vendorId)?.is_contractor ?? false,
+      contractor_no: facts.get(vendorId)?.contractor_no ?? null,
       position: contractorPosition(value.bills, value.advances),
     }))
     .sort((a, b) => a.vendor_name.localeCompare(b.vendor_name));
+}
+
+export type ContractorLedgerRow = LedgerEntry & {
+  balance: number;
+  /** What it was: a bill's number and their own count, a payment's reference, an advance's. */
+  label: string;
+  bill_id: string | null;
+  project_name: string;
+  reversal: boolean;
+};
+
+export type ContractorLedger = {
+  vendor: { id: string; name: string; contractor_no: string | null; is_contractor: boolean };
+  rows: ContractorLedgerRow[];
+  /** Bills recorded and not yet approved: owed once approved, so outside the balance. */
+  waiting: { count: number; total: number };
+};
+
+/** One vendor's account (approved bills, payments, advances, recoveries), oldest first with a running balance. */
+export async function getContractorLedger(
+  vendorId: string,
+  projectIds?: string[],
+): Promise<ContractorLedger | null> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const { data: vendor, error: vendorError } = await supabase
+    .from("vendors")
+    .select("id, name, contractor_no, is_contractor")
+    .eq("id", vendorId)
+    .maybeSingle();
+  if (vendorError) {
+    console.error("getContractorLedger vendor failed:", vendorError);
+    throw new Error("Could not read the contractor.", { cause: vendorError });
+  }
+  if (!vendor) return null;
+
+  const [bills, advances] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("bills")
+        .select(
+          "id, reference, status, project_id, invoice_date, total_amount, vendor_seq, projects(name)",
+        )
+        .eq("vendor_id", vendorId)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_advances")
+        .select("id, amount, paid_on, payment_ref, project_id, reverses_id, projects(name)")
+        .eq("vendor_id", vendorId)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const inScope = (projectId: string) => !projectIds || projectIds.includes(projectId);
+  const owed = bills.filter(
+    (bill) => (bill.status === "approved" || bill.status === "paid") && inScope(bill.project_id),
+  );
+  const billIds = owed.map((bill) => bill.id);
+  // Every recovery is on one of this vendor's bills; it may cross projects, so it is read for all of them.
+  const allBillIds = bills.map((bill) => bill.id);
+  const [payments, allRecoveries] = await Promise.all([
+    billIds.length
+      ? fetchAll((from, to) =>
+          supabase
+            .from("bill_payments")
+            .select("id, bill_id, amount, paid_on, payment_ref, reverses_id")
+            .in("bill_id", billIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    allBillIds.length
+      ? fetchAll((from, to) =>
+          supabase
+            .from("advance_recoveries")
+            .select("id, bill_id, advance_id, amount, recovered_on, reverses_id")
+            .in("bill_id", allBillIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  const scopedAdvanceIds = new Set(
+    advances.filter((row) => inScope(row.project_id)).map((row) => row.id),
+  );
+  const ownBill = new Set(billIds);
+  const recoveries = allRecoveries.flatMap((row) => {
+    const billIn = ownBill.has(row.bill_id);
+    const advanceIn = scopedAdvanceIds.has(row.advance_id);
+    if (!billIn && !advanceIn) return [];
+    const crossing: "pays" | "returns" | undefined =
+      billIn && advanceIn ? undefined : billIn ? "pays" : "returns";
+    return [{ ...row, crossing }];
+  });
+
+  const projectName = (embed: unknown) => (embed as { name: string } | null)?.name ?? "—";
+  const billById = new Map(owed.map((bill) => [bill.id, bill]));
+  const billLabel = (id: string) => {
+    const bill = billById.get(id);
+    return bill
+      ? `${bill.reference ?? "—"}${bill.vendor_seq ? ` (their bill ${bill.vendor_seq})` : ""}`
+      : "—";
+  };
+  const entries = [
+    ...owed.map((bill) => ({
+      id: bill.id,
+      kind: "bill" as const,
+      // Dated as on its paper; only approved bills count, a recorded one is listed apart.
+      on: bill.invoice_date,
+      amount: bill.total_amount ?? 0,
+      label: billLabel(bill.id),
+      bill_id: bill.id,
+      project_name: projectName(bill.projects),
+      reversal: false,
+    })),
+    ...payments.map((row) => ({
+      id: row.id,
+      kind: "payment" as const,
+      on: row.paid_on,
+      amount: row.amount,
+      label: `${row.payment_ref} · ${billLabel(row.bill_id)}`,
+      bill_id: row.bill_id,
+      project_name: projectName(billById.get(row.bill_id)?.projects),
+      reversal: row.reverses_id !== null,
+    })),
+    ...advances
+      .filter((row) => inScope(row.project_id))
+      .map((row) => ({
+        id: row.id,
+        kind: "advance" as const,
+        on: row.paid_on,
+        amount: row.amount,
+        label: row.payment_ref,
+        bill_id: null,
+        project_name: projectName(row.projects),
+        reversal: row.reverses_id !== null,
+      })),
+    ...recoveries.map((row) => ({
+      id: row.id,
+      kind: "recovery" as const,
+      crossing: row.crossing,
+      on: row.recovered_on,
+      amount: row.amount,
+      label:
+        row.crossing === "returns"
+          ? "Advance set against a bill outside this view"
+          : row.crossing === "pays"
+            ? `An advance from outside this view set against ${billLabel(row.bill_id)}`
+            : `Advance set against ${billLabel(row.bill_id)}`,
+      bill_id: row.crossing === "returns" ? null : row.bill_id,
+      project_name:
+        row.crossing === "returns" ? "—" : projectName(billById.get(row.bill_id)?.projects),
+      reversal: row.reverses_id !== null,
+    })),
+  ];
+
+  const waiting = bills.filter((bill) => bill.status === "recorded" && inScope(bill.project_id));
+  return {
+    vendor,
+    rows: contractorLedger(entries),
+    waiting: {
+      count: waiting.length,
+      total: roundPaise(waiting.reduce((sum, bill) => sum + (bill.total_amount ?? 0), 0)),
+    },
+  };
 }

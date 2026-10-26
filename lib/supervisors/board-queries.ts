@@ -224,7 +224,8 @@ export async function readSiteVillas() {
   }
   const lastLabour = new Map<string, Map<string, string>>();
   for (const log of logs) {
-    const group = groupOfWork.get(log.work_item_id);
+    // A named Additional or Rework log has no work, so it starts no stage.
+    const group = log.work_item_id ? groupOfWork.get(log.work_item_id) : undefined;
     if (!group) continue;
     const forPlot = lastLabour.get(log.plot_id) ?? new Map<string, string>();
     const last = forPlot.get(group);

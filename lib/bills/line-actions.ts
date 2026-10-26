@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { billLinesProblem, lineMoneyOf, type BillLineDraft } from "./lines";
+import { billLinesProblem, lineMoneyOf, receivedCapProblem, type BillLineDraft } from "./lines";
 import { rollUpBill } from "./math";
 import { documentChargesProblem, roundPaise, type DocumentCharges } from "@/lib/line-money";
 
@@ -24,7 +24,62 @@ const LINE_GUARD_PHRASES = [
   "permanent",
   "no longer exists",
   "issued purchase order",
+  "has arrived",
 ] as const;
+
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+/** What arrived and what other bills took, per PO line on these lines: so a bill past what arrived is refused before
+ * anything is written, not half-saved by bill_lines_guard (0156). A message, or undefined to go ahead. */
+async function receivedCheck(
+  supabase: Client,
+  billId: string | null,
+  lines: BillLineDraft[],
+): Promise<string | undefined> {
+  const ids = [
+    ...new Set(
+      lines.flatMap((line) => (line.kind === "material" && line.poLineId ? [line.poLineId] : [])),
+    ),
+  ];
+  if (ids.length === 0) return undefined;
+  const [facts, own] = await Promise.all([
+    supabase
+      .from("po_line_billing_facts")
+      .select("po_line_id, received_quantity, billed_quantity")
+      .in("po_line_id", ids),
+    billId
+      ? supabase
+          .from("bill_lines")
+          .select("po_line_id, quantity")
+          .eq("bill_id", billId)
+          .in("po_line_id", ids)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (facts.error || own.error) {
+    console.error("receivedCheck failed:", facts.error ?? own.error);
+    return "Could not check what was received. Try again.";
+  }
+  const onThisBill = new Map<string, number>();
+  for (const line of own.data ?? []) {
+    if (line.po_line_id) {
+      onThisBill.set(
+        line.po_line_id,
+        (onThisBill.get(line.po_line_id) ?? 0) + (line.quantity ?? 0),
+      );
+    }
+  }
+  const received = new Map<string, number>();
+  const billedElsewhere = new Map<string, number>();
+  for (const fact of facts.data ?? []) {
+    if (!fact.po_line_id) continue;
+    received.set(fact.po_line_id, fact.received_quantity ?? 0);
+    billedElsewhere.set(
+      fact.po_line_id,
+      (fact.billed_quantity ?? 0) - (onThisBill.get(fact.po_line_id) ?? 0),
+    );
+  }
+  return receivedCapProblem(lines, received, billedElsewhere);
+}
 
 export type BillLineSave = BillLineDraft & { id?: string };
 
@@ -92,7 +147,27 @@ export async function saveBillLines(billId: string, lines: BillLineSave[]): Prom
     }
   }
 
-  for (const [index, line] of lines.entries()) {
+  const capProblem = await receivedCheck(supabase, billId, lines);
+  if (capProblem) return { error: capProblem };
+
+  // Removals first, then lines that drop, then rises and new lines, so a quantity moved between lines of one PO line
+  // never passes what arrived on the way.
+  const removedIds = [...before.keys()].filter((id) => !kept.has(id));
+  if (removedIds.length) {
+    const { error } = await supabase.from("bill_lines").delete().in("id", removedIds);
+    if (error) {
+      console.error("saveBillLines delete failed:", error);
+      revalidatePath("/bills", "layout");
+      return guardError(error, "Could not remove a line. Try again.", LINE_GUARD_PHRASES);
+    }
+  }
+  const rises = (line: BillLineSave) =>
+    !line.id || (line.quantity ?? 0) > (before.get(line.id)?.quantity ?? 0);
+  const ordered = [
+    ...[...lines.entries()].filter(([, line]) => !rises(line)),
+    ...[...lines.entries()].filter(([, line]) => rises(line)),
+  ];
+  for (const [index, line] of ordered) {
     const values = row(billId, user.id, line, index);
     const { error } = line.id
       ? await supabase.from("bill_lines").update(values).eq("id", line.id)
@@ -101,15 +176,6 @@ export async function saveBillLines(billId: string, lines: BillLineSave[]): Prom
       console.error("saveBillLines write failed:", error);
       revalidatePath("/bills", "layout");
       return guardError(error, "Could not save a line. Try again.", LINE_GUARD_PHRASES);
-    }
-  }
-  const removedIds = [...before.keys()].filter((id) => !kept.has(id));
-  if (removedIds.length) {
-    const { error } = await supabase.from("bill_lines").delete().in("id", removedIds);
-    if (error) {
-      console.error("saveBillLines delete failed:", error);
-      revalidatePath("/bills", "layout");
-      return guardError(error, "Could not remove a line. Try again.", LINE_GUARD_PHRASES);
     }
   }
 
@@ -261,6 +327,10 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   if (totals.total <= 0) return { error: "The bill's total must be more than zero." };
 
   const supabase = await createClient();
+  if (input.kind === "po") {
+    const capProblem = await receivedCheck(supabase, null, input.lines);
+    if (capProblem) return { error: capProblem };
+  }
   // The casts paper over typegen (see createBill).
   const minted =
     input.kind === "nmr"

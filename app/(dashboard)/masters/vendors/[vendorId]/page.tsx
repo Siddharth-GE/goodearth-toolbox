@@ -47,7 +47,7 @@ export default async function VendorDetailPage({
         title={vendor.name}
         backHref="/masters/vendors"
         backLabel="All vendors"
-        description={[vendor.contact_name, vendor.mobile, vendor.gst_no]
+        description={[vendor.contractor_no, vendor.contact_name, vendor.mobile, vendor.gst_no]
           .filter(Boolean)
           .join(" · ")}
         actions={

@@ -135,3 +135,32 @@ export function describeLabour(log: {
   if (log.others) parts.push(`${log.others} other${log.others === 1 ? "" : "s"}`);
   return parts.join(", ") || "Nobody";
 }
+
+const NAME_LIMIT = 120;
+
+/** What a log was on: a Masters work, or — for Additional work or Rework only — a typed name (0156). A named log is
+ * daily wages or a lump sum: piece-work by quantity needs a work's unit. labour_logs_work_or_name holds the same. */
+export function labourWork(input: {
+  workItemId: string;
+  customName: string;
+  workClass: string;
+  kind: string;
+}): { work_item_id: string | null; custom_name: string | null } | { error: string } {
+  const name = input.customName.trim();
+  if (!name) {
+    return input.workItemId
+      ? { work_item_id: input.workItemId, custom_name: null }
+      : { error: "Pick the work the labour was on." };
+  }
+  if (input.workClass !== "additional" && input.workClass !== "rework") {
+    return { error: "Only Additional work or Rework can be given a name instead of a work." };
+  }
+  if (input.kind === "pw_qty") {
+    return {
+      error:
+        "Work with a typed name is paid as daily wages or a lump sum — a quantity needs a work's unit.",
+    };
+  }
+  if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
+  return { work_item_id: null, custom_name: name };
+}

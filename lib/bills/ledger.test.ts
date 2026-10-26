@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   cashRequestFigures,
+  contractorLedger,
   contractorPosition,
   lineLeftToPay,
   mondayOf,
@@ -84,4 +85,40 @@ test("money is reversed once, by an approver, and an advance only once nothing i
     blocked?.kind === "blocked" ? blocked.why : "",
     /25,000\.00 of it has been recovered/,
   );
+});
+
+test("a contractor's ledger: bills add, payments and advances take away, a recovery moves nothing", () => {
+  const rows = contractorLedger([
+    { id: "p1", kind: "payment", on: "2026-10-12", amount: 60000 },
+    { id: "a1", kind: "advance", on: "2026-10-01", amount: 50000 },
+    { id: "b1", kind: "bill", on: "2026-10-12", amount: 100000 },
+    { id: "r1", kind: "recovery", on: "2026-10-12", amount: 40000 },
+    { id: "p2", kind: "payment", on: "2026-10-20", amount: -60000 },
+  ]);
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.balance]),
+    [
+      ["a1", -50000],
+      ["b1", 50000],
+      ["p1", -10000],
+      ["r1", -10000],
+      // A reversed payment puts what it paid back on what is owed.
+      ["p2", 50000],
+    ],
+  );
+});
+
+test("filtered to one project, a recovery across projects pays the bill or brings the advance back", () => {
+  // ₹10k advanced on project A, recovered on a ₹15k bill on project B, ₹5k paid.
+  const onB = contractorLedger([
+    { id: "b", kind: "bill", on: "2026-10-05", amount: 15000 },
+    { id: "r", kind: "recovery", on: "2026-10-06", amount: 10000, crossing: "pays" },
+    { id: "p", kind: "payment", on: "2026-10-07", amount: 5000 },
+  ]);
+  assert.equal(onB.at(-1)?.balance, 0);
+  const onA = contractorLedger([
+    { id: "a", kind: "advance", on: "2026-10-01", amount: 10000 },
+    { id: "r", kind: "recovery", on: "2026-10-06", amount: 10000, crossing: "returns" },
+  ]);
+  assert.equal(onA.at(-1)?.balance, 0);
 });

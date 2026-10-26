@@ -385,7 +385,16 @@ export function AddBills({ requestId, bills }: { requestId: string; bills: Payab
                 </TableCell>
                 <TableCell className="text-muted">{formatDate(bill.invoice_date)}</TableCell>
                 <TableCell className="text-right font-mono">{formatMoney(bill.total)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMoney(bill.pending)}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatMoney(bill.pending)}
+                  {bill.advance_out > 0 && (
+                    <div className="text-warning text-xs font-medium">
+                      {`${formatMoney(bill.advance_out)} advance out — net ${formatMoney(
+                        Math.max(0, bill.pending - bill.advance_out),
+                      )}`}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   {on && (
                     <Input

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { describeLabour, labourShape, type LabourShapeInput } from "./labour";
+import { describeLabour, labourShape, labourWork, type LabourShapeInput } from "./labour";
 
 const input = (over: Partial<LabourShapeInput> = {}): LabourShapeInput => ({
   kind: "nmr",
@@ -90,5 +90,35 @@ test("each kind reads as one line", () => {
   assert.equal(
     describeLabour({ ...base, kind: "pw_lump", description: "Porch plaster" }),
     "Lump sum: Porch plaster",
+  );
+});
+
+test("a log is on a work, or Additional work or Rework is on a typed name", () => {
+  const base = { workItemId: "w1", customName: "", workClass: "standard", kind: "nmr" };
+  assert.deepEqual(labourWork(base), { work_item_id: "w1", custom_name: null });
+  assert.match(
+    (labourWork({ ...base, workItemId: "" }) as { error: string }).error,
+    /Pick the work/,
+  );
+  assert.match(
+    (labourWork({ ...base, customName: "Extra parapet" }) as { error: string }).error,
+    /Only Additional work or Rework/,
+  );
+  assert.deepEqual(
+    labourWork({ ...base, workItemId: "", customName: "  Extra parapet ", workClass: "rework" }),
+    { work_item_id: null, custom_name: "Extra parapet" },
+  );
+  // A typed name wins over a work the form still holds.
+  assert.deepEqual(
+    labourWork({ ...base, customName: "Sump shift", workClass: "additional", kind: "pw_lump" }),
+    { work_item_id: null, custom_name: "Sump shift" },
+  );
+  assert.match(
+    (
+      labourWork({ ...base, customName: "By qty", workClass: "rework", kind: "pw_qty" }) as {
+        error: string;
+      }
+    ).error,
+    /daily wages or a lump sum/,
   );
 });

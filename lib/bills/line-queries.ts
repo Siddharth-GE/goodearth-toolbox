@@ -210,20 +210,30 @@ export async function countLabourEntriesOnBill(billId: string): Promise<number> 
   return count ?? 0;
 }
 
-export type DeliveryInvoice = { invoiceNo: string; invoiceDate: string | null; grn: string };
+export type DeliveryForBill = {
+  id: string;
+  grn: string;
+  receivedAt: string;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+  /** Its invoice number is already on one of this PO's bills. */
+  billed: boolean;
+  /** What it brought, per PO line. */
+  quantities: Record<string, number>;
+};
 
-/** The supplier's invoices this PO's deliveries carried (0132), less any already on one of its bills. Read from the open stock table. */
-export async function getPoInvoicesForBill(poId: string): Promise<DeliveryInvoice[]> {
+/** Every delivery against this PO, newest first, so a bill can be made for one of them: its invoice and what it brought.
+ * Read from the open stock tables. */
+export async function getPoDeliveriesForBill(poId: string): Promise<DeliveryForBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
   const [receipts, billed] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("goods_receipts")
-        .select("id, reference, invoice_no, invoice_date")
+        .select("id, reference, received_at, invoice_no, invoice_date")
         .eq("po_id", poId)
-        .not("invoice_no", "is", null)
-        .order("received_at")
+        .order("received_at", { ascending: false })
         .order("id")
         .range(from, to),
     ),
@@ -231,15 +241,33 @@ export async function getPoInvoicesForBill(poId: string): Promise<DeliveryInvoic
       supabase.from("bills").select("id, invoice_no").eq("po_id", poId).order("id").range(from, to),
     ),
   ]);
+  if (receipts.length === 0) return [];
+  const lines = await fetchAll((from, to) =>
+    supabase
+      .from("goods_receipt_lines")
+      .select("receipt_id, po_line_id, quantity")
+      .in(
+        "receipt_id",
+        receipts.map((receipt) => receipt.id),
+      )
+      .order("id")
+      .range(from, to),
+  );
   const used = new Set(billed.map((bill) => bill.invoice_no.trim().toLowerCase()));
-  const seen = new Set<string>();
-  const invoices: DeliveryInvoice[] = [];
-  for (const receipt of receipts) {
-    const invoiceNo = (receipt.invoice_no ?? "").trim();
-    const key = invoiceNo.toLowerCase();
-    if (!invoiceNo || used.has(key) || seen.has(key)) continue;
-    seen.add(key);
-    invoices.push({ invoiceNo, invoiceDate: receipt.invoice_date, grn: receipt.reference ?? "—" });
+  const byReceipt = new Map<string, Record<string, number>>();
+  for (const line of lines) {
+    if (!line.po_line_id) continue;
+    const quantities = byReceipt.get(line.receipt_id) ?? {};
+    quantities[line.po_line_id] = (quantities[line.po_line_id] ?? 0) + line.quantity;
+    byReceipt.set(line.receipt_id, quantities);
   }
-  return invoices;
+  return receipts.map((receipt) => ({
+    id: receipt.id,
+    grn: receipt.reference ?? "—",
+    receivedAt: receipt.received_at,
+    invoiceNo: receipt.invoice_no?.trim() || null,
+    invoiceDate: receipt.invoice_date,
+    billed: Boolean(receipt.invoice_no && used.has(receipt.invoice_no.trim().toLowerCase())),
+    quantities: byReceipt.get(receipt.id) ?? {},
+  }));
 }

@@ -7,6 +7,8 @@ import {
   dayRatesFromLines,
   leftOnWorkOrderLine,
   leftToBill,
+  linesFromDelivery,
+  receivedCapProblem,
   linesFromPo,
   linesFromWorkOrder,
   type BillLineDraft,
@@ -174,4 +176,45 @@ test("when a bill on the order names no stage, nothing is taken as billed — ev
   assert.equal(measured.quantity, null);
   assert.equal(measured.labourContractLineId, "wl1");
   assert.equal(lump.rate, 15000);
+});
+
+test("a bill for one delivery takes what it brought, never past what is left to bill", () => {
+  // 60 received, 20 billed: 40 left. This delivery brought 25 bags of cement and nothing of the sand.
+  const lines = linesFromDelivery([poLine(), poLine({ po_line_id: "sand", item_name: "Sand" })], {
+    pl: 25,
+  });
+  assert.deepEqual(
+    lines.map((line) => [line.poLineId, line.quantity]),
+    [["pl", 25]],
+  );
+  // A delivery bigger than what is left (an earlier bill took some of it) bills only what is left.
+  assert.equal(linesFromDelivery([poLine()], { pl: 55 })[0].quantity, 40);
+});
+
+test("only what arrived is billed: a bill over it is refused before anything is saved", () => {
+  const line = (poLineId: string, quantity: number) => ({
+    kind: "material" as const,
+    poLineId,
+    quantity,
+    description: "Cement (CEM/01)",
+  });
+  const received = new Map([["pl", 60]]);
+  const elsewhere = new Map([["pl", 20]]);
+  assert.equal(
+    receivedCapProblem([line("pl", 25), line("pl", 15)], received, elsewhere),
+    undefined,
+  );
+  assert.match(
+    receivedCapProblem([line("pl", 25), line("pl", 16)], received, elsewhere) ?? "",
+    /Only 40 of Cement \(CEM\/01\) has arrived/,
+  );
+  // Labour and other lines are never capped by a delivery.
+  assert.equal(
+    receivedCapProblem(
+      [{ kind: "other", poLineId: null, quantity: 999, description: "Loading" }],
+      received,
+      elsewhere,
+    ),
+    undefined,
+  );
 });

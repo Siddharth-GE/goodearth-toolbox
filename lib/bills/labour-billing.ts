@@ -9,7 +9,8 @@ export type LabourEntry = {
   kind: "nmr" | "pw_qty" | "pw_lump";
   contractorId: string;
   projectId: string;
-  workItemId: string;
+  /** null for a log named instead of a work (0156): daily wages or a lump sum, so no rate is looked up. */
+  workItemId: string | null;
   masons: number;
   helpers: number;
   others: number;
@@ -85,7 +86,7 @@ export function suggestedPieceRate(
   workOrderLines: WorkOrderRate[],
   rateBook: Map<string, number>,
 ): number | null {
-  if (entry.kind === "pw_lump") return null;
+  if (entry.kind === "pw_lump" || entry.workItemId === null) return null;
   const onOrder = workOrderLines.find(
     (line) => !line.is_lump_sum && line.work_item_id === entry.workItemId,
   );

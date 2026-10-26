@@ -1,10 +1,15 @@
 import { PageTitle } from "@/components/ui/page-title";
 import {
-  getPoInvoicesForBill,
+  getPoDeliveriesForBill,
   getPoLinesForBill,
   getWorkOrderLinesForBill,
 } from "@/lib/bills/line-queries";
-import { linesFromPo, linesFromWorkOrder, type BillLineDraft } from "@/lib/bills/lines";
+import {
+  linesFromDelivery,
+  linesFromPo,
+  linesFromWorkOrder,
+  type BillLineDraft,
+} from "@/lib/bills/lines";
 import { getBillFormOptions } from "@/lib/bills/queries";
 import { idParam } from "@/lib/list-params";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
@@ -31,7 +36,13 @@ const NMR_START: BillLineDraft = {
 export default async function NewBillPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; vendor?: string; po?: string; contract?: string }>;
+  searchParams: Promise<{
+    kind?: string;
+    vendor?: string;
+    po?: string;
+    contract?: string;
+    delivery?: string;
+  }>;
 }) {
   const raw = await searchParams;
   const kind: FormKind = raw.kind === "contract" || raw.kind === "nmr" ? raw.kind : "po";
@@ -39,16 +50,25 @@ export default async function NewBillPage({
   const poId = kind === "po" ? idParam(raw.po) : undefined;
   const contractId = kind === "contract" ? idParam(raw.contract) : undefined;
 
-  const [options, gstRates, uoms, poLines, workLines, invoices] = await Promise.all([
+  const [options, gstRates, uoms, poLines, workLines, received] = await Promise.all([
     getBillFormOptions(),
     listActiveGstRates(),
     listActiveUomNames(),
     poId ? getPoLinesForBill(poId) : Promise.resolve(undefined),
     contractId ? getWorkOrderLinesForBill(contractId) : Promise.resolve(undefined),
-    poId ? getPoInvoicesForBill(poId) : Promise.resolve([]),
+    poId ? getPoDeliveriesForBill(poId) : Promise.resolve([]),
   ]);
+  // A delivery is offered while it has something left to bill and its invoice is not on a bill yet.
+  const deliveries = received.map((row) => ({
+    ...row,
+    open: !row.billed && !!poLines && linesFromDelivery(poLines, row.quantities).length > 0,
+  }));
+  // A bill for one delivery takes its invoice and what it brought; with none picked, everything received and unbilled.
+  const delivery = deliveries.find((row) => row.open && row.id === idParam(raw.delivery));
   const lines = poLines
-    ? linesFromPo(poLines)
+    ? delivery
+      ? linesFromDelivery(poLines, delivery.quantities)
+      : linesFromPo(poLines)
     : workLines
       ? linesFromWorkOrder(workLines)
       : kind === "nmr"
@@ -66,10 +86,10 @@ export default async function NewBillPage({
       />
       {/* A new anchor is a new bill: the form starts again with its lines. */}
       <BillForm
-        key={`${kind}-${vendorId}-${anchorId}`}
+        key={`${kind}-${vendorId}-${anchorId}-${delivery?.id ?? ""}`}
         options={options}
         initial={{ kind, vendorId, anchorId }}
-        prefill={{ lines, poLines, workLines, invoices }}
+        prefill={{ lines, poLines, workLines, deliveries, deliveryId: delivery?.id ?? "" }}
         gstRates={gstRates.map((rate) => rate.rate)}
         uoms={uoms}
       />
