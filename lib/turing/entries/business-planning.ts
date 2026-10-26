@@ -227,13 +227,18 @@ const plan: Field = {
   record: true,
 };
 
-/** A number on a new record starts as the editor starts it; on a change it is kept, never emptied, unless it may be cleared. */
+/** Never emptied (the editor has no empty box): a new record's starts as the editor's, a change's is kept; only a "clear" one empties. */
 const asField = (n: PlanNumber, as: "start" | "keep" | "clear"): Field => ({
   key: n.key,
   label: n.label,
   kind: n.whole ? "whole" : "amount",
+  ...(n.whole ? {} : { wide: true as const }),
   optional: true,
-  ...(as === "start" ? { start: String(n.start) } : as === "keep" ? { keep: true } : {}),
+  ...(as === "start"
+    ? { start: String(n.start), keep: true }
+    : as === "keep"
+      ? { keep: true }
+      : {}),
 });
 const flagField = (f: PlanFlag, adds: boolean): Field => ({
   key: f.key,
@@ -264,6 +269,7 @@ const buildMode: Field = {
     scheduled: "On a schedule, the whole thing, sold or not",
   },
   optional: true,
+  keep: true,
 };
 
 /** A row that changes something: at least one field beyond what it is about. */
@@ -278,7 +284,7 @@ const checks =
     rules.map((rule) => rule(values)).find(Boolean);
 
 const OPEN_ELSEWHERE =
-  "The plan is saved whole, so if it is open on a screen, reload it there before typing, or that screen's next save puts back what it showed.";
+  "The plan is saved whole: if it is open in another tab, reload it there before changing anything, or that tab's next save puts back what it shows.";
 
 function costEntries<S extends string>(kind: CostList, slug: S) {
   const { noun, numbers, flags } = COSTS[kind];
@@ -289,6 +295,7 @@ function costEntries<S extends string>(kind: CostList, slug: S) {
       tool: "/business-planning",
       title: `A plan's ${noun}, added`,
       description: `Adds a ${noun} to a plan's ${listed}, by a name no other ${noun} of the plan has. ${OPEN_ELSEWHERE}`,
+      warning: OPEN_ELSEWHERE,
       adds: true as const,
       check: (values: Record<string, Value>) => outOfRange(numbers, values),
       fields: [
@@ -303,6 +310,7 @@ function costEntries<S extends string>(kind: CostList, slug: S) {
       tool: "/business-planning",
       title: `A plan's ${noun}, changed`,
       description: `Changes one of a plan's ${listed}, found by its name. ${OPEN_ELSEWHERE}`,
+      warning: OPEN_ELSEWHERE,
       check: checks(changes(["plan_id", "item"], "Say what changes."), (values) =>
         outOfRange(numbers, values),
       ),
@@ -372,6 +380,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A plan's setup",
     description: `The plan-wide numbers on the Setup tab, and which scenario the plan shows. A JV land deal's premium and settlement month only while the land is paid as a JV. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     check: checks(
       changes(["plan_id"], "Say what changes in the setup."),
       (values) => outOfRange(SETUP, values),
@@ -389,6 +398,7 @@ export const BUSINESS_PLANNING = defineEntries([
         label: "Land paid how",
         kind: "choice",
         choices: ["cash", "jv"],
+        keep: true,
         labels: { cash: "Cash, up front", jv: "JV, settled later" },
         optional: true,
       },
@@ -398,6 +408,7 @@ export const BUSINESS_PLANNING = defineEntries([
         label: "Scenario shown",
         kind: "choice",
         choices: ["Base", "Moderate", "High"],
+        keep: true,
         optional: true,
       },
     ],
@@ -407,6 +418,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A line you sell, added",
     description: `Adds a SALE line (build and sell) to a plan, by a name no other line of the plan has; the zeros carry the product (a bare plot has no built-up area, an apartment no plot area). Build starts only for a line built on a schedule. Release at holds the line back until that share of every other line has sold (left out: launches straight away). Booking % and instalments are the line's own terms (left out: the plan's). ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     adds: true,
     check: checks(
       (values) => outOfRange([...SALE, ...SALE_OWN], values),
@@ -420,7 +432,7 @@ export const BUSINESS_PLANNING = defineEntries([
       plan,
       { ...buildMode, start: "on-sale" },
       ...SALE.map((n) => asField(n, "start")),
-      ...SALE_OWN.map((n) => asField(n, "clear")),
+      ...SALE_OWN.map((n) => asField(n, "keep")),
     ],
   },
   {
@@ -428,6 +440,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A line you sell, changed",
     description: `Changes one of a plan's SALE lines, found by its name. Build starts only for a line built on a schedule. Release at empty launches it straight away. Booking % or instalments give the line its own terms (the other taken from the line, else the plan); Plan's terms yes puts it back on the plan's. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     check: checks(
       changes(["plan_id", "line"], "Say what changes on the line."),
       (values) => outOfRange([...SALE, ...SALE_OWN], values),
@@ -449,6 +462,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A line you hold, added",
     description: `Adds a HOLD line (build and keep earning: senior living, leased commercial, hospitality) to a plan, by a name no other line of the plan has. Left out, a number starts as the editor starts it. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     adds: true,
     check: (values) => outOfRange(HOLD, values),
     fields: [
@@ -462,6 +476,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A line you hold, changed",
     description: `Changes one of a plan's HOLD lines, found by its name. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     check: checks(changes(["plan_id", "line"], "Say what changes on the line."), (values) =>
       outOfRange(HOLD, values),
     ),
@@ -472,6 +487,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A plan's line, removed",
     description: `Removes a line, sold or held, from a plan, found by its name. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     fields: [plan, lineName],
   },
   ...costEntries("overheads", "bp_overhead"),
@@ -483,6 +499,7 @@ export const BUSINESS_PLANNING = defineEntries([
     tool: "/business-planning",
     title: "A plan's cost, removed",
     description: `Removes an overhead, selling cost, one-time cost or shared infrastructure item from a plan, found by its name. ${OPEN_ELSEWHERE}`,
+    warning: OPEN_ELSEWHERE,
     fields: [
       plan,
       {

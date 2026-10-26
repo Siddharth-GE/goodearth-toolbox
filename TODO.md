@@ -7,7 +7,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 `plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
 
 - **Waiting on the founder:** a look at T1 on staging. The key in Vercel's Preview may expire on 31 Oct 2026; production needs its own when Turing ships.
-- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154), 6b bills (#155), 7 Client Relations (#156), 8 Birdwing (#157), 9 Birdwing Books (#158), 10 Design Management (#159) and 11 Selections and Budgets (#160), 12a the Estimator's rate book (#161), 12b the Estimator's estimates (#163), 13a Relay and Directory (#164), 13b the rest of Supervisors (#165), 14a bills' payments and funding (#166), 14b cash requests (#170) and 15 approvals (#172). Next: 16 Business planning, Reporter, Dexter names.
+- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154), 6b bills (#155), 7 Client Relations (#156), 8 Birdwing (#157), 9 Birdwing Books (#158), 10 Design Management (#159) and 11 Selections and Budgets (#160), 12a the Estimator's rate book (#161), 12b the Estimator's estimates (#163), 13a Relay and Directory (#164), 13b the rest of Supervisors (#165), 14a bills' payments and funding (#166), 14b cash requests (#170), 15 approvals (#172) and 16 Business planning, Reporter and Dexter names (#PR). That was the last batch.
 
 ## Native apps on iPhone and Android
 
@@ -106,6 +106,8 @@ These `scripts/trials/` fail against today's staging data, with or without the l
   - a shared notice banner.
 
 ## Known limits
+
+- **A business plan open in one tab saves over a change made elsewhere.** The editor holds the whole plan and saves all of it on any change, so a change from Turing or a second tab is put back by the first tab's next save. Turing's card warns before Save. The fix is a version check in `savePlan` (refuse when the plan changed since it was loaded; the editor then says "changed elsewhere, reload"), a change to Business planning.
 
 - **Dexter's Replace file removes the deck's old files before uploading the new ones**, so an upload that fails leaves the deck's link empty until it is replaced again (the page says so). Doing it safely means the new files go to a new folder and the deck then points at it: a folder column on `dexter_decks`, so a migration.
 

@@ -242,6 +242,8 @@ export type Field = {
   fine?: true;
   /** Rupees: above zero, to the paise, up to ₹999 crore — what is shown is what the money action stores. */
   paise?: true;
+  /** A business plan's number, which its editor takes as typed: up to ₹99,999 crore, six decimals. */
+  wide?: true;
 };
 
 /**
@@ -280,6 +282,8 @@ export type Entry<K extends string = string> = {
   alike?: Alike;
   /** A record with lines: one row per line, its `header` fields saying which record (`recordsOf`); `noun` names one ("Indent"). */
   lines?: { noun: string };
+  /** Said on the proposal card, above Save: what the admin must know before pressing it. */
+  warning?: string;
 };
 
 export type Value = string | boolean;
@@ -398,7 +402,9 @@ function checkValue(field: Field, raw: unknown): Checked<Value | undefined> {
         ? /^-?\d{1,9}(\.\d{1,3})?$/
         : field.fine
           ? /^\d{1,9}(\.\d{1,6})?$/
-          : /^\d{1,9}(\.\d{1,3})?$/
+          : field.wide
+            ? /^\d{1,12}(\.\d{1,6})?$/
+            : /^\d{1,9}(\.\d{1,3})?$/
       ).test(value)
         ? { ok: true, value }
         : { ok: false, error: `${field.label} is a number, like 12.5.` };

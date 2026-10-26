@@ -3,7 +3,16 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { checkProposal } from "../catalogue-fields";
-import { COSTS, HOLD, MONTHS, SALE, SALE_OWN, SETUP, type PlanNumber } from "./business-planning";
+import {
+  BUSINESS_PLANNING,
+  COSTS,
+  HOLD,
+  MONTHS,
+  SALE,
+  SALE_OWN,
+  SETUP,
+  type PlanNumber,
+} from "./business-planning";
 
 const PLAN = "11111111-1111-4111-8111-111111111111";
 const source = readFileSync("lib/business-planning/inputs.ts", "utf8");
@@ -161,4 +170,29 @@ test("a new SALE line starts as the editor's, and only a scheduled one has a bui
 test("a cost is removed by its kind and name", () => {
   assert.equal(ok("bp_cost_remove", { kind: "overhead", item: "Marketing" }), true);
   assert.equal(ok("bp_cost_remove", { kind: "overheads", item: "Marketing" }), false);
+});
+
+test("no box is saved empty: the editor has none, and the parser would fill it with another number", () => {
+  assert.equal(ok("bp_sale_line_new", { name: "Villas", booking_pct: "" }), false);
+  assert.equal(ok("bp_sale_line_new", { name: "Villas", release_at_pct: "" }), false);
+  assert.equal(ok("bp_hold_line_new", { name: "Senior living", efficiency_pct: "" }), false);
+  assert.equal(ok("bp_overhead_new", { name: "Marketing", to_month: "" }), false);
+  assert.equal(ok("bp_sale_line_change", { line: "Villas", build_mode: "" }), false);
+  assert.equal(ok("bp_plan_setup", { land_terms: "" }), false);
+  assert.equal(ok("bp_plan_setup", { scenario: "" }), false);
+});
+
+test("a plan's number is taken as the editor takes it: crores of rupees, a fraction of a sale", () => {
+  assert.equal(ok("bp_plan_setup", { opening_equity: "1500000000" }), true);
+  assert.equal(ok("bp_shared_item_new", { name: "Clubhouse", capex: "1200000000.50" }), true);
+  assert.equal(ok("bp_sale_line_change", { line: "Villas", velocity_base: "0.3333" }), true);
+});
+
+test("every entry saving the plan's document warns the admin on its card", () => {
+  for (const entry of BUSINESS_PLANNING)
+    assert.equal(
+      Boolean(entry.warning),
+      !["bp_plan_new", "bp_plan_change", "bp_plan_copy", "bp_plan_delete"].includes(entry.key),
+      entry.key,
+    );
 });
