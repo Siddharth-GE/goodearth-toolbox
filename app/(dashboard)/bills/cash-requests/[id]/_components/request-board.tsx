@@ -315,7 +315,7 @@ function PayForm({
                 : recordAdvance({
                     vendorId: item.vendor_id ?? "",
                     projectId: item.project_id ?? "",
-                    labourContractId: null,
+                    labourContractId: item.labour_contract_id,
                     amount: value,
                     paidOn,
                     reference,
@@ -459,7 +459,7 @@ export function AddAdvance({
   return (
     <div className="grid gap-3 sm:grid-cols-5">
       <div className="space-y-1.5">
-        <Label htmlFor="advance-vendor">Contractor</Label>
+        <Label htmlFor="advance-vendor">Contractor or supplier</Label>
         <Select
           id="advance-vendor"
           value={vendorId}

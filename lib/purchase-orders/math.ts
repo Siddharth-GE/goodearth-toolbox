@@ -2,7 +2,7 @@
 // NULL IS NOT ZERO: an unpriced line is not free; roll-ups count it separately. Round only when displaying (lib/format.ts).
 
 import { formatPercent } from "@/lib/format";
-import { lineMoney, splitGst } from "@/lib/line-money";
+import { lineMoney, splitGst, type DocumentCharges } from "@/lib/line-money";
 
 export type PoLineMoney = {
   quantity: number;
@@ -54,7 +54,10 @@ export function lineFigures(line: PoLineMoney, interState: boolean): PoLineFigur
 export type PoTotals = {
   gross: number;
   discount: number;
+  /** The lines' taxable value plus the additional charges, as po_billing_totals counts it (0133). */
   taxable: number;
+  charges: number;
+  chargesNote: string | null;
   gst: number;
   /** The GST split for this PO's vendor (lib/line-money.ts gstRegime). */
   cgst: number;
@@ -68,8 +71,12 @@ export type PoTotals = {
   pendingCount: number;
 };
 
-/** A line counts only when BOTH rate and gst_pct are present, so a half-priced line stays pending (issuing is blocked until none is: the 0021 guard). */
-export function rollUpPo(lines: PoLineMoney[], interState = false): PoTotals {
+/** A line counts only when BOTH rate and gst_pct are present, so a half-priced line stays pending (issuing is blocked until none is: the 0021 guard). The PO's additional charges are taxed at their own slab. */
+export function rollUpPo(
+  lines: PoLineMoney[],
+  interState = false,
+  charges?: DocumentCharges | null,
+): PoTotals {
   let gross = 0;
   let discount = 0;
   let taxable = 0;
@@ -90,10 +97,21 @@ export function rollUpPo(lines: PoLineMoney[], interState = false): PoTotals {
     gstBySlab.set(line.gst_pct, (gstBySlab.get(line.gst_pct) ?? 0) + money.gst);
   }
 
+  const chargesAmount = charges?.amount ?? 0;
+  if (chargesAmount > 0) {
+    const slab = charges?.gst_pct ?? 0;
+    const chargesGst = chargesAmount * (slab / 100);
+    taxable += chargesAmount;
+    gst += chargesGst;
+    gstBySlab.set(slab, (gstBySlab.get(slab) ?? 0) + chargesGst);
+  }
+
   return {
     gross,
     discount,
     taxable,
+    charges: chargesAmount,
+    chargesNote: chargesAmount > 0 ? charges?.note?.trim() || null : null,
     gst,
     ...splitGst(gst, interState),
     other,
@@ -111,14 +129,31 @@ export function isFullyPriced(lines: PoLineMoney[]): boolean {
 
 export type PoSummaryRow = { label: string; amount: number };
 
-/** The screen and the printed PO share these rows. A discount shows Subtotal, Less discount, Taxable value; GST is split per slab; other charges come last, after tax. */
+/** The screen and the printed PO share these rows. A discount shows Subtotal, Less discount, Taxable value; additional charges join the taxable value before GST; GST is split per slab; other charges come last, after tax. */
 export function summaryRows(totals: PoTotals, interState: boolean): PoSummaryRow[] {
   const rows: PoSummaryRow[] = [];
   if (totals.discount > 0) {
     rows.push({ label: "Subtotal", amount: totals.gross });
     rows.push({ label: "Less discount", amount: totals.discount });
   }
-  rows.push({ label: totals.discount > 0 ? "Taxable value" : "Subtotal", amount: totals.taxable });
+  if (totals.charges > 0) {
+    rows.push({
+      label: totals.discount > 0 ? "After discount" : "Subtotal",
+      amount: totals.taxable - totals.charges,
+    });
+    rows.push({
+      label: totals.chargesNote
+        ? `Additional charges — ${totals.chargesNote}`
+        : "Additional charges",
+      amount: totals.charges,
+    });
+    rows.push({ label: "Taxable value", amount: totals.taxable });
+  } else {
+    rows.push({
+      label: totals.discount > 0 ? "Taxable value" : "Subtotal",
+      amount: totals.taxable,
+    });
+  }
   for (const [slab, amount] of [...totals.gstBySlab.entries()].sort(([a], [b]) => a - b)) {
     if (slab === 0) continue;
     if (interState) {

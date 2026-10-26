@@ -6,19 +6,24 @@ import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { TableRow } from "@/components/ui/table";
 import {
   addDesignStage,
   moveDesignStage,
+  reorderDesignStages,
   renameDesignStage,
   setDesignStageActive,
   setDesignStageCode,
   setDesignStageOnBoard,
 } from "@/lib/design-management/stage-actions";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { dropStage } from "@/lib/design-management/stage-order";
+import { cn } from "@/lib/utils";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 
-export function DesignStageForm() {
+export function DesignStageForm({ stages }: { stages: { id: string; name: string }[] }) {
   const [state, formAction, pending] = useActionState(addDesignStage, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
@@ -30,11 +35,25 @@ export function DesignStageForm() {
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
-      <div className="flex items-end gap-2">
-        <div className="flex-1 space-y-1.5">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1 space-y-1.5">
           <Label htmlFor="stage-name">Add a stage</Label>
           <Input id="stage-name" name="name" required autoComplete="off" placeholder="e.g. MEP" />
         </div>
+        {stages.length > 0 && (
+          <div className="space-y-1.5">
+            <Label htmlFor="stage-after">Place it</Label>
+            <Select id="stage-after" name="after" defaultValue="end">
+              <option value="end">At the end</option>
+              <option value="start">At the start</option>
+              {stages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  After {stage.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <Button type="submit" disabled={pending}>
           {pending ? "Adding…" : "Add"}
         </Button>
@@ -201,6 +220,99 @@ export function DesignStageMoveButtons({
       >
         <ArrowDown className="size-4" />
       </IconButton>
+    </>
+  );
+}
+
+/**
+ * The stage rows, dragged by their handle into a new order on a computer (a phone keeps the arrows). The new order
+ * shows at once and saves as one list; a refusal puts it back and says why.
+ */
+export function DesignStageRows({
+  rows,
+}: {
+  rows: { id: string; name: string; cells: ReactNode }[];
+}) {
+  const { pending, error, run } = useActionRunner();
+  const serverIds = rows.map((row) => row.id).join(",");
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [seen, setSeen] = useState(serverIds);
+  if (seen !== serverIds) {
+    setSeen(serverIds);
+    setOrder(null);
+  }
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+
+  const ids = order ?? rows.map((row) => row.id);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  const drop = (onto: string) => {
+    const from = dragging;
+    setDragging(null);
+    setOver(null);
+    if (!from || from === onto) return;
+    const next = dropStage(ids, from, onto);
+    setOrder(next);
+    void run(async () => {
+      const result = await reorderDesignStages(next);
+      if (result?.error) setOrder(null);
+      return result;
+    });
+  };
+
+  return (
+    <>
+      {error ? (
+        <tr>
+          <td colSpan={6} className="px-3 py-2">
+            <FormMessage error={error} size="xs" />
+          </td>
+        </tr>
+      ) : null}
+      {ids.map((id) => {
+        const row = byId.get(id);
+        if (!row) return null;
+        return (
+          <TableRow
+            key={id}
+            onDragOver={(event) => {
+              if (!dragging) return;
+              event.preventDefault();
+              setOver(id);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              drop(id);
+            }}
+            className={cn(
+              dragging === id && "opacity-50",
+              over === id && dragging !== id && "bg-accent/10",
+            )}
+          >
+            <td className="w-8 pl-2 max-sm:hidden">
+              <span
+                draggable={!pending}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", row.name);
+                  setDragging(id);
+                }}
+                onDragEnd={() => {
+                  setDragging(null);
+                  setOver(null);
+                }}
+                aria-hidden
+                title={`Drag ${row.name} to a new place`}
+                className="text-muted hover:text-foreground grid size-7 cursor-grab place-items-center active:cursor-grabbing"
+              >
+                <GripVertical className="size-4" />
+              </span>
+            </td>
+            {row.cells}
+          </TableRow>
+        );
+      })}
     </>
   );
 }

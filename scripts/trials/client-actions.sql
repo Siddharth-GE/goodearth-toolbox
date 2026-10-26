@@ -86,10 +86,15 @@ begin
   if not v_refused then raise exception 'TRIAL 3 FAILED: an assumed date with no date'; end if;
   update client_actions set status = 'done', done_on = current_date where id = v_action;
 
-  -- 4. Nobody deletes an action: there is no delete policy, so the row stays.
-  delete from client_actions where id = v_action;
-  if not exists (select 1 from client_actions where id = v_action) then
-    raise exception 'TRIAL 4 FAILED: an action was deleted';
+  -- 4. A done action is not deleted: the guard says to cancel it instead (0149).
+  v_refused := false;
+  begin
+    delete from client_actions where id = v_action;
+  exception when raise_exception then
+    v_refused := true;
+  end;
+  if not v_refused or not exists (select 1 from client_actions where id = v_action) then
+    raise exception 'TRIAL 4 FAILED: a done action was deleted';
   end if;
 
   -- 5. The plot takes a build stage, Kaadal, a design check and the

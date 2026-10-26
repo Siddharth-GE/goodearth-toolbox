@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -13,15 +14,19 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import { deleteGoodsReceipt } from "@/lib/inventory/actions";
 import { getGoodsReceipt } from "@/lib/inventory/receipts-queries";
+import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
 import { BatchId } from "../../_components/batch-id";
 import { ReceiptRate } from "../../_components/receipt-rate";
+import { SiteConfirmationNote } from "../../_components/site-confirmation";
 
 export default async function ReceiptPage({ params }: { params: Promise<{ receiptId: string }> }) {
   const { receiptId } = await params;
   const receipt = await getGoodsReceipt(receiptId);
   if (!receipt) notFound();
+  const confirmation = receipt.to_site ? await getSiteConfirmation("receipt", receipt.id) : null;
 
   return (
     <div className="space-y-4">
@@ -31,12 +36,36 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
         backHref="/inventory/receive"
         backLabel="Receive"
         actions={
-          <Badge variant={receipt.to_site ? "info" : "success"}>{receipt.destination}</Badge>
+          <>
+            <Badge variant={receipt.to_site ? "info" : "success"}>{receipt.destination}</Badge>
+            <DeleteOrCancel
+              noun="delivery"
+              verb="Delete"
+              removal={
+                confirmation
+                  ? {
+                      kind: "blocked",
+                      why: "The site has confirmed it — correct it with an adjustment instead.",
+                    }
+                  : { kind: "cancel" }
+              }
+              cancelNote="Only while nothing has been issued from it, no bill counts it and the site hasn't confirmed it. Stock and the order's received figure correct themselves, and your reason is kept on record."
+              onCancel={deleteGoodsReceipt.bind(null, receipt.id)}
+            />
+          </>
         }
       />
 
       <section className="border-border bg-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-4">
         <Field label="Challan no." value={receipt.challan_no ?? "—"} />
+        <Field
+          label="Supplier's invoice"
+          value={
+            receipt.invoice_no
+              ? `${receipt.invoice_no}${receipt.invoice_date ? ` · ${formatDate(receipt.invoice_date)}` : ""}`
+              : "—"
+          }
+        />
         <Field label="Received on" value={formatDate(receipt.received_at)} />
         <Field label="Went to" value={receipt.destination} />
         {receipt.to_site && (
@@ -69,6 +98,10 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
           These goods were unloaded at site and are used where they landed — they count toward the
           purchase order but never entered store stock.
         </p>
+      )}
+
+      {receipt.to_site && (
+        <SiteConfirmationNote confirmation={confirmation} lines={receipt.lines} />
       )}
 
       <Table>

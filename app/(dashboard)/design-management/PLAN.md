@@ -22,7 +22,7 @@ Each villa's design from stage to stage — who is on it, what is next, what wen
 12. **A villa sits at the furthest stage that has started**, even while an earlier one is revised ("the stage that a house is in is marked by the latest stage even tho revisions may happen backwards"). It is not a straight line: stages run side by side and any stage can start at any time.
 13. **Several people on each stage** ("each house will have multiple people working on it").
 14. **Everyone holding the grant sees every villa** — the plan's recommendation, taken ("build it full"). Not `scoped`: a small team reviewing each other's drawings gains nothing from walls, and Supervisors already read the released drawings. Each person opens on their own work, with a switch to everyone.
-15. **Actions are Client Relations' Actions for the design team** — an owner, a date, overdue first; whoever set one closes it, or an admin; never deleted.
+15. **Actions are Client Relations' Actions for the design team** — an owner, a date, overdue first; whoever set one closes it, or an admin, and the same people delete it while nobody has changed it, else cancel it with a reason (`0149`, Client Relations' rule 9).
 
 | Screen                           | What it is                                                                                                    | Back to     |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -39,7 +39,7 @@ The Board lives at `…/villas`, so every link into a villa and its transmittals
 
 The rules are `lib/design-management/board.ts`, pure and tested; the reads `board-queries.ts`; the writes `board-actions.ts`.
 
-- **The columns are the stages switched On the board** (`design_stages.on_board`, `0126`), in the list's order. Switching one off hides its column and keeps every step and line of history on it.
+- **The columns are the stages switched On the board** (`design_stages.on_board`, `0126`), in the list's order. Switching one off hides its column and keeps every step and line of history on it. **The order is placed, not appended** (founder, 2026-10-24): a new stage is added where it is put (at the start, after any stage, or at the end), and the list is rearranged by dragging a row's handle on a computer or by the arrows on a phone; every move renumbers the list in steps of 10 (`lib/design-management/stage-order.ts`, tested).
 - **A step per villa per board stage** (`design_steps`): Working · With the client · Waiting on others · Revising · Done, a one-line note, started and done dates the guard keeps in line with the status. No row is "not started"; a step started by mistake goes back to not started (••• → Take back the start), never deleted.
 - **Where a villa sits is worked out, never stored**: the furthest board stage whose step has started. Every board stage Done reads Design complete.
 - **Pass on** is offered only on the stage a villa sits at — done or not, since a finished stage waiting to be handed on is the point — to any later stage, the next first; it marks this stage Done and starts that one with the people picked (`design_pass_step`, one transaction). An earlier stage under revision finishes with its Done chip.

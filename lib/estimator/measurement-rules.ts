@@ -8,10 +8,12 @@ export type MeasurementFields = {
   length: number | null;
   breadth: number | null;
   depth: number | null;
+  /** Taken off the sheet's total (0132): a door or window in a wall. */
+  deduct: boolean;
 };
 
 /** Blank is "not used"; anything typed must be a number above zero, and a row must measure something. */
-export function checkMeasurement(fields: MeasurementFields): string | undefined {
+export function checkMeasurement(fields: Omit<MeasurementFields, "deduct">): string | undefined {
   const boxes = [
     ["Nos", fields.nos],
     ["Length", fields.length],

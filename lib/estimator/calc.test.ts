@@ -720,3 +720,16 @@ test("a work still to measure costs nothing known, takes off nothing, and keeps 
   // What is measured still counts: a floor, not an answer.
   assert.equal(totals.grand, measured.totalCost);
 });
+
+test("a deduction row is measured like any row and taken off the sheet's total", () => {
+  const wall = { nos: 1, length: 10, breadth: null, depth: 3 };
+  const door = { nos: 1, length: 1.2, breadth: null, depth: 2.1, deduct: true };
+  const windows = { nos: 2, length: 1.5, breadth: null, depth: 1.2, deduct: true };
+  assert.equal(measurementQuantity(door), 2.52);
+  assert.equal(sheetTotal([wall, door, windows]), 23.88);
+  assert.equal(
+    sheetTotal([door]),
+    -2.52,
+    "the sum is honest; the sync refuses a total not above zero",
+  );
+});

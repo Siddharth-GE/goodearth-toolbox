@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -13,11 +14,16 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import { deleteStockIssue } from "@/lib/inventory/actions";
 import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
+import { isWorkClass } from "@/lib/masters/work-classes";
+import { getSiteConfirmation } from "@/lib/inventory/site-receipt-queries";
 import { notFound } from "next/navigation";
+import { ChangeWorkClass } from "../../_components/change-work-class";
+import { SiteConfirmationNote } from "../../_components/site-confirmation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
@@ -27,13 +33,14 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
     listWorkCategories(),
   ]);
   if (!issue) notFound();
+  const confirmation = issue.is_transfer ? null : await getSiteConfirmation("issue", issue.id);
 
   // Flag, never refuse: derived fresh, so a resubmitted estimate that covers the material clears the banner.
   const overRows =
     issue.plot_id && issue.work_item_id
       ? await getOverIssueRows(issue.plot_id, issue.work_item_id)
       : [];
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({
@@ -51,9 +58,29 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
         backHref="/inventory/issues"
         backLabel="Issues"
         actions={
-          <Badge variant={issue.is_transfer ? "info" : "warning"}>
-            {issue.is_transfer ? "Transfer" : "To site"}
-          </Badge>
+          <>
+            <Badge variant={issue.is_transfer ? "info" : "warning"}>
+              {issue.is_transfer ? "Transfer" : "To site"}
+            </Badge>
+            <DeleteOrCancel
+              noun={issue.is_transfer ? "transfer" : "issue"}
+              verb="Delete"
+              removal={
+                confirmation
+                  ? {
+                      kind: "blocked",
+                      why: "The site has confirmed it — correct it with an adjustment instead.",
+                    }
+                  : { kind: "cancel" }
+              }
+              cancelNote={
+                issue.is_transfer
+                  ? "Only while all of it is still in the receiving store. It goes back to the batches it came from, and your reason is kept on record."
+                  : "Only while the site hasn't confirmed it. It goes back to the batches it came from, a site request it filled opens again, and your reason is kept on record."
+              }
+              onCancel={deleteStockIssue.bind(null, issue.id)}
+            />
+          </>
         }
       />
 
@@ -85,8 +112,12 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
             <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               For the work{issue.work_category ? ` · ${issue.work_category}` : ""}
             </p>
-            <div className="mt-1">
+            <div className="mt-1 space-y-2">
               <RetagWork issueId={issue.id} workItemId={issue.work_item_id} works={works} />
+              <ChangeWorkClass
+                issueId={issue.id}
+                workClass={isWorkClass(issue.work_class) ? issue.work_class : "standard"}
+              />
             </div>
           </div>
         )}
@@ -109,6 +140,10 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           </div>
         )}
       </section>
+
+      {!issue.is_transfer && (
+        <SiteConfirmationNote confirmation={confirmation} lines={issue.lines} />
+      )}
 
       {issue.is_transfer && (
         <p className="text-muted text-sm">

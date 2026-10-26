@@ -52,6 +52,7 @@ export type IndentDetail = {
   work_item_id: string | null;
   required_by: string | null;
   note: string | null;
+  is_urgent: boolean;
   rejection_note: string | null;
   project_id: string;
   project_name: string;
@@ -63,6 +64,11 @@ export type IndentDetail = {
   approved_at: string | null;
   submitted_by_name: string | null;
   approved_by_name: string | null;
+  cancelled_at: string | null;
+  cancelled_by_name: string | null;
+  cancel_reason: string | null;
+  /** Every PO not cancelled that orders from this indent, drafts included: while any stands, it cannot be cancelled. */
+  live_po_refs: string[];
   lines: IndentLineRow[];
   line_count: number;
 };
@@ -112,7 +118,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, work_item_id, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
+        "id, reference, status, stage, work_item_id, required_by, note, is_urgent, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, cancelled_at, cancelled_by, cancel_reason, projects(name), plots(name), units(name)",
       )
       .eq("id", indentId)
       .maybeSingle(),
@@ -138,6 +144,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       [
         indent.submitted_by,
         indent.approved_by,
+        indent.cancelled_by,
         ...lines.map((line) => line.updated_by ?? line.created_by),
         ...lines.map((line) => line.estimator_decided_by),
       ].filter((id): id is string => id != null),
@@ -340,6 +347,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     work_item_id: indent.work_item_id,
     required_by: indent.required_by,
     note: indent.note,
+    is_urgent: indent.is_urgent,
     rejection_note: indent.rejection_note,
     project_id: indent.project_id,
     project_name: (indent.projects as { name: string } | null)?.name ?? "—",
@@ -351,6 +359,12 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     approved_at: indent.approved_at,
     submitted_by_name: nameOf(indent.submitted_by),
     approved_by_name: nameOf(indent.approved_by),
+    cancelled_at: indent.cancelled_at,
+    cancelled_by_name: nameOf(indent.cancelled_by),
+    cancel_reason: indent.cancel_reason,
+    live_po_refs: [
+      ...new Set([...orderedByLine.values()].flatMap((entry) => [...entry.refs])),
+    ].sort(),
     lines: mapped,
     line_count: mapped.length,
   };

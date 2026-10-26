@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import {
   actionBucket,
+  actionRemoval,
   addDays,
   closeRight,
   compareDone,
@@ -146,4 +147,29 @@ test("only the setter, or a manager, closes an action", () => {
   const unset = { createdBy: null, ownerId: "jiljith" };
   assert.equal(setterOf(unset), "jiljith");
   assert.equal(closeRight(unset, { id: "jiljith", isManager: false }), "close");
+});
+
+test("an untouched action deletes, a changed one cancels, and only for whoever closes it", () => {
+  const added = "2026-10-16T10:00:00.000Z";
+  const fresh = {
+    createdBy: "navarang",
+    ownerId: "jiljith",
+    status: "open",
+    createdAt: added,
+    updatedAt: "2026-10-16T10:01:00.000Z",
+  };
+  const setter = { id: "navarang", isManager: false };
+  assert.equal(actionRemoval(fresh, setter), "delete");
+  assert.equal(actionRemoval(fresh, { id: "siddharth", isManager: true }), "delete");
+  // Its owner marks it finished; neither they nor a bystander remove it.
+  assert.equal(actionRemoval(fresh, { id: "jiljith", isManager: false }), null);
+  assert.equal(actionRemoval(fresh, { id: "vaishnav", isManager: false }), null);
+  // Past the minute the cards call "Edited", or off open, it cancels.
+  assert.equal(
+    actionRemoval({ ...fresh, updatedAt: "2026-10-16T10:01:00.001Z" }, setter),
+    "cancel",
+  );
+  assert.equal(actionRemoval({ ...fresh, status: "waiting_client" }, setter), "cancel");
+  // Closed, cancelled included: nothing to remove.
+  assert.equal(actionRemoval({ ...fresh, status: "done" }, setter), null);
 });

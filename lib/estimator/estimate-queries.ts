@@ -275,6 +275,8 @@ export type MeasurementRow = {
   sortOrder: number;
   /** Set by a SketchUp import (0118): change it in the model, not on the sheet. */
   fromModel: boolean;
+  /** Taken off the total (0132). */
+  deduct: boolean;
 };
 
 /** line_id → its rows in sheet order. A line present here is MEASURED: its quantity is the sheet total. */
@@ -304,10 +306,13 @@ export async function getEstimateMeasurements(
     depth: number | null;
     sort_order: number;
     from_model: boolean;
+    is_deduction: boolean;
   }>((from, to) =>
     supabase
       .from("estimator_estimate_line_measurements")
-      .select("id, line_id, description, nos, length, breadth, depth, sort_order, from_model")
+      .select(
+        "id, line_id, description, nos, length, breadth, depth, sort_order, from_model, is_deduction",
+      )
       .in(
         "line_id",
         lines.map((line) => line.id),
@@ -329,6 +334,7 @@ export async function getEstimateMeasurements(
       depth: row.depth,
       sortOrder: row.sort_order,
       fromModel: row.from_model,
+      deduct: row.is_deduction,
     });
     byLine.set(row.line_id, bucket);
   }
@@ -481,8 +487,13 @@ export type EstimateDetail = {
   unitName: string | null;
   sourceName: string | null;
   lines: EstimateLineRow[];
-  status: "draft" | "submitted" | "superseded";
+  status: "draft" | "submitted" | "superseded" | "cancelled";
   reference: string | null;
+  cancelledAt: string | null;
+  cancelledByName: string | null;
+  cancelReason: string | null;
+  /** Indents not cancelled with a line on this official estimate: while any stands, it cannot be withdrawn (0144). */
+  drawingIndentRefs: string[];
   submittedByName: string | null;
   submittedAt: string | null;
   supersededAt: string | null;
@@ -503,7 +514,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
     .select(
-      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at, model_file, model_imported_at, model_imported_by",
+      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at, cancelled_at, cancelled_by, cancel_reason, model_file, model_imported_at, model_imported_by",
     )
     .eq("id", estimateId)
     .maybeSingle();
@@ -546,61 +557,85 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  const [submitter, importer, siblings, frozenCosts, frozenTakeoff] = await Promise.all([
-    estimate.submitted_by
-      ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    estimate.model_imported_by
-      ? supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", estimate.model_imported_by)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    estimate.unit_id
-      ? supabase
-          .from("estimator_estimates")
-          .select("id, is_working, status, reference")
-          .eq("unit_id", estimate.unit_id)
-          .or("is_working.eq.true,status.eq.submitted")
-      : Promise.resolve({ data: [], error: null }),
-    estimate.status !== "draft"
-      ? fetchAll<{
-          work_item_id: string;
-          qty: number;
-          uom: string | null;
-          labour_cost: number | null;
-          material_cost: number | null;
-          total_cost: number | null;
-        }>((from, to) =>
-          supabase
-            .from("estimator_estimate_line_costs")
-            .select("work_item_id, qty, uom, labour_cost, material_cost, total_cost")
-            .eq("estimate_id", estimateId)
-            .order("id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
-    estimate.status !== "draft"
-      ? fetchAll<{
-          work_item_id: string;
-          material_id: string | null;
-          item_id: string | null;
-          material_name: string;
-          uom: string;
-          quantity: number;
-          rate: number | null;
-        }>((from, to) =>
-          supabase
-            .from("estimator_estimate_takeoff")
-            .select("work_item_id, material_id, item_id, material_name, uom, quantity, rate")
-            .eq("estimate_id", estimateId)
-            .order("id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
-  ]);
+  const [submitter, importer, siblings, frozenCosts, frozenTakeoff, canceller, drawing] =
+    await Promise.all([
+      estimate.submitted_by
+        ? supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", estimate.submitted_by)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      estimate.model_imported_by
+        ? supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", estimate.model_imported_by)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      estimate.unit_id
+        ? supabase
+            .from("estimator_estimates")
+            .select("id, is_working, status, reference")
+            .eq("unit_id", estimate.unit_id)
+            .or("is_working.eq.true,status.eq.submitted")
+        : Promise.resolve({ data: [], error: null }),
+      estimate.status !== "draft"
+        ? fetchAll<{
+            work_item_id: string;
+            qty: number;
+            uom: string | null;
+            labour_cost: number | null;
+            material_cost: number | null;
+            total_cost: number | null;
+          }>((from, to) =>
+            supabase
+              .from("estimator_estimate_line_costs")
+              .select("work_item_id, qty, uom, labour_cost, material_cost, total_cost")
+              .eq("estimate_id", estimateId)
+              .order("id")
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      estimate.status !== "draft"
+        ? fetchAll<{
+            work_item_id: string;
+            material_id: string | null;
+            item_id: string | null;
+            material_name: string;
+            uom: string;
+            quantity: number;
+            rate: number | null;
+          }>((from, to) =>
+            supabase
+              .from("estimator_estimate_takeoff")
+              .select("work_item_id, material_id, item_id, material_name, uom, quantity, rate")
+              .eq("estimate_id", estimateId)
+              .order("id")
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+      estimate.cancelled_by
+        ? supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", estimate.cancelled_by)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      estimate.status === "submitted"
+        ? fetchAll<{ indents: { reference: string | null } | null }>((from, to) =>
+            supabase
+              .from("indent_lines")
+              .select("id, indents!indent_lines_indent_id_fkey!inner(reference, status)")
+              .eq("estimate_id", estimateId)
+              .neq("indents.status", "cancelled")
+              .order("id")
+              .range(from, to),
+          )
+        : Promise.resolve([]),
+    ]);
   if (siblings.error) fail("the villa's other estimates", siblings.error);
+  if (canceller.error) fail("who withdrew the estimate", canceller.error);
   if (importer.error) fail("who imported the model", importer.error);
   const villaWorking = (siblings.data ?? []).find(
     (row) => row.is_working && row.id !== estimate.id,
@@ -625,6 +660,14 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     submittedByName: submitter.data?.full_name ?? null,
     submittedAt: estimate.submitted_at,
     supersededAt: estimate.superseded_at,
+    cancelledAt: estimate.cancelled_at,
+    cancelledByName: canceller.data?.full_name ?? null,
+    cancelReason: estimate.cancel_reason,
+    drawingIndentRefs: [
+      ...new Set(
+        drawing.map((row) => row.indents?.reference).filter((ref): ref is string => !!ref),
+      ),
+    ].sort(),
     villaWorkingId: villaWorking?.id ?? null,
     villaOfficial: villaOfficial
       ? { id: villaOfficial.id, reference: villaOfficial.reference }

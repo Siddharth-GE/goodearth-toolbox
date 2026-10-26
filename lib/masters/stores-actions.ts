@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 function readStoreForm(formData: FormData) {
   return {
@@ -54,4 +55,14 @@ export async function updateStore(
 
   revalidatePath("/masters/stores");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteStore(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "stores", id, {
+    noun: "store",
+    retire: true,
+    paths: ["/masters/stores"],
+  });
 }

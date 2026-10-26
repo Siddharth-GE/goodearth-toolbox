@@ -30,11 +30,20 @@ export async function countIndentsPipeline(): Promise<{
 
   // Exact head-only counts, never rows.length.
   const [raised, lines, submitted, approved] = await Promise.all([
-    supabase.from("indents").select("id", { count: "exact", head: true }).gte("created_at", since),
+    // A cancelled indent (0143) counts nowhere.
+    supabase
+      .from("indents")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since)
+      .neq("status", "cancelled"),
     supabase
       .from("indent_lines")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", since),
+      .select("id, indents!indent_lines_indent_id_fkey!inner(status)", {
+        count: "exact",
+        head: true,
+      })
+      .gte("created_at", since)
+      .neq("indents.status", "cancelled"),
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
     supabase
       .from("indents")

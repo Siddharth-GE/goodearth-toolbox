@@ -16,6 +16,7 @@ export type BillLineRow = {
   po_line_id: string | null;
   item_id: string | null;
   labour_log_id: string | null;
+  labour_contract_line_id: string | null;
   work_item_id: string | null;
   work_label: string | null;
   description: string;
@@ -36,7 +37,7 @@ export async function getBillLines(billId: string): Promise<BillLineRow[]> {
       supabase
         .from("bill_lines")
         .select(
-          "id, line_kind, po_line_id, item_id, labour_log_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note",
+          "id, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note",
         )
         .eq("bill_id", billId)
         .order("sort_order")
@@ -53,6 +54,7 @@ export async function getBillLines(billId: string): Promise<BillLineRow[]> {
     po_line_id: line.po_line_id,
     item_id: line.item_id,
     labour_log_id: line.labour_log_id,
+    labour_contract_line_id: line.labour_contract_line_id,
     work_item_id: line.work_item_id,
     work_label: line.work_item_id ? (workLabel.get(line.work_item_id) ?? null) : null,
     description: line.description,
@@ -110,22 +112,68 @@ export async function getPoLinesForBill(poId: string): Promise<PoLineForBill[]> 
     .sort((a, b) => a.item_name.localeCompare(b.item_name));
 }
 
+/** Does any bill on this order have a line naming no stage (every bill before 0136, and Send to Bill's piece-work)?
+ * Then what each stage has billed is unknown, never zero. */
+export async function orderHasUntaggedBilling(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contractId: string,
+): Promise<boolean> {
+  const { data: bills, error } = await supabase
+    .from("bills")
+    .select("id")
+    .eq("labour_contract_id", contractId);
+  if (error) {
+    console.error("orderHasUntaggedBilling bills failed:", error);
+    throw new Error("Could not read the order's bills.", { cause: error });
+  }
+  const ids = (bills ?? []).map((bill) => bill.id);
+  if (ids.length === 0) return false;
+  const { count, error: linesError } = await supabase
+    .from("bill_lines")
+    .select("id", { count: "exact", head: true })
+    .in("bill_id", ids)
+    .is("labour_contract_line_id", null);
+  if (linesError) {
+    console.error("orderHasUntaggedBilling lines failed:", linesError);
+    throw new Error("Could not read the order's bill lines.", { cause: linesError });
+  }
+  return (count ?? 0) > 0;
+}
+
 export async function getWorkOrderLinesForBill(
   contractId: string,
 ): Promise<WorkOrderLineForBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
-  const lines = await fetchAll((from, to) =>
-    supabase
-      .from("labour_contract_lines")
-      .select("work_item_id, description, is_lump_sum, uom, rate")
-      .eq("contract_id", contractId)
-      .order("sort_order")
-      .order("created_at")
-      .order("id")
-      .range(from, to),
+  // What each line has billed comes through work_order_line_billing_facts (0136), /bills or /reporter.
+  const [lines, billed, untagged] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("labour_contract_lines")
+        .select("id, work_item_id, description, is_lump_sum, quantity, uom, rate")
+        .eq("contract_id", contractId)
+        .order("sort_order")
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("work_order_line_billing_facts")
+        .select("labour_contract_line_id, billed_value")
+        .eq("contract_id", contractId)
+        .order("labour_contract_line_id")
+        .range(from, to),
+    ),
+    orderHasUntaggedBilling(supabase, contractId),
+  ]);
+  const billedByLine = new Map(
+    billed.map((row) => [row.labour_contract_line_id ?? "", row.billed_value ?? 0]),
   );
-  return lines;
+  return lines.map((line) => ({
+    ...line,
+    billed: untagged ? null : (billedByLine.get(line.id) ?? 0),
+  }));
 }
 
 /** From the contractor's latest daily-wages bill that has lines; what Send to Bill suggests next. */
@@ -160,4 +208,38 @@ export async function countLabourEntriesOnBill(billId: string): Promise<number> 
     throw new Error("Could not read the bill's labour entries.", { cause: error });
   }
   return count ?? 0;
+}
+
+export type DeliveryInvoice = { invoiceNo: string; invoiceDate: string | null; grn: string };
+
+/** The supplier's invoices this PO's deliveries carried (0132), less any already on one of its bills. Read from the open stock table. */
+export async function getPoInvoicesForBill(poId: string): Promise<DeliveryInvoice[]> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const [receipts, billed] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id, reference, invoice_no, invoice_date")
+        .eq("po_id", poId)
+        .not("invoice_no", "is", null)
+        .order("received_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase.from("bills").select("id, invoice_no").eq("po_id", poId).order("id").range(from, to),
+    ),
+  ]);
+  const used = new Set(billed.map((bill) => bill.invoice_no.trim().toLowerCase()));
+  const seen = new Set<string>();
+  const invoices: DeliveryInvoice[] = [];
+  for (const receipt of receipts) {
+    const invoiceNo = (receipt.invoice_no ?? "").trim();
+    const key = invoiceNo.toLowerCase();
+    if (!invoiceNo || used.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    invoices.push({ invoiceNo, invoiceDate: receipt.invoice_date, grn: receipt.reference ?? "—" });
+  }
+  return invoices;
 }

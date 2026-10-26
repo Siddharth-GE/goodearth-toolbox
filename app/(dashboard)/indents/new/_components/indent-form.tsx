@@ -2,6 +2,7 @@
 
 import { SitePicker } from "@/components/masters/site-picker";
 import { Button, LinkButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
   const [workItemId, setWorkItemId] = useState("");
   const [requiredBy, setRequiredBy] = useState("");
   const [note, setNote] = useState("");
+  const [isUrgent, setIsUrgent] = useState(false);
   const { pending: creating, error, run } = useActionRunner();
 
   const project = options.projects.find((candidate) => candidate.id === projectId);
@@ -41,6 +43,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
         workItemId: workItemId || null,
         requiredBy: requiredBy || null,
         note: note || null,
+        isUrgent,
       }),
     );
   };
@@ -118,6 +121,20 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
           />
         </div>
       </div>
+
+      <label className="text-foreground flex items-start gap-2 text-sm">
+        <Checkbox
+          checked={isUrgent}
+          onChange={(event) => setIsUrgent(event.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Urgent
+          <span className="text-muted block text-xs">
+            An emergency the approver should see first. Say why in the note.
+          </span>
+        </span>
+      </label>
 
       <div className="space-y-1.5">
         <Label htmlFor="indent-note">Note</Label>

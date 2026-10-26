@@ -1,6 +1,6 @@
 import "server-only";
 
-import { requireTool } from "@/lib/auth/access";
+import { isToolLead, requireTool } from "@/lib/auth/access";
 import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
@@ -39,10 +39,15 @@ export type MovementRow = {
   note: string | null;
   createdAt: string;
   recordedByName: string | null;
+  /** Cancelled (0148): listed, counted in no balance. */
+  cancelledAt: string | null;
+  cancelReason: string | null;
 };
 
 export type FacilityDetail = FacilityRow & {
   movements: MovementRow[];
+  /** An admin's or the tool's team lead's: cancelling a movement (0148). */
+  canCancel: boolean;
 };
 
 /** Every facility with its computed position, active first. fetchAll on both tables: a silent 1,000-row cap would drop a movement and misstate a balance. */
@@ -66,6 +71,7 @@ export async function listFacilities(): Promise<FacilityRow[]> {
       supabase
         .from("funding_movements")
         .select("facility_id, kind, amount, happened_on")
+        .is("cancelled_at", null)
         .order("id")
         .range(from, to),
     ),
@@ -105,7 +111,7 @@ export async function listFacilities(): Promise<FacilityRow[]> {
 
 /** One facility with its full movement ledger, newest first. Null for "no such facility" and "not visible to you" alike (RLS), both ending at notFound(). */
 export const getFacility = cache(async (facilityId: string): Promise<FacilityDetail | null> => {
-  await requireTool("/financial-management");
+  const user = await requireTool("/financial-management");
   const supabase = await createClient();
 
   const { data: facility, error } = await supabase
@@ -120,7 +126,9 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
   const movements = await fetchAll((from, to) =>
     supabase
       .from("funding_movements")
-      .select("id, kind, amount, happened_on, reference, note, created_at, created_by")
+      .select(
+        "id, kind, amount, happened_on, reference, note, created_at, created_by, cancelled_at, cancel_reason",
+      )
       .eq("facility_id", facilityId)
       .order("happened_on", { ascending: false })
       .order("created_at", { ascending: false })
@@ -128,16 +136,21 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
       .range(from, to),
   );
 
-  const names = await profileNames(
-    supabase,
-    movements.map((movement) => movement.created_by),
-  );
+  const [names, canCancel] = await Promise.all([
+    profileNames(
+      supabase,
+      movements.map((movement) => movement.created_by),
+    ),
+    isToolLead(user, "/financial-management"),
+  ]);
 
-  const inputs = movements.map((movement) => ({
-    kind: movement.kind as MovementKind,
-    amount: movement.amount,
-    happenedOn: movement.happened_on,
-  }));
+  const inputs = movements
+    .filter((movement) => movement.cancelled_at === null)
+    .map((movement) => ({
+      kind: movement.kind as MovementKind,
+      amount: movement.amount,
+      happenedOn: movement.happened_on,
+    }));
 
   return {
     id: facility.id,
@@ -159,7 +172,10 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
       note: movement.note,
       createdAt: movement.created_at,
       recordedByName: movement.created_by ? (names.get(movement.created_by) ?? null) : null,
+      cancelledAt: movement.cancelled_at,
+      cancelReason: movement.cancel_reason,
     })),
+    canCancel,
   };
 });
 
@@ -237,6 +253,7 @@ export async function getCashPosition(): Promise<CashPosition> {
       supabase
         .from("funding_movements")
         .select("id, kind, amount, happened_on")
+        .is("cancelled_at", null)
         .order("id")
         .range(from, to),
     ),

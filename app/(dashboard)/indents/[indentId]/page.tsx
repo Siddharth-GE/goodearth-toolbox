@@ -4,11 +4,17 @@ import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getIndent } from "@/lib/indents/detail-queries";
 import { isCurrentUserApprover } from "@/lib/indents/queries";
-import { approvalBlocker, canEditIndent, estimatorHold, stillToBuy } from "@/lib/indents/workflow";
+import {
+  approvalBlocker,
+  canEditIndent,
+  estimatorHold,
+  indentRemoval,
+  stillToBuy,
+} from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { Printer } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
@@ -42,7 +48,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
     })),
   );
   const blocker = approvalBlocker(hold);
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   const works = workItems
     .filter((work) => work.is_active)
     .map((work) => ({
@@ -78,6 +84,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               lineCount={indent.line_count}
               decider={decider}
               approvalBlocker={blocker}
+              removal={indentRemoval(indent.status, indent.live_po_refs)}
             />
           </>
         }
@@ -112,6 +119,19 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         </div>
       )}
 
+      {indent.status === "cancelled" && (
+        <div className="border-danger/40 bg-danger/5 flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            <span className="font-medium">Cancelled</span>
+            {indent.cancelled_at && (
+              <span className="text-muted"> on {formatDate(indent.cancelled_at)}</span>
+            )}
+            : {indent.cancel_reason}. It is kept on record and counts nowhere.
+          </p>
+          <Attribution name={indent.cancelled_by_name} label="Cancelled by" />
+        </div>
+      )}
+
       {indent.status === "approved" && (
         <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
@@ -140,6 +160,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         works={works}
         requiredBy={indent.required_by}
         note={indent.note}
+        isUrgent={indent.is_urgent}
         editable={editable}
       />
 

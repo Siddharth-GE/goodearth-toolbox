@@ -6,9 +6,11 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchSelect, type SearchOption } from "@/components/ui/search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createBillWithLines } from "@/lib/bills/line-actions";
+import type { DeliveryInvoice } from "@/lib/bills/line-queries";
 import {
   billLinesProblem,
   lineMoneyOf,
@@ -48,6 +50,8 @@ export function BillForm({
     lines: BillLineDraft[];
     poLines?: PoLineForBill[];
     workLines?: WorkOrderLineForBill[];
+    /** The supplier invoices this PO's deliveries carried, not yet billed (0132). */
+    invoices: DeliveryInvoice[];
   };
   gstRates: number[];
   uoms: string[];
@@ -57,8 +61,10 @@ export function BillForm({
   const [nmrVendorId, setNmrVendorId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [scope, setScope] = useState("");
-  const [invoiceNo, setInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
+  // One unbilled invoice from the deliveries fills itself in; several are offered below the box.
+  const onlyInvoice = prefill.invoices.length === 1 ? prefill.invoices[0] : null;
+  const [invoiceNo, setInvoiceNo] = useState(onlyInvoice?.invoiceNo ?? "");
+  const [invoiceDate, setInvoiceDate] = useState(onlyInvoice?.invoiceDate ?? "");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<EditorLine[]>(() =>
     prefill.lines.map((draft) => toEditorLine(draft)),
@@ -72,20 +78,39 @@ export function BillForm({
     router.replace(`/bills/new?${params}`, { scroll: false });
   };
 
-  const vendors = useMemo(() => {
-    if (kind === "nmr") return options.vendors;
-    const billable = new Set(
+  // The order comes first and brings its vendor (founder, 2026-10-22): one search over every billable PO or work order.
+  const vendorName = useMemo(
+    () => new Map(options.vendors.map((vendor) => [vendor.id, vendor.name])),
+    [options.vendors],
+  );
+  const anchorOptions: SearchOption[] = useMemo(
+    () =>
       kind === "po"
-        ? options.pos.map((po) => po.vendor_id)
-        : options.contracts.map((contract) => contract.vendor_id),
-    );
-    return options.vendors.filter((vendor) => billable.has(vendor.id));
-  }, [options, kind]);
-  const pos = options.pos.filter((po) => po.vendor_id === vendorId);
-  const contracts = options.contracts.filter((contract) => contract.vendor_id === vendorId);
-  const anchoredPo = kind === "po" ? pos.find((po) => po.id === anchorId) : undefined;
+        ? options.pos.map((po) => ({
+            value: po.id,
+            label: po.reference,
+            hint: `${vendorName.get(po.vendor_id) ?? "—"} · ${po.project_name}`,
+          }))
+        : options.contracts.map((contract) => ({
+            value: contract.id,
+            label: `${contract.reference ? `${contract.reference} · ` : ""}${contract.description}`,
+            hint: `${vendorName.get(contract.vendor_id) ?? "—"} · ${contract.project_name} (${contract.scope_name})`,
+          })),
+    [kind, options.pos, options.contracts, vendorName],
+  );
+  const anchoredPo = kind === "po" ? options.pos.find((po) => po.id === anchorId) : undefined;
   const anchoredContract =
-    kind === "contract" ? contracts.find((contract) => contract.id === anchorId) : undefined;
+    kind === "contract"
+      ? options.contracts.find((contract) => contract.id === anchorId)
+      : undefined;
+  const anchorVendorId = anchoredPo?.vendor_id ?? anchoredContract?.vendor_id ?? vendorId;
+  const pickAnchor = (id: string) => {
+    const vendor =
+      (kind === "po"
+        ? options.pos.find((po) => po.id === id)?.vendor_id
+        : options.contracts.find((contract) => contract.id === id)?.vendor_id) ?? "";
+    go({ kind, vendorId: vendor, anchorId: id });
+  };
   const anchorTotal = anchoredPo?.ordered_total ?? anchoredContract?.contract_value ?? null;
   const alreadyBilled = anchoredPo?.billed_total ?? anchoredContract?.billed_total ?? 0;
 
@@ -170,53 +195,27 @@ export function BillForm({
         </div>
 
         {kind !== "nmr" ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="bill-vendor">{kind === "po" ? "Vendor" : "Contractor"}</Label>
-              <Select
-                id="bill-vendor"
-                value={vendorId}
-                onChange={(event) => go({ kind, vendorId: event.target.value })}
-              >
-                <option value="" disabled>
-                  {kind === "po" ? "Choose a vendor" : "Choose a contractor"}
-                </option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </option>
-                ))}
-              </Select>
-              <p className="text-muted text-xs">
-                {kind === "po"
-                  ? "Only vendors with an issued PO appear here."
-                  : "Only contractors with an approved work order appear here."}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bill-anchor">Against</Label>
-              <Select
+              <Label htmlFor="bill-anchor">
+                {kind === "po" ? "Against purchase order" : "Against work order"}
+              </Label>
+              <SearchSelect
                 id="bill-anchor"
+                options={anchorOptions}
                 value={anchorId}
-                onChange={(event) => go({ kind, vendorId, anchorId: event.target.value })}
-                disabled={!vendorId}
-              >
-                <option value="" disabled>
-                  {kind === "po" ? "Choose a purchase order" : "Choose a work order"}
-                </option>
-                {kind === "po"
-                  ? pos.map((po) => (
-                      <option key={po.id} value={po.id}>
-                        {po.reference} — {po.project_name}
-                      </option>
-                    ))
-                  : contracts.map((contract) => (
-                      <option key={contract.id} value={contract.id}>
-                        {contract.reference ? `${contract.reference} · ` : ""}
-                        {contract.description} — {contract.project_name} ({contract.scope_name})
-                      </option>
-                    ))}
-              </Select>
+                onChange={(id) => (id ? pickAnchor(id) : go({ kind }))}
+                placeholder={
+                  kind === "po"
+                    ? "Type the PO number, the vendor or the project…"
+                    : "Type the work order number, the contractor or the project…"
+                }
+                emptyHint={
+                  kind === "po"
+                    ? "Only issued purchase orders appear here."
+                    : "Only approved work orders appear here."
+                }
+              />
               {anchorId !== "" && (
                 <p className="text-muted text-xs">
                   {anchoredPo
@@ -227,6 +226,16 @@ export function BillForm({
                 </p>
               )}
             </div>
+            {anchorId !== "" && (
+              <div className="space-y-1.5">
+                <p className="text-muted text-xs font-medium">
+                  {kind === "po" ? "Vendor" : "Contractor"}
+                </p>
+                <p className="text-foreground text-sm font-medium">
+                  {vendorName.get(anchorVendorId) ?? "—"}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -314,6 +323,24 @@ export function BillForm({
               placeholder={kind === "nmr" ? "e.g. NMR week 32" : "As printed on the bill"}
               autoComplete="off"
             />
+            {kind === "po" && prefill.invoices.length > 0 && (
+              <p className="text-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <span>From the deliveries:</span>
+                {prefill.invoices.map((invoice) => (
+                  <button
+                    key={invoice.invoiceNo}
+                    type="button"
+                    className="text-accent font-medium hover:underline"
+                    onClick={() => {
+                      setInvoiceNo(invoice.invoiceNo);
+                      if (invoice.invoiceDate) setInvoiceDate(invoice.invoiceDate);
+                    }}
+                  >
+                    {invoice.invoiceNo} ({invoice.grn})
+                  </button>
+                ))}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="bill-invoice-date">

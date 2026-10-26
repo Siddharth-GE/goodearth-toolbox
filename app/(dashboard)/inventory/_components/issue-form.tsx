@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkClassField } from "@/components/masters/work-class-field";
+import type { WorkClass } from "@/lib/masters/work-classes";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +50,7 @@ export function IssueForm({
   const [destination, setDestination] = useState<Destination>("plot");
   const [plotId, setPlotId] = useState(request?.plotId ?? "");
   const [workItemId, setWorkItemId] = useState(request?.workItemId ?? "");
+  const [workClass, setWorkClass] = useState<WorkClass>(request?.workClass ?? "standard");
   const [toStoreId, setToStoreId] = useState("");
   const [projectId, setProjectId] = useState(store.project_id ?? "");
   const [issuedAt, setIssuedAt] = useState(() => todayInIndia());
@@ -124,6 +127,7 @@ export function IssueForm({
         issuedAt: issuedAt || null,
         note: note || null,
         requestId: destination === "plot" ? (request?.id ?? null) : null,
+        workClass: destination === "plot" ? workClass : null,
         lines: pickedEntries.map(([itemId, quantity]) => ({
           itemId,
           quantity,
@@ -204,6 +208,7 @@ export function IssueForm({
                 The work this material serves, from the works list — how issues line up against the
                 villa&apos;s estimate. The stage is the work&apos;s own group.
               </p>
+              <WorkClassField defaultValue={workClass} onChange={setWorkClass} />
             </div>
           ) : (
             <>

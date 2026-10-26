@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Attribution } from "@/components/ui/attribution";
 import { FACILITY_KIND_LABELS, MOVEMENT_KIND_LABELS } from "@/lib/financial-management/kinds";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
+import { cancelMovement } from "@/lib/financial-management/actions";
 import { getFacility } from "@/lib/financial-management/queries";
 import { formatCrore, formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { NotebookPen } from "lucide-react";
@@ -20,7 +22,6 @@ import { notFound } from "next/navigation";
 import { FacilityFormDialog } from "../../_components/facility-form-dialog";
 import { FacilityMenu } from "../../_components/facility-menu";
 import { MovementFormDialog } from "../../_components/movement-form-dialog";
-import { MovementRowMenu } from "../../_components/movement-row-menu";
 
 const KIND_BADGE = {
   drawdown: "success",
@@ -189,16 +190,28 @@ export default async function FacilityPage({
           </TableHead>
           <TableBody>
             {facility.movements.map((movement) => (
-              <TableRow key={movement.id}>
+              <TableRow
+                key={movement.id}
+                className={movement.cancelledAt ? "text-muted" : undefined}
+              >
                 <TableCell className="text-muted whitespace-nowrap">
                   {formatDate(movement.happenedOn)}
+                  {movement.cancelledAt && (
+                    <div className="text-xs">{`Cancelled — ${movement.cancelReason}`}</div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={KIND_BADGE[movement.kind]}>
                     {MOVEMENT_KIND_LABELS[movement.kind]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-foreground text-right font-mono font-medium">
+                <TableCell
+                  className={
+                    movement.cancelledAt
+                      ? "text-right font-mono line-through"
+                      : "text-foreground text-right font-mono font-medium"
+                  }
+                >
                   {formatMoney(movement.amount)}
                 </TableCell>
                 <TableCell className="text-muted">{movement.reference ?? "—"}</TableCell>
@@ -210,10 +223,14 @@ export default async function FacilityPage({
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end">
-                    <MovementRowMenu
-                      movementId={movement.id}
-                      facilityId={facility.id}
-                      describedAs={`${MOVEMENT_KIND_LABELS[movement.kind]} of ${formatMoney(movement.amount)} on ${formatDate(movement.happenedOn)}`}
+                    <DeleteOrCancel
+                      noun="movement"
+                      removal={
+                        facility.canCancel && !movement.cancelledAt ? { kind: "cancel" } : null
+                      }
+                      cancelNote={`The ${MOVEMENT_KIND_LABELS[movement.kind].toLowerCase()} of ${formatMoney(movement.amount)} on ${formatDate(movement.happenedOn)} leaves every balance, and stays listed here with your reason. This can't be undone.`}
+                      reasonPlaceholder="Typed twice by mistake"
+                      onCancel={cancelMovement.bind(null, movement.id, facility.id)}
                     />
                   </div>
                 </TableCell>

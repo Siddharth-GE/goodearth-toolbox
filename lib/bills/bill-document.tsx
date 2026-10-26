@@ -14,7 +14,7 @@ import {
 import { pdf } from "@/lib/pdf/theme";
 import { formatAmount, formatDate, formatPercent, formatQuantity } from "@/lib/format";
 import type { BillLineRow } from "./line-queries";
-import { billLineMoney, rollUpBill } from "./math";
+import { billLineMoney, rollUpBill, summaryRows } from "./math";
 import type { BillSettlement } from "./payment-queries";
 import type { BillDetail } from "./queries";
 
@@ -105,8 +105,19 @@ export function BillDocument({ data }: { data: BillPdfData }) {
     bill.po_reference ?? bill.contract_reference ?? (bill.kind === "nmr" ? "Muster roll" : "—");
   // An itemised bill's figures are its lines'; an older bill's are as typed.
   const totals = lines.length
-    ? rollUpBill(lines.map((line) => ({ ...line, discount_amount: line.discount_amount })))
-    : { taxable: bill.taxable_amount, gst: bill.gst_amount, other: 0, total: bill.total_amount };
+    ? rollUpBill(
+        lines.map((line) => ({ ...line, discount_amount: line.discount_amount })),
+        { amount: bill.charges_amount, gst_pct: bill.charges_gst_pct, note: bill.charges_note },
+      )
+    : {
+        taxable: bill.taxable_amount,
+        charges: 0,
+        chargesNote: null,
+        gst: bill.gst_amount,
+        other: 0,
+        total: bill.total_amount,
+        unpricedCount: 0,
+      };
 
   const meta: DocumentMeta = {
     documentType: "BILL",
@@ -159,20 +170,12 @@ export function BillDocument({ data }: { data: BillPdfData }) {
         )}
 
         <View style={styles.totalsBox} wrap={false}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Taxable value</Text>
-            <Text style={styles.totalsValue}>{formatAmount(totals.taxable)}</Text>
-          </View>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>GST</Text>
-            <Text style={styles.totalsValue}>{formatAmount(totals.gst)}</Text>
-          </View>
-          {totals.other > 0 && (
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Other charges</Text>
-              <Text style={styles.totalsValue}>{formatAmount(totals.other)}</Text>
+          {summaryRows(totals).map((row) => (
+            <View key={row.label} style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>{row.label}</Text>
+              <Text style={styles.totalsValue}>{formatAmount(row.amount)}</Text>
             </View>
-          )}
+          ))}
           <View style={styles.grandRow}>
             <Text style={styles.grandLabel}>Total</Text>
             <Text style={styles.grandValue}>{formatAmount(bill.total_amount)}</Text>

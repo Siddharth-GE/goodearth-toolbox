@@ -4,7 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
@@ -23,6 +23,7 @@ export type IndentListRow = {
   status: IndentStatus;
   stage: string | null;
   required_by: string | null;
+  is_urgent: boolean;
   created_at: string;
   project_name: string;
   unit_name: string | null;
@@ -48,7 +49,7 @@ export async function getWelcomeCounts() {
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  const [submitted, drafts, approved] = await Promise.all([
+  const [submitted, drafts, approved, urgent] = await Promise.all([
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "draft"),
     supabase
@@ -56,14 +57,24 @@ export async function getWelcomeCounts() {
       .select("id", { count: "exact", head: true })
       .eq("status", "approved")
       .gte("created_at", since),
+    supabase
+      .from("indents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted")
+      .eq("is_urgent", true),
   ]);
 
-  assertRead("indents", "the welcome counts", submitted.error ?? drafts.error ?? approved.error);
+  assertRead(
+    "indents",
+    "the welcome counts",
+    submitted.error ?? drafts.error ?? approved.error ?? urgent.error,
+  );
 
   return {
     awaitingApproval: submitted.count ?? 0,
     drafts: drafts.count ?? 0,
     approvedThisMonth: approved.count ?? 0,
+    urgentAwaiting: urgent.count ?? 0,
   };
 }
 
@@ -95,7 +106,8 @@ export async function listIndents({
   // created_at is a timestamp, so the "to" day runs up to the day after it.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
-    if (status) next = next.eq("status", status);
+    // Cancelled indents show only when asked for by name.
+    next = status ? next.eq("status", status) : next.neq("status", "cancelled");
     if (projectId) next = next.eq("project_id", projectId);
     if (workItemId) next = next.eq("work_item_id", workItemId);
     if (from) next = next.gte("created_at", istDayStart(from));
@@ -108,10 +120,12 @@ export async function listIndents({
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
+        "id, reference, status, stage, required_by, is_urgent, created_at, projects(name), units(name), indent_lines(count)",
         { count: "exact" },
       ),
   )
+    // Urgent first in every list: the approver's emergencies, and site's own.
+    .order("is_urgent", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
@@ -134,6 +148,7 @@ export async function listIndents({
       status: row.status as IndentStatus,
       stage: row.stage,
       required_by: row.required_by,
+      is_urgent: row.is_urgent,
       created_at: row.created_at,
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
       unit_name: (row.units as { name: string } | null)?.name ?? null,
@@ -246,7 +261,7 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
     listWorkItems(),
     listWorkCategories(),
   ]);
-  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),

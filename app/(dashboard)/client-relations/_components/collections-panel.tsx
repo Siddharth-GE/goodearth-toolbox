@@ -1,3 +1,5 @@
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
+import { cancelReceipt } from "@/lib/client-relations/actions";
 import { unpricedNote } from "@/lib/client-relations/dues";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { Section } from "@/components/ui/section";
@@ -13,11 +15,17 @@ import type { EngagementDetail } from "@/lib/client-relations/queries";
 import { RECEIPT_MODES, milestoneLabel, optionFor } from "@/lib/client-relations/stages";
 import { formatDate, formatMoney } from "@/lib/format";
 
-import { DeleteReceiptButton } from "./delete-receipt-button";
 import { MilestoneRowEditor } from "./milestone-row";
 import { ReceiptDialog } from "./receipt-dialog";
 
-export function CollectionsPanel({ engagement }: { engagement: EngagementDetail }) {
+/** `canCancel`: an admin or the team lead (0148), who cancels a payment with a reason. */
+export function CollectionsPanel({
+  engagement,
+  canCancel,
+}: {
+  engagement: EngagementDetail;
+  canCancel: boolean;
+}) {
   const { dues } = engagement;
 
   return (
@@ -106,9 +114,15 @@ export function CollectionsPanel({ engagement }: { engagement: EngagementDetail 
             </TableHead>
             <TableBody>
               {engagement.receipts.map((receipt) => (
-                <TableRow key={receipt.id}>
+                <TableRow
+                  key={receipt.id}
+                  className={receipt.cancelledAt ? "text-muted" : undefined}
+                >
                   <TableCell className="whitespace-nowrap">
                     {formatDate(receipt.receivedOn)}
+                    {receipt.cancelledAt && (
+                      <div className="text-xs">{`Cancelled — ${receipt.cancelReason}`}</div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {receipt.milestoneStage ? (
@@ -121,13 +135,18 @@ export function CollectionsPanel({ engagement }: { engagement: EngagementDetail 
                     {optionFor(RECEIPT_MODES, receipt.mode)?.label ?? receipt.mode}
                   </TableCell>
                   <TableCell className="text-muted">{receipt.reference ?? "—"}</TableCell>
-                  <TableCell className="text-right font-mono text-xs whitespace-nowrap">
+                  <TableCell
+                    className={`text-right font-mono text-xs whitespace-nowrap ${receipt.cancelledAt ? "line-through" : ""}`}
+                  >
                     {formatMoney(receipt.amount)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <DeleteReceiptButton
-                      receiptId={receipt.id}
-                      amount={formatMoney(receipt.amount)}
+                    <DeleteOrCancel
+                      noun="payment"
+                      removal={canCancel && !receipt.cancelledAt ? { kind: "cancel" } : null}
+                      cancelNote={`${formatMoney(receipt.amount)} stops counting towards what this plot has paid, everywhere. It stays listed here with your reason. This can't be undone.`}
+                      reasonPlaceholder="Recorded on the wrong plot"
+                      onCancel={cancelReceipt.bind(null, receipt.id)}
                     />
                   </TableCell>
                 </TableRow>

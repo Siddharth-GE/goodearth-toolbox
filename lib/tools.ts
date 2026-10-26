@@ -238,6 +238,16 @@ export const TOOLS: Tool[] = [
   },
 ];
 
+/**
+ * Turing, the admins' assistant: its own row at the top of the sidebar, never in a team and never
+ * grantable, so it stays out of TOOLS. lib/turing/ and its routes are still a tool to check:boundaries.
+ */
+export const TURING = {
+  name: "Turing",
+  description: "Claude, working inside the toolbox with you.",
+  href: "/turing",
+} as const;
+
 export const GRANTABLE_TOOLS = TOOLS.filter((tool) => tool.href !== "/settings");
 
 // The grants that may search the catalogue — see Tool.catalogue.

@@ -124,6 +124,43 @@ export async function listStockIssues({
   };
 }
 
+export type IssueItemRow = {
+  id: string;
+  issue_id: string;
+  item_name: string;
+  item_code: string | null;
+  quantity: number;
+  uom: string;
+};
+
+/** The "Items" view of the list: the lines of the issues already on the page, so filters and paging stay the issues'. */
+export async function listIssueItems(issueIds: string[]): Promise<IssueItemRow[]> {
+  await requireTool("/inventory");
+  if (issueIds.length === 0) return [];
+  const supabase = await createClient();
+  const lines = await fetchAll((from, to) =>
+    supabase
+      .from("stock_issue_lines")
+      .select("id, issue_id, item_id, quantity, uom")
+      .in("issue_id", issueIds)
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
+  const items = await itemsById(
+    supabase,
+    lines.map((line) => line.item_id),
+  );
+  return lines.map((line) => ({
+    id: line.id,
+    issue_id: line.issue_id,
+    item_name: items.get(line.item_id)?.name ?? "—",
+    item_code: items.get(line.item_id)?.code ?? null,
+    quantity: line.quantity,
+    uom: line.uom,
+  }));
+}
+
 export type IssueDetail = {
   id: string;
   reference: string;
@@ -134,6 +171,7 @@ export type IssueDetail = {
   work_item_id: string | null;
   work_name: string | null;
   work_category: string | null;
+  work_class: string;
   issued_at: string;
   note: string | null;
   issued_by_name: string | null;
@@ -165,7 +203,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   const { data: issue, error: issueError } = await supabase
     .from("stock_issues")
     .select(
-      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
+      "id, reference, store_id, to_store_id, plot_id, work_item_id, work_class, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
     )
     .eq("id", issueId)
     .maybeSingle();
@@ -266,6 +304,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     work_category:
       (issue.work_items as { name: string; work_categories: { name: string } | null } | null)
         ?.work_categories?.name ?? null,
+    work_class: issue.work_class,
     issued_at: issue.issued_at,
     note: issue.note,
     issued_by_name: nameOf(issue.created_by),

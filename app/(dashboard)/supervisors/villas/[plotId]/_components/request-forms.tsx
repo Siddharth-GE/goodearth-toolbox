@@ -2,6 +2,7 @@
 
 import { CataloguePickerDialog, type PickedLine } from "@/components/masters/catalogue-picker";
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { WorkClassField } from "@/components/masters/work-class-field";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -11,9 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { createIssueRequest, withdrawIssueRequest } from "@/lib/supervisors/actions";
 import type { EstimateQuickPick, WorkOption } from "@/lib/supervisors/queries";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { WorkOptions } from "./work-options";
 
-type ChosenItem = { id: string; name: string; uom: string };
+export type ChosenItem = { id: string; name: string; uom: string };
 
 /** "Request an issue": the work, then the material, from the estimate's list for it or the whole catalogue. The chosen item lives OUTSIDE the dialog content (Radix unmounts it on close), so onOpen resets it. */
 export function RequestIssueDialog({
@@ -23,6 +25,9 @@ export function RequestIssueDialog({
   hasEstimate,
   categories,
   brands,
+  trigger,
+  stageWorkIds,
+  preset,
 }: {
   plotId: string;
   works: WorkOption[];
@@ -30,6 +35,11 @@ export function RequestIssueDialog({
   hasEstimate: boolean;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
+  trigger?: ReactNode;
+  /** Opened from a stage: its works first, and the only one picked. */
+  stageWorkIds?: string[];
+  /** "Request what's left": the work, the material and the quantity filled in. */
+  preset?: { workItemId: string; item: ChosenItem; quantity: number | null };
 }) {
   const [workItemId, setWorkItemId] = useState("");
   const [item, setItem] = useState<ChosenItem | null>(null);
@@ -39,7 +49,6 @@ export function RequestIssueDialog({
   // The server decides again from the estimate; this only asks in time.
   const offEstimate =
     hasEstimate && item !== null && !workPicks.some((pick) => pick.itemId === item.id);
-  const workCategories = [...new Set(works.map((work) => work.categoryName))];
 
   const choose = (picked: PickedLine[]) => {
     const first = picked[0];
@@ -55,10 +64,10 @@ export function RequestIssueDialog({
         label="Request"
         isEdit={false}
         action={createIssueRequest}
-        trigger={<Button variant="secondary">Request material</Button>}
+        trigger={trigger ?? <Button variant="secondary">Request material</Button>}
         onOpen={() => {
-          setWorkItemId("");
-          setItem(null);
+          setWorkItemId(preset?.workItemId ?? (stageWorkIds?.length === 1 ? stageWorkIds[0] : ""));
+          setItem(preset?.item ?? null);
         }}
       >
         <input type="hidden" name="plot_id" value={plotId} />
@@ -76,20 +85,7 @@ export function RequestIssueDialog({
             }}
             required
           >
-            <option value="" disabled>
-              Pick the work…
-            </option>
-            {workCategories.map((category) => (
-              <optgroup key={category} label={category}>
-                {works
-                  .filter((work) => work.categoryName === category)
-                  .map((work) => (
-                    <option key={work.id} value={work.id}>
-                      {work.label}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
+            <WorkOptions works={works} stageWorkIds={stageWorkIds} />
           </Select>
         </div>
 
@@ -150,8 +146,16 @@ export function RequestIssueDialog({
 
         <div className="space-y-1.5">
           <Label htmlFor="quantity">Quantity{item ? ` (${item.uom})` : ""}</Label>
-          <Input id="quantity" name="quantity" inputMode="decimal" required />
+          <Input
+            id="quantity"
+            name="quantity"
+            inputMode="decimal"
+            defaultValue={preset?.quantity ?? ""}
+            required
+          />
         </div>
+
+        <WorkClassField />
 
         <div className="space-y-1.5">
           <Label htmlFor="note">Note for the store (optional)</Label>

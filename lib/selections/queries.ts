@@ -400,7 +400,9 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
     supabase
       .from("indents")
       .select("id, reference")
-      .in("id", [...new Set(anchored.map((line) => line.indent_id))]),
+      .in("id", [...new Set(anchored.map((line) => line.indent_id))])
+      // A cancelled indent (0143) is hit by nothing.
+      .neq("status", "cancelled"),
     fetchAll((from, to) =>
       supabase
         .from("po_line_facts")
@@ -425,6 +427,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
   }
 
   for (const line of anchored) {
+    if (!indentRefs.has(line.indent_id)) continue;
     const entry = impact.get(line.line_key) ?? { indent_refs: [], po_refs: [] };
     const indentRef = indentRefs.get(line.indent_id);
     if (indentRef && !entry.indent_refs.includes(indentRef)) entry.indent_refs.push(indentRef);

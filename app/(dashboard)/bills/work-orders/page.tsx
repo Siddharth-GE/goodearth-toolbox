@@ -24,6 +24,7 @@ import Link from "next/link";
 const STATUSES: { value: ContractStatus; label: string }[] = [
   { value: "pending_approval", label: "Pending approval" },
   { value: "approved", label: "Approved" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 export default async function WorkOrdersPage({
@@ -142,6 +143,8 @@ export default async function WorkOrdersPage({
                   <div className="flex flex-wrap items-center gap-1">
                     {order.status === "approved" ? (
                       <Badge variant="success">Approved</Badge>
+                    ) : order.status === "cancelled" ? (
+                      <Badge variant="danger">Cancelled</Badge>
                     ) : (
                       <Badge variant="warning">Pending approval</Badge>
                     )}

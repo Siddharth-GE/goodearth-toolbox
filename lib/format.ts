@@ -115,6 +115,14 @@ export function formatShortDate(value: string | Date | null | undefined): string
   return date.toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 }
 
+/** `Nov 2026` — a month mark on a date strip. */
+export function formatMonthMark(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(LOCALE, { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 /** `4:05 pm`, for where only the time of day matters. */
 export function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
@@ -150,6 +158,12 @@ export function hourInIndia(): number {
 export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   return value.toLocaleString(LOCALE);
+}
+
+/** "A", "A and B", "A, B and C": a list read as one phrase in a sentence. */
+export function joinInWords(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 const ONES = [

@@ -493,6 +493,8 @@ async function loadMoney(
         .from("client_receipts")
         .select("id, engagement_id, milestone_id, amount, received_on, mode, reference, note")
         .in("engagement_id", engagementIds)
+        // A cancelled payment (0148) counts towards nothing.
+        .is("cancelled_at", null)
         .order("id")
         .range(from, to),
     ),
@@ -597,6 +599,9 @@ export type ReceiptRow = {
   mode: string;
   reference: string | null;
   note: string | null;
+  /** Cancelled (0148): listed, counted in nothing. */
+  cancelledAt: string | null;
+  cancelReason: string | null;
 };
 
 export type EngagementDetail = EngagementRow & {
@@ -671,10 +676,14 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
     mode: string;
     reference: string | null;
     note: string | null;
+    cancelled_at: string | null;
+    cancel_reason: string | null;
   }>((from, to) =>
     supabase
       .from("client_receipts")
-      .select("id, engagement_id, milestone_id, amount, received_on, mode, reference, note")
+      .select(
+        "id, engagement_id, milestone_id, amount, received_on, mode, reference, note, cancelled_at, cancel_reason",
+      )
       .in("engagement_id", ids)
       .order("id")
       .range(from, to),
@@ -719,6 +728,8 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
           mode: r.mode,
           reference: r.reference,
           note: r.note,
+          cancelledAt: r.cancelled_at,
+          cancelReason: r.cancel_reason,
         })),
       trails: trails.get(record.unit_id) ?? [],
       issuedRevision: issued?.revision ?? null,

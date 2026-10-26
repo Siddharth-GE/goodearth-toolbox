@@ -5,16 +5,19 @@ import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { VendorRow } from "@/lib/masters/vendors";
-import { createVendor, updateVendor } from "@/lib/masters/vendors-actions";
+import { createVendor, deleteVendor, updateVendor } from "@/lib/masters/vendors-actions";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
   const isEdit = !!vendor;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
       label="Vendor"
       isEdit={isEdit}
       action={isEdit ? updateVendor.bind(null, vendor.id) : createVendor}
+      onDelete={isAdmin && vendor ? () => deleteVendor(vendor.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

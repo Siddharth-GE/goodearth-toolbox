@@ -26,6 +26,9 @@ const INDENT_GUARD_PHRASES = [
   "official estimate",
   "outside the estimate",
   "estimator",
+  // 0143: cancelling.
+  "cancel",
+  "Cancel",
 ] as const;
 
 const REASON_LIMIT = 500;
@@ -37,6 +40,8 @@ export type CreateIndentInput = {
   workItemId: string | null;
   requiredBy: string | null;
   note: string | null;
+  /** An emergency request: sorted first for the approver (0132). */
+  isUrgent: boolean;
 };
 
 export async function createIndent(input: CreateIndentInput): Promise<ActionState> {
@@ -78,11 +83,15 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
-  // create_indent()'s signature predates works (additive-only), so the work rides a second write; a failure leaves a visible, fixable draft.
-  if (input.workItemId) {
+  // create_indent()'s signature predates works and the urgent mark (additive-only), so they ride a second write; a failure leaves a visible, fixable draft.
+  if (input.workItemId || input.isUrgent) {
     const { error: workError } = await supabase
       .from("indents")
-      .update({ work_item_id: input.workItemId, updated_by: user.id })
+      .update({
+        work_item_id: input.workItemId || null,
+        is_urgent: input.isUrgent,
+        updated_by: user.id,
+      })
       .eq("id", indentId);
     if (workError) console.error("createIndent work update failed:", workError);
   }
@@ -456,6 +465,7 @@ export async function updateIndentHeader(
     workItemId: string | null;
     requiredBy: string | null;
     note: string | null;
+    isUrgent: boolean;
   },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
@@ -468,6 +478,7 @@ export async function updateIndentHeader(
       work_item_id: input.workItemId || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
+      is_urgent: input.isUrgent,
       updated_by: user.id,
     })
     .eq("id", indentId);
@@ -638,6 +649,34 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 
   revalidatePath("/indents", "layout");
   redirect("/indents/list");
+}
+
+// indents_guard (0143) refuses while a live PO orders from it, stamps who and when, and makes it final.
+export async function cancelIndent(indentId: string, reason: string): Promise<ActionState> {
+  await requireTool("/indents");
+
+  const why = reason.trim();
+  if (!why) return { error: "Say why this indent is cancelled." };
+  if (why.length > REASON_LIMIT) {
+    return { error: `Keep the reason under ${REASON_LIMIT} characters.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("indents")
+    .update({ status: "cancelled", cancel_reason: why })
+    .eq("id", indentId);
+  if (error) {
+    console.error("cancelIndent failed:", error);
+    // The guard locks the indent's lines against a PO being written to them at the same moment.
+    if (error.code === "40P01") {
+      return { error: "A purchase order was being made from this indent just then. Try again." };
+    }
+    return guardError(error, "Could not cancel this indent. Try again.", INDENT_GUARD_PHRASES);
+  }
+
+  revalidatePath("/indents", "layout");
+  return undefined;
 }
 
 export type EstimatePullInput = {

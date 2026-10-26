@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +27,17 @@ export function ActionButtons({
   actor,
   createdBy,
   totalAmount,
+  hasMoney,
 }: {
   billId: string;
   status: BillStatus;
   actor: { isAdmin: boolean; isApprover: boolean; approvalLimit: number | null; userId: string };
   createdBy: string | null;
   totalAmount: number;
+  /** Paid and reversed (0147): its money rows stay, so it is corrected, never deleted. */
+  hasMoney: boolean;
 }) {
   const { pending, error, run: runAction, clearError } = useActionRunner();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
   const [note, setNote] = useState("");
 
@@ -113,46 +116,32 @@ export function ActionButtons({
   return (
     <div className="space-y-1 text-right">
       <div className="flex items-center justify-end gap-2">
-        {confirmingDelete ? (
-          <>
-            <span className="text-muted text-xs">Its number stays used — sure?</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Keep it
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="text-danger"
-              disabled={pending}
-              onClick={() => run(() => deleteBill(billId))}
-            >
-              {pending ? "Deleting…" : "Delete bill"}
-            </Button>
-          </>
-        ) : (
-          <>
-            {deletable && (
-              <Button variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(true)}>
-                Delete
-              </Button>
-            )}
-            {approvable && (
-              <Button disabled={pending} onClick={() => run(() => approveBill(billId))}>
-                {pending ? "Approving…" : "Approve"}
-              </Button>
-            )}
-            {overLimit && (
-              <span className="text-muted text-xs">
-                Above your approval limit of {formatMoney(actor.approvalLimit)} — an admin or a
-                higher approver decides this one.
-              </span>
-            )}
-          </>
+        <DeleteOrCancel
+          noun="bill"
+          verb="Delete"
+          removal={
+            !deletable
+              ? null
+              : hasMoney
+                ? {
+                    kind: "blocked",
+                    why: "Money was paid and reversed on it, so it stays on record — correct it and approve it again.",
+                  }
+                : { kind: "delete" }
+          }
+          deleteNote="It is still recorded and no money has moved, so it goes for good. Its number stays used."
+          onDelete={() => deleteBill(billId)}
+        />
+        {approvable && (
+          <Button disabled={pending} onClick={() => run(() => approveBill(billId))}>
+            {pending ? "Approving…" : "Approve"}
+          </Button>
+        )}
+        {overLimit && (
+          <span className="text-muted text-xs">
+            Above your approval limit of {formatMoney(actor.approvalLimit)} — an admin or a higher
+            approver decides this one.
+          </span>
         )}
       </div>
       <FormMessage error={error} size="xs" />

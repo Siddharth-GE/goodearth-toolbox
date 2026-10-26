@@ -74,19 +74,43 @@ export type ReceivablePoPage = {
 /** Issued POs goods can still arrive against. A PO leaves by completing itself (0023), so empty means nothing outstanding. */
 export async function listReceivablePos({
   page = 1,
-}: { page?: number } = {}): Promise<ReceivablePoPage> {
+  q,
+  projectId,
+}: { page?: number; q?: string; projectId?: string } = {}): Promise<ReceivablePoPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  const { data, count, error } = await supabase
+  // A vendor-name search becomes vendor ids, so one or() covers the PO number and the vendor.
+  let vendorIds: string[] = [];
+  if (q) {
+    const { data: matched, error: vendorError } = await supabase
+      .from("vendors")
+      .select("id")
+      .ilike("name", `%${q}%`)
+      .limit(200);
+    if (vendorError) {
+      console.error("listReceivablePos vendor search failed:", vendorError);
+      throw new Error("Could not search the purchase orders.", { cause: vendorError });
+    }
+    vendorIds = (matched ?? []).map((row) => row.id);
+  }
+
+  let query = supabase
     .from("po_facts")
     .select("id, project_id, plot_id, unit_id, vendor_id, reference, expected_by, issued_at", {
       count: "exact",
     })
-    .eq("status", "issued")
+    .eq("status", "issued");
+  if (projectId) query = query.eq("project_id", projectId);
+  if (q) {
+    const clauses = [`reference.ilike.*${q}*`];
+    if (vendorIds.length) clauses.push(`vendor_id.in.(${vendorIds.join(",")})`);
+    query = query.or(clauses.join(","));
+  }
+  const { data, count, error } = await query
     .order("issued_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
@@ -476,6 +500,8 @@ export type ReceiptDetail = {
   work_name: string | null;
   work_category: string | null;
   challan_no: string | null;
+  invoice_no: string | null;
+  invoice_date: string | null;
   received_at: string;
   note: string | null;
   created_at: string;
@@ -540,7 +566,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   const { data: receipt, error: receiptError } = await supabase
     .from("goods_receipts")
     .select(
-      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
+      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, invoice_no, invoice_date, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
     )
     .eq("id", receiptId)
     .maybeSingle();
@@ -626,6 +652,8 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
       (receipt.work_items as { name: string; work_categories: { name: string } | null } | null)
         ?.work_categories?.name ?? null,
     challan_no: receipt.challan_no,
+    invoice_no: receipt.invoice_no,
+    invoice_date: receipt.invoice_date,
     received_at: receipt.received_at,
     note: receipt.note,
     created_at: receipt.created_at,

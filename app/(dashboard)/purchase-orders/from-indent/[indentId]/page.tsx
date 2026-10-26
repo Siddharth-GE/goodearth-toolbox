@@ -36,7 +36,11 @@ export default async function OrderIndentPage({
       {indent.status !== "approved" ? (
         <EmptyState
           icon={PackageCheck}
-          title="This indent isn't approved"
+          title={
+            indent.status === "cancelled"
+              ? "This indent was cancelled"
+              : "This indent isn't approved"
+          }
           description="Only an approved indent can be ordered. It is approved in the Indents tool."
           action={<LinkButton href="/purchase-orders/from-indent">Indents to order</LinkButton>}
         />

@@ -167,6 +167,27 @@ Dexter's viewer sandboxed HTML and SVG and nothing else, so an `.xml` (or `.xhtm
 **Rule.** A policy asks `is_admin()` or `has_app()`, never `profiles.role`. When a helper learns a new condition, search every policy that bypasses it.
 **Check.** Live: `select tablename, policyname from pg_policies where qual ilike '%role%' or with_check ilike '%role%'`, which should list nothing (Phase 3's `db:check-policies` will run it on every pull request). Run a trial as an admin with an unverified `session_id`, as `scripts/trials/user-apps-is-admin.sql` does.
 
+### 23. Every read got slower one row at a time
+
+After `0129` put `session_is_verified()` on every read policy, each list paid for the check once per row: the works list (714 rows) spent 135 ms in it, and a Supervisors page, reading a dozen lists, took two seconds where Inventory took half of one. Tests, build and trials pass whatever a policy costs; only timing a page shows it.
+
+**Rule.** A policy calls its checks wrapped — `(select has_app('/x'))`, `(select session_is_verified())`, `(select auth.uid())` — so each runs once per query (`0139`). A call that takes a column stays bare: it has to.
+**Check.** `db:check-policies` refuses a bare call. A page that feels slow: time its reads as the probe, then compare a table's read with the policy wrapped inside a rolled-back trial.
+
+### 24. An update to Turing's instructions broke every older conversation
+
+The day Turing learned to propose changes, the founder's conversation from that morning answered every message with "Claude could not take that message". Claude's reasoning from earlier turns is stored and replayed, and Anthropic binds it to the system prompt and tool list it was written under; the update changed both, so the API refused the replay with a 400 (`Invalid signature in thinking block … bound to a different conversation`). Tests, build and a fresh conversation all pass — only a conversation older than the deploy shows it.
+
+**Rule.** Turing's requests carry `thinking.block_binding.prefix_mismatch_behavior: "drop_block"` (beta `thinking-binding-controls-2026-08-01`): reasoning that no longer matches is set aside and the conversation carries on.
+**Check.** After any change to `lib/turing/claude.ts`'s prompt or tools, send one message in a conversation started before the deploy. For a reported Turing error, read the deployment's log: `npx vercel logs <url> --since 3h --level error -x | grep turing`.
+
+### 25. A delete that empties a record before the database refuses it
+
+Deleting a mix still in use on the Estimator's Mixes page said "in use, can't be deleted" — after it had already deleted the mix's materials in a request of its own, so every work using it was priced at nothing. Supabase calls are not one transaction: each `.delete()` stands the moment it returns, and the foreign key that refused the mix came a call later. Three saves that replace a list (clear, then insert) had the same shape: a trail type's activities, a copied work's materials, a transmittal's kept sheets. Every check passes; only a refusal or a failure mid-way shows it.
+
+**Rule.** A save that deletes in steps first checks everything that would refuse the last step, and a save that clears a list to rewrite it reads the old list first and puts it back if the rewrite fails. Where that cannot hold, one database function does it in one transaction.
+**Check.** In a new or changed action, any `.delete()` followed by another write in the same function: what happens if the second call fails or is refused?
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.

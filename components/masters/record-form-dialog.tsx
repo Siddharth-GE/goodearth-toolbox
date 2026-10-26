@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogClose,
@@ -24,6 +25,7 @@ export function RecordFormDialog({
   trigger,
   onOpen,
   wide = false,
+  onDelete,
 }: {
   /** Singular record name, e.g. "Vendor". Titles and buttons derive from it. */
   label: string;
@@ -34,6 +36,8 @@ export function RecordFormDialog({
   /** Called when the dialog opens, for a form holding its own state (Units resets its plot list). A handler, not an effect on `open`. */
   onOpen?: () => void;
   wide?: boolean;
+  /** An edit dialog's Delete, left of Cancel; the server refuses anything still in use, inside the confirm. */
+  onDelete?: () => Promise<FormState>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -56,7 +60,12 @@ export function RecordFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${label}` : `New ${label}`}</DialogTitle>
         </DialogHeader>
-        <RecordForm action={action} onSaved={() => setOpen(false)}>
+        <RecordForm
+          action={action}
+          onSaved={() => setOpen(false)}
+          onDelete={isEdit ? onDelete : undefined}
+          noun={label.toLowerCase()}
+        >
           {children}
         </RecordForm>
       </DialogContent>
@@ -71,10 +80,14 @@ export function RecordFormDialog({
 function RecordForm({
   action,
   onSaved,
+  onDelete,
+  noun,
   children,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   onSaved: () => void;
+  onDelete?: () => Promise<FormState>;
+  noun: string;
   children: ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -92,6 +105,24 @@ function RecordForm({
         {children}
         <FormMessage error={state?.error} />
         <DialogFooter>
+          {onDelete ? (
+            <ConfirmDialog
+              trigger={
+                <Button type="button" variant="ghost" className="text-danger mr-auto">
+                  Delete
+                </Button>
+              }
+              title={`Delete this ${noun}?`}
+              description="It goes for good, only while nothing uses it. If something does, you'll be told what, and nothing changes."
+              confirmLabel="Delete"
+              pendingLabel="Deleting…"
+              onConfirm={async () => {
+                const result = await onDelete();
+                if (!result?.error) onSaved();
+                return result;
+              }}
+            />
+          ) : null}
           <DialogClose asChild>
             <Button variant="secondary">Cancel</Button>
           </DialogClose>

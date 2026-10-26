@@ -24,6 +24,8 @@ export type Database = {
           id: string
           note: string | null
           recovered_on: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -36,6 +38,8 @@ export type Database = {
           id?: string
           note?: string | null
           recovered_on?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -48,6 +52,8 @@ export type Database = {
           id?: string
           note?: string | null
           recovered_on?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -85,6 +91,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_recoveries_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: false
+            referencedRelation: "advance_recoveries"
             referencedColumns: ["id"]
           },
           {
@@ -270,6 +283,7 @@ export type Database = {
           gst_pct: number
           id: string
           item_id: string | null
+          labour_contract_line_id: string | null
           labour_log_id: string | null
           line_kind: string
           note: string | null
@@ -292,6 +306,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           item_id?: string | null
+          labour_contract_line_id?: string | null
           labour_log_id?: string | null
           line_kind: string
           note?: string | null
@@ -314,6 +329,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           item_id?: string | null
+          labour_contract_line_id?: string | null
           labour_log_id?: string | null
           line_kind?: string
           note?: string | null
@@ -362,6 +378,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_labour_contract_line_id_fkey"
+            columns: ["labour_contract_line_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contract_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_labour_contract_line_id_fkey"
+            columns: ["labour_contract_line_id"]
+            isOneToOne: false
+            referencedRelation: "work_order_line_billing_facts"
+            referencedColumns: ["labour_contract_line_id"]
           },
           {
             foreignKeyName: "bill_lines_labour_log_id_fkey"
@@ -425,6 +455,8 @@ export type Database = {
           note: string | null
           paid_on: string
           payment_ref: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -438,6 +470,8 @@ export type Database = {
           note?: string | null
           paid_on?: string
           payment_ref: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -451,6 +485,8 @@ export type Database = {
           note?: string | null
           paid_on?: string
           payment_ref?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -491,6 +527,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bill_payments_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: false
+            referencedRelation: "bill_payments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bill_payments_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -504,6 +547,9 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bill_no: number
+          charges_amount: number | null
+          charges_gst_pct: number | null
+          charges_note: string | null
           created_at: string
           created_by: string | null
           gst_amount: number
@@ -535,6 +581,9 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bill_no: number
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           gst_amount: number
@@ -566,6 +615,9 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bill_no?: number
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           gst_amount?: number
@@ -663,6 +715,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "bills_updated_by_fkey"
@@ -816,6 +875,9 @@ export type Database = {
       birdwing_cross_charges: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           charged_month: string
           cost_centre_id: string | null
           created_at: string
@@ -830,6 +892,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           charged_month: string
           cost_centre_id?: string | null
           created_at?: string
@@ -844,6 +909,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           charged_month?: string
           cost_centre_id?: string | null
           created_at?: string
@@ -857,6 +925,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "birdwing_cross_charges_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "birdwing_cross_charges_cost_centre_id_fkey"
             columns: ["cost_centre_id"]
@@ -1422,6 +1497,9 @@ export type Database = {
       birdwing_receipts: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -1437,6 +1515,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1452,6 +1533,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1466,6 +1550,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "birdwing_receipts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "birdwing_receipts_created_by_fkey"
             columns: ["created_by"]
@@ -2328,6 +2419,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       business_plan_targets: {
@@ -2653,9 +2751,176 @@ export type Database = {
           },
         ]
       }
+      checklist_template_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          template_id: string
+          work_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          template_id: string
+          work_group_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          template_id?: string
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_groups_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_groups_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_template_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          origin: string
+          review_note: string | null
+          sort_order: number
+          template_id: string
+          text: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          origin?: string
+          review_note?: string | null
+          sort_order?: number
+          template_id: string
+          text: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          origin?: string
+          review_note?: string | null
+          sort_order?: number
+          template_id?: string
+          text?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_template_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          work_refs: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          work_refs?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          work_refs?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_actions: {
         Row: {
           action: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           done_on: string | null
@@ -2672,6 +2937,9 @@ export type Database = {
         }
         Insert: {
           action: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           done_on?: string | null
@@ -2688,6 +2956,9 @@ export type Database = {
         }
         Update: {
           action?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           done_on?: string | null
@@ -2703,6 +2974,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_actions_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_actions_created_by_fkey"
             columns: ["created_by"]
@@ -2880,6 +3158,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "client_engagements_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -2961,6 +3246,9 @@ export type Database = {
       client_receipts: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           engagement_id: string
@@ -2975,6 +3263,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           engagement_id: string
@@ -2989,6 +3280,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           engagement_id?: string
@@ -3002,6 +3296,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_receipts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_receipts_created_by_fkey"
             columns: ["created_by"]
@@ -3231,6 +3532,8 @@ export type Database = {
           paid_on: string
           payment_ref: string
           project_id: string
+          reverse_reason: string | null
+          reverses_id: string | null
           updated_at: string
           updated_by: string | null
           vendor_id: string
@@ -3246,6 +3549,8 @@ export type Database = {
           paid_on?: string
           payment_ref: string
           project_id: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id: string
@@ -3261,6 +3566,8 @@ export type Database = {
           paid_on?: string
           payment_ref?: string
           project_id?: string
+          reverse_reason?: string | null
+          reverses_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string
@@ -3295,6 +3602,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contractor_advances_reverses_id_fkey"
+            columns: ["reverses_id"]
+            isOneToOne: false
+            referencedRelation: "contractor_advances"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contractor_advances_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -3313,6 +3627,9 @@ export type Database = {
       design_actions: {
         Row: {
           action: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           design_stage_id: string | null
@@ -3328,6 +3645,9 @@ export type Database = {
         }
         Insert: {
           action: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           design_stage_id?: string | null
@@ -3343,6 +3663,9 @@ export type Database = {
         }
         Update: {
           action?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           design_stage_id?: string | null
@@ -3357,6 +3680,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "design_actions_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "design_actions_created_by_fkey"
             columns: ["created_by"]
@@ -3384,6 +3714,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_actions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "design_actions_updated_by_fkey"
@@ -3527,6 +3864,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "design_step_events_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       design_step_people: {
@@ -3639,6 +3983,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_steps_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "design_steps_updated_by_fkey"
@@ -4087,6 +4438,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "drawing_revisions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       drawing_set_works: {
@@ -4278,6 +4636,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_item_rates_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_item_rates_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4454,6 +4819,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_line_costs_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4489,6 +4861,7 @@ export type Database = {
           description: string | null
           from_model: boolean
           id: string
+          is_deduction: boolean
           length: number | null
           line_id: string
           model_refs: string[] | null
@@ -4505,6 +4878,7 @@ export type Database = {
           description?: string | null
           from_model?: boolean
           id?: string
+          is_deduction?: boolean
           length?: number | null
           line_id: string
           model_refs?: string[] | null
@@ -4521,6 +4895,7 @@ export type Database = {
           description?: string | null
           from_model?: boolean
           id?: string
+          is_deduction?: boolean
           length?: number | null
           line_id?: string
           model_refs?: string[] | null
@@ -4603,6 +4978,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_lines_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -4693,6 +5075,13 @@ export type Database = {
             foreignKeyName: "estimator_estimate_takeoff_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -4728,6 +5117,9 @@ export type Database = {
       }
       estimator_estimates: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           est_no: number | null
@@ -4752,6 +5144,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           est_no?: number | null
@@ -4776,6 +5171,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           est_no?: number | null
@@ -4800,6 +5198,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "estimator_estimates_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "estimator_estimates_created_by_fkey"
             columns: ["created_by"]
@@ -4826,6 +5231,13 @@ export type Database = {
             columns: ["source_estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_estimates_source_estimate_id_fkey"
+            columns: ["source_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -5106,6 +5518,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_work_facts"
             referencedColumns: ["estimate_id"]
           },
           {
@@ -5396,6 +5815,9 @@ export type Database = {
       funding_movements: {
         Row: {
           amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           facility_id: string
@@ -5409,6 +5831,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           facility_id: string
@@ -5422,6 +5847,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           facility_id?: string
@@ -5434,6 +5862,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "funding_movements_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "funding_movements_created_by_fkey"
             columns: ["created_by"]
@@ -5617,6 +6052,8 @@ export type Database = {
           created_by: string | null
           grn_no: number
           id: string
+          invoice_date: string | null
+          invoice_no: string | null
           note: string | null
           plot_id: string | null
           po_id: string
@@ -5636,6 +6073,8 @@ export type Database = {
           created_by?: string | null
           grn_no: number
           id?: string
+          invoice_date?: string | null
+          invoice_no?: string | null
           note?: string | null
           plot_id?: string | null
           po_id: string
@@ -5655,6 +6094,8 @@ export type Database = {
           created_by?: string | null
           grn_no?: number
           id?: string
+          invoice_date?: string | null
+          invoice_no?: string | null
           note?: string | null
           plot_id?: string | null
           po_id?: string
@@ -5724,6 +6165,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "goods_receipts_updated_by_fkey"
@@ -5800,6 +6248,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_chat_spaces_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
         ]
       }
@@ -6024,6 +6479,13 @@ export type Database = {
             foreignKeyName: "indent_lines_estimate_id_fkey"
             columns: ["estimate_id"]
             isOneToOne: false
+            referencedRelation: "estimate_work_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "indent_lines_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
             referencedRelation: "estimator_estimates"
             referencedColumns: ["id"]
           },
@@ -6068,10 +6530,14 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           id: string
           indent_no: number
+          is_urgent: boolean
           note: string | null
           plot_id: string | null
           project_id: string
@@ -6090,10 +6556,14 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           indent_no: number
+          is_urgent?: boolean
           note?: string | null
           plot_id?: string | null
           project_id: string
@@ -6112,10 +6582,14 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           indent_no?: number
+          is_urgent?: boolean
           note?: string | null
           plot_id?: string | null
           project_id?: string
@@ -6135,6 +6609,13 @@ export type Database = {
           {
             foreignKeyName: "indents_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_cancelled_by_fkey"
+            columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -6180,6 +6661,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "indents_updated_by_fkey"
@@ -6235,6 +6723,7 @@ export type Database = {
           status: string
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string
         }
         Insert: {
@@ -6251,6 +6740,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id: string
         }
         Update: {
@@ -6267,6 +6757,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string
         }
         Relationships: [
@@ -6577,6 +7068,7 @@ export type Database = {
           created_at: string
           default_uom: string
           description: string | null
+          gst_pct: number | null
           id: string
           image_url: string | null
           indicative_price: number | null
@@ -6598,6 +7090,7 @@ export type Database = {
           created_at?: string
           default_uom: string
           description?: string | null
+          gst_pct?: number | null
           id?: string
           image_url?: string | null
           indicative_price?: number | null
@@ -6619,6 +7112,7 @@ export type Database = {
           created_at?: string
           default_uom?: string
           description?: string | null
+          gst_pct?: number | null
           id?: string
           image_url?: string | null
           indicative_price?: number | null
@@ -6759,6 +7253,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           contract_value: number
           created_at: string
           created_by: string | null
@@ -6779,6 +7276,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_value: number
           created_at?: string
           created_by?: string | null
@@ -6799,6 +7299,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           contract_value?: number
           created_at?: string
           created_by?: string | null
@@ -6820,6 +7323,13 @@ export type Database = {
           {
             foreignKeyName: "labour_contracts_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -6851,6 +7361,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "labour_contracts_updated_by_fkey"
@@ -6887,6 +7404,7 @@ export type Database = {
           uom: string | null
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string
         }
         Insert: {
@@ -6907,6 +7425,7 @@ export type Database = {
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id: string
         }
         Update: {
@@ -6927,6 +7446,7 @@ export type Database = {
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string
         }
         Relationships: [
@@ -7246,6 +7766,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          is_test: boolean
           location: string | null
           name: string
           project_type: string
@@ -7258,6 +7779,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_test?: boolean
           location?: string | null
           name: string
           project_type: string
@@ -7270,6 +7792,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_test?: boolean
           location?: string | null
           name?: string
           project_type?: string
@@ -7415,6 +7938,9 @@ export type Database = {
         Row: {
           cancelled_at: string | null
           cancelled_by: string | null
+          charges_amount: number | null
+          charges_gst_pct: number | null
+          charges_note: string | null
           created_at: string
           created_by: string | null
           deletion_note: string | null
@@ -7442,6 +7968,9 @@ export type Database = {
         Insert: {
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           deletion_note?: string | null
@@ -7469,6 +7998,9 @@ export type Database = {
         Update: {
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charges_amount?: number | null
+          charges_gst_pct?: number | null
+          charges_note?: string | null
           created_at?: string
           created_by?: string | null
           deletion_note?: string | null
@@ -7549,6 +8081,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "purchase_orders_updated_by_fkey"
@@ -8002,6 +8541,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "pusher_chains_updated_by_fkey"
@@ -8512,6 +9058,641 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "selections_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+        ]
+      }
+      site_checklist_items: {
+        Row: {
+          checklist_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          photo_path: string | null
+          remarks: string | null
+          status: string
+          template_item_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          checklist_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          photo_path?: string | null
+          remarks?: string | null
+          status?: string
+          template_item_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          checklist_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          photo_path?: string | null
+          remarks?: string | null
+          status?: string
+          template_item_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "site_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_template_item_id_fkey"
+            columns: ["template_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_template_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklist_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_checklists: {
+        Row: {
+          attachment_path: string | null
+          created_at: string
+          created_by: string | null
+          drawing_revision: string | null
+          finished_on: string | null
+          id: string
+          inspected_on: string | null
+          location: string | null
+          note: string | null
+          plot_id: string
+          signed_off_at: string | null
+          signed_off_by: string | null
+          started_on: string
+          status: string
+          template_id: string
+          updated_at: string
+          updated_by: string | null
+          work_group_id: string | null
+        }
+        Insert: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          drawing_revision?: string | null
+          finished_on?: string | null
+          id?: string
+          inspected_on?: string | null
+          location?: string | null
+          note?: string | null
+          plot_id: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          started_on?: string
+          status?: string
+          template_id: string
+          updated_at?: string
+          updated_by?: string | null
+          work_group_id?: string | null
+        }
+        Update: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          drawing_revision?: string | null
+          finished_on?: string | null
+          id?: string
+          inspected_on?: string | null
+          location?: string | null
+          note?: string | null
+          plot_id?: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          started_on?: string
+          status?: string
+          template_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_checklists_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_signed_off_by_fkey"
+            columns: ["signed_off_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_checklists_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_receipt_confirmation_lines: {
+        Row: {
+          confirmation_id: string
+          id: string
+          issue_line_id: string | null
+          receipt_line_id: string | null
+          received_quantity: number
+        }
+        Insert: {
+          confirmation_id: string
+          id?: string
+          issue_line_id?: string | null
+          receipt_line_id?: string | null
+          received_quantity: number
+        }
+        Update: {
+          confirmation_id?: string
+          id?: string
+          issue_line_id?: string | null
+          receipt_line_id?: string | null
+          received_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_confirmation_id_fkey"
+            columns: ["confirmation_id"]
+            isOneToOne: false
+            referencedRelation: "site_receipt_confirmations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_issue_line_id_fkey"
+            columns: ["issue_line_id"]
+            isOneToOne: true
+            referencedRelation: "stock_issue_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmation_lines_receipt_line_id_fkey"
+            columns: ["receipt_line_id"]
+            isOneToOne: true
+            referencedRelation: "goods_receipt_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_receipt_confirmations: {
+        Row: {
+          confirmed_at: string
+          confirmed_by: string
+          id: string
+          issue_id: string | null
+          note: string | null
+          receipt_id: string | null
+        }
+        Insert: {
+          confirmed_at?: string
+          confirmed_by: string
+          id?: string
+          issue_id?: string | null
+          note?: string | null
+          receipt_id?: string | null
+        }
+        Update: {
+          confirmed_at?: string
+          confirmed_by?: string
+          id?: string
+          issue_id?: string | null
+          note?: string | null
+          receipt_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_receipt_confirmations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmations_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "stock_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_receipt_confirmations_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: true
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_schedule_settings: {
+        Row: {
+          created_at: string
+          id: string
+          singleton: boolean
+          typical_sqft: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          typical_sqft?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          typical_sqft?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_schedule_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_sequence: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          days_to_confirm: boolean
+          follows_group_id: string | null
+          id: string
+          link: string
+          position: number
+          typical_days: number | null
+          updated_at: string
+          updated_by: string | null
+          wait_days: number
+          work_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          days_to_confirm?: boolean
+          follows_group_id?: string | null
+          id?: string
+          link?: string
+          position: number
+          typical_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          wait_days?: number
+          work_group_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          days_to_confirm?: boolean
+          follows_group_id?: string | null
+          id?: string
+          link?: string
+          position?: number
+          typical_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          wait_days?: number
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_sequence_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_follows_group_id_fkey"
+            columns: ["follows_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_sequence_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: true
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_stage_events: {
+        Row: {
+          actor_id: string | null
+          at: string
+          from_status: string | null
+          id: string
+          kind: string
+          note: string | null
+          plot_id: string
+          seq: number
+          to_status: string | null
+          waiting_on: string | null
+          work_group_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          at?: string
+          from_status?: string | null
+          id?: string
+          kind: string
+          note?: string | null
+          plot_id: string
+          seq?: never
+          to_status?: string | null
+          waiting_on?: string | null
+          work_group_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          at?: string
+          from_status?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          plot_id?: string
+          seq?: never
+          to_status?: string | null
+          waiting_on?: string | null
+          work_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_stage_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stage_events_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stage_events_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_stages: {
+        Row: {
+          baseline_finish: string | null
+          baseline_start: string | null
+          contractor_id: string | null
+          created_at: string
+          created_by: string | null
+          days: number | null
+          finished_on: string | null
+          follows_group_id: string | null
+          id: string
+          link: string | null
+          not_needed: boolean
+          pinned_start: string | null
+          plot_id: string
+          started_on: string | null
+          status: string
+          status_changed_at: string
+          updated_at: string
+          updated_by: string | null
+          waiting_note: string | null
+          waiting_on: string | null
+          work_group_id: string
+        }
+        Insert: {
+          baseline_finish?: string | null
+          baseline_start?: string | null
+          contractor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          days?: number | null
+          finished_on?: string | null
+          follows_group_id?: string | null
+          id?: string
+          link?: string | null
+          not_needed?: boolean
+          pinned_start?: string | null
+          plot_id: string
+          started_on?: string | null
+          status?: string
+          status_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          waiting_note?: string | null
+          waiting_on?: string | null
+          work_group_id: string
+        }
+        Update: {
+          baseline_finish?: string | null
+          baseline_start?: string | null
+          contractor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          days?: number | null
+          finished_on?: string | null
+          follows_group_id?: string | null
+          id?: string
+          link?: string | null
+          not_needed?: boolean
+          pinned_start?: string | null
+          plot_id?: string
+          started_on?: string | null
+          status?: string
+          status_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          waiting_note?: string | null
+          waiting_on?: string | null
+          work_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_stages_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_follows_group_id_fkey"
+            columns: ["follows_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_villas: {
+        Row: {
+          baseline_note: string | null
+          baselined_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          plot_id: string
+          start_on: string | null
+          supervisor_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          baseline_note?: string | null
+          baselined_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plot_id: string
+          start_on?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          baseline_note?: string | null
+          baselined_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plot_id?: string
+          start_on?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_villas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: true
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_villas_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       space_types: {
@@ -8639,6 +9820,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
         ]
       }
@@ -8927,6 +10115,44 @@ export type Database = {
           },
         ]
       }
+      stock_deletions: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          id: string
+          kind: string
+          reason: string
+          reference: string
+          snapshot: Json
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          kind: string
+          reason: string
+          reference: string
+          snapshot: Json
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          kind?: string
+          reason?: string
+          reference?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_deletions_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_issue_lines: {
         Row: {
           created_at: string
@@ -9027,6 +10253,7 @@ export type Database = {
           to_store_id: string | null
           updated_at: string
           updated_by: string | null
+          work_class: string
           work_item_id: string | null
         }
         Insert: {
@@ -9043,6 +10270,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string | null
         }
         Update: {
@@ -9059,6 +10287,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_class?: string
           work_item_id?: string | null
         }
         Relationships: [
@@ -9410,6 +10639,239 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transmittals_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+        ]
+      }
+      turing_conversations: {
+        Row: {
+          container_expires_at: string | null
+          container_id: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          title: string
+          turn_started_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          container_expires_at?: string | null
+          container_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          title?: string
+          turn_started_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          container_expires_at?: string | null
+          container_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          title?: string
+          turn_started_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_conversations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_files: {
+        Row: {
+          anthropic_file_id: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          media_type: string
+          name: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+        }
+        Insert: {
+          anthropic_file_id: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          media_type: string
+          name: string
+          owner_id?: string
+          size_bytes: number
+          storage_path: string
+        }
+        Update: {
+          anthropic_file_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          name?: string
+          owner_id?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_files_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_files_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_messages: {
+        Row: {
+          cache_read_tokens: number | null
+          cache_write_tokens: number | null
+          content: Json
+          conversation_id: string
+          created_at: string
+          id: number
+          input_tokens: number | null
+          output_tokens: number | null
+          role: string
+        }
+        Insert: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content: Json
+          conversation_id: string
+          created_at?: string
+          id?: never
+          input_tokens?: number | null
+          output_tokens?: number | null
+          role: string
+        }
+        Update: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content?: Json
+          conversation_id?: string
+          created_at?: string
+          id?: never
+          input_tokens?: number | null
+          output_tokens?: number | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_pages: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          recipe: Json
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          recipe: Json
+          storage_path: string
+          title: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          recipe?: Json
+          storage_path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_pages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_pages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turing_saves: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          owner_id: string
+          reported: boolean
+          results: Json | null
+          tool_use_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          reported?: boolean
+          results?: Json | null
+          tool_use_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          reported?: boolean
+          results?: Json | null
+          tool_use_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turing_saves_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "turing_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turing_saves_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       units: {
@@ -9708,6 +11170,7 @@ export type Database = {
           code: string
           created_at: string
           created_by: string | null
+          family: string
           id: string
           is_active: boolean
           name: string
@@ -9719,6 +11182,7 @@ export type Database = {
           code: string
           created_at?: string
           created_by?: string | null
+          family?: string
           id?: string
           is_active?: boolean
           name: string
@@ -9730,6 +11194,7 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string | null
+          family?: string
           id?: string
           is_active?: boolean
           name?: string
@@ -10091,6 +11556,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       batch_on_hand: {
@@ -10217,6 +11689,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "bills_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
@@ -10266,6 +11745,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "bills_vendor_id_fkey"
@@ -10424,6 +11910,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "selection_lines_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
@@ -10515,6 +12008,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
+          {
             foreignKeyName: "client_payment_milestones_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
@@ -10562,6 +12062,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "client_receipts_engagement_id_fkey"
@@ -10640,6 +12147,31 @@ export type Database = {
           },
         ]
       }
+      estimate_work_facts: {
+        Row: {
+          estimate_id: string | null
+          quantity: number | null
+          unit_id: string | null
+          uom: string | null
+          work_item_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_lines_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_work_info_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
       po_billing_totals: {
         Row: {
           bill_count: number | null
@@ -10710,6 +12242,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "purchase_orders_vendor_id_fkey"
@@ -10912,6 +12451,13 @@ export type Database = {
             referencedRelation: "units"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
+          },
         ]
       }
       stock_by_location: {
@@ -10928,6 +12474,17 @@ export type Database = {
           item_id: string | null
           quantity: number | null
           store_id: string | null
+        }
+        Relationships: []
+      }
+      villa_cost_facts: {
+        Row: {
+          amount: number | null
+          kind: string | null
+          plot_id: string | null
+          unit_id: string | null
+          unpriced: boolean | null
+          work_item_id: string | null
         }
         Relationships: []
       }
@@ -10959,6 +12516,31 @@ export type Database = {
             foreignKeyName: "estimator_work_info_work_item_id_fkey"
             columns: ["work_item_id"]
             isOneToOne: true
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_line_billing_facts: {
+        Row: {
+          billed_value: number | null
+          contract_id: string | null
+          labour_contract_line_id: string | null
+          line_value: number | null
+          work_item_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_contract_lines_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contract_lines_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
             referencedRelation: "work_items"
             referencedColumns: ["id"]
           },
@@ -11211,6 +12793,10 @@ export type Database = {
         Args: { p_decision: string; p_line_id: string; p_note: string }
         Returns: undefined
       }
+      delete_draft_cash_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       delete_draft_estimate: {
         Args: { p_estimate: string }
         Returns: undefined
@@ -11232,7 +12818,24 @@ export type Database = {
         Args: { p_transmittal_id: string }
         Returns: undefined
       }
+      delete_goods_receipt: {
+        Args: { p_reason: string; p_receipt_id: string }
+        Returns: undefined
+      }
+      delete_pending_work_order: {
+        Args: { p_contract_id: string }
+        Returns: undefined
+      }
+      delete_pricing_budget: {
+        Args: { p_budget_id: string }
+        Returns: undefined
+      }
       delete_recorded_bill: { Args: { p_bill_id: string }; Returns: undefined }
+      delete_stock_issue: {
+        Args: { p_issue_id: string; p_reason: string }
+        Returns: undefined
+      }
+      delete_test_project: { Args: { p_project: string }; Returns: Json }
       design_pass_step: {
         Args: {
           p_from: string
@@ -11317,6 +12920,10 @@ export type Database = {
         Returns: undefined
       }
       replay_pre_batch_history: { Args: never; Returns: number }
+      reverse_bill_money: {
+        Args: { p_id: string; p_kind: string; p_reason: string }
+        Returns: string
+      }
       seed_default_project_stages: {
         Args: { p_project_id: string }
         Returns: undefined

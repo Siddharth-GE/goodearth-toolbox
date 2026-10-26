@@ -23,6 +23,8 @@ The `data/` files importers read are gitignored: real business data, some of it 
 - `copy-storage.ts` — copies Storage objects between projects and rewrites the URLs pointing at them. `--from <ref> --to <ref>`
 - `scramble-staging-emails.ts` — makes staging's staff emails unroutable, or restores named ones to sign in. `--project <ref> --keep a@b`
 - `wipe-staging-records.ts` — clears every record made in the tools, staging only (it refuses any other ref), after writing every row and file it deletes to `data/backups/`. Every table must be on its cleared or kept list. `--project <ref>`
+- `clear-operations.ts` — clears every record in the Operations tools (Indents, POs, Inventory, Bills, Budgets, Selections, estimates, Supervisors) on the practice database, keeping setup, the rate book and every other tool; numbering restarts. `--project <ref> [--commit]`
+- `seed-test-project.ts` — makes the test project (`projects.is_test`) and fills its whole chain from `seed-test-project.sql`, through the tools' own functions; rehearse the `.sql` with `dry-run-migrations.ts` first. Settings → Test project deletes it. `--project <ref> --commit`
 - `wipe-drawings.ts` — deletes every drawing, transmittal and sheet file in Design Management (design stages stay), past the guards in one transaction. `--project <ref> [--commit]`
 - `backup-tables.ts` — library: whole tables to JSON in `data/backups/` before a script changes them.
 - `vercel-env.ts` — writes one variable from `.env.local` to Vercel through its API, trimmed and never pasted. `--name <VAR> --target preview|production`
@@ -31,7 +33,8 @@ The `data/` files importers read are gitignored: real business data, some of it 
 
 - `import-catalogue-sheet.ts` — the design team's catalogue workbook: pasted pictures and product links onto existing items (matched by content, never by the sheet's code — `lib/masters/catalogue-sheet.ts`), rows not there as new items. `--project <ref> --xlsx <path>`
 - `fetch-catalogue-images.ts` — finds the vendor's photo for items with only a link, then thumbnails every item with a picture into Storage. `--project <ref>` (`--limit 10` to try a few)
-- `import-masters-workbook.ts` — the founder's final masters workbook: vendors and contractors (bank details into the gated `vendor_payment_details`), works and their labour rates, material categories, materials, stages; deletes what it no longer lists, and stops while any record still points at it. `--project <ref> --xlsx <path>`
+- `import-masters-workbook.ts` — the founder's masters workbook: vendors and contractors (bank details into the gated `vendor_payment_details`), material categories, materials and their GST %, the estate's works and their labour rates. Deletes nothing: works it no longer lists are switched off, everything else is left and named. `read-xlsx.ts` is its reader. `--project <ref> --xlsx <path>`
+- `import-site-schedule.ts` — the site team's schedule workbook (a sheet per plot): typical days and curing waits for Supervisors → Sequence, and each plot's start, supervisor and progress up to today; never overwrites what is set. `--project <ref> --plots-in <project name> --xlsx <path> [--commit]`
 - The first imports (material master, vendors, contractors, works, catalogue, the Saarang register, staff) are in git history; `import-masters-workbook.ts` superseded them.
 
 ## App checks

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { requireTool } from "@/lib/auth/access";
+import { isToolLead, requireTool } from "@/lib/auth/access";
 import { todayInIndia } from "@/lib/format";
 import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -229,11 +229,18 @@ async function moneyParts(supabase: Client, stayIds: string[]): Promise<MoneyPar
       return (byId ? query.in("stay_id", stayIds) : query).order("id").range(from, to);
     }),
     fetchAll((from, to) => {
-      const query = supabase.from("birdwing_receipts").select("id, stay_id, amount");
+      // A cancelled receipt or settlement (0148) counts towards nothing.
+      const query = supabase
+        .from("birdwing_receipts")
+        .select("id, stay_id, amount")
+        .is("cancelled_at", null);
       return (byId ? query.in("stay_id", stayIds) : query).order("id").range(from, to);
     }),
     fetchAll((from, to) => {
-      const query = supabase.from("birdwing_cross_charges").select("id, stay_id, amount");
+      const query = supabase
+        .from("birdwing_cross_charges")
+        .select("id, stay_id, amount")
+        .is("cancelled_at", null);
       return (byId ? query.in("stay_id", stayIds) : query).order("id").range(from, to);
     }),
     fetchAll((from, to) => {
@@ -586,6 +593,9 @@ export type StayReceipt = {
   invoiceNumber: string | null;
   byName: string | null;
   imported: boolean;
+  /** Cancelled (0148): listed, counted in nothing. */
+  cancelledAt: string | null;
+  cancelReason: string | null;
 };
 
 export type StaySettlement = {
@@ -596,6 +606,8 @@ export type StaySettlement = {
   month: string;
   note: string | null;
   byName: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
 };
 
 export type StayFile = {
@@ -609,6 +621,8 @@ export type StayFile = {
 };
 
 export type StayDetail = {
+  /** An admin's or the tool's team lead's: cancelling a receipt or a settlement (0148). */
+  canCancel: boolean;
   id: string;
   ref: string;
   isBlock: boolean;
@@ -657,7 +671,7 @@ export type StayDetail = {
 };
 
 export async function getStay(stayId: string): Promise<StayDetail | null> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
 
   const { data: stay, error } = await supabase
@@ -706,14 +720,16 @@ export async function getStay(stayId: string): Promise<StayDetail | null> {
       supabase
         .from("birdwing_receipts")
         .select(
-          "id, amount, received_on, mode, reference, note, invoice_id, created_by, source_key",
+          "id, amount, received_on, mode, reference, note, invoice_id, created_by, source_key, cancelled_at, cancel_reason",
         )
         .eq("stay_id", stayId)
         .order("received_on")
         .order("created_at"),
       supabase
         .from("birdwing_cross_charges")
-        .select("id, kind, cost_centre_id, amount, charged_month, note, created_by")
+        .select(
+          "id, kind, cost_centre_id, amount, charged_month, note, created_by, cancelled_at, cancel_reason",
+        )
         .eq("stay_id", stayId)
         .order("created_at"),
       supabase
@@ -792,6 +808,8 @@ export async function getStay(stayId: string): Promise<StayDetail | null> {
     invoiceNumber: row.invoice_id ? (invoiceNumber.get(row.invoice_id) ?? null) : null,
     byName: nameOf(row.created_by),
     imported: row.source_key !== null,
+    cancelledAt: row.cancelled_at,
+    cancelReason: row.cancel_reason,
   }));
   const settlementList: StaySettlement[] = (settlements.data ?? []).map((row) => ({
     id: row.id,
@@ -801,19 +819,25 @@ export async function getStay(stayId: string): Promise<StayDetail | null> {
     month: row.charged_month,
     note: row.note,
     byName: nameOf(row.created_by),
+    cancelledAt: row.cancelled_at,
+    cancelReason: row.cancel_reason,
   }));
+  const canCancel = await isToolLead(user, GRANT);
 
   const money = stayMoney({
     chargeAmounts: chargeList.map((charge) => charge.amount),
     otaCommission: Number(stay.ota_commission),
     discount: Number(stay.discount),
-    receipts: receiptList.map((receipt) => receipt.amount),
-    settlements: settlementList.map((settlement) => settlement.amount),
+    receipts: receiptList.filter((row) => !row.cancelledAt).map((receipt) => receipt.amount),
+    settlements: settlementList
+      .filter((row) => !row.cancelledAt)
+      .map((settlement) => settlement.amount),
   });
   const use = oneOf(STAY_USES, stay.use);
   const g = guest.data;
 
   return {
+    canCancel,
     id: stay.id,
     ref: stay.ref,
     isBlock: stay.is_block,

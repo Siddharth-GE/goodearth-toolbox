@@ -10,6 +10,7 @@ import {
   contractorPosition,
   type CashRequestStatus,
   type ContractorPosition,
+  type MoneyKind,
 } from "./ledger";
 import { pendingOnBill } from "./math";
 import { roundPaise } from "@/lib/line-money";
@@ -50,7 +51,19 @@ export async function getBillSettlement(billId: string, total: number): Promise<
   return { paid, recovered, pending: pendingOnBill(total, paid, recovered) };
 }
 
-export type BillMoneyEvent = {
+/** A reversal (0147) is its own row, the amount the other way; `reversed` marks the row it reverses. */
+type Reversible = { reversal: boolean; reversed: boolean; reason: string | null };
+
+function reversalState(rows: { id: string; reverses_id: string | null }[]) {
+  const reversed = new Set(rows.flatMap((row) => (row.reverses_id ? [row.reverses_id] : [])));
+  return (row: { id: string; reverses_id: string | null; reverse_reason: string | null }) => ({
+    reversal: row.reverses_id !== null,
+    reversed: reversed.has(row.id),
+    reason: row.reverse_reason,
+  });
+}
+
+export type BillMoneyEvent = Reversible & {
   id: string;
   kind: "payment" | "recovery";
   amount: number;
@@ -67,7 +80,9 @@ export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent
     fetchAll((from, to) =>
       supabase
         .from("bill_payments")
-        .select("id, amount, paid_on, payment_ref, note, created_by, created_at")
+        .select(
+          "id, amount, paid_on, payment_ref, note, created_by, created_at, reverses_id, reverse_reason",
+        )
         .eq("bill_id", billId)
         .order("paid_on")
         .order("id")
@@ -77,7 +92,7 @@ export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent
       supabase
         .from("advance_recoveries")
         .select(
-          "id, amount, recovered_on, note, created_by, contractor_advances(paid_on, payment_ref)",
+          "id, amount, recovered_on, note, created_by, reverses_id, reverse_reason, contractor_advances(paid_on, payment_ref)",
         )
         .eq("bill_id", billId)
         .order("recovered_on")
@@ -89,6 +104,8 @@ export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent
     ...payments.map((row) => row.created_by),
     ...recoveries.map((row) => row.created_by),
   ]);
+  const paymentState = reversalState(payments);
+  const recoveryState = reversalState(recoveries);
   return [
     ...payments.map((row) => ({
       id: row.id,
@@ -98,6 +115,7 @@ export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent
       reference: row.payment_ref,
       note: row.note,
       by: row.created_by ? (names.get(row.created_by) ?? null) : null,
+      ...paymentState(row),
     })),
     ...recoveries.map((row) => {
       const advance = row.contractor_advances as { paid_on: string; payment_ref: string } | null;
@@ -111,6 +129,7 @@ export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent
           : "From an advance",
         note: row.note,
         by: row.created_by ? (names.get(row.created_by) ?? null) : null,
+        ...recoveryState(row),
       };
     }),
   ].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
@@ -133,7 +152,9 @@ export async function getOpenAdvances(vendorId: string): Promise<OpenAdvance[]> 
   const advances = await fetchAll((from, to) =>
     supabase
       .from("contractor_advances")
-      .select("id, amount, paid_on, payment_ref, projects(name), labour_contracts(reference)")
+      .select(
+        "id, amount, paid_on, payment_ref, reverses_id, projects(name), labour_contracts(reference)",
+      )
       .eq("vendor_id", vendorId)
       .order("paid_on")
       .order("id")
@@ -144,7 +165,9 @@ export async function getOpenAdvances(vendorId: string): Promise<OpenAdvance[]> 
     supabase,
     advances.map((advance) => advance.id),
   );
+  const reversed = new Set(advances.map((advance) => advance.reverses_id));
   return advances
+    .filter((advance) => advance.reverses_id === null && !reversed.has(advance.id))
     .map((advance) => {
       const back = recovered.get(advance.id) ?? 0;
       return {
@@ -351,6 +374,8 @@ export type CashRequestItem = {
   vendor_name: string;
   project_id: string | null;
   project_name: string;
+  /** The work order an advance is asked against, kept on the advance when it is paid. */
+  labour_contract_id: string | null;
   work_order: string | null;
   bill_total: number | null;
   bill_pending: number | null;
@@ -436,6 +461,7 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
       vendor_name: item.bills?.vendors?.name ?? item.vendors?.name ?? "Direct labour",
       project_id: item.bills?.project_id ?? item.project_id,
       project_name: item.bills?.projects?.name ?? item.projects?.name ?? "—",
+      labour_contract_id: item.labour_contract_id,
       work_order: item.labour_contracts?.reference ?? null,
       bill_total: bill?.total ?? null,
       bill_pending: bill?.pending ?? null,
@@ -462,9 +488,11 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
   };
 }
 
-export type LedgerRow = {
+export type LedgerRow = Reversible & {
   id: string;
-  kind: "payment" | "advance" | "recovery";
+  kind: MoneyKind;
+  /** An advance's recoveries, net of reversals; zero for the rest. */
+  recovered: number;
   on: string;
   amount: number;
   reference: string;
@@ -493,7 +521,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       supabase
         .from("bill_payments")
         .select(
-          "id, amount, paid_on, payment_ref, note, bill_id, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
+          "id, amount, paid_on, payment_ref, note, bill_id, reverses_id, reverse_reason, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
         )
         .order("paid_on", { ascending: false })
         .order("id")
@@ -503,7 +531,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       supabase
         .from("contractor_advances")
         .select(
-          "id, amount, paid_on, payment_ref, note, vendor_id, project_id, vendors(name), projects(name)",
+          "id, amount, paid_on, payment_ref, note, vendor_id, project_id, reverses_id, reverse_reason, vendors(name), projects(name)",
         )
         .order("paid_on", { ascending: false })
         .order("id")
@@ -513,7 +541,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       supabase
         .from("advance_recoveries")
         .select(
-          "id, amount, recovered_on, note, bill_id, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
+          "id, amount, recovered_on, note, bill_id, advance_id, reverses_id, reverse_reason, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
         )
         .order("recovered_on", { ascending: false })
         .order("id")
@@ -529,12 +557,22 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
     projects: { name: string } | null;
   } | null;
 
+  const paymentState = reversalState(payments);
+  const advanceState = reversalState(advances);
+  const recoveryState = reversalState(recoveries);
+  const recoveredFrom = new Map<string, number>();
+  for (const row of recoveries) {
+    recoveredFrom.set(row.advance_id, (recoveredFrom.get(row.advance_id) ?? 0) + row.amount);
+  }
+
   const rows: LedgerRow[] = [
     ...payments.map((row) => {
       const bill = row.bills as BillEmbed;
       return {
         id: row.id,
         kind: "payment" as const,
+        recovered: 0,
+        ...paymentState(row),
         on: row.paid_on,
         amount: row.amount,
         reference: row.payment_ref,
@@ -550,6 +588,8 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
     ...advances.map((row) => ({
       id: row.id,
       kind: "advance" as const,
+      recovered: roundPaise(recoveredFrom.get(row.id) ?? 0),
+      ...advanceState(row),
       on: row.paid_on,
       amount: row.amount,
       reference: row.payment_ref,
@@ -566,6 +606,8 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       return {
         id: row.id,
         kind: "recovery" as const,
+        recovered: 0,
+        ...recoveryState(row),
         on: row.recovered_on,
         amount: row.amount,
         reference: "Recovered from an advance",

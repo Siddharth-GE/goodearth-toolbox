@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ export function HeaderFields({
   works,
   requiredBy,
   note,
+  isUrgent,
   editable,
 }: {
   indentId: string;
@@ -28,27 +30,33 @@ export function HeaderFields({
   works: WorkOption[];
   requiredBy: string | null;
   note: string | null;
+  isUrgent: boolean;
   editable: boolean;
 }) {
   const [workValue, setWorkValue] = useState(workItemId ?? "");
   const [requiredByValue, setRequiredByValue] = useState(requiredBy ?? "");
   const [noteValue, setNoteValue] = useState(note ?? "");
+  const [urgentValue, setUrgentValue] = useState(isUrgent);
 
   const { flush, error, saved } = useSaveOnBlur({
     initial: {
       work: workItemId ?? "",
       requiredBy: requiredBy ?? "",
       note: note ?? "",
+      urgent: isUrgent,
     },
     save: (value) =>
       updateIndentHeader(indentId, {
         workItemId: value.work || null,
         requiredBy: value.requiredBy || null,
         note: value.note || null,
+        isUrgent: value.urgent,
       }),
   });
 
-  const save = () => flush({ work: workValue, requiredBy: requiredByValue, note: noteValue });
+  const saveWith = (urgent: boolean) =>
+    flush({ work: workValue, requiredBy: requiredByValue, note: noteValue, urgent });
+  const save = () => saveWith(urgentValue);
 
   const workLabel = (id: string | null) => {
     const work = works.find((row) => row.id === id);
@@ -63,6 +71,7 @@ export function HeaderFields({
         <ReadOnlyField label="Work" value={workLabel(workItemId)} />
         <ReadOnlyField label="Required by" value={formatDate(requiredBy)} />
         <ReadOnlyField label="Note" value={note ?? "—"} />
+        {isUrgent && <ReadOnlyField label="Urgent" value="Yes — an emergency request" />}
       </div>
     );
   }
@@ -118,6 +127,16 @@ export function HeaderFields({
           />
         </div>
       </div>
+      <label className="text-foreground flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={urgentValue}
+          onChange={(event) => {
+            setUrgentValue(event.target.checked);
+            saveWith(event.target.checked);
+          }}
+        />
+        Urgent — the approver sees it first
+      </label>
       <FormMessage error={error} success={saved ? "Saved" : undefined} size="xs" />
     </div>
   );

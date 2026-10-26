@@ -1,6 +1,7 @@
 "use client";
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { WorkClassField } from "@/components/masters/work-class-field";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -13,19 +14,21 @@ import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/superviso
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";
 import { todayInIndia } from "@/lib/format";
+import { WorkOptions } from "./work-options";
 
 function WorkSelect({
   works,
+  stageWorkIds,
   name,
   value,
   onChange,
 }: {
   works: WorkOption[];
+  stageWorkIds?: string[];
   name: string;
   value: string;
   onChange: (workItemId: string) => void;
 }) {
-  const categories = [...new Set(works.map((work) => work.categoryName))];
   return (
     <Select
       id={name}
@@ -34,20 +37,7 @@ function WorkSelect({
       onChange={(event) => onChange(event.target.value)}
       required
     >
-      <option value="" disabled>
-        Pick the work…
-      </option>
-      {categories.map((category) => (
-        <optgroup key={category} label={category}>
-          {works
-            .filter((work) => work.categoryName === category)
-            .map((work) => (
-              <option key={work.id} value={work.id}>
-                {work.label}
-              </option>
-            ))}
-        </optgroup>
-      ))}
+      <WorkOptions works={works} stageWorkIds={stageWorkIds} />
     </Select>
   );
 }
@@ -85,6 +75,8 @@ export function LabourLogDialog({
   log,
   workItemId,
   trigger,
+  stageWorkIds,
+  contractorId,
 }: {
   plotId: string;
   works: WorkOption[];
@@ -92,11 +84,16 @@ export function LabourLogDialog({
   log?: LabourLogRow;
   workItemId?: string;
   trigger?: React.ReactNode;
+  /** Opened from a stage: its works first, the only one picked, and its contractor. */
+  stageWorkIds?: string[];
+  contractorId?: string | null;
 }) {
   const isEdit = !!log;
   const today = todayInIndia();
   const [kind, setKind] = useState<LabourKind>(log?.kind ?? "nmr");
-  const [work, setWork] = useState(log?.workItemId ?? workItemId ?? "");
+  const [work, setWork] = useState(
+    log?.workItemId ?? workItemId ?? (stageWorkIds?.length === 1 ? stageWorkIds[0] : ""),
+  );
   const workUom = works.find((option) => option.id === work)?.uom ?? null;
 
   return (
@@ -122,12 +119,22 @@ export function LabourLogDialog({
 
       <div className="space-y-1.5">
         <Label htmlFor="work_item_id">Work</Label>
-        <WorkSelect works={works} name="work_item_id" value={work} onChange={setWork} />
+        <WorkSelect
+          works={works}
+          stageWorkIds={stageWorkIds}
+          name="work_item_id"
+          value={work}
+          onChange={setWork}
+        />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="contractor_id">Contractor</Label>
-        <Select name="contractor_id" defaultValue={log?.contractorId ?? ""} required>
+        <Select
+          name="contractor_id"
+          defaultValue={log?.contractorId ?? contractorId ?? ""}
+          required
+        >
           <option value="" disabled>
             Pick the contractor…
           </option>
@@ -138,6 +145,8 @@ export function LabourLogDialog({
           ))}
         </Select>
       </div>
+
+      <WorkClassField defaultValue={log?.workClass ?? "standard"} />
 
       <div className="space-y-1.5">
         <Label htmlFor="kind">How is this paid?</Label>

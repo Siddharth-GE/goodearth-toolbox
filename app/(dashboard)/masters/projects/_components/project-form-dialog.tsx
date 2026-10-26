@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { CompanyRow } from "@/lib/masters/companies";
-import { createProject, updateProject } from "@/lib/masters/projects-actions";
+import { createProject, deleteProject, updateProject } from "@/lib/masters/projects-actions";
 import type { ProjectRow } from "@/lib/masters/projects";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function ProjectFormDialog({
   project,
@@ -16,6 +17,7 @@ export function ProjectFormDialog({
   companies: CompanyRow[];
 }) {
   const isEdit = !!project;
+  const isAdmin = useMastersAdmin();
   // Include the project's own company even if switched off, so saving doesn't drop it.
   const choices = companies.filter(
     (company) => company.is_active || company.id === project?.company_id,
@@ -26,6 +28,7 @@ export function ProjectFormDialog({
       label="Project"
       isEdit={isEdit}
       action={isEdit ? updateProject.bind(null, project.id) : createProject}
+      onDelete={isAdmin && project ? () => deleteProject(project.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

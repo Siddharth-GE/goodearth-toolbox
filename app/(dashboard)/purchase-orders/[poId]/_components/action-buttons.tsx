@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +51,6 @@ export function ActionButtons({
   fullyPriced: boolean;
 }) {
   const { pending, error, run: runAction, clearError } = useActionRunner();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [note, setNote] = useState("");
@@ -187,48 +187,22 @@ export function ActionButtons({
   return (
     <div className="space-y-1 text-right">
       <div className="flex items-center justify-end gap-2">
-        {confirmingDelete ? (
-          <>
-            <span className="text-muted text-xs">Its number stays used — sure?</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Keep it
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="text-danger"
-              disabled={pending}
-              onClick={() => run(() => deleteDraftPo(poId))}
-            >
-              {pending ? "Deleting…" : "Delete draft"}
-            </Button>
-          </>
-        ) : (
-          <>
-            {mayDelete && (
-              <Button variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(true)}>
-                Delete
-              </Button>
-            )}
-            <Button
-              disabled={pending || lineCount === 0}
-              title={lineCount === 0 ? "Add at least one line first" : undefined}
-              onClick={() => run(() => issuePo(poId))}
-            >
-              {pending ? "Issuing…" : "Issue to vendor"}
-            </Button>
-          </>
-        )}
+        <DeleteOrCancel
+          noun="draft purchase order"
+          removal={mayDelete ? { kind: "delete" } : null}
+          deleteNote="It has not gone to the vendor, so it goes for good and its indent lines are free to order again. Its number stays used."
+          onDelete={() => deleteDraftPo(poId)}
+        />
+        <Button
+          disabled={pending || lineCount === 0}
+          title={lineCount === 0 ? "Add at least one line first" : undefined}
+          onClick={() => run(() => issuePo(poId))}
+        >
+          {pending ? "Issuing…" : "Issue to vendor"}
+        </Button>
       </div>
-      {!confirmingDelete && lineCount === 0 && (
-        <p className="text-muted text-xs">Add at least one line to issue</p>
-      )}
-      {!confirmingDelete && lineCount > 0 && !fullyPriced && (
+      {lineCount === 0 && <p className="text-muted text-xs">Add at least one line to issue</p>}
+      {lineCount > 0 && !fullyPriced && (
         <p className="text-muted text-xs">Lines without a rate and GST will block issuing</p>
       )}
       <FormMessage error={error} size="xs" />

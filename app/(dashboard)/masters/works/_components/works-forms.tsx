@@ -7,11 +7,15 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { WORK_FAMILIES } from "@/lib/masters/work-families";
 import type { WorkCategoryRow, WorkGroupRow, WorkItemRow } from "@/lib/masters/works";
 import {
   addWorkCategory,
   addWorkGroup,
   addWorkItem,
+  deleteWorkCategory,
+  deleteWorkGroup,
+  deleteWorkItem,
   setWorkCategoryActive,
   setWorkGroupActive,
   setWorkItemActive,
@@ -21,20 +25,25 @@ import {
 } from "@/lib/masters/works-actions";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function WorkCategoryFormDialog({
   category,
+  defaultFamily,
   trigger,
 }: {
   category?: WorkCategoryRow;
+  defaultFamily?: string;
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!category;
+  const isAdmin = useMastersAdmin();
   return (
     <RecordFormDialog
       label="Category"
       isEdit={isEdit}
       action={isEdit ? updateWorkCategory.bind(null, category.id) : addWorkCategory}
+      onDelete={isAdmin && category ? () => deleteWorkCategory(category.id) : undefined}
       trigger={trigger}
     >
       <div className="space-y-1.5">
@@ -60,6 +69,21 @@ export function WorkCategoryFormDialog({
           placeholder="e.g. Foundation"
         />
       </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="family">Part of</Label>
+        <Select
+          id="family"
+          name="family"
+          defaultValue={category?.family ?? defaultFamily ?? "Buildings"}
+          required
+        >
+          {WORK_FAMILIES.map((family) => (
+            <option key={family} value={family}>
+              {family}
+            </option>
+          ))}
+        </Select>
+      </div>
       {isEdit && (
         <label className="text-foreground flex items-center gap-2 text-sm">
           <Checkbox name="is_active" value="1" defaultChecked={category.is_active} />
@@ -82,11 +106,13 @@ export function WorkGroupFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!group;
+  const isAdmin = useMastersAdmin();
   return (
     <RecordFormDialog
       label="Group"
       isEdit={isEdit}
       action={isEdit ? updateWorkGroup.bind(null, group.id) : addWorkGroup}
+      onDelete={isAdmin && group ? () => deleteWorkGroup(group.id) : undefined}
       trigger={trigger}
     >
       <div className="space-y-1.5">
@@ -102,11 +128,13 @@ export function WorkGroupFormDialog({
           <option value="" disabled>
             Choose a category
           </option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.code} — {category.name}
-            </option>
-          ))}
+          {categories
+            .filter((category) => category.is_active || category.id === group?.category_id)
+            .map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.code} — {category.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">
@@ -161,6 +189,7 @@ export function WorkItemFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!item;
+  const isAdmin = useMastersAdmin();
   // Editing keeps the category fixed; moving an item means a new code (delete + add).
   const [categoryId, setCategoryId] = useState(item?.category_id ?? defaultCategoryId ?? "");
   const filteredGroups = groups.filter((group) => group.category_id === categoryId);
@@ -170,6 +199,7 @@ export function WorkItemFormDialog({
       label="Work Item"
       isEdit={isEdit}
       action={isEdit ? updateWorkItem.bind(null, item.id) : addWorkItem}
+      onDelete={isAdmin && item ? () => deleteWorkItem(item.id) : undefined}
       trigger={trigger}
       onOpen={() => setCategoryId(item?.category_id ?? defaultCategoryId ?? "")}
     >
@@ -186,11 +216,13 @@ export function WorkItemFormDialog({
           <option value="" disabled>
             Choose a category
           </option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.code} — {category.name}
-            </option>
-          ))}
+          {categories
+            .filter((category) => category.is_active || category.id === item?.category_id)
+            .map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.code} — {category.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">
@@ -202,11 +234,13 @@ export function WorkItemFormDialog({
           disabled={!categoryId}
         >
           <option value="">None — directly under the category</option>
-          {filteredGroups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.code} — {group.name}
-            </option>
-          ))}
+          {filteredGroups
+            .filter((group) => group.is_active || group.id === item?.group_id)
+            .map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.code} — {group.name}
+              </option>
+            ))}
         </Select>
       </div>
       <div className="space-y-1.5">

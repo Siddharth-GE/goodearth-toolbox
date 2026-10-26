@@ -5,18 +5,21 @@ import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { createPlot, updatePlot } from "@/lib/masters/plots-actions";
+import { createPlot, deletePlot, updatePlot } from "@/lib/masters/plots-actions";
 import type { PlotRow } from "@/lib/masters/plots";
 import type { ProjectRow } from "@/lib/masters/projects";
+import { useMastersAdmin } from "../../_components/masters-admin";
 
 export function PlotFormDialog({ projects, plot }: { projects: ProjectRow[]; plot?: PlotRow }) {
   const isEdit = !!plot;
+  const isAdmin = useMastersAdmin();
 
   return (
     <RecordFormDialog
       label="Plot"
       isEdit={isEdit}
       action={isEdit ? updatePlot.bind(null, plot.id) : createPlot}
+      onDelete={isAdmin && plot ? () => deletePlot(plot.id) : undefined}
     >
       <div className="space-y-1.5">
         <Label htmlFor="project_id">Project</Label>

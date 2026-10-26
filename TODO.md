@@ -2,9 +2,16 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## Building now — Turing, the admins' assistant
+
+`plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
+
+- **Waiting on the founder:** a look at T1 on staging. The key in Vercel's Preview may expire on 31 Oct 2026; production needs its own when Turing ships.
+- **T2: Turing in every tool, the admin's press always** — the 16 batches are in `plan.md`. Merged into staging and waiting on the founder's look: the Supervisors schedule (#146, `0153`) and batches 1 labour logs (#148), 2 Masters from sheets (#150), 3 indents (#151), 4 purchase orders (#152) and 5 inventory (#153), 6a work orders (#154), 6b bills (#155), 7 Client Relations (#156), 8 Birdwing (#157), 9 Birdwing Books (#158), 10 Design Management (#159) and 11 Selections and Budgets (#160), 12a the Estimator's rate book (#161), 12b the Estimator's estimates (#163), 13a Relay and Directory (#164), 13b the rest of Supervisors (#165) and 14a bills' payments and funding (#166). Next: batch 14b, cash requests (drafts on `feature/turing-cash-requests`), then 15 approvals and 16 Business planning, Reporter, Dexter names.
+
 ## Native apps on iPhone and Android — next build
 
-- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), the top section of `plan.md`.
+- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), their section of `plan.md`.
 - **Meanwhile: the Play wrapper's version 1.** Built and signed; the founder's steps (Play Console, the reviewer account, the screenshots) and the fingerprint still to add are the launch steps in `android/PLAN.md`. The Capacitor app replaces it later as an update.
 - **Waiting on the founder:** trying Google sign-in in the app; a Firebase project (phase C); Apple's Organization enrolment; what staff would scan (phase D).
 
@@ -21,6 +28,7 @@ The founder gives the steps. Before the switch:
 
 1. ~~The refactor before production~~ — done and vetted 2026-10-18 (`plan.md`).
 2. The vet list below, tried or accepted as is.
+   - If the test project has been seeded again, delete it (Settings → Test project): its POs and bills use real vendors.
 3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
@@ -54,7 +62,7 @@ Each checklist is in `plan.md`, under the heading named.
   - A deck link pasted into WhatsApp shows the Kaadal K.
 - **The final masters workbook**: a look through Masters → Vendors, Works, Items and Stages.
 
-## Five stale trials
+## Six stale trials
 
 These `scripts/trials/` fail against today's staging data, with or without the latest migrations (checked 2026-10-18). Each needs its setup brought up to date, not the code:
 
@@ -62,6 +70,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 - `client-actions-setter.sql`: steps now move with their side's owner (`0125`).
 - `client-actions.sql`, step 1: the staff account sees no plots since `0123` scoped the tool.
 - `client-relations-scope.sql`: the trial accounts already hold real actions.
+- `design-board.sql`, step 0: the board's stages are no longer Design, Permit, WD, Structural and Interiors.
 - `takeoff-working-date.sql`: the trial villa already has an official estimate.
 
 ## Setup the tools are waiting on
@@ -95,6 +104,16 @@ These `scripts/trials/` fail against today's staging data, with or without the l
   - the remaining raw `<h2>` headings (small card headings and labels) onto `Section`, `Heading` and the label style;
   - one page rhythm;
   - a shared notice banner.
+
+## Known limits
+
+- **Dexter's Replace file removes the deck's old files before uploading the new ones**, so an upload that fails leaves the deck's link empty until it is replaced again (the page says so). Doing it safely means the new files go to a new folder and the deck then points at it: a folder column on `dexter_decks`, so a migration.
+
+- **The Supervisors board reads every official estimate line** (`lib/supervisors/board-queries.ts`) to know which stages each villa has. Fine at today's handful of estimates; at ~100 villas it is ~80 sequential pages, so give it a small view of distinct (unit, work group) before then — with its revokes, and a Fable review.
+
+- **Look ahead reads each villa with something starting in full** (`getVillaDetail`, for material readiness). Fine for a supervisor's own villas; on Everyone at ~40 villas it is hundreds of reads, so give readiness its own narrow read of the estimate's materials and what was issued, for the villas involved, before then.
+
+- **A villa's own order can meet a later sequence change in a circle.** `setStageFollows` refuses a circle as things stand, but Supervisors → Sequence knows nothing of villa choices; a later sequence edit that closes one leaves that villa with no dates until its choice is undone.
 
 ## Open questions for the founder
 

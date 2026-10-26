@@ -2,8 +2,10 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/drawings/queries";
+import { plotNumber } from "@/lib/masters/plot-number";
 import { listVendors } from "@/lib/masters/vendors";
-import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { type WorkClass, workClassOf } from "@/lib/masters/work-classes";
+import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
@@ -23,92 +25,6 @@ const GRANT = "/supervisors";
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("supervisors", context, error);
-
-export async function getWelcomeCounts(): Promise<{
-  villas: number;
-  workersThisWeek: number;
-  openRequests: number;
-  contractors: number;
-}> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  const since = weekAgo.toISOString().slice(0, 10);
-
-  const [villas, weekLogs, openRequests, contractors] = await Promise.all([
-    supabase.from("units").select("id", { count: "exact", head: true }),
-    fetchAll<{ masons: number; helpers: number; others: number }>((from, to) =>
-      supabase
-        .from("labour_logs")
-        .select("masons, helpers, others")
-        .gte("log_date", since)
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("issue_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "requested"),
-    supabase
-      .from("vendors")
-      .select("id", { count: "exact", head: true })
-      .eq("is_contractor", true)
-      .eq("is_active", true),
-  ]);
-
-  const failed = villas.error ?? openRequests.error ?? contractors.error;
-  if (failed) fail("the welcome counts", failed);
-
-  return {
-    villas: villas.count ?? 0,
-    workersThisWeek: weekLogs.reduce((sum, log) => sum + log.masons + log.helpers + log.others, 0),
-    openRequests: openRequests.count ?? 0,
-    contractors: contractors.count ?? 0,
-  };
-}
-
-export type VillaRow = {
-  plotId: string;
-  unitId: string;
-  villaName: string;
-  plotName: string;
-  projectName: string;
-};
-
-export async function listVillas(): Promise<VillaRow[]> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const [units, plots, projects] = await Promise.all([
-    fetchAll<{ id: string; project_id: string; plot_id: string; name: string }>((from, to) =>
-      supabase
-        .from("units")
-        .select("id, project_id, plot_id, name")
-        .order("name")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("plots").select("id, name").order("id").range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("projects").select("id, name").order("id").range(from, to),
-    ),
-  ]);
-
-  const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-
-  return units.map((unit) => ({
-    plotId: unit.plot_id,
-    unitId: unit.id,
-    villaName: unit.name,
-    plotName: plotNames.get(unit.plot_id) ?? "—",
-    projectName: projectNames.get(unit.project_id) ?? "—",
-  }));
-}
 
 export type VillaWorkGroup = {
   workItemId: string;
@@ -135,6 +51,7 @@ export type LabourLogRow = {
   note: string | null;
   billId: string | null;
   billReference: string | null;
+  workClass: WorkClass;
 };
 
 export type IssueRequestRow = {
@@ -149,6 +66,7 @@ export type IssueRequestRow = {
   /** Why it was asked for although the estimate doesn't list it (0104). */
   offEstimateReason: string | null;
   createdAt: string;
+  workClass: WorkClass;
 };
 
 export type EstimateQuickPick = {
@@ -166,6 +84,8 @@ export type VillaDetail = {
   unitId: string | null;
   villaName: string;
   plotName: string;
+  /** The large number on the header (lib/masters/plot-number). */
+  plotNumber: string;
   projectName: string;
   /** Null when no official estimate exists for the villa. */
   estimate: { reference: string; submittedAt: string } | null;
@@ -180,13 +100,57 @@ export type VillaDetail = {
 
 const LOGS_SHOWN = 30;
 
+export type VillaBasics = Pick<
+  VillaDetail,
+  "plotId" | "unitId" | "villaName" | "plotName" | "plotNumber" | "projectName" | "estimate"
+>;
+
+/** The villa's header alone — the tabs that show no materials or labour read only this. */
+export async function getVillaBasics(plotId: string): Promise<VillaBasics | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const [{ data: plot, error: plotError }, { data: unit, error: unitError }] = await Promise.all([
+    supabase
+      .from("plots")
+      .select("id, name, code, project_id, projects(name)")
+      .eq("id", plotId)
+      .maybeSingle(),
+    supabase.from("units").select("id, name").eq("plot_id", plotId).maybeSingle(),
+  ]);
+  if (plotError) fail("the villa", plotError);
+  if (unitError) fail("the villa", unitError);
+  if (!plot) return null;
+  // One row names the official estimate; its lines are the Work tab's.
+  const { data: official, error: officialError } = unit
+    ? await supabase
+        .from("estimate_takeoff_facts")
+        .select("reference, submitted_at")
+        .eq("unit_id", unit.id)
+        .limit(1)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (officialError) fail("the villa's estimate", officialError);
+  return {
+    plotId,
+    unitId: unit?.id ?? null,
+    villaName: unit?.name ?? plot.name,
+    plotName: plot.name,
+    plotNumber: plotNumber(plot.code, plot.name),
+    projectName: (plot.projects as { name: string } | null)?.name ?? "—",
+    estimate:
+      official?.reference && official.submitted_at
+        ? { reference: official.reference, submittedAt: official.submitted_at }
+        : null,
+  };
+}
+
 export async function getVillaDetail(plotId: string): Promise<VillaDetail | null> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
   const { data: plot, error: plotError } = await supabase
     .from("plots")
-    .select("id, name, project_id, projects(name)")
+    .select("id, name, code, project_id, projects(name)")
     .eq("id", plotId)
     .maybeSingle();
   if (plotError) fail("the villa", plotError);
@@ -312,7 +276,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     supabase
       .from("labour_logs")
       .select(
-        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id",
+        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id, work_class",
         { count: "exact" },
       )
       .eq("plot_id", plotId)
@@ -330,11 +294,12 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       declined_reason: string | null;
       off_estimate_reason: string | null;
       created_at: string;
+      work_class: string;
     }>((from, to) =>
       supabase
         .from("issue_requests")
         .select(
-          "id, work_item_id, item_id, quantity, note, status, declined_reason, off_estimate_reason, created_at",
+          "id, work_item_id, item_id, quantity, note, status, declined_reason, off_estimate_reason, created_at, work_class",
         )
         .eq("plot_id", plotId)
         .order("created_at", { ascending: false })
@@ -457,6 +422,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     unitId: unit?.id ?? null,
     villaName: unit?.name ?? plot.name,
     plotName: plot.name,
+    plotNumber: plotNumber(plot.code, plot.name),
     projectName: (plot.projects as { name: string } | null)?.name ?? "—",
     estimate: takeoffRows.length
       ? { reference: takeoffRows[0].reference, submittedAt: takeoffRows[0].submitted_at }
@@ -480,6 +446,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       note: log.note,
       billId: log.bill_id,
       billReference: log.bill_id ? (billRefs.get(log.bill_id) ?? null) : null,
+      workClass: workClassOf(log.work_class) ?? "standard",
     })),
     labourTotal: logsPage.count ?? logs.length,
     requests: requestRows.map((request) => ({
@@ -493,6 +460,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       declinedReason: request.declined_reason,
       offEstimateReason: request.off_estimate_reason,
       createdAt: request.created_at,
+      workClass: workClassOf(request.work_class) ?? "standard",
     })),
     quickPicks,
     drawings,
@@ -530,7 +498,9 @@ export async function listWorkOptions(): Promise<WorkOption[]> {
         .range(from, to),
     ),
   ]);
-  const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const categoryNameById = new Map(
+    categories.map((category) => [category.id, workCategoryLabel(category)]),
+  );
   const unitByWork = new Map(units.map((unit) => [unit.work_item_id, unit.uom]));
   return workItems
     .filter((work) => work.is_active)

@@ -24,9 +24,9 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## The one principle
 
-**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants and team leads, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`, `lib/native/`, `lib/push/`, `lib/google/`).
+**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants and team leads, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`, `lib/xlsx.ts`, `lib/native/`, `lib/push/`, `lib/google/`).
 
-**One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page).
+**One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page). `lib/turing/` is the one module allowed to call other tools' **action files** — never their queries or screens — and only after an admin presses Save on a Turing proposal (`check:boundaries` holds both edges; SECURITY.md, _Turing_).
 
 ## Structure
 

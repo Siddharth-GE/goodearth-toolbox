@@ -3,6 +3,7 @@
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
+import { WORK_CLASS_LABEL, isWorkClass, workClassOf } from "@/lib/masters/work-classes";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -45,6 +46,9 @@ export type RecordReceiptInput = {
   /** The work a to-site delivery serves (0081); never sent for a store. */
   workItemId: string | null;
   challanNo: string | null;
+  /** The supplier's invoice, as it came with the goods; the bill offers it (0132). */
+  invoiceNo: string | null;
+  invoiceDate: string | null;
   receivedAt: string | null;
   note: string | null;
   lines: ReceiveLineInput[];
@@ -141,6 +145,28 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     added++;
   }
 
+  // create_goods_receipt predates the invoice (additive-only), so it rides a second write once the lines are in.
+  const invoiceNo = input.invoiceNo?.trim() || null;
+  if (invoiceNo || input.invoiceDate) {
+    const { error: invoiceError } = await supabase
+      .from("goods_receipts")
+      .update({
+        invoice_no: invoiceNo,
+        invoice_date: input.invoiceDate || null,
+        updated_by: user.id,
+      })
+      .eq("id", receiptId);
+    if (invoiceError) {
+      console.error("recordGoodsReceipt invoice failed:", invoiceError);
+      revalidatePath("/inventory", "layout");
+      revalidatePath(`/purchase-orders/${input.poId}`);
+      return {
+        error:
+          "The delivery is recorded with all its lines, but its invoice number could not be saved — type it on the bill instead.",
+      };
+    }
+  }
+
   revalidatePath("/inventory", "layout");
   revalidatePath(`/purchase-orders/${input.poId}`);
   redirect(`/inventory/receipts/${receiptId}`);
@@ -210,6 +236,8 @@ export type RecordIssueInput = {
   lines: IssueLineInput[];
   /** The supervisor's request to stamp fulfilled once the issue is recorded. */
   requestId?: string | null;
+  /** Standard work, additional work or rework, for an issue to a plot (0132). */
+  workClass?: string | null;
 };
 
 /** The negative-stock guard refuses any line taking a store below zero, under an advisory
@@ -227,6 +255,9 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (input.plotId && !input.workItemId) {
     return { error: "Say which work this material is for." };
   }
+  const workClass = workClassOf(input.workClass);
+  if (!workClass)
+    return { error: "Say whether it is for standard work, additional work or rework." };
   if (input.lines.length === 0) return { error: "Add at least one item." };
   if (input.lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
     return { error: "Quantities must be more than 0." };
@@ -315,6 +346,19 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     added++;
   }
 
+  // create_stock_issue predates the class (additive-only), so it rides a second write, as an indent's work does.
+  let classMissed = false;
+  if (input.plotId && workClass !== "standard") {
+    const { error: classError } = await supabase
+      .from("stock_issues")
+      .update({ work_class: workClass, updated_by: user.id })
+      .eq("id", issueId);
+    if (classError) {
+      console.error("recordStockIssue work class failed:", classError);
+      classMissed = true;
+    }
+  }
+
   // Stamping the supervisor's request is best-effort: if it fails the request stays queued.
   // Cross-tool write exception (STATUS.md); the 0084 trigger only lets it move requested to fulfilled/declined.
   if (input.requestId) {
@@ -329,6 +373,11 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   }
 
   revalidatePath("/inventory", "layout");
+  if (classMissed) {
+    return {
+      error: `The issue is recorded, but as standard work: saving it as ${WORK_CLASS_LABEL[workClass].toLowerCase()} failed. Ask an admin to correct it.`,
+    };
+  }
   redirect(`/inventory/issues/${issueId}`);
 }
 
@@ -415,6 +464,37 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
   return undefined;
 }
 
+/** Corrects what a plot issue was for (0132): standard work, additional work or rework. A label fix, like retagging the work. */
+export async function setIssueWorkClass(issueId: string, value: string): Promise<ActionState> {
+  const user = await requireTool("/inventory");
+  if (!isWorkClass(value)) return { error: "Pick standard work, additional work or rework." };
+
+  const supabase = await createClient();
+  const { data: issue, error: readError } = await supabase
+    .from("stock_issues")
+    .select("id, plot_id")
+    .eq("id", issueId)
+    .maybeSingle();
+  if (readError) {
+    console.error("setIssueWorkClass read failed:", readError);
+    return { error: "Could not save. Try again." };
+  }
+  if (!issue) return { error: "That issue no longer exists." };
+  if (!issue.plot_id) return { error: "A transfer between stores serves no work." };
+
+  const { error } = await supabase
+    .from("stock_issues")
+    .update({ work_class: value, updated_by: user.id })
+    .eq("id", issueId);
+  if (error) {
+    console.error("setIssueWorkClass failed:", error);
+    return guardError(error, "Could not save. Try again.", INVENTORY_GUARD_PHRASES);
+  }
+
+  revalidatePath("/inventory", "layout");
+  return undefined;
+}
+
 /** Retags the work a plot issue served (0080). A label fix: quantities and numbers are untouched. */
 export async function retagIssueWork(issueId: string, workItemId: string): Promise<ActionState> {
   const user = await requireTool("/inventory");
@@ -444,4 +524,51 @@ export async function retagIssueWork(issueId: string, workItemId: string): Promi
 
   revalidatePath("/inventory", "layout");
   return undefined;
+}
+
+// delete_goods_receipt (0146) refuses once anything has drawn on it, a bill counts it or the site has confirmed it.
+export async function deleteGoodsReceipt(receiptId: string, reason: string): Promise<ActionState> {
+  await requireTool("/inventory");
+  const why = reason.trim();
+  if (!why) return { error: "Say why this delivery is deleted." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_goods_receipt", {
+    p_receipt_id: receiptId,
+    p_reason: why,
+  });
+  if (error) {
+    console.error("deleteGoodsReceipt failed:", error);
+    // The function's refusals are written for the store-keeper.
+    return error.code === "P0001"
+      ? { error: error.message }
+      : { error: "Could not delete this delivery. Try again." };
+  }
+
+  revalidatePath("/inventory", "layout");
+  redirect("/inventory/receive");
+}
+
+// delete_stock_issue (0146) refuses once the site has confirmed it or a transfer's material has moved on.
+export async function deleteStockIssue(issueId: string, reason: string): Promise<ActionState> {
+  await requireTool("/inventory");
+  const why = reason.trim();
+  if (!why) return { error: "Say why this issue is deleted." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_stock_issue", {
+    p_issue_id: issueId,
+    p_reason: why,
+  });
+  if (error) {
+    console.error("deleteStockIssue failed:", error);
+    return error.code === "P0001"
+      ? { error: error.message }
+      : { error: "Could not delete this issue. Try again." };
+  }
+
+  revalidatePath("/inventory", "layout");
+  // A site request it filled is open again on the supervisor's side.
+  revalidatePath("/supervisors", "layout");
+  redirect("/inventory/issues");
 }

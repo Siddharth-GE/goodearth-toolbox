@@ -7,9 +7,11 @@
  *   - row-level security on every table in public;
  *   - no policy reads profiles.role itself (is_admin() carries the second factor, BUGCATCHER #22);
  *   - one permissive SELECT policy per table (CLAUDE.md: widen the qual, never add a second);
+ *   - every check a policy calls is wrapped as (select …), so it runs once per query, not per row (0139);
  *   - every security-definer function sets search_path, and, if a client role can call it,
  *     checks a grant or is a trigger or a named exception below;
  *   - nothing in public is executable by anon (an extension's own functions aside).
+ *   - a deletable master whose children cascade or blank carries a delete guard (0150).
  */
 import { requireProjectRef, sql } from "./supabase-management";
 
@@ -23,6 +25,45 @@ const NO_GRANT_CHECK = new Set([
   "pusher_current_stage",
   "stock_qty_on_hand",
 ]);
+
+/** The shared masters an admin may delete while unused (0150). */
+const MASTERS = [
+  "projects",
+  "plots",
+  "units",
+  "clients",
+  "vendors",
+  "items",
+  "stores",
+  "companies",
+  "document_terms",
+  "item_categories",
+  "brands",
+  "construction_stages",
+  "progress_stages",
+  "uoms",
+  "work_categories",
+  "work_groups",
+  "work_items",
+];
+
+/** Rows a master's delete guard deletes with it: a unit's plot record and schedule, a project's Relay plan. */
+const SEEDED = [
+  "client_engagements",
+  "client_payment_milestones",
+  "project_stages",
+  "pusher_project_plans",
+];
+
+/** The cascading or blanking links a guard refuses before they act (0150). */
+const GUARDED: [string, string][] = [
+  ["brands", "items"],
+  ["clients", "units"],
+  ["projects", "stores"],
+  ["items", "item_margins"],
+  ["units", "spaces"],
+  ["client_engagements", "client_payment_milestones"],
+];
 
 const GRANT_WORDS = ["has_app(", "is_admin(", "is_lead(", "auth.uid("];
 
@@ -56,6 +97,17 @@ async function main() {
     problems.push(`${row.tablename}: ${row.n} permissive SELECT policies; widen one qual instead`);
   }
 
+  // A bare check runs once per row read; (select check(...)) runs once per query (0139).
+  for (const row of await ask(`
+    select tablename, policyname from pg_policies
+     where schemaname = 'public'
+       and coalesce(qual, '') || ' ' || coalesce(with_check, '')
+           ~ '(?<!SELECT )((has_app|is_lead)\\(''[^'']*''::text\\)|session_is_verified\\(\\)|is_admin\\(\\)|auth\\.uid\\(\\))'`)) {
+    problems.push(
+      `${row.tablename}: policy "${row.policyname}" calls a check once per row; wrap it as (select …)`,
+    );
+  }
+
   const definers = await ask(`
     select p.proname as name,
            pg_get_function_result(p.oid) as returns,
@@ -81,6 +133,27 @@ async function main() {
        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
      order by 1`)) {
     problems.push(`${row.name}: executable by anon`);
+  }
+
+  // A delete of a master, or of the rows a master's guard deletes with it, may cascade or blank only what a guard
+  // refuses first (0150): any other such link would take data silently.
+  for (const row of await ask(`
+    select k.confrelid::regclass::text as parent, k.conrelid::regclass::text as child
+      from pg_constraint k
+     where k.contype = 'f' and k.confdeltype in ('c', 'n', 'd')
+       and (
+         (k.confrelid::regclass::text in (${MASTERS.map((t) => `'${t}'`).join(", ")})
+          and exists (select 1 from pg_policies p
+                       where p.schemaname = 'public' and p.tablename = k.confrelid::regclass::text
+                         and p.cmd in ('DELETE', 'ALL')))
+         or k.confrelid::regclass::text in (${SEEDED.map((t) => `'${t}'`).join(", ")}))
+       and (k.confrelid::regclass::text, k.conrelid::regclass::text) not in (${GUARDED.map(
+         ([parent, child]) => `('${parent}', '${child}')`,
+       ).join(", ")})
+     order by 1, 2`)) {
+    problems.push(
+      `${row.parent} → ${row.child}: a delete would cascade or blank it with no guard to refuse`,
+    );
   }
 
   if (problems.length > 0) {

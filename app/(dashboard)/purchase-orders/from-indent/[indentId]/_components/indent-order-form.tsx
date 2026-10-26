@@ -64,7 +64,7 @@ export function IndentOrderForm({
           quantity: String(line.left),
           vendorId: line.suggestion?.vendorId ?? "",
           rate: asText(line.suggestion?.rate),
-          gst: asText(line.suggestion?.gstPct),
+          gst: asText(line.item_gst_pct ?? line.suggestion?.gstPct),
         },
       ]),
     ),
@@ -81,11 +81,16 @@ export function IndentOrderForm({
   const update = (lineId: string, patch: Partial<Row>) =>
     setRows((current) => ({ ...current, [lineId]: { ...current[lineId], ...patch } }));
 
-  /** A new vendor brings their own last price for the item, when there is one. */
+  /** A new vendor brings their own last price for the item; GST stays Masters' when it has one. */
   const withVendor = (line: IndentOrderLine, row: Row, vendorId: string): Row => {
     const price = vendorId ? prices[priceKey(line.item_id, vendorId)] : undefined;
     return price
-      ? { ...row, vendorId, rate: asText(price.rate), gst: asText(price.gstPct) }
+      ? {
+          ...row,
+          vendorId,
+          rate: asText(price.rate),
+          gst: asText(line.item_gst_pct ?? price.gstPct),
+        }
       : { ...row, vendorId };
   };
 

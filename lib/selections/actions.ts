@@ -345,3 +345,18 @@ export async function requestItem(input: {
 }
 
 // Catalogue search lives in app/api/catalogue/route.ts: Server Actions dispatch one at a time (keystrokes queue) and revalidating re-renders the route.
+
+// Only a draft goes: delete_draft_selection (0143) takes its lines with it; an issued revision is replaced, never deleted.
+export async function deleteDraftSelection(selectionId: string): Promise<ActionState> {
+  await requireTool("/selections");
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("delete_draft_selection", { p_selection_id: selectionId });
+  if (error) {
+    console.error("deleteDraftSelection failed:", error);
+    return { error: dbErrorMessage(error, "Could not delete this revision.") };
+  }
+
+  revalidatePath("/selections", "layout");
+  redirect("/selections/units");
+}

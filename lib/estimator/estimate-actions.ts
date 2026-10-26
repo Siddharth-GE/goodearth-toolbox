@@ -98,6 +98,27 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
   redirect("/estimator/estimates");
 }
 
+// estimator_estimates_guard (0144) refuses while a live indent draws on it, stamps who and when, and makes it final.
+export async function withdrawEstimate(id: string, reason: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const why = reason.trim();
+  if (!why) return { error: "Say why this estimate is withdrawn." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimates")
+    .update({ status: "cancelled", cancel_reason: why })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("withdrawEstimate failed:", error);
+    return { error: "Could not withdraw the estimate. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
 /** Put works on an estimate, set up or not. They arrive "to measure" (0097: no quantity yet).
  * Works already on the estimate are skipped (one line per work, 0074). */
 export async function addEstimateLines(
@@ -254,6 +275,7 @@ export async function addLineMeasurement(
     length: parseNumber(formData.get("length")),
     breadth: parseNumber(formData.get("breadth")),
     depth: parseNumber(formData.get("depth")),
+    deduct: formData.get("deduct") === "1",
   };
   const problem = checkMeasurement(fields);
   if (problem) return { error: problem };
@@ -272,9 +294,11 @@ export async function addLineMeasurement(
     return { error: "Could not add the row. Try again." };
   }
 
+  const { deduct, ...boxes } = fields;
   const { error } = await supabase.from("estimator_estimate_line_measurements").insert({
     line_id: lineId,
-    ...fields,
+    ...boxes,
+    is_deduction: deduct,
     sort_order: (last?.sort_order ?? 0) + 1,
     created_by: user.id,
     updated_by: user.id,
@@ -297,7 +321,7 @@ export async function updateLineMeasurement(
   const user = await requireTool(GRANT);
   if (!id) return { error: "Which row?" };
 
-  // A server action's argument is whatever the caller sent. Build the update from exactly these five fields, never a
+  // A server action's argument is whatever the caller sent. Build the update from exactly these six fields, never a
   // spread, so extra keys cannot move a row onto another work. A non-number becomes NaN, which checkMeasurement refuses.
   const box = (value: unknown): number | null =>
     value === null ? null : typeof value === "number" ? value : Number.NaN;
@@ -307,6 +331,7 @@ export async function updateLineMeasurement(
     length: box(fields?.length),
     breadth: box(fields?.breadth),
     depth: box(fields?.depth),
+    deduct: fields?.deduct === true,
   };
   const problem = checkMeasurement(cleaned);
   if (problem) return { error: problem };
@@ -317,9 +342,10 @@ export async function updateLineMeasurement(
   if (!source) return { error: "That row is no longer on the sheet — reload the page." };
   if (source.fromModel) return { error: MODEL_ROW };
 
+  const { deduct, ...cleanedBoxes } = cleaned;
   const { data: row, error } = await supabase
     .from("estimator_estimate_line_measurements")
-    .update({ ...cleaned, updated_by: user.id })
+    .update({ ...cleanedBoxes, is_deduction: deduct, updated_by: user.id })
     .eq("id", id)
     .eq("from_model", false)
     .select("line_id")
@@ -371,7 +397,7 @@ export async function duplicateLineMeasurement(id: string): Promise<ActionState>
 
   const { data: row, error: rowError } = await supabase
     .from("estimator_estimate_line_measurements")
-    .select("line_id, description, nos, length, breadth, depth, from_model")
+    .select("line_id, description, nos, length, breadth, depth, is_deduction, from_model")
     .eq("id", id)
     .maybeSingle();
   if (rowError) {
@@ -400,6 +426,7 @@ export async function duplicateLineMeasurement(id: string): Promise<ActionState>
     length: row.length,
     breadth: row.breadth,
     depth: row.depth,
+    is_deduction: row.is_deduction,
     sort_order: (last?.sort_order ?? 0) + 1,
     created_by: user.id,
     updated_by: user.id,
@@ -441,7 +468,7 @@ export async function copyMeasurementRows(
   const [source, last] = await Promise.all([
     supabase
       .from("estimator_estimate_line_measurements")
-      .select("description, nos, length, breadth, depth")
+      .select("description, nos, length, breadth, depth, is_deduction")
       .eq("line_id", fromLineId)
       .order("sort_order")
       .order("id"),
@@ -468,6 +495,7 @@ export async function copyMeasurementRows(
       length: row.length,
       breadth: row.breadth,
       depth: row.depth,
+      is_deduction: row.is_deduction,
       sort_order: start + index + 1,
       created_by: user.id,
       updated_by: user.id,

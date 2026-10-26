@@ -6,6 +6,7 @@ import {
   contractorPosition,
   lineLeftToPay,
   mondayOf,
+  moneyReversal,
   paymentProblem,
 } from "./ledger";
 
@@ -64,4 +65,23 @@ test("a payment's refusals, said first", () => {
   assert.match(paymentProblem({ ...ok, amount: 50001 }) ?? "", /pending/);
   assert.match(paymentProblem({ ...ok, cap: 40000 }) ?? "", /released/);
   assert.equal(paymentProblem({ ...ok, cap: null }), undefined);
+});
+
+test("money is reversed once, by an approver, and an advance only once nothing is recovered", () => {
+  const approver = { isAdmin: false, isApprover: true };
+  const entry = { kind: "payment" as const, reversal: false, reversed: false };
+  assert.deepEqual(moneyReversal(entry, approver), { kind: "cancel" });
+  assert.deepEqual(moneyReversal(entry, { isAdmin: true, isApprover: false }), { kind: "cancel" });
+  assert.equal(moneyReversal(entry, { isAdmin: false, isApprover: false }), null);
+  assert.equal(moneyReversal({ ...entry, reversed: true }, approver), null);
+  assert.equal(moneyReversal({ ...entry, reversal: true }, approver), null);
+
+  const advance = { kind: "advance" as const, reversal: false, reversed: false };
+  assert.deepEqual(moneyReversal({ ...advance, recovered: 0 }, approver), { kind: "cancel" });
+  const blocked = moneyReversal({ ...advance, recovered: 25000 }, approver);
+  assert.equal(blocked?.kind, "blocked");
+  assert.match(
+    blocked?.kind === "blocked" ? blocked.why : "",
+    /25,000\.00 of it has been recovered/,
+  );
 });

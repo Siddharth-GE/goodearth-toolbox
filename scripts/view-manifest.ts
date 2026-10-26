@@ -74,6 +74,14 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: false,
     why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. /supervisors joined 0084 so a request for issue shows the estimate's figure beside it. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer or supervisor. working_updated_at (0109) is when the villa's working estimate last changed — a date, so Indents can say the official copy it reads is out of date.",
   },
+  estimate_work_facts: {
+    columns: ["estimate_id", "unit_id", "work_item_id", "quantity", "uom"],
+    guards: ["/estimator", "/indents", "/inventory", "/supervisors"],
+    barrier: true,
+    invoker: false,
+    money: false,
+    why: "The official estimate's quantity per work (0137) — '1,800 sqft of block work' — so the site sets logged piece-work against it and the schedule sizes a villa. The same four grants as estimate_takeoff_facts. The line's labour_rate must never appear here.",
+  },
   po_facts: {
     columns: [
       "id",
@@ -200,7 +208,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "The one sanctioned money window between purchase orders and bills: ordered against billed, for the two tools that already see both. Not money-free — it is money behind a gate.",
+    why: "The one sanctioned money window between purchase orders and bills: ordered against billed, for the two tools that already see both. Not money-free — it is money behind a gate. Since 0133 the ordered total counts the PO's own additional charges and their GST, as a bill's total counts its own.",
   },
   bill_money_facts: {
     columns: [
@@ -249,7 +257,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Published plan targets, three ways. THE THREE-WAY WHERE IS LOAD-BEARING: re-running an earlier migration as-is drops Financial Management and Reporter without failing anything.",
+    why: "Published plan targets, three ways. THE THREE-WAY WHERE IS LOAD-BEARING: re-running an earlier migration as-is drops Financial Management and Reporter without failing anything. A cancelled receipt counts in nothing (0148).",
   },
   crm_milestone_facts: {
     columns: [
@@ -274,7 +282,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Client payment milestones, for Reporter and Financial Management. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. /client-relations left the WHERE in 0123: a member sees only their own plots' money, through the tables, and this view would hand them every plot's. THE TWO-WAY WHERE IS LOAD-BEARING.",
+    why: "Client payment milestones, for Reporter and Financial Management. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. /client-relations left the WHERE in 0123: a member sees only their own plots' money, through the tables, and this view would hand them every plot's. THE TWO-WAY WHERE IS LOAD-BEARING. A cancelled receipt counts in nothing (0148).",
   },
   crm_receipt_facts: {
     columns: [
@@ -298,7 +306,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "Money actually received, for Reporter and Financial Management. /client-relations left the WHERE in 0123, for crm_milestone_facts' reason. THE TWO-WAY WHERE IS LOAD-BEARING.",
+    why: "Money actually received, for Reporter and Financial Management. /client-relations left the WHERE in 0123, for crm_milestone_facts' reason. THE TWO-WAY WHERE IS LOAD-BEARING. A cancelled receipt counts in nothing (0148).",
   },
   budget_report_lines: {
     columns: [
@@ -372,6 +380,28 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: true,
     why: "A material bill pre-fills from its PO's lines (0106), and a /bills-only user cannot read purchase_order_lines. The second sanctioned window between POs and bills, beside po_billing_totals, for the same two tools that already see both sides' money.",
   },
+  villa_cost_facts: {
+    columns: ["plot_id", "unit_id", "work_item_id", "kind", "amount", "unpriced"],
+    guards: ["/bills", "/estimator", "/reporter"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "Budget against actual per villa (0136, founder 2026-10-22): the official estimate, what POs and work orders committed, and what was issued, delivered and billed, before GST. Gated to the estimator and the billing team, who see these figures already, and Reporter. The one place estimate money leaves the Estimator.",
+  },
+  work_order_line_billing_facts: {
+    columns: [
+      "labour_contract_line_id",
+      "contract_id",
+      "work_item_id",
+      "line_value",
+      "billed_value",
+    ],
+    guards: ["/bills", "/reporter"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "Stage billing (0136): each work order line's value and what bills have named against it, so a Superstructure or MEP order is paid stage by stage. Bills' own money, for Bills and Reporter only.",
+  },
   batch_on_hand: {
     columns: ["receipt_line_id", "store_id", "item_id", "received_at", "quantity"],
     guards: [],
@@ -423,7 +453,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: true,
-    why: "One row per Birdwing stay with its money worked out as Stays works it (0117) — Financial Management's Birdwing tab and Reporter's dataset. A guest's name only: no phone, email, ID or note may ever join it.",
+    why: "One row per Birdwing stay with its money worked out as Stays works it (0117) — Financial Management's Birdwing tab and Reporter's dataset. A guest's name only: no phone, email, ID or note may ever join it. A cancelled receipt counts in nothing (0148).",
   },
   birdwing_expense_facts: {
     columns: [

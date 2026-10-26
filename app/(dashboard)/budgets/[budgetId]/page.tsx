@@ -1,7 +1,9 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { EmptyState } from "@/components/ui/empty-state";
+import { deleteBudget } from "@/lib/budgets/actions";
 import { getBudget, listVendorOptions } from "@/lib/budgets/queries";
 import { FileDown, Lock, PackageOpen } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -16,8 +18,11 @@ export default async function BudgetPricingPage({
 }) {
   const { budgetId } = await params;
 
-  const [budget, vendors] = await Promise.all([getBudget(budgetId), listVendorOptions()]);
+  const budget = await getBudget(budgetId);
   if (!budget) notFound();
+  const vendors = await listVendorOptions(
+    budget.spaces.flatMap((space) => space.lines.flatMap((line) => line.expected_vendor_id ?? [])),
+  );
 
   const editable = budget.status === "pricing";
 
@@ -62,6 +67,13 @@ export default async function BudgetPricingPage({
               </>
             )}
             {!editable && <ReopenButton budgetId={budgetId} />}
+            {/* A re-opened budget was approved once, so indents may rest on it: approved again, never deleted. */}
+            <DeleteOrCancel
+              noun="budget"
+              removal={editable && budget.version === 1 ? { kind: "delete" } : null}
+              deleteNote="It has never been approved, so nothing rests on it. Its pricing goes for good; the revision can be priced afresh."
+              onDelete={deleteBudget.bind(null, budgetId)}
+            />
           </>
         }
       />

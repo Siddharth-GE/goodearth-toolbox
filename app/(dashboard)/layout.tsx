@@ -17,10 +17,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     // Column on phones, row from md up. The page body is the one scroll container;
     // min-w-0 keeps a wide table scrolling in place.
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar sections={sections} userName={user.profile?.full_name || user.email} />
+    <div className="flex min-h-[calc(100dvh-var(--banner-h))] flex-col md:flex-row">
+      <Sidebar
+        sections={sections}
+        userName={user.profile?.full_name || user.email}
+        turing={user.profile?.role === "admin"}
+      />
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10">{children}</div>
+        {/* A page marked data-bleed (Turing's workspace) fills the whole area on a computer. */}
+        <div className="mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10 md:has-[>[data-bleed]]:max-w-none md:has-[>[data-bleed]]:p-0">
+          {children}
+        </div>
       </main>
     </div>
   );

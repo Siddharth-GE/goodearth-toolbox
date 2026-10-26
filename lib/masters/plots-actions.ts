@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PlotStatus } from "./plots";
+import { deleteMaster } from "./delete-master";
 
 const PLOT_STATUSES = ["available", "reserved", "sold"];
 
@@ -80,4 +81,14 @@ export async function updatePlot(
 
   revalidatePath("/masters/plots");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150). */
+export async function deletePlot(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "plots", id, {
+    noun: "plot",
+    retire: false,
+    paths: ["/masters/plots"],
+  });
 }

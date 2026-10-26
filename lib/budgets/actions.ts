@@ -388,3 +388,18 @@ export async function setItemMargin(
 
   return undefined;
 }
+
+// Only a first pricing goes: delete_pricing_budget (0143) refuses a re-opened budget, which indents may rest on.
+export async function deleteBudget(budgetId: string): Promise<ActionState> {
+  await requireTool("/budgets");
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("delete_pricing_budget", { p_budget_id: budgetId });
+  if (error) {
+    console.error("deleteBudget failed:", error);
+    return { error: dbErrorMessage(error, "Could not delete this budget.") };
+  }
+
+  revalidatePath("/budgets", "layout");
+  redirect("/budgets/interiors");
+}

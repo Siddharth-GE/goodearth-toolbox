@@ -158,10 +158,12 @@ type StepRecord = {
   updated_at: string;
   created_by: string | null;
   updated_by: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
 };
 
 const STEP_SELECT =
-  "id, engagement_id, action, owner_id, due_on, due_assumed, status, track, notes, done_on, created_at, updated_at, created_by, updated_by";
+  "id, engagement_id, action, owner_id, due_on, due_assumed, status, track, notes, done_on, created_at, updated_at, created_by, updated_by, cancelled_by, cancel_reason";
 
 export type NextStep = {
   id: string;
@@ -179,6 +181,10 @@ export type NextStep = {
   createdBy: string | null;
   setterName: string;
   stamp: { edited: boolean; on: string; by: string | null };
+  createdAt: string;
+  updatedAt: string;
+  /** Closed by a cancel, with its reason (0149): struck through among the done, never reopened. */
+  cancelled: { reason: string; by: string | null } | null;
   plot: PlotRef | null;
 };
 
@@ -227,12 +233,28 @@ function toStep(
     createdBy: record.created_by,
     setterName: names.get(record.created_by ?? record.owner_id) ?? "—",
     stamp: stampOf(record, names),
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+    cancelled:
+      record.cancel_reason === null
+        ? null
+        : {
+            reason: record.cancel_reason,
+            by: record.cancelled_by
+              ? (names.get(record.cancelled_by)?.split(" ")[0] ?? null)
+              : null,
+          },
     plot: record.engagement_id ? (plots.get(record.engagement_id) ?? null) : null,
   };
 }
 
 function stepPeople(records: StepRecord[]): string[] {
-  return records.flatMap((r) => [r.owner_id, r.created_by ?? "", r.updated_by ?? ""]);
+  return records.flatMap((r) => [
+    r.owner_id,
+    r.created_by ?? "",
+    r.updated_by ?? "",
+    r.cancelled_by ?? "",
+  ]);
 }
 
 export type BoardFilters = {
@@ -278,7 +300,9 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
     supabase
       .from("client_actions")
       .select("id", { count: "exact", head: true })
-      .eq("status", "done"),
+      .eq("status", "done")
+      // A cancelled action is listed among the done but never counted (0149).
+      .is("cancelled_at", null),
   ]);
   fail("done actions", doneCountRes.error);
 

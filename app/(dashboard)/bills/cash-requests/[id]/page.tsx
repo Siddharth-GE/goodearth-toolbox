@@ -1,8 +1,10 @@
 import { Heading } from "@/components/ui/heading";
 import { Badge } from "@/components/ui/badge";
+import { DeleteOrCancel } from "@/components/ui/delete-or-cancel";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
 import { CASH_REQUEST_STATUS_LABEL } from "@/lib/bills/ledger";
+import { deleteCashRequest } from "@/lib/bills/payment-actions";
 import { getCashRequest, listPayableBills } from "@/lib/bills/payment-queries";
 import { getContractFormOptions, getCurrentBillActor } from "@/lib/bills/queries";
 import { listWorkOrders } from "@/lib/bills/work-order-queries";
@@ -44,7 +46,17 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
         ]
           .filter(Boolean)
           .join(" · ")}
-        actions={<Badge variant="neutral">{CASH_REQUEST_STATUS_LABEL[request.status]}</Badge>}
+        actions={
+          <>
+            <Badge variant="neutral">{CASH_REQUEST_STATUS_LABEL[request.status]}</Badge>
+            <DeleteOrCancel
+              noun="cash request"
+              removal={drafting ? { kind: "delete" } : null}
+              deleteNote="It is still a draft and no money has moved, so it goes with its lines."
+              onDelete={deleteCashRequest.bind(null, request.id)}
+            />
+          </>
+        }
       />
 
       {drafting && request.sent_back_note && (
@@ -109,9 +121,10 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
             <Heading>Add an advance</Heading>
             <AddAdvance
               requestId={request.id}
-              contractors={vendors
-                .filter((vendor) => vendor.is_contractor)
-                .map(({ id, name }) => ({ id, name }))}
+              contractors={[
+                ...vendors.filter((vendor) => vendor.is_contractor),
+                ...vendors.filter((vendor) => !vendor.is_contractor),
+              ].map(({ id, name }) => ({ id, name }))}
               projects={options.projects.map(({ id, name }) => ({ id, name }))}
               workOrders={workOrders.map((order) => ({
                 id: order.id,

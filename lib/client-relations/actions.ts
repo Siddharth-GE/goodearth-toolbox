@@ -23,6 +23,11 @@ function revalidateAll(): void {
 /** Database messages are written for people (0050); surface those, fall back for the rest. */
 const CRM_GUARD_PHRASES = [
   "no longer exists",
+  // money_in_cancel_guard (0148).
+  "can no longer be changed",
+  "is never edited",
+  "can cancel a",
+  "Say why it is cancelled",
   "You need the Client Relations app",
   "Unknown unit status",
   // crm_assign_unit and crm_release_unit, on a plot someone else owns (0123).
@@ -259,12 +264,19 @@ export async function addReceipt(input: ReceiptInputData): Promise<ActionState> 
   return undefined;
 }
 
-export async function deleteReceipt(receiptId: string): Promise<ActionState> {
+/** Money is cancelled with a reason, never deleted (0148); the guard checks the admin or team lead and stamps it. */
+export async function cancelReceipt(receiptId: string, reason: string): Promise<ActionState> {
   await requireTool(GRANT);
+  if (!reason.trim()) return { error: "Say why it is cancelled." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("client_receipts").delete().eq("id", receiptId);
-  if (error) return friendly(error, "Could not remove that payment. Try again.");
+  const { data, error } = await supabase
+    .from("client_receipts")
+    .update({ cancel_reason: reason.trim() })
+    .eq("id", receiptId)
+    .select("id");
+  if (error) return friendly(error, "Could not cancel that payment. Try again.");
+  if (!data?.length) return { error: "That payment is not on a plot you can see." };
 
   revalidateAll();
   return undefined;

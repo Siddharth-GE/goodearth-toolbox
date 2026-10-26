@@ -3,8 +3,10 @@
 import { checked, optionalText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { isWorkFamily } from "@/lib/masters/work-families";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { deleteMaster } from "./delete-master";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -37,6 +39,7 @@ function readWorksForm(formData: FormData) {
   return {
     code: text(formData, "code").toUpperCase(),
     name: text(formData, "name"),
+    family: text(formData, "family"),
     category_id: text(formData, "category_id"),
     group_id: optionalText(formData, "group_id"),
     // Checkbox: checked posts "1", unchecked posts nothing; only update actions read it.
@@ -50,8 +53,9 @@ export async function addWorkCategory(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const { code, name } = readWorksForm(formData);
+  const { code, name, family } = readWorksForm(formData);
   if (!code) return { error: "Give the category a code, like FD." };
+  if (!isWorkFamily(family)) return { error: "Choose what the category is part of." };
   if (code.length > 10) return { error: "Keep the code under 10 characters." };
   if (!name) return { error: "Give the category a name." };
   if (name.length > 80) return { error: "Keep the name under 80 characters." };
@@ -71,6 +75,7 @@ export async function addWorkCategory(
   const { error } = await supabase.from("work_categories").insert({
     code,
     name,
+    family,
     sort_order: (last?.sort_order ?? 0) + 10,
     created_by: user.id,
     updated_by: user.id,
@@ -92,15 +97,16 @@ export async function updateWorkCategory(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const { code, name, is_active } = readWorksForm(formData);
+  const { code, name, family, is_active } = readWorksForm(formData);
   if (!code) return { error: "Give the category a code, like FD." };
+  if (!isWorkFamily(family)) return { error: "Choose what the category is part of." };
   if (!name) return { error: "Give the category a name." };
   if (name.length > 80) return { error: "Keep the name under 80 characters." };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("work_categories")
-    .update({ code, name, is_active, updated_by: user.id })
+    .update({ code, name, family, is_active, updated_by: user.id })
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: "Another category already has that code." };
@@ -310,4 +316,34 @@ export async function setWorkItemActive(id: string, isActive: boolean): Promise<
 
   revalidatePath("/masters/works");
   return undefined;
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkCategory(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_categories", id, {
+    noun: "work category",
+    retire: true,
+    paths: ["/masters/works"],
+  });
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkGroup(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_groups", id, {
+    noun: "work group",
+    retire: true,
+    paths: ["/masters/works"],
+  });
+}
+
+/** Only while nothing uses it, and only by an admin (0150); anything in use is retired with Active instead. */
+export async function deleteWorkItem(id: string): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  return deleteMaster(user, "work_items", id, {
+    noun: "work",
+    retire: true,
+    paths: ["/masters/works"],
+  });
 }

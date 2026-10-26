@@ -18,6 +18,7 @@ import type { IndentStatus } from "@/lib/indents/workflow";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { ClipboardList } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { IndentStatusBadge } from "../_components/status-badge";
 
 const TABS: { key: string; label: string; status?: IndentStatus }[] = [
@@ -25,6 +26,7 @@ const TABS: { key: string; label: string; status?: IndentStatus }[] = [
   { key: "draft", label: "Draft", status: "draft" },
   { key: "submitted", label: "Submitted", status: "submitted" },
   { key: "approved", label: "Approved", status: "approved" },
+  { key: "cancelled", label: "Cancelled", status: "cancelled" },
 ];
 
 export default async function IndentsPage({
@@ -166,7 +168,14 @@ export default async function IndentsPage({
             <TableBody>
               {indents.map((indent) => (
                 <TableRow key={indent.id}>
-                  <TableCell className="text-foreground font-medium">{indent.reference}</TableCell>
+                  <TableCell className="text-foreground font-medium">
+                    {indent.reference}
+                    {indent.is_urgent && (
+                      <Badge variant="danger" className="ml-2">
+                        Urgent
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>{indent.project_name}</TableCell>
                   <TableCell>
                     {indent.unit_name ?? "—"}
