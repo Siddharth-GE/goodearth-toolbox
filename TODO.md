@@ -2,6 +2,10 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## Next — Saarang Collections
+
+The Zoho-exports collection meeting summary as its own tool. The plan is `plan.md`'s top section, on `feature/saarang-collections`; it is waiting on the founder's approval.
+
 ## Building now — Turing, the admins' assistant
 
 `plan.md`, top section. T1 (the chat, reads, files, pages) is on staging (#145, `0151`–`0152`).
