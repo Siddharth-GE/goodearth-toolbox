@@ -74,7 +74,7 @@ Settled while building: a delivery is picked on the form and nothing is stored o
 
 ## C. The Estimator — several rows per work — migration
 
-Built on `feature/team-additions-c`, `0157` drafted (trial `scripts/trials/estimate-rows.sql`, proven against two broken copies). The rules now live in the Estimator's `PLAN.md`.
+Built on `feature/team-additions-c`, `0157` on staging (trial `scripts/trials/estimate-rows.sql`, proven against two broken copies). The rules now live in the Estimator's `PLAN.md`.
 
 The independent Opus review cleared `0157` for staging. Its findings are fixed:
 
