@@ -223,6 +223,17 @@ export function factsForWork<T extends { work_item_id: string | null }>(
   return workItemId ? facts.filter((fact) => fact.work_item_id === workItemId) : facts;
 }
 
+/** An indent raised for a stage (a work group, 0158) offers the materials of every work in it. */
+export function factsForGroup<T extends { work_item_id: string | null }>(
+  facts: T[],
+  groupOfWork: Map<string, string | null>,
+  groupId: string,
+): T[] {
+  return facts.filter(
+    (fact) => fact.work_item_id !== null && groupOfWork.get(fact.work_item_id) === groupId,
+  );
+}
+
 /** A stage (work category) offers the materials of every work in it. */
 export function factsForStage<T extends { work_item_id: string | null }>(
   facts: T[],

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
-import { listWorkGroups } from "@/lib/masters/works";
+import { listWorkCategories, listWorkGroups } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
@@ -81,5 +81,47 @@ export async function getSiteSequence(): Promise<SiteSequence> {
       .filter((group) => group.is_active && !inSequence.has(group.id))
       .map((group) => ({ id: group.id, code: group.code, name: group.name })),
     typicalSqft: settings.data?.typical_sqft ?? null,
+  };
+}
+
+export type CategoryLead = {
+  categoryId: string;
+  code: string;
+  name: string;
+  ownerId: string | null;
+};
+
+/** Each active work category and its lead (0158), with everyone who may lead one. */
+export async function getCategoryLeads(): Promise<{
+  categories: CategoryLead[];
+  people: { id: string; name: string }[];
+}> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const [categories, leads, people] = await Promise.all([
+    listWorkCategories(),
+    supabase.from("site_category_owners").select("category_id, owner_id"),
+    fetchAll((from, to) =>
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("is_active", true)
+        .order("full_name")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  if (leads.error) readFailed("supervisors", "the category leads", leads.error);
+  const leadOf = new Map((leads.data ?? []).map((row) => [row.category_id, row.owner_id]));
+  return {
+    categories: categories
+      .filter((category) => category.is_active)
+      .map((category) => ({
+        categoryId: category.id,
+        code: category.code,
+        name: category.name,
+        ownerId: leadOf.get(category.id) ?? null,
+      })),
+    people: people.map((person) => ({ id: person.id, name: person.full_name ?? "—" })),
   };
 }

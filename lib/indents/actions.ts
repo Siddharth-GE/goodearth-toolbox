@@ -37,7 +37,9 @@ export type CreateIndentInput = {
   projectId: string;
   plotId: string | null;
   unitId: string | null;
+  /** An older indent's one work; a new one names its stage instead (0158). Never both. */
   workItemId: string | null;
+  workGroupId?: string | null;
   requiredBy: string | null;
   note: string | null;
   /** An emergency request: sorted first for the approver (0132). */
@@ -48,6 +50,9 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   const user = await requireTool("/indents");
 
   if (!input.projectId) return { error: "Pick a project first." };
+  if (input.workItemId && input.workGroupId) {
+    return { error: "An indent is for a stage or one work, not both." };
+  }
 
   const supabase = await createClient();
 
@@ -84,11 +89,12 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
   // create_indent()'s signature predates works and the urgent mark (additive-only), so they ride a second write; a failure leaves a visible, fixable draft.
-  if (input.workItemId || input.isUrgent) {
+  if (input.workItemId || input.workGroupId || input.isUrgent) {
     const { error: workError } = await supabase
       .from("indents")
       .update({
         work_item_id: input.workItemId || null,
+        work_group_id: input.workGroupId || null,
         is_urgent: input.isUrgent,
         updated_by: user.id,
       })
@@ -463,12 +469,17 @@ export async function updateIndentHeader(
   indentId: string,
   input: {
     workItemId: string | null;
+    /** Picking a stage replaces an older indent's one work (0158); left out, the stage stays as it is. */
+    workGroupId?: string | null;
     requiredBy: string | null;
     note: string | null;
     isUrgent: boolean;
   },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
+  if (input.workItemId && input.workGroupId) {
+    return { error: "An indent is for a stage or one work, not both." };
+  }
 
   const supabase = await createClient();
   // `stage` is absent on purpose: an old indent keeps its legacy stage.
@@ -476,6 +487,12 @@ export async function updateIndentHeader(
     .from("indents")
     .update({
       work_item_id: input.workItemId || null,
+      // A work given replaces a stage; a stage left out stays as it is.
+      ...(input.workGroupId === undefined
+        ? input.workItemId
+          ? { work_group_id: null }
+          : {}
+        : { work_group_id: input.workGroupId || null }),
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
       is_urgent: input.isUrgent,

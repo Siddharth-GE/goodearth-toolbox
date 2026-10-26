@@ -301,7 +301,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       supabase
         .from("purchase_order_lines")
         .select(
-          "id, item_id, quantity, uom, rate, gst_pct, discount_pct, discount_amount, other_charges, note, indent_line_id, created_by, updated_by, created_at, items(name, code, description, thumb_url, brands(name), item_categories(name)), indent_lines(indents(reference, work_items(code, name)))",
+          "id, item_id, quantity, uom, rate, gst_pct, discount_pct, discount_amount, other_charges, note, indent_line_id, created_by, updated_by, created_at, items(name, code, description, thumb_url, brands(name), item_categories(name)), indent_lines(indents(reference, work_items(code, name), work_groups(code, name)))",
         )
         .eq("po_id", poId)
         .order("sort_order")
@@ -358,9 +358,14 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       item_categories: { name: string } | null;
     } | null;
     const indent = line.indent_lines as {
-      indents: { reference: string; work_items: { code: string; name: string } | null } | null;
+      indents: {
+        reference: string;
+        work_items: { code: string; name: string } | null;
+        work_groups: { code: string; name: string } | null;
+      } | null;
     } | null;
-    const work = indent?.indents?.work_items;
+    // A stage indent (0158) names its stage where an older one names its work.
+    const work = indent?.indents?.work_items ?? indent?.indents?.work_groups;
     return {
       id: line.id,
       item_id: line.item_id,

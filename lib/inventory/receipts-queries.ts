@@ -585,7 +585,7 @@ async function boughtForByPoLine(
   const indentLines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
-      .select("id, indents(reference, work_items(code, name))")
+      .select("id, indents(reference, work_items(code, name), work_groups(code, name))")
       .in("id", indentLineIds)
       .order("id")
       .range(from, to),
@@ -595,10 +595,10 @@ async function boughtForByPoLine(
       const indent = line.indents as {
         reference: string;
         work_items: { code: string; name: string } | null;
+        work_groups: { code: string; name: string } | null;
       } | null;
-      const work = indent?.work_items
-        ? `${indent.work_items.name} (${indent.work_items.code})`
-        : null;
+      const named = indent?.work_items ?? indent?.work_groups;
+      const work = named ? `${named.name} (${named.code})` : null;
       return [line.id, [work, indent?.reference].filter(Boolean).join(" · ")];
     }),
   );

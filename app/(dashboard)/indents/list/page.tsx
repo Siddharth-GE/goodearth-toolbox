@@ -36,7 +36,7 @@ export default async function IndentsPage({
     status?: string;
     page?: string;
     project?: string;
-    work?: string;
+    stage?: string;
     q?: string;
     from?: string;
     to?: string;
@@ -45,7 +45,7 @@ export default async function IndentsPage({
   const raw = await searchParams;
   const page = raw.page;
   const project = idParam(raw.project);
-  const work = idParam(raw.work);
+  const stage = idParam(raw.stage);
   const q = searchParam(raw.q);
   const from = dateParam(raw.from);
   const to = dateParam(raw.to);
@@ -56,7 +56,7 @@ export default async function IndentsPage({
       page: Number(page) || 1,
       status: tab.status,
       projectId: project,
-      workItemId: work,
+      workGroupId: stage,
       q,
       from,
       to,
@@ -68,7 +68,7 @@ export default async function IndentsPage({
   // Every choice rides along so a tab or page link never drops a filter (strings: a function can't cross into a Client Component).
   const hrefWith = (params: URLSearchParams) => {
     if (project) params.set("project", project);
-    if (work) params.set("work", work);
+    if (stage) params.set("stage", stage);
     if (q) params.set("q", q);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
@@ -89,7 +89,7 @@ export default async function IndentsPage({
     return hrefWith(params);
   };
 
-  const filtered = Boolean(project || work || q || from || to);
+  const filtered = Boolean(project || stage || q || from || to);
 
   return (
     <div className="space-y-4">
@@ -111,7 +111,7 @@ export default async function IndentsPage({
 
       <ListToolbar
         action="/indents/list"
-        values={{ q, from, to, project, work }}
+        values={{ q, from, to, project, stage }}
         keep={{ status: tab.status }}
         search={{ placeholder: "Indent number…" }}
         dates={{ label: "Raised" }}
@@ -123,10 +123,10 @@ export default async function IndentsPage({
             options: filterOptions.projects.map((row) => ({ value: row.id, label: row.name })),
           },
           {
-            param: "work",
-            label: "Work",
-            allLabel: "All works",
-            options: filterOptions.works.map((row) => ({ value: row.id, label: row.label })),
+            param: "stage",
+            label: "Stage",
+            allLabel: "All stages",
+            options: filterOptions.stages.map((row) => ({ value: row.id, label: row.label })),
           },
         ]}
       />

@@ -14,7 +14,12 @@ import {
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
-import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
+import {
+  listWorkCategories,
+  listWorkGroups,
+  listWorkItems,
+  workCategoryLabel,
+} from "@/lib/masters/works";
 import { Printer } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
@@ -24,15 +29,17 @@ import { LineGrid } from "./_components/line-grid";
 
 export default async function IndentPage({ params }: { params: Promise<{ indentId: string }> }) {
   const { indentId } = await params;
-  const [indent, decider, categories, brands, workItems, workCategories, uoms] = await Promise.all([
-    getIndent(indentId),
-    isCurrentUserApprover(),
-    listItemCategories(),
-    listBrands(),
-    listWorkItems(),
-    listWorkCategories(),
-    listActiveUomNames(),
-  ]);
+  const [indent, decider, categories, brands, workItems, workCategories, uoms, workGroups] =
+    await Promise.all([
+      getIndent(indentId),
+      isCurrentUserApprover(),
+      listItemCategories(),
+      listBrands(),
+      listWorkItems(),
+      listWorkCategories(),
+      listActiveUomNames(),
+      listWorkGroups(),
+    ]);
   if (!indent) notFound();
 
   const editable = canEditIndent(indent.status);
@@ -56,6 +63,14 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
       code: work.code,
       name: work.name,
       category: categoryNameById.get(work.category_id) ?? "Other",
+    }));
+  const stages = workGroups
+    .filter((group) => group.is_active)
+    .map((group) => ({
+      id: group.id,
+      code: group.code,
+      name: group.name,
+      category: categoryNameById.get(group.category_id) ?? "Other",
     }));
 
   return (
@@ -157,7 +172,9 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         indentId={indent.id}
         stage={indent.stage}
         workItemId={indent.work_item_id}
+        workGroupId={indent.work_group_id}
         works={works}
+        stages={stages}
         requiredBy={indent.required_by}
         note={indent.note}
         isUrgent={indent.is_urgent}

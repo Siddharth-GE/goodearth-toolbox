@@ -50,6 +50,7 @@ export type IndentDetail = {
   status: IndentStatus;
   stage: string | null;
   work_item_id: string | null;
+  work_group_id: string | null;
   required_by: string | null;
   note: string | null;
   is_urgent: boolean;
@@ -81,6 +82,8 @@ export type IndentHeader = {
   project_name: string;
   unit_id: string | null;
   work_item_id: string | null;
+  /** The stage it was raised for (0158); an older indent names one work instead. */
+  work_group_id: string | null;
 };
 
 export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
@@ -89,7 +92,9 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
   const { data, error } = await withRetry(() =>
     supabase
       .from("indents")
-      .select("id, reference, status, project_id, unit_id, work_item_id, projects(name)")
+      .select(
+        "id, reference, status, project_id, unit_id, work_item_id, work_group_id, projects(name)",
+      )
       .eq("id", indentId)
       .maybeSingle(),
   );
@@ -107,6 +112,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
     project_name: (data.projects as { name: string } | null)?.name ?? "—",
     unit_id: data.unit_id,
     work_item_id: data.work_item_id,
+    work_group_id: data.work_group_id,
   };
 });
 
@@ -118,7 +124,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, work_item_id, required_by, note, is_urgent, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, cancelled_at, cancelled_by, cancel_reason, projects(name), plots(name), units(name)",
+        "id, reference, status, stage, work_item_id, work_group_id, required_by, note, is_urgent, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, cancelled_at, cancelled_by, cancel_reason, projects(name), plots(name), units(name)",
       )
       .eq("id", indentId)
       .maybeSingle(),
@@ -345,6 +351,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     status: indent.status as IndentStatus,
     stage: indent.stage,
     work_item_id: indent.work_item_id,
+    work_group_id: indent.work_group_id,
     required_by: indent.required_by,
     note: indent.note,
     is_urgent: indent.is_urgent,

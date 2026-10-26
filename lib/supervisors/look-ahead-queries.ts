@@ -11,6 +11,7 @@ import {
   type ContractorLoad,
   type PlannedStage,
 } from "./look-ahead";
+import { stageOwner } from "./programme";
 import { storeStock } from "./programme-queries";
 import { getVillaDetail, type VillaDetail } from "./queries";
 import { stageReadiness, type Readiness } from "./readiness";
@@ -59,15 +60,30 @@ function planned(villa: SiteVilla): PlannedStage[] {
 }
 
 export async function getLookAhead(params: { who?: string }): Promise<LookAhead> {
-  const [{ user, today, villas }, contractors, works] = await Promise.all([
+  const [{ user, today, villas, leads }, contractors, works] = await Promise.all([
     readSiteVillas(),
     listVendors(),
     listWorkItems(),
   ]);
-  const runsAny = villas.some((villa) => villa.card.supervisor?.id === user.id);
+  // Mine: every stage of a villa I run, and on any other villa the stages I own (0158).
+  const runs = (villa: SiteVilla) => villa.card.supervisor?.id === user.id;
+  const ownedHere = (villa: SiteVilla) =>
+    new Set(
+      villa.stages
+        .filter((stage) => stageOwner(stage, leads, new Map())?.id === user.id)
+        .map((stage) => stage.id),
+    );
+  const runsAny = villas.some((villa) => runs(villa) || ownedHere(villa).size > 0);
   const who = params.who === "mine" || params.who === "all" ? params.who : runsAny ? "mine" : "all";
-  const scoped = villas.filter((villa) => who === "all" || villa.card.supervisor?.id === user.id);
-  const stages = scoped.flatMap(planned);
+  const scoped = villas.filter(
+    (villa) => who === "all" || runs(villa) || ownedHere(villa).size > 0,
+  );
+  const stages = scoped.flatMap((villa) => {
+    const all = planned(villa);
+    if (who === "all" || runs(villa)) return all;
+    const owned = ownedHere(villa);
+    return all.filter((stage) => owned.has(stage.groupId));
+  });
   const { thisWeek, nextTwoWeeks, waiting } = lookAhead(stages, today);
 
   // Readiness needs each villa's own materials read: only the villas with something starting.

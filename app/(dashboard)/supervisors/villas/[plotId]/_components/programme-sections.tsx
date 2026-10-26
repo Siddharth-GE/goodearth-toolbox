@@ -64,6 +64,8 @@ export function controlData(plotId: string, stage: StageView): StageControlData 
       statusChangedAt: stage.record?.statusChangedAt ?? null,
     },
     contractorId: stage.record?.contractorId ?? null,
+    owner: stage.owner,
+    leadName: stage.leadName,
     checklists: stage.checklists.map((entry) => ({
       name: entry.templateName,
       signedOff: entry.checklist?.status === "signed_off",
@@ -499,11 +501,13 @@ export function ProgrammeList({
   plotId,
   stages,
   contractors,
+  people,
   leftOff,
 }: {
   plotId: string;
   stages: StageView[];
   contractors: ContractorOption[];
+  people: VillaProgramme["people"];
   leftOff: VillaProgramme["leftOff"];
 }) {
   const families = stageFamilies(stages);
@@ -526,6 +530,7 @@ export function ProgrammeList({
               </span>
             </summary>
             <StageRows
+              people={people}
               plotId={plotId}
               stages={family.stages}
               allStages={stages}
@@ -569,11 +574,13 @@ function StageRows({
   stages,
   allStages,
   contractors,
+  people,
 }: {
   plotId: string;
   stages: StageView[];
   allStages: StageView[];
   contractors: ContractorOption[];
+  people: VillaProgramme["people"];
 }) {
   return (
     <div className="divide-border border-border divide-y border-t">
@@ -593,6 +600,7 @@ function StageRows({
             key={stage.id}
             stage={controlData(plotId, stage)}
             contractors={contractors}
+            people={people}
             waitingLine={waitingLine(stage)}
             otherStages={allStages
               .filter((other) => other.id !== stage.id)
@@ -622,6 +630,7 @@ function StageRows({
                       dates,
                       stage.forecast.slip ? describeSlip(stage.forecast.slip) : null,
                       stage.contractorName,
+                      stage.owner ? `owner ${stage.owner.name}` : null,
                       checklist
                         ? checklist.status === "signed_off"
                           ? "checklist signed off"

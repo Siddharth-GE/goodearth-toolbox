@@ -112,7 +112,7 @@ test("an indent line needs an item and a quantity; a reason only off the estimat
 test("Claude is told which fields make one record", () => {
   assert.ok(
     catalogueText().includes(
-      "rows with the same project_id, plot_id, work_item_id, required_by, is_urgent, note, submit make one record",
+      "rows with the same project_id, plot_id, work_group_id, work_item_id, required_by, is_urgent, note, submit make one record",
     ),
   );
 });

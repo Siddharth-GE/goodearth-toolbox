@@ -17,6 +17,7 @@ import {
   placeVillaOrder,
   stageProgress,
   villaHealth,
+  stageOwner,
   type GroupInfo,
   type Health,
   type ProgrammeStage,
@@ -70,6 +71,10 @@ export type StagePlan = {
 export type StageView = ProgrammeStage & {
   day: number | null;
   contractorName: string | null;
+  /** Who owns the stage: the villa's own pick, else its category's lead (0158). */
+  owner: { id: string; name: string; fromLead: boolean } | null;
+  /** The stage's category lead, whoever owns it on this villa: what clearing a villa's own owner hands back to. */
+  leadName: string | null;
   works: { id: string; label: string }[];
   progress: WorkProgress[];
   checklists: StageChecklist[];
@@ -132,6 +137,7 @@ export type StageRow = {
   started_on: string | null;
   finished_on: string | null;
   contractor_id: string | null;
+  owner_id: string | null;
   days: number | null;
   pinned_start: string | null;
   baseline_start: string | null;
@@ -210,6 +216,7 @@ export async function readShared(supabase: Client) {
         code: group.code,
         name: group.name,
         categoryName: category.name,
+        categoryId: category.id,
         order: category.sort_order * 10_000 + group.sort_order,
       },
     ];
@@ -307,6 +314,7 @@ export function planVilla(
     startedOn: record.started_on,
     finishedOn: record.finished_on,
     contractorId: record.contractor_id,
+    ownerId: record.owner_id,
   }));
   const planByGroup = new Map<string, StagePlan>(
     input.records.map((record) => [
@@ -414,6 +422,15 @@ export function planVilla(
   };
 }
 
+/** Each work category's lead (0158): category id → person. */
+export async function readCategoryLeads(supabase: Client): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from("site_category_owners")
+    .select("category_id, owner_id");
+  if (error) fail("the category leads", error);
+  return new Map((data ?? []).map((row) => [row.category_id, row.owner_id]));
+}
+
 /** What both the page and "Set the first plan" need: the villa's stages in order, with their forecast. */
 async function readProgramme(supabase: Client, plotId: string, unitId: string | null) {
   const [shared, records, site, estimate] = await Promise.all([
@@ -422,7 +439,7 @@ async function readProgramme(supabase: Client, plotId: string, unitId: string | 
       supabase
         .from("site_stages")
         .select(
-          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
+          "id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, owner_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
         )
         .eq("plot_id", plotId)
         .order("id")
@@ -470,7 +487,7 @@ export async function getVillaProgramme(input: {
   const supabase = await createClient();
   const { plotId, unitId } = input;
 
-  const [base, logs, events, profiles] = await Promise.all([
+  const [base, logs, events, profiles, leads] = await Promise.all([
     readProgramme(supabase, plotId, unitId),
     fetchAll((from, to) =>
       supabase
@@ -496,8 +513,10 @@ export async function getVillaProgramme(input: {
         .order("id")
         .range(from, to),
     ),
+    readCategoryLeads(supabase),
   ]);
   if (events.error) fail("the stage history", events.error);
+  const profileNames = new Map(profiles.map((person) => [person.id, person.full_name ?? "—"]));
 
   const { today, works, groupOfWork, estimateRows, programme, schedule } = base;
   const groupById = new Map(base.groupInfos.map((group) => [group.id, group]));
@@ -558,6 +577,10 @@ export async function getVillaProgramme(input: {
           : dayOfStage({ startedOn: stage.record?.startedOn ?? null }, today),
       contractorName: stage.record?.contractorId
         ? (contractorNames.get(stage.record.contractorId) ?? null)
+        : null,
+      owner: stageOwner(stage, leads, profileNames),
+      leadName: stage.categoryId
+        ? (profileNames.get(leads.get(stage.categoryId) ?? "") ?? null)
         : null,
       works: stageWorks,
       progress: stageProgress(stageWorks, estimateRows, pieceWork),

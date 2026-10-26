@@ -182,10 +182,11 @@ type IndentHeadRow = {
   plots: { name: string; code: string | null } | null;
   units: { name: string; code: string | null } | null;
   work_items: { code: string; name: string } | null;
+  work_groups: { code: string; name: string } | null;
 };
 
 const INDENT_HEAD_COLUMNS =
-  "id, reference, status, project_id, plot_id, unit_id, approved_at, projects(name, code), plots(name, code), units(name, code), work_items(code, name)";
+  "id, reference, status, project_id, plot_id, unit_id, approved_at, projects(name, code), plots(name, code), units(name, code), work_items(code, name), work_groups(code, name)";
 
 const workLabelOf = (work: { code: string; name: string } | null) =>
   work ? `${work.name} — ${work.code}` : null;
@@ -260,7 +261,7 @@ export async function listIndentsToOrder(q?: string): Promise<IndentToOrderRow[]
       reference: indent.reference,
       project_name: indent.projects?.name ?? "—",
       place: indent.units?.name ?? indent.plots?.name ?? "General",
-      work_label: workLabelOf(indent.work_items),
+      work_label: workLabelOf(indent.work_items ?? indent.work_groups),
       approved_at: indent.approved_at,
       line_count: counts.get(indent.id)?.total ?? 0,
       lines_left: counts.get(indent.id)?.left ?? 0,
@@ -420,7 +421,7 @@ export async function getIndentForOrdering(indentId: string): Promise<IndentForO
     status: indent.status,
     project_name: indent.projects?.name ?? "—",
     place: indent.units?.name ?? indent.plots?.name ?? "General",
-    work_label: workLabelOf(indent.work_items),
+    work_label: workLabelOf(indent.work_items ?? indent.work_groups),
     scope_problem: scopeProblem,
     lines: open,
     fully_ordered: mapped.length - open.length,

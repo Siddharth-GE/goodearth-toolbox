@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  stageOwner,
   buildProgramme,
   dayInIndia,
   dayOfStage,
@@ -290,4 +291,23 @@ test("placeVillaOrder settles a chain whatever order the choices come in", () =>
     ]),
     ["C", "B", "A", "D"],
   );
+});
+
+test("a stage's owner is the villa's own pick, else its category's lead (0158)", () => {
+  const leads = new Map([["mep", "lead"]]);
+  const names = new Map([
+    ["lead", "Anu"],
+    ["own", "Sayooj"],
+  ]);
+  assert.deepEqual(stageOwner({ categoryId: "mep", record: null }, leads, names), {
+    id: "lead",
+    name: "Anu",
+    fromLead: true,
+  });
+  assert.deepEqual(stageOwner({ categoryId: "mep", record: { ownerId: "own" } }, leads, names), {
+    id: "own",
+    name: "Sayooj",
+    fromLead: false,
+  });
+  assert.equal(stageOwner({ categoryId: "car", record: null }, leads, names), null);
 });

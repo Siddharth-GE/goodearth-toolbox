@@ -337,6 +337,48 @@ async function writeVilla(
   return undefined;
 }
 
+/** Who owns this stage on this villa (0158); empty goes back to the stage's category lead. */
+export async function setStageOwner(input: {
+  plotId: string;
+  groupId: string;
+  ownerId: string;
+}): Promise<ActionState> {
+  return writeStage(
+    input.plotId,
+    input.groupId,
+    { owner_id: input.ownerId || null },
+    "setStageOwner",
+  );
+}
+
+/** A work category's lead (0158): owns that category's stages on every villa that names no owner of its own. Empty
+ * takes the lead off. */
+export async function setCategoryLead(input: {
+  categoryId: string;
+  ownerId: string;
+}): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!input.categoryId) return { error: "Which work category?" };
+  const supabase = await createClient();
+  const { error } = input.ownerId
+    ? await supabase.from("site_category_owners").upsert(
+        {
+          category_id: input.categoryId,
+          owner_id: input.ownerId,
+          created_by: user.id,
+          updated_by: user.id,
+        },
+        { onConflict: "category_id" },
+      )
+    : await supabase.from("site_category_owners").delete().eq("category_id", input.categoryId);
+  if (error) {
+    console.error("setCategoryLead failed:", error);
+    return { error: "Could not save the lead. Try again." };
+  }
+  revalidatePath("/supervisors", "layout");
+  return undefined;
+}
+
 /** Who runs the villa — the board's Mine / Everyone. A filter, not a permission. */
 export async function setVillaSupervisor(input: {
   plotId: string;
