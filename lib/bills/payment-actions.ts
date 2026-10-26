@@ -302,6 +302,13 @@ export async function sendBackCashRequest(requestId: string, note: string): Prom
   const user = await requireTool("/bills");
   if (!note.trim()) return { error: "Say what needs changing." };
   const supabase = await createClient();
+  // The approver's cuts go back with it: a draft can't clear them, and the next release keeps any left.
+  const { error: cutsError } = await supabase
+    .from("cash_request_items")
+    .update({ released_amount: null, updated_by: user.id })
+    .eq("cash_request_id", requestId)
+    .not("released_amount", "is", null);
+  if (cutsError) return refused("sendBackCashRequest", cutsError);
   const { error } = await supabase
     .from("cash_requests")
     .update({ status: "draft", sent_back_note: note.trim(), updated_by: user.id })
