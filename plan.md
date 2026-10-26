@@ -152,14 +152,32 @@ The independent Opus review found no blocker. Its findings are fixed:
 
 ## F. Return from a villa to a store — migration (reviewed before apply)
 
-- [ ] Inventory → **Return from site:** a villa, a store, items and quantities, and a reason.
-  - The villa's reached-site total goes down and the store's stock goes up.
-  - Never more than reached that villa.
-- [ ] **The rate:**
+Built on `feature/team-additions-f`: `0159` and `0160` (an execute revoke 0159 missed), both on staging.
+
+- [x] Inventory → **Returns:** a villa, a store, items and quantities, and a reason, saved in one go.
+  - The villa's holding goes down and the store's stock goes up; the item's stock history shows "Came back" at both ends.
+  - Never more than is still at that villa. A return is never changed or deleted, and the issue or delivery it came from can no longer be deleted.
+- [x] **The rate:**
   - returned material goes back into the batches it was issued from, newest issue first, so it keeps their rate;
   - material that reached the villa straight from a PO delivery comes back as a batch at that delivery's rate.
+- [x] **Budget against actual:** a return comes off the villa's material issued, naming no work (Inventory PLAN). Two fixes came with it:
+  - material issued was read below zero: every villa's figure now shows the right positive amount;
+  - a delivery naming the house rather than the plot now counts at its villa.
 
-  `stock_by_location` and `batch_on_hand` follow (manifest rows).
+The independent Opus review found no blocker. Its findings are fixed:
+
+- direct deliveries come back as batches;
+- a delete and a return for the same villa and item take the same lock;
+- an unknown item refuses the whole return.
+
+The trial (`scripts/trials/site-returns.sql`) was proven against broken copies.
+
+- [ ] [Founder] Vet on staging:
+  - Inventory → Issues: issue a few of something to a villa.
+  - Inventory → **Returns**: pick that villa. What it still holds is listed. Send some back to a store with a reason.
+  - Ask for more than the villa holds: it is refused.
+  - Inventory → Stock: the store shows the material back; open the item and see "Came back" in its history.
+  - Estimator → that villa's Budget against actual: material issued is a positive figure, less what came back.
 
 # Turing, the admins' assistant `[Opus drafted; Fable's review of T1 waived by the founder, 2026-10-24]`
 

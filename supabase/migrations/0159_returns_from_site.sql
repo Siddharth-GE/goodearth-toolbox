@@ -6,14 +6,15 @@
 -- 2. Never more than reached the villa: a return line is refused past the villa's own total (what was delivered
 --    straight to it, plus what was issued to it, less what came back already), under a lock per villa and item.
 -- 3. The material goes back into the batches the villa drew, newest issue first, so it keeps their rate: a
---    stock_batch_movements row per batch, with the new cause return_line_id. What no batch covers (material delivered
---    straight to the site, or issued before batches) comes back with no batch, as stock from before batches does.
+--    stock_batch_movements row per batch, with the new cause return_line_id. Material delivered straight to the site
+--    is a batch of its own, at its delivery's rate. Only stock issued before batches comes back with none.
 -- 4. stock_on_hand adds a return to its store; stock_by_location takes it off its villa. Same columns.
 -- 5. An issue or a direct delivery to a villa cannot be deleted once that item has come back from the villa — the villa
 --    would be left holding less than nothing.
 -- 6. villa_cost_facts: a return takes its value at the batches' rates off the villa's material issued (no work named).
 --    And an issue is valued from its batches as a positive figure: 0136 summed the store-side movements, which are
---    negative, so every villa's material issued read below zero and partly priced.
+--    negative, so every villa's material issued read below zero and partly priced. A delivery straight to a house
+--    counts at the house's villa (0136 read only a delivery that named the plot).
 
 -- 1 ------------------------------------------------------------------------------------------------------
 create table if not exists site_returns (
@@ -92,6 +93,7 @@ set search_path to 'public'
 as $$
 declare
   v_id uuid;
+  v_n integer;
 begin
   if not has_app('/inventory') then
     raise exception 'Only the store records material coming back from a villa';
@@ -107,6 +109,10 @@ begin
   select v_id, x.item_id, x.quantity, i.default_uom, auth.uid(), auth.uid()
     from jsonb_to_recordset(p_lines) as x(item_id uuid, quantity numeric)
     join items i on i.id = x.item_id;
+  get diagnostics v_n = row_count;
+  if v_n <> jsonb_array_length(p_lines) then
+    raise exception 'Some of those items are not in Masters';
+  end if;
   return v_id;
 end $$;
 
@@ -175,13 +181,24 @@ declare
 begin
   select plot_id, store_id into v_plot, v_store from site_returns where id = new.return_id;
   for b in
+    -- What reached the villa, by batch: issued from a store, or delivered straight to it (that delivery line is the
+    -- batch, at its rate). Newest first.
     with issued as (
-      select m.receipt_line_id, -sum(m.quantity) as quantity, max(si.issued_at) as last_issued
-        from stock_batch_movements m
-        join stock_issue_lines l on l.id = m.issue_line_id
-        join stock_issues si on si.id = l.issue_id
-       where si.plot_id = v_plot and l.item_id = new.item_id and m.quantity < 0
-       group by m.receipt_line_id
+      select receipt_line_id, sum(quantity) as quantity, max(reached_on) as last_issued
+        from (
+          select m.receipt_line_id, -m.quantity as quantity, si.issued_at as reached_on
+            from stock_batch_movements m
+            join stock_issue_lines l on l.id = m.issue_line_id
+            join stock_issues si on si.id = l.issue_id
+           where si.plot_id = v_plot and l.item_id = new.item_id and m.quantity < 0
+          union all
+          select gl.id, gl.quantity, gr.received_at
+            from goods_receipt_lines gl
+            join goods_receipts gr on gr.id = gl.receipt_id and gr.to_site
+            left join units u on u.id = gr.unit_id
+           where coalesce(u.plot_id, gr.plot_id) = v_plot and gl.item_id = new.item_id
+        ) reached
+       group by receipt_line_id
     ),
     returned as (
       select m.receipt_line_id, sum(m.quantity) as quantity
@@ -309,7 +326,12 @@ begin
       from goods_receipts gr left join units u on u.id = gr.unit_id
      where gr.id = old.receipt_id and gr.to_site;
   end if;
-  if v_plot is not null and exists (
+  if v_plot is null then
+    return old;
+  end if;
+  -- The return guard's lock, so a delete and a return for the same villa and item cannot pass each other.
+  perform pg_advisory_xact_lock(hashtextextended('site_return:' || v_plot::text || old.item_id::text, 0));
+  if exists (
     select 1 from site_return_lines rl join site_returns r on r.id = rl.return_id
      where r.plot_id = v_plot and rl.item_id = old.item_id
   ) then
@@ -378,10 +400,12 @@ material_spent as (
          coalesce(valued, 0) as amount, valued_quantity < quantity as unpriced
     from issued_line
   union all
-  select gr.plot_id, gr.work_item_id, 'material_delivered',
+  -- A delivery to a house names its unit, not its plot: the villa is the unit's plot.
+  select coalesce(u.plot_id, gr.plot_id), gr.work_item_id, 'material_delivered',
          grl.quantity * r.rate, r.rate is null
     from goods_receipt_lines grl
     join goods_receipts gr on gr.id = grl.receipt_id and gr.to_site
+    left join units u on u.id = gr.unit_id
     left join goods_receipt_line_rates r on r.receipt_line_id = grl.id
   union all
   -- A return takes its value, at the batches it went back into, off the villa's material (0159). It names no work.

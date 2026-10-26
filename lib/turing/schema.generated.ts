@@ -2447,6 +2447,34 @@ export const TURING_SCHEMA: Schema = {
       "receipt_id": "string | null"
     }
   },
+  "site_return_lines": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "item_id": "string",
+      "quantity": "number",
+      "return_id": "string",
+      "uom": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
+  "site_returns": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "plot_id": "string",
+      "reason": "string",
+      "returned_on": "string",
+      "store_id": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "site_schedule_settings": {
     "kind": "table",
     "columns": {
@@ -2629,6 +2657,7 @@ export const TURING_SCHEMA: Schema = {
       "issue_line_id": "string | null",
       "quantity": "number",
       "receipt_line_id": "string",
+      "return_line_id": "string | null",
       "store_id": "string"
     }
   },

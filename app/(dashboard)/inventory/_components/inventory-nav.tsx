@@ -4,7 +4,7 @@ import { NavTabs } from "@/components/ui/tabs";
 export function InventoryNav({
   active,
 }: {
-  active: "receive" | "stock" | "issues" | "adjustments";
+  active: "receive" | "stock" | "issues" | "adjustments" | "returns";
 }) {
   return (
     <NavTabs
@@ -13,6 +13,7 @@ export function InventoryNav({
         { key: "stock", href: "/inventory/stock", label: "Stock" },
         { key: "issues", href: "/inventory/issues", label: "Issues" },
         { key: "adjustments", href: "/inventory/adjustments", label: "Adjustments" },
+        { key: "returns", href: "/inventory/returns", label: "Returns" },
       ]}
       active={active}
     />

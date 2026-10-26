@@ -65,6 +65,8 @@ const USERS: Record<string, string> = {
   selection_lines: "Selections",
   selections: "Selections",
   site_checklists: "Site checklists",
+  site_return_lines: "Returns from site",
+  site_returns: "Returns from site",
   site_sequence: "Supervisors' sequence",
   site_stage_events: "Villa programmes",
   site_stages: "Villa programmes",

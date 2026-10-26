@@ -29,6 +29,7 @@ const KIND_LABEL: Record<MovementRow["kind"], string> = {
   issue: "Issued",
   transfer_in: "Arrived",
   adjustment: "Adjusted",
+  return: "Came back",
 };
 
 const KIND_VARIANT: Record<MovementRow["kind"], "success" | "warning" | "info"> = {
@@ -36,6 +37,7 @@ const KIND_VARIANT: Record<MovementRow["kind"], "success" | "warning" | "info"> 
   issue: "warning",
   transfer_in: "info",
   adjustment: "info",
+  return: "info",
 };
 
 export default async function ItemHistoryPage({

@@ -24,8 +24,12 @@ declare
   v_grl uuid;
   v_issue uuid;
   v_return uuid;
+  v_pl2 uuid;
+  v_grn2 uuid;
+  v_grl2 uuid;
   v_n numeric;
   v_refused boolean;
+  v_msg text;
 begin
   select default_uom into v_uom from items where id = v_item;
   select p.id, u.id, u.code into v_plot, v_unit, v_ucode
@@ -45,6 +49,8 @@ begin
   returning id into v_po;
   insert into purchase_order_lines (po_id, item_id, quantity, uom, rate, gst_pct, created_by, updated_by)
   values (v_po, v_item, 10, v_uom, 100, 18, v_user, v_user) returning id into v_pl;
+  insert into purchase_order_lines (po_id, item_id, quantity, uom, rate, gst_pct, created_by, updated_by)
+  values (v_po, v_item, 3, v_uom, 100, 18, v_user, v_user) returning id into v_pl2;
   update purchase_orders set status = 'issued', issued_by = v_user, issued_at = now() where id = v_po;
   insert into goods_receipts (project_id, po_id, store_id, to_site, grn_no, reference, received_at, created_by, updated_by)
   values (v_project, v_po, v_store, false, 9359, 'GRN/TRIAL/359', current_date, v_user, v_user)
@@ -123,6 +129,46 @@ begin
      or (select amount from villa_cost_facts where plot_id = v_plot and kind = 'material_issued' and work_item_id is null) <> -600 then
     raise exception 'TRIAL 4 FAILED: the issue and the returns are not valued +600 and -600';
   end if;
+
+  -- 5. Material delivered straight to the villa comes back as a batch of its own, at its delivery's rate; and that
+  --    delivery cannot be deleted once some of it came back.
+  insert into goods_receipts (project_id, po_id, store_id, to_site, plot_id, unit_id, work_item_id, grn_no, reference, received_at, created_by, updated_by)
+  values (v_project, v_po, null, true, null, v_unit, v_work, 9360, 'GRN/TRIAL/360', current_date, v_user, v_user)
+  returning id into v_grn2;
+  insert into goods_receipt_lines (receipt_id, po_line_id, item_id, quantity, uom, created_by, updated_by)
+  values (v_grn2, v_pl2, v_item, 3, v_uom, v_user, v_user) returning id into v_grl2;
+  set local role authenticated;
+  perform record_site_return(v_plot, v_store2, current_date, 'Delivered too much',
+    jsonb_build_array(jsonb_build_object('item_id', v_item, 'quantity', 3)));
+  select quantity into v_n from batch_on_hand where store_id = v_store2 and receipt_line_id = v_grl2;
+  if v_n is distinct from 3 then raise exception 'TRIAL 5 FAILED: the delivery''s batch in the store is %, expected 3', v_n; end if;
+  reset role;
+  if (select amount from villa_cost_facts where plot_id = v_plot and kind = 'material_issued' and work_item_id is null) <> -900 then
+    raise exception 'TRIAL 5 FAILED: the direct delivery''s return is not valued at ₹300';
+  end if;
+  -- The delivery names the house, not the plot, and still counts at the villa.
+  if (select amount from villa_cost_facts where plot_id = v_plot and kind = 'material_delivered') is distinct from 300 then
+    raise exception 'TRIAL 5 FAILED: the delivery to the house is not ₹300 at its villa';
+  end if;
+  v_msg := null;
+  begin
+    delete from goods_receipt_lines where id = v_grl2;
+  exception when others then v_msg := sqlerrm;
+  end;
+  if v_msg is null or v_msg not like '%come back from that villa%' then
+    raise exception 'TRIAL 5 FAILED: the delivery was deleted after a return (%)', v_msg;
+  end if;
+
+  -- 6. Every line must be an item: an unknown id is refused, not dropped.
+  set local role authenticated;
+  v_refused := false;
+  begin
+    perform record_site_return(v_plot, v_store, current_date, 'Unknown item',
+      jsonb_build_array(jsonb_build_object('item_id', gen_random_uuid(), 'quantity', 1)));
+  exception when raise_exception then v_refused := true;
+  end;
+  if not v_refused then raise exception 'TRIAL 6 FAILED: a return with an unknown item was saved'; end if;
+  reset role;
 
   raise exception 'ALL TRIALS PASSED';
 end $trial$;

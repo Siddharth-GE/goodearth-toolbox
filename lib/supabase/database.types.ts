@@ -9443,6 +9443,143 @@ export type Database = {
           },
         ]
       }
+      site_return_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          quantity: number
+          return_id: string
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          quantity: number
+          return_id: string
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          quantity?: number
+          return_id?: string
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_return_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "site_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+          {
+            foreignKeyName: "site_return_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          plot_id: string
+          reason: string
+          returned_on: string
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plot_id: string
+          reason: string
+          returned_on?: string
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plot_id?: string
+          reason?: string
+          returned_on?: string
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_returns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_schedule_settings: {
         Row: {
           created_at: string
@@ -10172,6 +10309,7 @@ export type Database = {
           issue_line_id: string | null
           quantity: number
           receipt_line_id: string
+          return_line_id: string | null
           store_id: string
         }
         Insert: {
@@ -10182,6 +10320,7 @@ export type Database = {
           issue_line_id?: string | null
           quantity: number
           receipt_line_id: string
+          return_line_id?: string | null
           store_id: string
         }
         Update: {
@@ -10192,6 +10331,7 @@ export type Database = {
           issue_line_id?: string | null
           quantity?: number
           receipt_line_id?: string
+          return_line_id?: string | null
           store_id?: string
         }
         Relationships: [
@@ -10221,6 +10361,13 @@ export type Database = {
             columns: ["receipt_line_id"]
             isOneToOne: false
             referencedRelation: "goods_receipt_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batch_movements_return_line_id_fkey"
+            columns: ["return_line_id"]
+            isOneToOne: false
+            referencedRelation: "site_return_lines"
             referencedColumns: ["id"]
           },
           {
@@ -13035,6 +13182,16 @@ export type Database = {
           }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       pusher_current_stage: { Args: { p_project_id: string }; Returns: string }
+      record_site_return: {
+        Args: {
+          p_lines: Json
+          p_plot_id: string
+          p_reason: string
+          p_returned_on: string
+          p_store_id: string
+        }
+        Returns: string
+      }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }
