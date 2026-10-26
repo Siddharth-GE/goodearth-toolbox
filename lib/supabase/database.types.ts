@@ -576,6 +576,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           vendor_id: string | null
+          vendor_seq: number | null
         }
         Insert: {
           approved_at?: string | null
@@ -610,6 +611,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
+          vendor_seq?: number | null
         }
         Update: {
           approved_at?: string | null
@@ -644,6 +646,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
+          vendor_seq?: number | null
         }
         Relationships: [
           {
@@ -7394,6 +7397,7 @@ export type Database = {
           contractor_id: string
           created_at: string
           created_by: string | null
+          custom_name: string | null
           description: string | null
           helpers: number
           id: string
@@ -7408,13 +7412,14 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           work_class: string
-          work_item_id: string
+          work_item_id: string | null
         }
         Insert: {
           bill_id?: string | null
           contractor_id: string
           created_at?: string
           created_by?: string | null
+          custom_name?: string | null
           description?: string | null
           helpers?: number
           id?: string
@@ -7429,13 +7434,14 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           work_class?: string
-          work_item_id: string
+          work_item_id?: string | null
         }
         Update: {
           bill_id?: string | null
           contractor_id?: string
           created_at?: string
           created_by?: string | null
+          custom_name?: string | null
           description?: string | null
           helpers?: number
           id?: string
@@ -7450,7 +7456,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           work_class?: string
-          work_item_id?: string
+          work_item_id?: string | null
         }
         Relationships: [
           {
@@ -11088,6 +11094,7 @@ export type Database = {
           address: string | null
           contact_designation: string | null
           contact_name: string | null
+          contractor_no: string | null
           created_at: string
           email: string | null
           gst_no: string | null
@@ -11105,6 +11112,7 @@ export type Database = {
           address?: string | null
           contact_designation?: string | null
           contact_name?: string | null
+          contractor_no?: string | null
           created_at?: string
           email?: string | null
           gst_no?: string | null
@@ -11122,6 +11130,7 @@ export type Database = {
           address?: string | null
           contact_designation?: string | null
           contact_name?: string | null
+          contractor_no?: string | null
           created_at?: string
           email?: string | null
           gst_no?: string | null

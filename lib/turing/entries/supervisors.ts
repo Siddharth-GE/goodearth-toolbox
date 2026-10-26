@@ -16,6 +16,7 @@ const log: Field = {
 export const LABOUR_LOG_FORM = [
   "plot_id",
   "work_item_id",
+  "custom_name",
   "contractor_id",
   "log_date",
   "kind",
@@ -37,7 +38,7 @@ const has = (values: Record<string, Value>, key: string) =>
  */
 export function labourConflict(
   values: Record<string, Value>,
-  now?: { kind: string; work_item_id: string },
+  now?: { kind: string; work_item_id: string | null },
 ): string | undefined {
   const kind = String(values.kind ?? now?.kind ?? "");
   if (kind === "nmr") {
@@ -64,7 +65,9 @@ export function labourConflict(
 const labourDetails = (optional: boolean): Field[] => {
   const may = optional ? ({ optional: true, keep: true } as const) : {};
   return [
-    { key: "work_item_id", label: "Work", kind: "id", table: "work_items", ...may },
+    // A work, or for Additional work or Rework a typed name instead (Supervisors refuses neither or a quantity on a name).
+    { key: "work_item_id", label: "Work", kind: "id", table: "work_items", optional: true },
+    { key: "custom_name", label: "Named work (Additional or Rework)", kind: "text", optional: true, max: 120 },
     { key: "contractor_id", label: "Contractor", kind: "id", table: "vendors", ...may },
     { key: "log_date", label: "Date", kind: "date", ...may },
     {
@@ -235,7 +238,7 @@ export const SUPERVISORS = defineEntries([
     tool: "/supervisors",
     title: "A day's labour",
     description:
-      "Logs a day's labour on a villa: the work, the contractor (a vendor with is_contractor) and how it is paid — nmr is daily wages (masons, helpers, others; at least one), pw_qty is piece-work by quantity (in the work's unit from the rate book), pw_lump is a lump sum (what was done says what). Work class is standard unless it was additional work or rework. A second log for the same villa, work, contractor, day, payment and class is refused: change that one instead. Quantities and heads only, never wages.",
+      "Logs a day's labour on a villa: the work, the contractor (a vendor with is_contractor) and how it is paid — nmr is daily wages (masons, helpers, others; at least one), pw_qty is piece-work by quantity (in the work's unit from the rate book), pw_lump is a lump sum (what was done says what). Work class is standard unless it was additional work or rework. Additional work or rework that is not on the works list takes a named work instead of a work, paid as nmr or pw_lump only. A second log for the same villa, work, contractor, day, payment and class is refused: change that one instead. Quantities and heads only, never wages.",
     adds: true,
     check: (values) => labourConflict(values),
     fields: [plot, ...labourDetails(false)],

@@ -222,7 +222,8 @@ export const TURING_SCHEMA: Schema = {
       "unit_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null",
-      "vendor_id": "string | null"
+      "vendor_id": "string | null",
+      "vendor_seq": "number | null"
     }
   },
   "birdwing_attendance": {
@@ -1916,6 +1917,7 @@ export const TURING_SCHEMA: Schema = {
       "contractor_id": "string",
       "created_at": "string",
       "created_by": "string | null",
+      "custom_name": "string | null",
       "description": "string | null",
       "helpers": "number",
       "id": "string",
@@ -1930,7 +1932,7 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string",
       "updated_by": "string | null",
       "work_class": "string",
-      "work_item_id": "string"
+      "work_item_id": "string | null"
     }
   },
   "plots": {
@@ -2809,6 +2811,7 @@ export const TURING_SCHEMA: Schema = {
       "address": "string | null",
       "contact_designation": "string | null",
       "contact_name": "string | null",
+      "contractor_no": "string | null",
       "created_at": "string",
       "email": "string | null",
       "gst_no": "string | null",

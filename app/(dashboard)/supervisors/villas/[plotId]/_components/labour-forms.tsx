@@ -3,6 +3,7 @@
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { WorkClassField } from "@/components/masters/work-class-field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
 import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervisors/labour";
+import type { WorkClass } from "@/lib/masters/work-classes";
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";
@@ -95,6 +97,11 @@ export function LabourLogDialog({
     log?.workItemId ?? workItemId ?? (stageWorkIds?.length === 1 ? stageWorkIds[0] : ""),
   );
   const workUom = works.find((option) => option.id === work)?.uom ?? null;
+  const [workClass, setWorkClass] = useState<WorkClass>(log?.workClass ?? "standard");
+  // Additional work or Rework may be something not on the works list: it then carries a typed name (0156).
+  const [named, setNamed] = useState(Boolean(log?.customName));
+  const byName = named && workClass !== "standard";
+  const kinds = byName ? LABOUR_KINDS.filter((option) => option !== "pw_qty") : LABOUR_KINDS;
 
   return (
     <RecordFormDialog
@@ -117,16 +124,47 @@ export function LabourLogDialog({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="work_item_id">Work</Label>
-        <WorkSelect
-          works={works}
-          stageWorkIds={stageWorkIds}
-          name="work_item_id"
-          value={work}
-          onChange={setWork}
-        />
-      </div>
+      <WorkClassField defaultValue={workClass} onChange={setWorkClass} />
+
+      {workClass !== "standard" && (
+        <label className="text-foreground flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={named}
+            onChange={(event) => {
+              setNamed(event.target.checked);
+              if (event.target.checked && kind === "pw_qty") setKind("nmr");
+            }}
+          />
+          Not on the works list — give it a name
+        </label>
+      )}
+
+      {byName ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="custom_name">What was the work?</Label>
+          <Input
+            id="custom_name"
+            name="custom_name"
+            defaultValue={log?.customName ?? ""}
+            placeholder="e.g. Extra parapet on the terrace"
+            maxLength={120}
+            autoComplete="off"
+            required
+          />
+          <input type="hidden" name="work_item_id" value="" />
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor="work_item_id">Work</Label>
+          <WorkSelect
+            works={works}
+            stageWorkIds={stageWorkIds}
+            name="work_item_id"
+            value={work}
+            onChange={setWork}
+          />
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="contractor_id">Contractor</Label>
@@ -146,8 +184,6 @@ export function LabourLogDialog({
         </Select>
       </div>
 
-      <WorkClassField defaultValue={log?.workClass ?? "standard"} />
-
       <div className="space-y-1.5">
         <Label htmlFor="kind">How is this paid?</Label>
         <Select
@@ -156,7 +192,7 @@ export function LabourLogDialog({
           value={kind}
           onChange={(event) => setKind(event.target.value as LabourKind)}
         >
-          {LABOUR_KINDS.map((option) => (
+          {kinds.map((option) => (
             <option key={option} value={option}>
               {LABOUR_KIND_LABEL[option]}
             </option>

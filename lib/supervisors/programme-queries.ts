@@ -504,15 +504,18 @@ export async function getVillaProgramme(input: {
 
   const lastLabourByGroup = new Map<string, string>();
   for (const log of logs) {
-    const group = groupOfWork.get(log.work_item_id);
+    const group = log.work_item_id ? groupOfWork.get(log.work_item_id) : undefined;
     if (!group) continue;
     const last = lastLabourByGroup.get(group);
     if (!last || log.log_date > last) lastLabourByGroup.set(group, log.log_date);
   }
   const pieceWork = logs
     // Standard work only: rework repeats what the estimate already counts, and additional work is beyond it.
-    .filter((log) => log.kind === "pw_qty" && log.work_class === "standard")
-    .map((log) => ({ workItemId: log.work_item_id, quantity: log.quantity, uom: log.uom }));
+    .flatMap((log) =>
+      log.kind === "pw_qty" && log.work_class === "standard" && log.work_item_id
+        ? [{ workItemId: log.work_item_id, quantity: log.quantity, uom: log.uom }]
+        : [],
+    );
 
   const contractorNames = new Map(
     input.contractors.map((contractor) => [contractor.id, contractor.name]),

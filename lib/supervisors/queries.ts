@@ -37,7 +37,9 @@ export type VillaWorkGroup = {
 export type LabourLogRow = {
   id: string;
   logDate: string;
-  workItemId: string;
+  /** null for Additional work or Rework logged by name instead of a Masters work (0156). */
+  workItemId: string | null;
+  customName: string | null;
   workLabel: string;
   contractorId: string;
   contractorName: string;
@@ -276,7 +278,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     supabase
       .from("labour_logs")
       .select(
-        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id, work_class",
+        "id, log_date, work_item_id, custom_name, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id, work_class",
         { count: "exact" },
       )
       .eq("plot_id", plotId)
@@ -433,7 +435,8 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       id: log.id,
       logDate: log.log_date,
       workItemId: log.work_item_id,
-      workLabel: workLabel(log.work_item_id),
+      customName: log.custom_name,
+      workLabel: log.custom_name ?? workLabel(log.work_item_id),
       contractorId: log.contractor_id,
       contractorName: vendorNames.get(log.contractor_id) ?? "—",
       kind: isLabourKind(log.kind) ? log.kind : "nmr",
