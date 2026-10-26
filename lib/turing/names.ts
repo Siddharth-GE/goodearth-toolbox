@@ -83,6 +83,7 @@ const NAMED_BY: Record<
     | "funding_movements"
     | "cash_requests"
     | "cash_request_items"
+    | "item_requests"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -542,6 +543,11 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   for (const one of facilities)
     names[one.id] =
       `${one.party} (${one.kind.replace(/_/g, " ")}${one.is_active ? "" : ", closed"})`;
+  const itemRequests = await readIn(list("item_requests"), (chunk) =>
+    supabase.from("item_requests").select("id, requested_name, status").in("id", chunk),
+  );
+  for (const one of itemRequests)
+    names[one.id] = `${one.requested_name} (item request, ${one.status})`;
 
   // A check's answer by its check and checklist; a checklist by its template, villa and place; a check by its words.
   const answers = await readIn(list("site_checklist_items"), (chunk) =>

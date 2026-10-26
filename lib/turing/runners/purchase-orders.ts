@@ -3,6 +3,7 @@ import "server-only";
 import { getDefaultTerms } from "@/lib/masters/terms";
 import {
   addPoolLines,
+  approvePoDeletion,
   createPosFromIndent,
   createPurchaseOrder,
   deleteDraftPo,
@@ -34,6 +35,7 @@ import {
   retired,
   saving,
   siteOf,
+  unlessStatus,
   type RunResult,
   type Runners,
   type Values,
@@ -413,7 +415,7 @@ export const PO_RUNNERS: Runners<Key> = {
   },
   // The screen offers each only in its state; the withdraw would otherwise set any PO back to issued.
   po_cancel_request: async (v) => {
-    const refused = await unlessStatus(
+    const refused = await poUnless(
       String(v.po_id),
       "issued",
       "Only an issued PO can be asked to be cancelled.",
@@ -421,27 +423,23 @@ export const PO_RUNNERS: Runners<Key> = {
     return refused ?? requestPoDeletion(String(v.po_id), String(v.reason));
   },
   po_cancel_withdraw: async (v) => {
-    const refused = await unlessStatus(
+    const refused = await poUnless(
       String(v.po_id),
       "deletion_requested",
       "That PO has no cancellation asked for.",
     );
     return refused ?? withdrawPoDeletion(String(v.po_id));
   },
+  // The yes would otherwise cancel an issued PO nobody asked to cancel.
+  po_cancel_approve: async (v) => {
+    const refused = await poUnless(
+      String(v.po_id),
+      "deletion_requested",
+      "That PO has no cancellation asked for.",
+    );
+    return refused ?? approvePoDeletion(String(v.po_id));
+  },
 };
 
-/** A refusal unless the PO is in `status` now. */
-async function unlessStatus(
-  poId: string,
-  status: string,
-  refusal: string,
-): Promise<RunResult | null> {
-  const now = await recordNow(
-    "purchase_orders",
-    { column: "id", id: poId },
-    ["status"],
-    "That PO is gone.",
-  );
-  if ("error" in now) return now;
-  return now.row.status === status ? null : { error: refusal };
-}
+const poUnless = (poId: string, status: string, refusal: string) =>
+  unlessStatus("purchase_orders", poId, status, refusal, "That PO is gone.");

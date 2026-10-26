@@ -109,7 +109,8 @@ export type IdTable =
   | "funding_facilities"
   | "funding_movements"
   | "cash_requests"
-  | "cash_request_items";
+  | "cash_request_items"
+  | "item_requests";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -196,6 +197,8 @@ const FROM: Record<IdTable, string> = {
   funding_movements: "funding_movements (money drawn, repaid or paid as interest on a facility)",
   cash_requests: "cash_requests (a week's request for money to pay bills and advances)",
   cash_request_items: "cash_request_items (a bill or advance on a cash request)",
+  item_requests:
+    "item_requests (a designer's item the catalogue lacked, already in use as a provisional item)",
 };
 
 export type Field = {

@@ -88,6 +88,22 @@ export async function recordNow(
   return { row: data as unknown as Record<string, unknown> };
 }
 
+/**
+ * A refusal unless the record's status is `status` now: the screens offer a decision only in its
+ * state, and the decisions update by id alone, so one in another state could move it backwards.
+ */
+export async function unlessStatus(
+  table: string,
+  id: string,
+  status: string,
+  refusal: string,
+  gone: string,
+): Promise<Failure | null> {
+  const now = await recordNow(table, { column: "id", id }, ["status"], gone);
+  if ("error" in now) return now;
+  return now.row.status === status ? null : { error: refusal };
+}
+
 const RETIRED_NOUN = {
   vendors: "vendor",
   stores: "store",

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { deleteBill } from "@/lib/bills/actions";
+import { approveBill, deleteBill, sendBackBill } from "@/lib/bills/actions";
 import { sendLabourToBill } from "@/lib/bills/labour-actions";
 import {
   createBillWithLines,
@@ -24,6 +24,7 @@ import {
   retired,
   saving,
   siteOf,
+  unlessStatus,
   type RunResult,
   type Runners,
   type Values,
@@ -495,6 +496,13 @@ export const BILL_RUNNERS: Runners<Key> = {
     const done = await saving(() => deleteBill(String(v.bill_id)), "/bills/list");
     return "error" in done ? done : undefined;
   },
+  // The screen offers Approve only while recorded and Send back only while approved.
+  bill_approve: async (v) =>
+    (await billUnless(String(v.bill_id), "recorded", "That bill is already approved.")) ??
+    approveBill(String(v.bill_id)),
+  bill_send_back: async (v) =>
+    (await billUnless(String(v.bill_id), "approved", "Only an approved bill can be sent back.")) ??
+    sendBackBill(String(v.bill_id), String(v.note)),
   labour_to_bill: {
     lines: async (header, rows) => {
       const ids = rows.map((row) => String(row.labour_log_id));
@@ -560,6 +568,9 @@ export const BILL_RUNNERS: Runners<Key> = {
     },
   },
 };
+
+const billUnless = (billId: string, status: string, refusal: string) =>
+  unlessStatus("bills", billId, status, refusal, "That bill is gone.");
 
 const numberOrNull = (value: string) => (value === "" ? null : Number(value));
 

@@ -2,9 +2,11 @@ import "server-only";
 
 import {
   addDirectLines,
+  approveIndent,
   cancelIndent,
   createIndent,
   deleteIndent,
+  rejectIndent,
   removeLine,
   submitIndent,
   updateIndentHeader,
@@ -14,7 +16,16 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { INDENTS } from "../entries/indents";
 import { idFrom } from "../redirects";
-import { given, recordNow, saving, siteOf, type RunResult, type Runners, type Values } from "./kit";
+import {
+  given,
+  recordNow,
+  saving,
+  siteOf,
+  unlessStatus,
+  type RunResult,
+  type Runners,
+  type Values,
+} from "./kit";
 
 type Key = (typeof INDENTS)[number]["key"];
 
@@ -241,4 +252,18 @@ export const INDENT_RUNNERS: Runners<Key> = {
     return "error" in done ? done : undefined;
   },
   indent_cancel: (v) => cancelIndent(String(v.indent_id), String(v.reason)),
+  // The screen offers both only while it waits; the actions update by id alone.
+  indent_approve: async (v) =>
+    (await waiting(String(v.indent_id))) ?? approveIndent(String(v.indent_id)),
+  indent_send_back: async (v) =>
+    (await waiting(String(v.indent_id))) ?? rejectIndent(String(v.indent_id), String(v.note)),
 };
+
+const waiting = (indentId: string) =>
+  unlessStatus(
+    "indents",
+    indentId,
+    "submitted",
+    "That indent is not waiting for approval.",
+    "That indent is gone.",
+  );

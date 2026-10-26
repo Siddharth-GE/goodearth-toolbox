@@ -210,6 +210,22 @@ export const BILLS = defineEntries([
     fields: [bill],
   },
   {
+    key: "bill_approve",
+    tool: "/bills",
+    title: "A bill, approved",
+    description:
+      "Approves a recorded bill (bills.status recorded), so it can be paid; its figures can no longer change. Check its lines and total against the vendor's bill first.",
+    fields: [bill],
+  },
+  {
+    key: "bill_send_back",
+    tool: "/bills",
+    title: "A bill, sent back",
+    description:
+      "Sends an approved bill back to recorded so its figures can be fixed, with a note saying what needs changing. Refused while money paid against it stands — reverse that first.",
+    fields: [bill, { key: "note", label: "What needs changing", kind: "text" }],
+  },
+  {
     key: "labour_to_bill",
     tool: "/bills",
     title: "Labour logs, sent to a bill",

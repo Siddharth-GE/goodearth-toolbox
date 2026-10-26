@@ -279,6 +279,33 @@ export const MASTERS = defineEntries([
     fields: [record("item_id", "Item", "items")],
   },
   {
+    key: "item_request_accept",
+    tool: "/masters",
+    title: "An item request, accepted",
+    description:
+      "Accepts a designer's item request (item_requests.status pending) as a new catalogue item; its provisional item stops being provisional. A code given replaces the item's, left out keeps it, empty clears it. Refused while the item is switched off in Masters. Most requests are an item already in the catalogue under another name: read items first and merge instead (item_request_merge).",
+    fields: [record("request_id", "Request", "item_requests"), words("code", "Code", { max: 100 })],
+  },
+  {
+    key: "item_request_merge",
+    tool: "/masters",
+    title: "An item request, merged",
+    description:
+      "Marks a pending item request as the same as an active catalogue item (items.id). Its provisional item is switched off and points at that one; lines already using it stay as they are.",
+    fields: [
+      record("request_id", "Request", "item_requests"),
+      { key: "item_id", label: "Same as", kind: "id", table: "items" },
+    ],
+  },
+  {
+    key: "item_request_reject",
+    tool: "/masters",
+    title: "An item request, rejected",
+    description:
+      "Rejects a pending item request: its provisional item is switched off (lines already using it stay).",
+    fields: [record("request_id", "Request", "item_requests")],
+  },
+  {
     key: "brand_new",
     tool: "/masters",
     title: "A brand, added",
