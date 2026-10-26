@@ -706,7 +706,8 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
               rate: row.rate,
             })),
           },
-    lines: lines
+    lines: [...lines]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
       .map((line) => {
         const item = itemById.get(line.work_item_id);
         return {
@@ -719,17 +720,10 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           qty: line.qty,
           labourRate: line.labour_rate,
           note: line.note,
-          createdAt: line.created_at,
         };
       })
-      // Sorted by work code, the order the site team reads; a work's rows in the order they were added.
-      .sort(
-        (a, b) =>
-          a.code.localeCompare(b.code, undefined, { numeric: true }) ||
-          a.createdAt.localeCompare(b.createdAt) ||
-          a.id.localeCompare(b.id),
-      )
-      .map(({ createdAt: _createdAt, ...line }) => line),
+      // Sorted by work code, the order the site team reads; a work's rows keep the order they were added in.
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
   };
 }
 

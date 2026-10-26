@@ -7,13 +7,13 @@
  */
 import {
   aggregateFrozenTakeoff,
-  applyEstimateOverrides,
   applyRateOverrides,
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
   frozenLineCosts,
   groupLineCosts,
+  lineRecipes,
   rateBuildUp,
   type LineCost,
   type MaterialDef,
@@ -107,24 +107,31 @@ export function buildEstimateView(input: {
     ).map((m) => [m.id, m]),
   );
   const mixesById = new Map<string, MixDef>(book.mixes.map((m) => [m.id, m]));
-  const recipesByWork = new Map<string, WorkRecipe>(
-    applyEstimateOverrides(book.recipes, variations.byWork, variations.labourRateByWork).map(
-      (recipe) => [recipe.workItemId, recipe],
-    ),
+  // Keyed by row: a work may sit on the estimate more than once, each row with its own list and labour (0157).
+  const recipesByLine: Map<string, WorkRecipe> = lineRecipes(
+    book.recipes,
+    estimate.lines.map((line) => ({ id: line.id, workItemId: line.workItemId })),
+    variations.componentsByLine,
+    variations.labourRateByLine,
   );
 
-  const lineInputs = estimate.lines.map((line) => ({ workItemId: line.workItemId, qty: line.qty }));
+  const lineInputs = estimate.lines.map((line) => ({
+    workItemId: line.workItemId,
+    qty: line.qty,
+    key: line.id,
+  }));
 
   let lineCosts: LineCost[];
   let takeoffRows: TakeoffRow[];
   const uomByWork = new Map<string, string | null>();
-  const unitRateByWork = new Map<string, number | null>();
+  const unitRateByLine = new Map<string, number | null>();
 
   if (isDraft || !estimate.frozen) {
-    lineCosts = lineInputs.map((line) =>
-      computeLine(line, recipesByWork.get(line.workItemId), mixesById, materialsById),
-    );
-    takeoffRows = computeTakeoff(lineInputs, recipesByWork, mixesById, materialsById).map((row) => {
+    lineCosts = lineInputs.map((line) => ({
+      ...computeLine(line, recipesByLine.get(line.key), mixesById, materialsById),
+      lineId: line.key,
+    }));
+    takeoffRows = computeTakeoff(lineInputs, recipesByLine, mixesById, materialsById).map((row) => {
       const material = materialsById.get(row.materialId);
       return {
         materialId: row.materialId,
@@ -137,9 +144,9 @@ export function buildEstimateView(input: {
     });
     for (const work of works) uomByWork.set(work.workItemId, work.uom);
     for (const line of estimate.lines) {
-      unitRateByWork.set(
-        line.workItemId,
-        rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById)?.rate ?? null,
+      unitRateByLine.set(
+        line.id,
+        rateBuildUp(recipesByLine.get(line.id), mixesById, materialsById)?.rate ?? null,
       );
     }
   } else {
@@ -148,10 +155,12 @@ export function buildEstimateView(input: {
     for (const row of estimate.frozen.lineCosts) {
       uomByWork.set(row.workItemId, row.uom);
       // The arithmetic is linear, so total ÷ quantity is exactly the frozen per-unit rate.
-      unitRateByWork.set(
-        row.workItemId,
-        row.totalCost === null || row.qty === 0 ? null : row.totalCost / row.qty,
-      );
+      if (row.lineId) {
+        unitRateByLine.set(
+          row.lineId,
+          row.totalCost === null || row.qty === 0 ? null : row.totalCost / row.qty,
+        );
+      }
     }
   }
   takeoffRows.sort((a, b) => a.name.localeCompare(b.name));
@@ -195,11 +204,11 @@ export function buildEstimateView(input: {
   const rateViewFor = (line: EstimateDetail["lines"][number], uom: string | null): LineRateView => {
     const standard = book.recipes.find((recipe) => recipe.workItemId === line.workItemId);
     const own = variations.byLine.get(line.id);
-    const buildUp = rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById);
+    const buildUp = rateBuildUp(recipesByLine.get(line.id), mixesById, materialsById);
     return {
       lineId: line.id,
       workItemId: line.workItemId,
-      workName: line.name,
+      workName: line.label ? `${line.name} — ${line.label}` : line.name,
       workUom: uom,
       own: own !== undefined,
       labour: {
@@ -235,10 +244,15 @@ export function buildEstimateView(input: {
     totals,
     missing: missingParts(totals),
     boq: groupLineCosts(lineCosts, categoryByWork, categoryOrder),
-    lineByWork: new Map(estimate.lines.map((line) => [line.workItemId, line])),
+    lineById: new Map(estimate.lines.map((line) => [line.id, line])),
+    /** How many rows each work has: a frozen work with several keeps its materials per work, not per row. */
+    rowsByWork: estimate.lines.reduce(
+      (counts, line) => counts.set(line.workItemId, (counts.get(line.workItemId) ?? 0) + 1),
+      new Map<string, number>(),
+    ),
     takeoffRows,
     uomByWork,
-    unitRateByWork,
+    unitRateByLine,
     standardRateById,
     rateOptions: {
       materials: materialItems
@@ -247,8 +261,8 @@ export function buildEstimateView(input: {
       mixes: mixRows.filter((mix) => mix.isActive).map(({ id, name, uom }) => ({ id, name, uom })),
     },
     rateViewFor,
-    frozenLineByWork: new Map(
-      (estimate.frozen?.lineCosts ?? []).map((row) => [row.workItemId, row]),
+    frozenLineById: new Map(
+      (estimate.frozen?.lineCosts ?? []).flatMap((row) => (row.lineId ? [[row.lineId, row]] : [])),
     ),
     frozenNameById: new Map(
       (estimate.frozen?.takeoff ?? []).map((row) => [

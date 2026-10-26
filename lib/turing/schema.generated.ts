@@ -1430,10 +1430,12 @@ export const TURING_SCHEMA: Schema = {
   "estimator_estimate_lines": {
     "kind": "table",
     "columns": {
+      "copied_from": "string | null",
       "created_at": "string",
       "created_by": "string | null",
       "estimate_id": "string",
       "id": "string",
+      "label": "string | null",
       "labour_rate": "number | null",
       "note": "string | null",
       "qty": "number | null",

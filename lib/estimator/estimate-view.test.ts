@@ -41,8 +41,8 @@ const works: WorkStatusRow[] = [
 
 const noVariations: EstimateVariations = {
   byLine: new Map(),
-  byWork: new Map(),
-  labourRateByWork: new Map(),
+  componentsByLine: new Map(),
+  labourRateByLine: new Map(),
   rateByMaterialId: new Map(),
   extraMaterials: [],
 };
@@ -64,6 +64,7 @@ const estimate = (over: Partial<EstimateDetail> = {}): EstimateDetail => ({
       workItemId: "plaster",
       code: "PL.1",
       name: "Plastering",
+      label: null,
       categoryCode: "PL",
       qty: 100,
       note: null,
@@ -99,7 +100,7 @@ const view = (over: Partial<EstimateDetail> = {}, variations = noVariations) =>
 test("a working estimate prices live: labour plus materials, per unit and in all", () => {
   const v = view();
   // 100 labour + 0.5 bag × 400 + 0.01 cum × 2000 = 320 a sqm.
-  assert.equal(v.unitRateByWork.get("plaster"), 320);
+  assert.equal(v.unitRateByLine.get("l1"), 320);
   assert.equal(v.totals.grand, 32000);
   assert.deepEqual(v.missing, []);
   assert.equal(v.isDraft, true);
@@ -118,7 +119,7 @@ test("the materials list is sorted by name and priced", () => {
 
 test("this villa's price for a material replaces Masters' before any arithmetic", () => {
   const v = view({}, { ...noVariations, rateByMaterialId: new Map([["cement", 500]]) });
-  assert.equal(v.unitRateByWork.get("plaster"), 370);
+  assert.equal(v.unitRateByLine.get("l1"), 370);
   const rate = v.rateViewFor(estimate().lines[0], "sqm");
   assert.equal(rate.own, false);
   const cement = rate.prices.find((price) => price.itemId === "cement");
@@ -133,6 +134,7 @@ test("an official estimate renders its frozen figures, not today's rates", () =>
       lineCosts: [
         {
           workItemId: "plaster",
+          lineId: "l1",
           qty: 100,
           uom: "sqm",
           labourCost: 10000,
@@ -153,7 +155,7 @@ test("an official estimate renders its frozen figures, not today's rates", () =>
     },
   });
   assert.equal(v.isDraft, false);
-  assert.equal(v.unitRateByWork.get("plaster"), 250);
+  assert.equal(v.unitRateByLine.get("l1"), 250);
   assert.equal(v.totals.grand, 25000);
 });
 
@@ -162,12 +164,20 @@ test("a frozen line with no quantity has no per-unit rate", () => {
     status: "submitted",
     frozen: {
       lineCosts: [
-        { workItemId: "plaster", qty: 0, uom: "sqm", labourCost: 0, materialCost: 0, totalCost: 0 },
+        {
+          workItemId: "plaster",
+          lineId: "l1",
+          qty: 0,
+          uom: "sqm",
+          labourCost: 0,
+          materialCost: 0,
+          totalCost: 0,
+        },
       ],
       takeoff: [],
     },
   });
-  assert.equal(v.unitRateByWork.get("plaster"), null);
+  assert.equal(v.unitRateByLine.get("l1"), null);
 });
 
 test("an unmeasured line is named in the warning under the total", () => {
@@ -204,4 +214,21 @@ test("an official estimate withdraws until a live indent draws on it", () => {
   assert.equal(officialRemoval("draft", []), null);
   assert.equal(officialRemoval("superseded", []), null);
   assert.equal(officialRemoval("cancelled", []), null);
+});
+
+test("two rows of one work are each priced on their own, each keeping its labour rate (0157)", () => {
+  const second = { ...estimate().lines[0], id: "l2", label: "Ceiling", qty: 10, labourRate: 200 };
+  const v = view(
+    { lines: [{ ...estimate().lines[0], label: "Walls" }, second] },
+    { ...noVariations, labourRateByLine: new Map([["l2", 200]]) },
+  );
+  assert.equal(v.unitRateByLine.get("l1"), 320);
+  assert.equal(v.unitRateByLine.get("l2"), 420);
+  // 100 x 320 + 10 x 420
+  assert.equal(v.totals.grand, 36200);
+  assert.deepEqual(
+    v.boq[0].lineCosts.map((line) => line.lineId),
+    ["l1", "l2"],
+  );
+  assert.equal(v.rowsByWork.get("plaster"), 2);
 });

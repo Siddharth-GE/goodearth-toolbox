@@ -80,7 +80,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: false,
-    why: "The official estimate's quantity per work (0137) — '1,800 sqft of block work' — so the site sets logged piece-work against it and the schedule sizes a villa. The same four grants as estimate_takeoff_facts. The line's labour_rate must never appear here.",
+    why: "The official estimate's quantity per work (0137) — '1,800 sqft of block work' — so the site sets logged piece-work against it and the schedule sizes a villa. The same four grants as estimate_takeoff_facts. The line's labour_rate must never appear here. Since 0157 a work may have several rows, so the view adds them up: still one row per work.",
   },
   po_facts: {
     columns: [

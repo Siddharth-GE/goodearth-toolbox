@@ -6,12 +6,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { checked, parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
-import {
-  applyRateOverrides,
-  computeLine,
-  lineRecipes,
-  computeWorkTakeoff,
-} from "./calc";
+import { applyRateOverrides, computeLine, lineRecipes, computeWorkTakeoff } from "./calc";
 import { getEstimateVariations, getRecipeBook } from "./estimate-queries";
 import { checkMeasurement, type MeasurementFields } from "./measurement-rules";
 import { revalidatePath } from "next/cache";
@@ -120,7 +115,7 @@ export async function withdrawEstimate(id: string, reason: string): Promise<Acti
 }
 
 /** Put works on an estimate, set up or not. They arrive "to measure" (0097: no quantity yet).
- * Works already on the estimate are skipped (one line per work, 0074). */
+ * Works already on the estimate are skipped; a second row of a work comes from Duplicate (0157). */
 export async function addEstimateLines(
   estimateId: string,
   workItemIds: string[],
@@ -156,9 +151,6 @@ export async function addEstimateLines(
   );
   if (error) {
     if (error.code === "P0001") return { error: error.message };
-    if (error.code === "23505") {
-      return { error: "One of those works was just added by someone else — reload the page." };
-    }
     console.error("addEstimateLines failed:", error);
     return { error: "Could not add the works. Try again." };
   }
@@ -198,6 +190,108 @@ export async function updateEstimateLineQty(id: string, qty: number | null): Pro
   if (error) {
     console.error("updateEstimateLineQty failed:", error);
     return { error: "Could not save the quantity. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+const LABEL_LIMIT = 120;
+
+/** What tells a row from another row of the same work: "W1 1.2 × 1.5". Empty clears it. */
+export async function setEstimateLineLabel(id: string, label: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const text = typeof label === "string" ? label.trim() : "";
+  if (!id) return { error: "Which row?" };
+  if (text.length > LABEL_LIMIT) return { error: `Keep the name under ${LABEL_LIMIT} characters.` };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimate_lines")
+    .update({ label: text || null, updated_by: user.id })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("setEstimateLineLabel failed:", error);
+    return { error: "Could not save the name. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/** A second row of the same work, with the row's quantity, labour rate, own materials and measurements, to change
+ * only what differs (0157). A copy that fails part-way is taken back, so no half row is left. */
+export async function duplicateEstimateLine(id: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!id) return { error: "Which row?" };
+  const supabase = await createClient();
+
+  const [line, components, measurements] = await Promise.all([
+    supabase
+      .from("estimator_estimate_lines")
+      .select("estimate_id, work_item_id, label, qty, note, labour_rate")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("estimator_estimate_line_components")
+      .select("item_id, mix_id, material_id, qty_per_unit")
+      .eq("line_id", id),
+    supabase
+      .from("estimator_estimate_line_measurements")
+      .select("description, nos, length, breadth, depth, sort_order, is_deduction")
+      .eq("line_id", id)
+      .order("sort_order")
+      .order("id"),
+  ]);
+  if (line.error || components.error || measurements.error) {
+    console.error(
+      "duplicateEstimateLine read failed:",
+      line.error ?? components.error ?? measurements.error,
+    );
+    return { error: "Could not copy the row. Try again." };
+  }
+  if (!line.data) return { error: "That row is no longer on the estimate — reload the page." };
+
+  const label = `${line.data.label ?? "Copy"}${line.data.label ? " (copy)" : ""}`.slice(
+    0,
+    LABEL_LIMIT,
+  );
+  const { data: copy, error } = await supabase
+    .from("estimator_estimate_lines")
+    .insert({ ...line.data, label, created_by: user.id, updated_by: user.id })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("duplicateEstimateLine failed:", error);
+    return { error: "Could not copy the row. Try again." };
+  }
+
+  const stamp = { line_id: copy.id, created_by: user.id, updated_by: user.id };
+  // Model rows are copied as hand rows: the model refills only its own rows on the next import.
+  const [componentCopy, measurementCopy] = await Promise.all([
+    components.data.length
+      ? supabase
+          .from("estimator_estimate_line_components")
+          .insert(components.data.map((row) => ({ ...row, ...stamp })))
+      : Promise.resolve({ error: null }),
+    measurements.data.length
+      ? supabase
+          .from("estimator_estimate_line_measurements")
+          .insert(measurements.data.map((row) => ({ ...row, ...stamp })))
+      : Promise.resolve({ error: null }),
+  ]);
+  if (componentCopy.error || measurementCopy.error) {
+    console.error(
+      "duplicateEstimateLine (contents) failed:",
+      componentCopy.error ?? measurementCopy.error,
+    );
+    const undo = await removeEstimateLine(copy.id);
+    if (undo?.error) console.error("duplicateEstimateLine (undo) failed:", undo.error);
+    return {
+      error: "Could not copy the row's materials or measurements, so no copy was kept. Try again.",
+    };
   }
 
   revalidatePath("/estimator", "layout");
