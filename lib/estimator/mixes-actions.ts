@@ -8,7 +8,7 @@ import { checked, parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { GRANT, NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./shared";
+import { GRANT, GROUP_LIMIT, NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./shared";
 
 /** A foreign key refusing a delete is the house rule: reference data in use is deactivated, never removed. */
 function deleteError(error: { code?: string }, what: string, instead: string): string {
@@ -16,23 +16,34 @@ function deleteError(error: { code?: string }, what: string, instead: string): s
   return `Could not delete the ${what}. Try again.`;
 }
 
-type MixFields = { name: string; uom: string; description: string | null; is_active: boolean };
+type MixFields = {
+  name: string;
+  uom: string;
+  description: string | null;
+  group_name: string | null;
+  is_active: boolean;
+};
 
 function readMixFields(formData: FormData): MixFields | { error: string } {
   const name = text(formData, "name");
   const uom = text(formData, "uom");
   const description = text(formData, "description");
+  const groupName = text(formData, "group_name");
 
   if (!name) return { error: "Give the mix a name, like M20 concrete." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
   if (!uom) return { error: "Say what one unit of the mix is, like cum." };
   if (uom.length > UOM_LIMIT) return { error: `Keep the unit under ${UOM_LIMIT} characters.` };
   if (description.length > TEXT_LIMIT) return { error: "That description is too long." };
+  if (groupName.length > GROUP_LIMIT) {
+    return { error: `Keep the group under ${GROUP_LIMIT} characters.` };
+  }
 
   return {
     name,
     uom,
     description: description || null,
+    group_name: groupName || null,
     is_active: checked(formData, "is_active", "1"),
   };
 }

@@ -17,6 +17,7 @@ import {
   updateMix,
   updateMixComponentQty,
 } from "@/lib/estimator/mixes-actions";
+import { GROUP_LIMIT } from "@/lib/estimator/limits";
 import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
@@ -27,10 +28,13 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 export function MixFormDialog({
   mix,
   uoms,
+  groups,
   trigger,
 }: {
   mix?: MixRow | MixDetail;
   uoms: string[];
+  /** The groups already in use, offered as the group is typed. */
+  groups: string[];
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!mix;
@@ -66,6 +70,24 @@ export function MixFormDialog({
         <p className="text-muted text-xs">
           Its materials are given per one of these — so for concrete, per cubic metre.
         </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="group_name">Group (optional)</Label>
+        <Input
+          id="group_name"
+          name="group_name"
+          list="mix-groups"
+          defaultValue={mix?.groupName ?? ""}
+          maxLength={GROUP_LIMIT}
+          autoComplete="off"
+          placeholder="e.g. Concrete, Mortar, Plaster"
+        />
+        <datalist id="mix-groups">
+          {groups.map((group) => (
+            <option key={group} value={group} />
+          ))}
+        </datalist>
+        <p className="text-muted text-xs">The Mixes list sorts mixes under their group.</p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="description">Note (optional)</Label>

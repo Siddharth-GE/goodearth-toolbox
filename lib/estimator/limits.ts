@@ -2,3 +2,5 @@
 export const NAME_LIMIT = 120;
 export const UOM_LIMIT = 20;
 export const TEXT_LIMIT = 2000;
+/** estimator_mixes.group_name's CHECK (0154). */
+export const GROUP_LIMIT = 60;

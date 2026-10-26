@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { MaterialDef } from "./calc";
 
 export const GRANT = "/estimator";
-export { NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./limits";
+export { GROUP_LIMIT, NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./limits";
 
 export const fail = (context: string, error: { message: string }): never =>
   readFailed("estimator", context, error);

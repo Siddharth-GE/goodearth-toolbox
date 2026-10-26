@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { mixUnitCost } from "@/lib/estimator/calc";
-import { getMix } from "@/lib/estimator/mixes-queries";
+import { getMix, listMixGroups } from "@/lib/estimator/mixes-queries";
 import { listMaterialItems, listUomNames } from "@/lib/estimator/shared";
 import { formatMoney } from "@/lib/format";
 import { notFound } from "next/navigation";
@@ -25,10 +25,11 @@ import {
 
 export default async function MixPage({ params }: { params: Promise<{ mixId: string }> }) {
   const { mixId } = await params;
-  const [mix, materials, uoms] = await Promise.all([
+  const [mix, materials, uoms, groups] = await Promise.all([
     getMix(mixId),
     listMaterialItems(),
     listUomNames(),
+    listMixGroups(),
   ]);
   if (!mix) notFound();
 
@@ -52,7 +53,7 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {!mix.isActive && <Badge variant="neutral">Inactive</Badge>}
-            <MixFormDialog mix={mix} uoms={uoms} />
+            <MixFormDialog mix={mix} uoms={uoms} groups={groups} />
             <DeleteMixButton mixId={mix.id} />
           </div>
         }
