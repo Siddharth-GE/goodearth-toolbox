@@ -29,7 +29,7 @@ export const LABOUR_LOG_FORM = [
 ] as const;
 
 const has = (values: Record<string, Value>, key: string) =>
-  key in values && values[key] !== "" && values[key] !== "0";
+  key in values && values[key] !== "" && Number(values[key]) !== 0;
 
 /**
  * What Supervisors' save would drop without a word: a value the way of paying does not use, or a
@@ -88,9 +88,9 @@ const labourDetails = (optional: boolean): Field[] => {
       labels: { standard: "Standard work", additional: "Additional work", rework: "Rework" },
       blank: "Standard work (the default)",
     },
-    { key: "masons", label: "Masons", kind: "amount", optional: true },
-    { key: "helpers", label: "Helpers", kind: "amount", optional: true },
-    { key: "others", label: "Others", kind: "amount", optional: true },
+    { key: "masons", label: "Masons", kind: "amount", heads: true, optional: true },
+    { key: "helpers", label: "Helpers", kind: "amount", heads: true, optional: true },
+    { key: "others", label: "Others", kind: "amount", heads: true, optional: true },
     { key: "quantity", label: "Quantity", kind: "amount", optional: true },
     { key: "description", label: "What was done", kind: "text", optional: true },
     { key: "note", label: "Note", kind: "text", optional: true },

@@ -32,7 +32,8 @@ export function rateBookParams(raw: Record<string, string | undefined>): RateBoo
   return {
     q: q || undefined,
     category: category || undefined,
-    show: raw.show && raw.show in RATE_BOOK_SHOWS ? (raw.show as RateBookShow) : undefined,
+    show:
+      raw.show && Object.hasOwn(RATE_BOOK_SHOWS, raw.show) ? (raw.show as RateBookShow) : undefined,
   };
 }
 

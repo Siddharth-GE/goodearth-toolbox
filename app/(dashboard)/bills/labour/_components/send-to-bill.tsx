@@ -338,7 +338,7 @@ export function SendToBill({
                   id="labour-reference"
                   value={reference}
                   onChange={(event) => setReference(event.target.value)}
-                  placeholder="e.g. NMR week 41"
+                  placeholder="e.g. Muster roll week 41"
                   autoComplete="off"
                 />
               </div>

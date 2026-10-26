@@ -32,7 +32,7 @@ export default async function CashRequestsPage({
 }) {
   const raw = await searchParams;
   const status =
-    raw.status && raw.status in CASH_REQUEST_STATUS_LABEL
+    raw.status && Object.hasOwn(CASH_REQUEST_STATUS_LABEL, raw.status)
       ? (raw.status as CashRequestStatus)
       : undefined;
   const from = dateParam(raw.from);

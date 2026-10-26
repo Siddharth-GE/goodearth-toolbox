@@ -114,12 +114,30 @@ export async function listReceivablePos({
     .eq("status", "issued");
   if (projectId) query = query.eq("project_id", projectId);
   if (vendorId) query = query.eq("vendor_id", vendorId);
-  if (plotId) query = query.eq("plot_id", plotId);
+  // One or() only: the villa's scopes and the search each become a group, joined by and().
+  const groups: string[] = [];
+  if (plotId) {
+    // A PO is scoped to a plot or to one of its units, never both (0021).
+    const { data: units, error: unitError } = await supabase
+      .from("units")
+      .select("id")
+      .eq("plot_id", plotId);
+    if (unitError) {
+      console.error("listReceivablePos unit lookup failed:", unitError);
+      throw new Error("Could not search the purchase orders.", { cause: unitError });
+    }
+    const unitIds = (units ?? []).map((row) => row.id);
+    const scopes = [`plot_id.eq.${plotId}`];
+    if (unitIds.length) scopes.push(`unit_id.in.(${unitIds.join(",")})`);
+    groups.push(scopes.join(","));
+  }
   if (q) {
     const clauses = [`reference.ilike.*${q}*`];
     if (vendorIds.length) clauses.push(`vendor_id.in.(${vendorIds.join(",")})`);
-    query = query.or(clauses.join(","));
+    groups.push(clauses.join(","));
   }
+  if (groups.length === 1) query = query.or(groups[0]);
+  if (groups.length === 2) query = query.or(`and(or(${groups[0]}),or(${groups[1]}))`);
   const { data, count, error } = await query
     .order("issued_at", { ascending: false })
     .order("id")

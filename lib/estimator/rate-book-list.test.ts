@@ -26,6 +26,7 @@ const rows = [
 const codes = (list: RateBookListRow[]) => list.map((row) => row.code);
 
 test("a show that is not on the list is dropped", () => {
+  assert.equal(rateBookParams({ show: "constructor" }).show, undefined);
   assert.deepEqual(rateBookParams({ show: "nonsense", q: "  " }), {
     q: undefined,
     category: undefined,

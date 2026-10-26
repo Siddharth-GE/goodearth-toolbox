@@ -36,7 +36,7 @@ import {
 
 export type FormKind = "po" | "contract" | "nmr";
 
-// Daily wages logged on site are billed from Bills → Labour (Send to Bill); this NMR form is for a muster roll that never went through the log. Over-billing warns, never blocks.
+// Labour logged on site is billed from Bills → Labour (Send to Bill); kind nmr here is labour with no work order: miscellaneous work or an unlogged muster roll. Over-billing warns, never blocks.
 export function BillForm({
   options,
   initial,

@@ -15,20 +15,33 @@
 
 ## A. Quick wins — Estimator mixes and rate book, labour in halves, search, miscellaneous labour bills
 
-- [ ] **Duplicate a mix:** a Duplicate button on the mix page copies its materials under "<name> (copy)" and opens the copy.
-- [ ] **The rate book moves onto `ListToolbar`:**
+Built on `feature/team-additions`, `0155` on staging. An independent Opus review found nothing serious, and its five smaller findings are fixed:
+
+- the villa filter also finds a PO made for one of the villa's units;
+- a mix copy whose materials fail is taken back;
+- Turing's head counts take two decimals up to 999, and "0.00" counts as none;
+- a filter value like `constructor` is refused;
+- the no-work-order wording is the same on every screen.
+
+- [x] **Duplicate a mix:** a Duplicate button on the mix page copies its materials under "<name> (copy)" and opens the copy.
+- [x] **The rate book moves onto `ListToolbar`:**
   - search also finds a work by a material or mix inside it;
-  - filters by category, and by Not set up / Used but not priced / Priced.
-- [ ] **Labour in decimals:** a migration turns `labour_logs.masons/helpers/others` into numeric (two places, ≥ 0); the count fields, `lib/supervisors/labour.ts`, its test and Turing's fields follow. Views and functions that read the columns are found and kept.
-- [ ] **Search and filters — the audit's call.** Add search or filters where an operations list has none:
+  - filters by category, and by Not set up / Used but not priced / Set up, not priced / Labour only / Priced.
+- [x] **Labour in decimals** (`0155`): `labour_logs.masons/helpers/others` are numeric (two places, ≥ 0). The count fields, `lib/supervisors/labour.ts`, its test and Turing's fields follow. No view reads the columns, and Send to Bill already summed them as numeric.
+- [x] **Search and filters — the audit's call:**
   - Receive's PO finder gains vendor and villa;
-  - Bills: Labour, Contractors, Contracts and Cash requests;
-  - the Estimator's Estimates;
-  - Client Relations' Dues.
-
-  Masters' own search forms work, so they stay.
-
-- [ ] **Miscellaneous labour:** New bill offers "Miscellaneous labour — no work order", with a contractor and free lines. It is today's no-anchor bill, so no migration.
+  - the Estimator's villa list gains search, project and state;
+  - Bills' cash requests gain status and week.
+  - Left as they are: Bills → Labour already filters by project, villa, contractor and date. Contractors is rebuilt in B. Contracts only redirects to work orders. Client Relations' Dues filters by project and overdue. Masters' own search forms work.
+- [x] **Miscellaneous labour:** the no-work-order bill already existed as "NMR — a muster roll", with an optional contractor; it is now offered and shown as "Labour, no work order — miscellaneous or a muster roll". No migration.
+- [ ] [Founder] Vet on staging:
+  - Estimator → Mixes → a mix → **Duplicate**: the copy opens with the same materials.
+  - Estimator → Rate book: search "cement" lists the works using it; Category and Show narrow the list.
+  - Supervisors → a villa → Add labour, daily wages, **0.5** helpers: it saves and shows 0.5. Send it to a bill in Bills → Labour: the half day is billed at half the rate.
+  - Inventory → Receive: pick a vendor or a villa in the finder.
+  - Estimator → Villas: search a villa, pick Show → Not started.
+  - Bills → Cash requests: filter by status.
+  - Bills → New bill → "Labour, no work order": pick the contractor, add lines, save.
 
 ## B. Bills and contractors — migration (money: reviewed before apply)
 

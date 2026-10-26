@@ -34,7 +34,8 @@ export default async function VillasPage({
   const raw = await searchParams;
   const q = searchParam(raw.q);
   const project = idParam(raw.project);
-  const show = raw.show && raw.show in SHOWS ? (raw.show as keyof typeof SHOWS) : undefined;
+  const show =
+    raw.show && Object.hasOwn(SHOWS, raw.show) ? (raw.show as keyof typeof SHOWS) : undefined;
   const villas = await listVillas();
 
   const words = (q ?? "").toLowerCase().split(" ").filter(Boolean);

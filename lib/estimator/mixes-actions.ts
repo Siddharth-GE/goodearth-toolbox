@@ -143,8 +143,10 @@ export async function duplicateMix(id: string): Promise<ActionState> {
     );
     if (error) {
       console.error("duplicateMix (components) failed:", error);
-      revalidatePath("/estimator", "layout");
-      return { error: "The copy was made but its materials were not. Add them on the copy." };
+      // Brand new and named by nothing, so an empty copy is taken back rather than left to find.
+      const { error: undoError } = await supabase.from("estimator_mixes").delete().eq("id", copyId);
+      if (undoError) console.error("duplicateMix (undo) failed:", undoError);
+      return { error: "Could not copy the mix's materials, so no copy was kept. Try again." };
     }
   }
 
