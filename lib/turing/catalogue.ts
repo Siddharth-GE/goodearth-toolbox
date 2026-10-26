@@ -5,6 +5,7 @@ import "server-only";
 // screens — each tool's in its own runners file.
 import type { EntryKey } from "./catalogue-fields";
 import { BILL_RUNNERS } from "./runners/bills";
+import { BUSINESS_PLANNING_RUNNERS } from "./runners/business-planning";
 import { BIRDWING_RUNNERS } from "./runners/birdwing";
 import { BIRDWING_BOOKS_RUNNERS } from "./runners/birdwing-books";
 import { CLIENT_RELATIONS_RUNNERS } from "./runners/client-relations";
@@ -20,6 +21,7 @@ import { MONEY_RUNNERS } from "./runners/money";
 import { CASH_REQUEST_RUNNERS } from "./runners/cash-requests";
 import { PO_RUNNERS } from "./runners/purchase-orders";
 import { RELAY_RUNNERS } from "./runners/relay";
+import { REPORTER_DEXTER_RUNNERS } from "./runners/reporter-dexter";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
 import { SUPERVISORS_SITE_RUNNERS } from "./runners/supervisors-site";
@@ -46,4 +48,6 @@ export const RUNNERS: Runners<EntryKey> = {
   ...SUPERVISORS_SITE_RUNNERS,
   ...MONEY_RUNNERS,
   ...CASH_REQUEST_RUNNERS,
+  ...BUSINESS_PLANNING_RUNNERS,
+  ...REPORTER_DEXTER_RUNNERS,
 };

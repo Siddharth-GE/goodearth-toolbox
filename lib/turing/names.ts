@@ -84,6 +84,7 @@ const NAMED_BY: Record<
     | "cash_requests"
     | "cash_request_items"
     | "item_requests"
+    | "dexter_decks"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -118,6 +119,9 @@ const NAMED_BY: Record<
   pusher_trail_sets: "name",
   staff_departments: "name",
   checklist_templates: "name",
+  business_plans: "name",
+  reports: "name",
+  dexter_projects: "name",
 };
 
 /** What a log holds, so the admin sees what a change overrides: "2 masons, 1 helper", "12 cum". */
@@ -548,6 +552,11 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   );
   for (const one of itemRequests)
     names[one.id] = `${one.requested_name} (item request, ${one.status})`;
+  // A deck by its title and project, and whether its link opens.
+  const decks = await readIn(list("dexter_decks"), (chunk) =>
+    supabase.from("dexter_decks").select("id, title, project_id, share_enabled").in("id", chunk),
+  );
+  for (const one of decks) add("dexter_projects", one.project_id);
 
   // A check's answer by its check and checklist; a checklist by its template, villa and place; a check by its words.
   const answers = await readIn(list("site_checklist_items"), (chunk) =>
@@ -676,6 +685,10 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
       }
     }),
   );
+  for (const one of decks)
+    names[one.id] = [one.title, names[one.project_id], one.share_enabled ? "link on" : "link off"]
+      .filter(Boolean)
+      .join(" · ");
   for (const one of transmittals)
     names[one.id] = [
       one.number ?? "Draft transmittal",

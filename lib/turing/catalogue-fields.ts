@@ -5,6 +5,7 @@
  */
 
 import { BILLS } from "./entries/bills";
+import { BUSINESS_PLANNING } from "./entries/business-planning";
 import { BIRDWING } from "./entries/birdwing";
 import { BIRDWING_BOOKS } from "./entries/birdwing-books";
 import { CLIENT_RELATIONS } from "./entries/client-relations";
@@ -20,6 +21,7 @@ import { MASTERS } from "./entries/masters";
 import { MONEY } from "./entries/money";
 import { CASH_REQUESTS } from "./entries/cash-requests";
 import { RELAY } from "./entries/relay";
+import { REPORTER_DEXTER } from "./entries/reporter-dexter";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
 import { WORK_ORDERS } from "./entries/work-orders";
@@ -110,7 +112,11 @@ export type IdTable =
   | "funding_movements"
   | "cash_requests"
   | "cash_request_items"
-  | "item_requests";
+  | "item_requests"
+  | "business_plans"
+  | "reports"
+  | "dexter_projects"
+  | "dexter_decks";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -199,6 +205,10 @@ const FROM: Record<IdTable, string> = {
   cash_request_items: "cash_request_items (a bill or advance on a cash request)",
   item_requests:
     "item_requests (a designer's item the catalogue lacked, already in use as a provisional item)",
+  business_plans: "business_plans (a business plan)",
+  reports: "reports (a saved Reporter report)",
+  dexter_projects: "dexter_projects (a Dexter project: a folder of pitch decks)",
+  dexter_decks: "dexter_decks (a Dexter deck: an uploaded pitch with a client link)",
 };
 
 export type Field = {
@@ -296,6 +306,8 @@ export const ENTRIES = [
   ...SUPERVISORS_SITE,
   ...MONEY,
   ...CASH_REQUESTS,
+  ...BUSINESS_PLANNING,
+  ...REPORTER_DEXTER,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 
