@@ -99,7 +99,7 @@ Settled while building: adding works still skips a work already on the estimate,
 
 ## D. Stage owners, and indents by stage — migration
 
-Built on `feature/team-additions-d` (trial `scripts/trials/stage-owners.sql`, proven against two broken copies). The rules now live in the Supervisors, Indents and Estimator plans.
+Built on `feature/team-additions-d`, `0158` on staging (trial `scripts/trials/stage-owners.sql`, proven against two broken copies). The rules now live in the Supervisors, Indents and Estimator plans.
 
 The independent Opus review found nothing blocking. Its findings are fixed:
 
