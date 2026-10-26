@@ -1,6 +1,6 @@
 import "server-only";
 
-import { setLabourContractActive } from "@/lib/bills/actions";
+import { approveLabourContract, setLabourContractActive } from "@/lib/bills/actions";
 import {
   cancelWorkOrder,
   createWorkOrder,
@@ -22,6 +22,7 @@ import {
   recordNow,
   saving,
   siteOf,
+  unlessStatus,
   type RunResult,
   type Runners,
   type Values,
@@ -343,6 +344,14 @@ export const WORK_ORDER_RUNNERS: Runners<Key> = {
     return "error" in done ? done : undefined;
   },
   work_order_cancel: (v) => cancelWorkOrder(String(v.work_order_id), String(v.reason)),
+  work_order_approve: async (v) =>
+    (await unlessStatus(
+      "labour_contracts",
+      String(v.work_order_id),
+      "pending_approval",
+      "That work order is not waiting for approval.",
+      "That work order is gone.",
+    )) ?? approveLabourContract(String(v.work_order_id)),
   work_order_active: async (v) => {
     const now = await recordNow(
       "labour_contracts",

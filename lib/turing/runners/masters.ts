@@ -14,6 +14,11 @@ import {
   deleteItemCategory,
   updateItemCategory,
 } from "@/lib/masters/item-categories-actions";
+import {
+  approveItemRequest,
+  mergeItemRequest,
+  rejectItemRequest,
+} from "@/lib/masters/item-requests-actions";
 import { createItem, deleteItem, updateItem } from "@/lib/masters/items-actions";
 import { createPlot, deletePlot, updatePlot } from "@/lib/masters/plots-actions";
 import {
@@ -54,7 +59,7 @@ import {
 
 import { entryFor, formKeys, formOf } from "../catalogue-fields";
 import type { MASTERS } from "../entries/masters";
-import { recordNow, type Runners, type Values } from "./kit";
+import { recordNow, retired, type Runners, type Values } from "./kit";
 
 type Key = (typeof MASTERS)[number]["key"];
 type Save = (state: ActionState, form: FormData) => Promise<ActionState>;
@@ -95,6 +100,22 @@ const changing =
 
 const of = (values: Values, key: string) => String(values[key]);
 
+/**
+ * The request's provisional item, while it is still pending: the decisions update by id alone,
+ * so a second one would undo the first (accepting a rejected item leaves it switched off).
+ */
+async function pendingRequest(requestId: string): Promise<{ itemId: string } | { error: string }> {
+  const now = await recordNow(
+    "item_requests",
+    { column: "id", id: requestId },
+    ["status", "provisional_item_id"],
+    "That item request is gone.",
+  );
+  if ("error" in now) return now;
+  if (now.row.status !== "pending") return { error: `That request is already ${now.row.status}.` };
+  return { itemId: String(now.row.provisional_item_id) };
+}
+
 export const MASTERS_RUNNERS: Runners<Key> = {
   vendor_new: adding("vendor_new", createVendor),
   vendor_change: changing("vendor_change", updateVendor, {
@@ -114,6 +135,28 @@ export const MASTERS_RUNNERS: Runners<Key> = {
     gone: "That item is gone.",
   }),
   item_delete: (v) => deleteItem(of(v, "item_id")),
+  item_request_accept: async (v) => {
+    const request = await pendingRequest(of(v, "request_id"));
+    if ("error" in request) return request;
+    const code = typeof v.code === "string" && v.code ? v.code : null;
+    return approveItemRequest(of(v, "request_id"), request.itemId, code);
+  },
+  item_request_merge: async (v) => {
+    const request = await pendingRequest(of(v, "request_id"));
+    if ("error" in request) return request;
+    // The screen offers active items other than the provisional one itself.
+    if (of(v, "item_id") === request.itemId)
+      return { error: "An item can't be merged into itself." };
+    return (
+      (await retired("items", of(v, "item_id"))) ??
+      mergeItemRequest(of(v, "request_id"), request.itemId, of(v, "item_id"))
+    );
+  },
+  item_request_reject: async (v) => {
+    const request = await pendingRequest(of(v, "request_id"));
+    if ("error" in request) return request;
+    return rejectItemRequest(of(v, "request_id"), request.itemId);
+  },
 
   brand_new: adding("brand_new", createBrand),
   brand_change: changing("brand_change", updateBrand, {

@@ -205,14 +205,23 @@ export const PURCHASE_ORDERS = defineEntries([
     tool: "/purchase-orders",
     title: "A PO's cancellation, asked for",
     description:
-      "Asks for an issued PO to be cancelled, with the reason; an admin's yes on the PO's own screen cancels it.",
+      "Asks for an issued PO to be cancelled, with the reason; an admin's yes (po_cancel_approve) cancels it.",
     fields: [po, { key: "reason", label: "Why", kind: "text" }],
   },
   {
     key: "po_cancel_withdraw",
     tool: "/purchase-orders",
-    title: "A PO's cancellation, withdrawn",
-    description: "Withdraws a request to cancel a PO; it reads as issued again.",
+    title: "A PO's cancellation, withdrawn or refused",
+    description:
+      "Withdraws a request to cancel a PO, or refuses someone else's; it reads as issued again.",
+    fields: [po],
+  },
+  {
+    key: "po_cancel_approve",
+    tool: "/purchase-orders",
+    title: "A PO's cancellation, approved",
+    description:
+      "Says yes to a request to cancel a PO (purchase_orders.status deletion_requested; its deletion_note says why): the PO is cancelled for good, its lines go back to be bought, and its number stays used. Refused once goods were received against it.",
     fields: [po],
   },
 ]);

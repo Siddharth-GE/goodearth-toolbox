@@ -142,4 +142,20 @@ export const INDENTS = defineEntries([
       "Cancels a submitted or approved indent, with the reason why; final. Refused while a live PO orders from it.",
     fields: [indent, { key: "reason", label: "Why", kind: "text" }],
   },
+  {
+    key: "indent_approve",
+    tool: "/indents",
+    title: "An indent, approved",
+    description:
+      "Approves an indent waiting for approval (indents.status submitted), so it can be ordered; whoever raised it hears on their phone. Refused while a line outside the estimate waits for the estimator's answer or was refused by it — send that one back instead.",
+    fields: [indent],
+  },
+  {
+    key: "indent_send_back",
+    tool: "/indents",
+    title: "An indent, sent back",
+    description:
+      "Sends an indent waiting for approval back to draft, with a note saying what needs changing, which the site team sees at its top.",
+    fields: [indent, { key: "note", label: "What needs changing", kind: "text" }],
+  },
 ]);

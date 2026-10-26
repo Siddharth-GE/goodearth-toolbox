@@ -213,6 +213,14 @@ export const WORK_ORDERS = defineEntries([
     fields: [order, { key: "reason", label: "Why", kind: "text" }],
   },
   {
+    key: "work_order_approve",
+    tool: "/bills",
+    title: "A work order, approved",
+    description:
+      "Approves a work order waiting for approval (labour_contracts.status pending_approval); its works, value and terms are permanent after, and it can be billed and advanced against.",
+    fields: [order],
+  },
+  {
     key: "work_order_active",
     tool: "/bills",
     title: "A work order, switched off or on",
