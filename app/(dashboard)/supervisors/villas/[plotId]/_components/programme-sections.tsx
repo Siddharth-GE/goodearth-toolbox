@@ -65,6 +65,7 @@ export function controlData(plotId: string, stage: StageView): StageControlData 
     },
     contractorId: stage.record?.contractorId ?? null,
     owner: stage.owner,
+    leadName: stage.leadName,
     checklists: stage.checklists.map((entry) => ({
       name: entry.templateName,
       signedOff: entry.checklist?.status === "signed_off",

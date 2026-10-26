@@ -73,6 +73,8 @@ export type StageView = ProgrammeStage & {
   contractorName: string | null;
   /** Who owns the stage: the villa's own pick, else its category's lead (0158). */
   owner: { id: string; name: string; fromLead: boolean } | null;
+  /** The stage's category lead, whoever owns it on this villa: what clearing a villa's own owner hands back to. */
+  leadName: string | null;
   works: { id: string; label: string }[];
   progress: WorkProgress[];
   checklists: StageChecklist[];
@@ -577,6 +579,9 @@ export async function getVillaProgramme(input: {
         ? (contractorNames.get(stage.record.contractorId) ?? null)
         : null,
       owner: stageOwner(stage, leads, profileNames),
+      leadName: stage.categoryId
+        ? (profileNames.get(leads.get(stage.categoryId) ?? "") ?? null)
+        : null,
       works: stageWorks,
       progress: stageProgress(stageWorks, estimateRows, pieceWork),
       checklists,

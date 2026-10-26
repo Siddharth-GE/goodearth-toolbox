@@ -2857,6 +2857,7 @@ export const TURING_SCHEMA: Schema = {
       "plot_id": "string | null",
       "unit_id": "string | null",
       "unpriced": "boolean | null",
+      "work_group_id": "string | null",
       "work_item_id": "string | null"
     }
   },

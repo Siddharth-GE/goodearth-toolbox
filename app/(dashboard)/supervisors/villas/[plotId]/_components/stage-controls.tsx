@@ -60,6 +60,7 @@ export type StageControlData = {
   contractorId: string | null;
   /** Its owner: this villa's own pick, else the category's lead (0158). */
   owner: { id: string; name: string; fromLead: boolean } | null;
+  leadName: string | null;
   /** Checklists this stage should be signed off with, by name, and whether each is. */
   checklists: { name: string; signedOff: boolean }[];
   /** The schedule: this villa's own days and pinned start, and the days and dates the forecast uses. */
@@ -288,7 +289,7 @@ export function StageOwnerSelect({
 }) {
   const { pending, error, run } = useActionRunner();
   const own = stage.owner && !stage.owner.fromLead ? stage.owner.id : "";
-  const lead = stage.owner?.fromLead ? stage.owner.name : null;
+  const lead = stage.leadName;
   return (
     <div className="space-y-1.5">
       <Select
@@ -306,6 +307,10 @@ export function StageOwnerSelect({
         }
       >
         <option value="">{lead ? `The category lead, ${lead}` : "No owner yet"}</option>
+        {/* A saved owner since switched off stays shown, so the page never claims there is none. */}
+        {own && !people.some((person) => person.id === own) && (
+          <option value={own}>{stage.owner?.name ?? "Someone switched off"}</option>
+        )}
         {people.map((person) => (
           <option key={person.id} value={person.id}>
             {person.name}

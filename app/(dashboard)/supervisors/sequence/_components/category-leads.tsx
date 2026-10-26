@@ -34,6 +34,9 @@ function LeadRow({
           }
         >
           <option value="">No lead</option>
+          {category.ownerId && !people.some((person) => person.id === category.ownerId) && (
+            <option value={category.ownerId}>Someone switched off</option>
+          )}
           {people.map((person) => (
             <option key={person.id} value={person.id}>
               {person.name}

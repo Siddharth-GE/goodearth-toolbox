@@ -99,16 +99,28 @@ Settled while building: adding works still skips a work already on the estimate,
 
 ## D. Stage owners, and indents by stage — migration
 
-- [ ] **Stage owners:**
-  - `site_category_owners` (work category → person) is set on Supervisors → Sequence;
-  - `site_stages.owner_id` overrides it on one villa's stage;
-  - a stage's owner is the override, else the category's lead;
-  - the villa page, board and look ahead show the owner, and Mine includes stages I own.
-- [ ] **Indents by stage:**
-  - the indent records a stage (`indents.work_group_id`), and its pull offers every work's materials in that stage;
-  - each line records the work it came from (`indent_lines.work_item_id`), backfilled from the indent's work;
-  - the Estimator's approvals key on the line's work;
-  - old indents keep their work, and Turing's indent entries take the stage.
+Built on `feature/team-additions-d` (trial `scripts/trials/stage-owners.sql`, proven against two broken copies). The rules now live in the Supervisors, Indents and Estimator plans.
+
+The independent Opus review found nothing blocking. Its findings are fixed:
+
+- Budget against actual files a stage indent's purchases under the whole stage (`villa_cost_facts.work_group_id`);
+- a cancel can no longer change an indent's stage (`indents_guard`);
+- the estimator's yes spreads only to a stage's active works;
+- POs and deliveries name a stage indent by its stage;
+- the owner picker names the category lead it hands back to;
+- a switched-off owner or lead stays shown;
+- Turing refuses a stage and a work together.
+
+Settled while building: indent lines carry no work of their own. The estimator's yes on a stage indent covers the stage's works instead, so no line column is needed.
+
+- [x] **Stage owners:** a category lead on Supervisors → Sequence, a villa's own owner in the stage sheet, the owner on every stage, and Mine on the board and the look ahead.
+- [x] **Indents by stage:** the form, the header, the pull, the list filter, the print, the site check and Turing.
+- [ ] [Founder] Vet on staging:
+  - Supervisors → Sequence → "Who leads each category": set MEP to one person.
+  - Open a villa → a MEP stage: its owner reads "The category lead". Change it to someone else, then back.
+  - Sign in as that person (or check the board's Mine): the villa shows.
+  - Indents → New indent → pick a stage, then Pull from the estimate: every work of that stage's materials is offered.
+  - Indents list → filter by that stage.
 
 ## E. My plate — the shell, likely no migration
 

@@ -6645,6 +6645,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "indents_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "indents_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
@@ -12561,6 +12568,7 @@ export type Database = {
           plot_id: string | null
           unit_id: string | null
           unpriced: boolean | null
+          work_group_id: string | null
           work_item_id: string | null
         }
         Relationships: []

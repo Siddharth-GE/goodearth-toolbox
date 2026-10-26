@@ -44,7 +44,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 - **Costs are live while working, frozen at official** (`0077`). The app computes the snapshot — per-row costs and the per-(work, material) takeoff — and SQL validates it, never re-implements it. **The takeoff stays one row per work and material** however many rows a work has, so Indents, Inventory and Supervisors read what they always did; `estimate_work_facts` adds a work's rows up. An official work with several rows shows each row's labour and its own material cost, not a per-row material list.
 - **One working and one official estimate per villa** (partial unique indexes); a race loses at the index, loudly. Only drafts are edited or deleted (`delete_draft_estimate`, one transaction). A template is an estimate with no villa (`check (is_template = (unit_id is null))`); no screen makes one.
 - **Deletion is refused, not cascaded** — a material used in a recipe is deactivated, never deleted.
-- **Material outside the official estimate is flagged forever** (`0083`). Detection is derived, per (work, item), from issues and direct-to-site deliveries; only the estimator's acknowledgement is stored, with no delete policy and no un-approve. The amber badge never clears.
+- **Material outside the official estimate is flagged forever** (`0083`). An approval given at a stage indent (`0158`) covers the item on every active work of that stage. Detection is derived, per (work, item), from issues and direct-to-site deliveries; only the estimator's acknowledgement is stored, with no delete policy and no un-approve. The amber badge never clears.
 - **No embeds** — `units` has two paths to `plots`, so names merge through a `Map` (BUGCATCHER #2).
 
 ## Things that will bite
