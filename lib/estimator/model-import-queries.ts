@@ -108,13 +108,7 @@ export async function getWorkingEstimateForModel(unitId: string): Promise<Estima
       .order("id")
       .range(from, to),
   );
-  // The model measures a work's first unlabelled row, else its first (import_model_rows, 0157): that row comes first.
-  const lines = [...read].sort(
-    (a, b) =>
-      Number(a.label !== null) - Number(b.label !== null) ||
-      a.created_at.localeCompare(b.created_at) ||
-      a.id.localeCompare(b.id),
-  );
+  const lines = read;
   const rows =
     lines.length === 0
       ? []
@@ -142,12 +136,22 @@ export async function getWorkingEstimateForModel(unitId: string): Promise<Estima
     estimateId: header.id,
     modelFile: header.model_file,
     modelGuid: header.model_guid,
-    lines: lines.map((line) => ({
-      lineId: line.id,
-      workItemId: line.work_item_id,
-      qty: line.qty,
-      handRows: counts.get(line.id)?.hand ?? 0,
-      modelRows: counts.get(line.id)?.model ?? 0,
-    })),
+    // The model measures the row it measured before, else a work's first unlabelled row, else its first
+    // (import_model_rows, 0157): that row comes first.
+    lines: [...lines]
+      .sort(
+        (a, b) =>
+          Number((counts.get(b.id)?.model ?? 0) > 0) - Number((counts.get(a.id)?.model ?? 0) > 0) ||
+          Number(a.label !== null) - Number(b.label !== null) ||
+          a.created_at.localeCompare(b.created_at) ||
+          a.id.localeCompare(b.id),
+      )
+      .map((line) => ({
+        lineId: line.id,
+        workItemId: line.work_item_id,
+        qty: line.qty,
+        handRows: counts.get(line.id)?.hand ?? 0,
+        modelRows: counts.get(line.id)?.model ?? 0,
+      })),
   };
 }

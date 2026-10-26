@@ -425,7 +425,8 @@ export function frozenLineCosts(lines: FrozenLineRow[], takeoff: FrozenTakeoffRo
       qty: line.qty,
       toMeasure: false,
       isSetUp: line.uom !== null,
-      hasRecipe: rows.length > 0,
+      // A work with several rows shares its takeoff, so a row's own material cost says whether it has a recipe.
+      hasRecipe: rows.length > 0 && line.materialCost !== 0,
       labourCost: line.labourCost,
       materialCost: line.materialCost,
       totalCost: line.totalCost,

@@ -7,7 +7,8 @@
 --    and an ON DELETE SET NULL would try to change a frozen row, which the draft-only guard refuses.
 -- 2. estimator_copy_estimate_contents and make_estimate_official pair rows by copied_from; p_costs carries each
 --    working row's line_id. The takeoff stays one row per work and material, so every reader downstream is unchanged.
--- 3. import_model_rows adds a work the estimate lacks, and measures a work's first unlabelled row (else its first).
+-- 3. import_model_rows adds a work the estimate lacks, and measures the row it measured before, else a work's first
+--    unlabelled row, else its first.
 -- 4. estimate_work_facts sums a work's rows: one row per work, as Supervisors reads it.
 
 -- 1 ------------------------------------------------------------------------------------------------------
@@ -28,13 +29,15 @@ language plpgsql
 set search_path to 'public'
 as $$
 begin
+  -- created_at is carried over so a work's rows keep their order in the copy.
   insert into estimator_estimate_lines
-    (estimate_id, work_item_id, label, qty, note, labour_rate, copied_from, created_by, updated_by)
+    (estimate_id, work_item_id, label, qty, note, labour_rate, copied_from, created_at, created_by, updated_by)
   select p_to, l.work_item_id, l.label,
          case when p_everything then l.qty end,
          l.note,
          case when p_everything then l.labour_rate end,
          l.id,
+         l.created_at,
          auth.uid(), auth.uid()
   from estimator_estimate_lines l
   where l.estimate_id = p_from;
@@ -111,17 +114,20 @@ begin
 
   perform estimator_copy_estimate_contents(p_working, v_new, true);
 
-  -- Each cost row names the working row it priced; the copy of that row takes it.
+  -- Each cost row names the working row it priced; the copy of that row takes it. A cost row naming only its work
+  -- (the app before 0157, between this migration and its deploy) still lands, while a work has one row.
   insert into estimator_estimate_line_costs
     (estimate_id, line_id, work_item_id, qty, uom, labour_rate,
      labour_cost, material_cost, total_cost, created_by, updated_by)
   select v_new, l.id, l.work_item_id, c.qty, c.uom, c.labour_rate,
          c.labour_cost, c.material_cost, c.total_cost, auth.uid(), auth.uid()
   from jsonb_to_recordset(p_costs) as c(
-    line_id uuid, qty numeric, uom text, labour_rate numeric,
+    line_id uuid, work_item_id uuid, qty numeric, uom text, labour_rate numeric,
     labour_cost numeric, material_cost numeric, total_cost numeric
   )
-  join estimator_estimate_lines l on l.estimate_id = v_new and l.copied_from = c.line_id;
+  join estimator_estimate_lines l
+    on l.estimate_id = v_new
+   and (l.copied_from = c.line_id or (c.line_id is null and l.work_item_id = c.work_item_id));
 
   -- The snapshot must describe exactly what was copied: one cost row per
   -- line, at the line's own quantity. Anything else means the estimate
@@ -210,7 +216,8 @@ begin
   using estimator_estimate_lines l
   where l.id = m.line_id and l.estimate_id = p_estimate and m.from_model;
 
-  -- The new rows, in the model's order, after the line's hand rows: on the work's first unlabelled row, else its first.
+  -- The new rows, in the model's order, after the line's hand rows: on the row the model measured last time, else the
+  -- work's first unlabelled row, else its first.
   insert into estimator_estimate_line_measurements
     (line_id, description, nos, length, breadth, depth, sort_order, from_model, model_refs,
      created_by, updated_by)
@@ -230,7 +237,7 @@ begin
   join lateral (
     select f.id from estimator_estimate_lines f
      where f.estimate_id = p_estimate and f.work_item_id = x.work_item_id
-     order by (f.label is not null), f.created_at, f.id
+     order by (f.id = any(v_had)) desc, (f.label is not null), f.created_at, f.id
      limit 1
   ) l on true
   cross join lateral jsonb_array_elements(
