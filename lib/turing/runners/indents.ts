@@ -115,6 +115,7 @@ export const INDENT_RUNNERS: Runners<Key> = {
       const site = await siteOf(projectId, text(header, "plot_id"));
       if ("error" in site) return site;
       const workItemId = text(header, "work_item_id");
+      const workGroupId = text(header, "work_group_id");
       const isUrgent = header.is_urgent === true;
       const made = await saving(
         () =>
@@ -122,6 +123,7 @@ export const INDENT_RUNNERS: Runners<Key> = {
             projectId,
             ...site,
             workItemId,
+            workGroupId,
             requiredBy: text(header, "required_by"),
             note: text(header, "note"),
             isUrgent,
@@ -142,23 +144,25 @@ export const INDENT_RUNNERS: Runners<Key> = {
       const kept = await recordNow(
         "indents",
         { column: "id", id },
-        ["work_item_id", "is_urgent"],
+        ["work_item_id", "work_group_id", "is_urgent"],
         null,
       );
       if (
         "error" in kept ||
         (kept.row.work_item_id ?? null) !== workItemId ||
+        (kept.row.work_group_id ?? null) !== workGroupId ||
         Boolean(kept.row.is_urgent) !== isUrgent
       ) {
         const fixed = await updateIndentHeader(id, {
           workItemId,
+          workGroupId,
           requiredBy: text(header, "required_by"),
           note: text(header, "note"),
           isUrgent,
         });
         if (fixed?.error) {
           return {
-            error: `${reference} was made as a draft without its work or urgent mark: ${fixed.error}`,
+            error: `${reference} was made as a draft without its stage, work or urgent mark: ${fixed.error}`,
           };
         }
       }
@@ -182,18 +186,23 @@ export const INDENT_RUNNERS: Runners<Key> = {
     const now = await recordNow(
       "indents",
       { column: "id", id: String(v.indent_id) },
-      ["work_item_id", "required_by", "note", "is_urgent"],
+      ["work_item_id", "work_group_id", "required_by", "note", "is_urgent"],
       "That indent is gone.",
     );
     if ("error" in now) return now;
     const row = now.row as {
       work_item_id: string | null;
+      work_group_id: string | null;
       required_by: string | null;
       note: string | null;
       is_urgent: boolean;
     };
+    // Naming a stage drops an older indent's work, and naming a work drops the stage: never both.
+    const stageGiven = "work_group_id" in v && Boolean(v.work_group_id);
+    const workGiven = "work_item_id" in v && Boolean(v.work_item_id);
     return updateIndentHeader(String(v.indent_id), {
-      workItemId: given(v, "work_item_id", row.work_item_id) || null,
+      workItemId: stageGiven ? null : given(v, "work_item_id", row.work_item_id) || null,
+      workGroupId: workGiven ? null : given(v, "work_group_id", row.work_group_id) || null,
       requiredBy: given(v, "required_by", row.required_by) || null,
       note: given(v, "note", row.note) || null,
       isUrgent: "is_urgent" in v ? v.is_urgent === true : row.is_urgent,

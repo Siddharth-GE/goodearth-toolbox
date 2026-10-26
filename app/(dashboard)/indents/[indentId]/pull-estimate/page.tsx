@@ -33,6 +33,7 @@ export default async function EstimatePullPage({
         indent.work_item_id,
         allWorks,
         idParam(stageParam) ?? null,
+        indent.work_group_id,
       )
     : null;
   const href = `/indents/${indentId}/pull-estimate`;

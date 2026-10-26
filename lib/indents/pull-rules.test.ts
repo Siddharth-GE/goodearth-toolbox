@@ -5,6 +5,7 @@ import {
   classifyBudgetChooser,
   classifyDesignDrift,
   classifyEstimatePull,
+  factsForGroup,
   factsForStage,
   factsForWork,
   groupEstimatePull,
@@ -315,4 +316,23 @@ test("a stage offers every work in it; a fact with no work belongs to no stage",
     ["cement", "steel"],
   );
   assert.equal(factsForStage(facts, stageOf, "finishes").length, 0);
+});
+
+test("an indent for a stage offers the materials of every work in that stage (0158)", () => {
+  const facts = [
+    { work_item_id: "block-gf", item_id: "block" },
+    { work_item_id: "block-ff", item_id: "cement" },
+    { work_item_id: "plaster", item_id: "sand" },
+    { work_item_id: null, item_id: "loose" },
+  ];
+  const groupOfWork = new Map<string, string | null>([
+    ["block-gf", "masonry"],
+    ["block-ff", "masonry"],
+    ["plaster", "plastering"],
+  ]);
+  assert.deepEqual(
+    factsForGroup(facts, groupOfWork, "masonry").map((fact) => fact.item_id),
+    ["block", "cement"],
+  );
+  assert.equal(factsForGroup(facts, groupOfWork, "roofing").length, 0);
 });
