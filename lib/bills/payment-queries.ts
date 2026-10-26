@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 
 import {
   cashRequestFigures,
+  contractorLedger,
   contractorPosition,
+  type LedgerEntry,
   type CashRequestStatus,
   type ContractorPosition,
   type MoneyKind,
@@ -641,10 +643,28 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
 export type ContractorRow = {
   vendor_id: string;
   vendor_name: string;
+  is_contractor: boolean;
+  contractor_no: string | null;
   position: ContractorPosition;
 };
 
-export async function listContractorPositions(projectId?: string): Promise<ContractorRow[]> {
+/** Who is a contractor and their number, for the vendors a money list names. */
+async function vendorFacts(supabase: Client, ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map<string, { is_contractor: boolean; contractor_no: string | null }>();
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from("vendors")
+      .select("id, is_contractor, contractor_no")
+      .in("id", unique)
+      .order("id")
+      .range(from, to),
+  );
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+/** projectIds narrows to those projects (one project, or a company's); undefined is every project. */
+export async function listContractorPositions(projectIds?: string[]): Promise<ContractorRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
   const [bills, advances, recovered] = await Promise.all([
@@ -675,7 +695,7 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     return fresh;
   };
   for (const bill of bills) {
-    if (!bill.vendor_id || (projectId && bill.project_id !== projectId)) continue;
+    if (!bill.vendor_id || (projectIds && !projectIds.includes(bill.project_id))) continue;
     entry(bill.vendor_id, bill.vendor_name).bills.push({
       total: bill.total,
       paid: bill.paid,
@@ -683,7 +703,7 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     });
   }
   for (const advance of advances) {
-    if (projectId && advance.project_id !== projectId) continue;
+    if (projectIds && !projectIds.includes(advance.project_id)) continue;
     entry(
       advance.vendor_id,
       (advance.vendors as { name: string } | null)?.name ?? "—",
@@ -693,11 +713,155 @@ export async function listContractorPositions(projectId?: string): Promise<Contr
     });
   }
 
+  const facts = await vendorFacts(supabase, [...byVendor.keys()]);
   return [...byVendor.entries()]
     .map(([vendorId, value]) => ({
       vendor_id: vendorId,
       vendor_name: value.name,
+      is_contractor: facts.get(vendorId)?.is_contractor ?? false,
+      contractor_no: facts.get(vendorId)?.contractor_no ?? null,
       position: contractorPosition(value.bills, value.advances),
     }))
     .sort((a, b) => a.vendor_name.localeCompare(b.vendor_name));
+}
+
+export type ContractorLedgerRow = LedgerEntry & {
+  balance: number;
+  /** What it was: a bill's number and their own count, a payment's reference, an advance's. */
+  label: string;
+  bill_id: string | null;
+  project_name: string;
+  reversal: boolean;
+};
+
+export type ContractorLedger = {
+  vendor: { id: string; name: string; contractor_no: string | null; is_contractor: boolean };
+  rows: ContractorLedgerRow[];
+  /** Bills recorded and not yet approved: owed once approved, so outside the balance. */
+  waiting: { count: number; total: number };
+};
+
+/** One vendor's account (approved bills, payments, advances, recoveries), oldest first with a running balance. */
+export async function getContractorLedger(
+  vendorId: string,
+  projectIds?: string[],
+): Promise<ContractorLedger | null> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const { data: vendor, error: vendorError } = await supabase
+    .from("vendors")
+    .select("id, name, contractor_no, is_contractor")
+    .eq("id", vendorId)
+    .maybeSingle();
+  if (vendorError) {
+    console.error("getContractorLedger vendor failed:", vendorError);
+    throw new Error("Could not read the contractor.", { cause: vendorError });
+  }
+  if (!vendor) return null;
+
+  const [bills, advances] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("bills")
+        .select("id, reference, status, project_id, invoice_date, total_amount, vendor_seq, projects(name)")
+        .eq("vendor_id", vendorId)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_advances")
+        .select("id, amount, paid_on, payment_ref, project_id, reverses_id, projects(name)")
+        .eq("vendor_id", vendorId)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const inScope = (projectId: string) => !projectIds || projectIds.includes(projectId);
+  const owed = bills.filter(
+    (bill) => (bill.status === "approved" || bill.status === "paid") && inScope(bill.project_id),
+  );
+  const billIds = owed.map((bill) => bill.id);
+  const [payments, recoveries] = billIds.length
+    ? await Promise.all([
+        fetchAll((from, to) =>
+          supabase
+            .from("bill_payments")
+            .select("id, bill_id, amount, paid_on, payment_ref, reverses_id")
+            .in("bill_id", billIds)
+            .order("id")
+            .range(from, to),
+        ),
+        fetchAll((from, to) =>
+          supabase
+            .from("advance_recoveries")
+            .select("id, bill_id, amount, recovered_on, reverses_id")
+            .in("bill_id", billIds)
+            .order("id")
+            .range(from, to),
+        ),
+      ])
+    : [[], []];
+
+  const projectName = (embed: unknown) => (embed as { name: string } | null)?.name ?? "—";
+  const billById = new Map(owed.map((bill) => [bill.id, bill]));
+  const billLabel = (id: string) => {
+    const bill = billById.get(id);
+    return bill ? `${bill.reference ?? "—"}${bill.vendor_seq ? ` (their bill ${bill.vendor_seq})` : ""}` : "—";
+  };
+  const entries = [
+    ...owed.map((bill) => ({
+      id: bill.id,
+      kind: "bill" as const,
+      // Dated as on its paper; only approved bills count, a recorded one is listed apart.
+      on: bill.invoice_date,
+      amount: bill.total_amount ?? 0,
+      label: billLabel(bill.id),
+      bill_id: bill.id,
+      project_name: projectName(bill.projects),
+      reversal: false,
+    })),
+    ...payments.map((row) => ({
+      id: row.id,
+      kind: "payment" as const,
+      on: row.paid_on,
+      amount: row.amount,
+      label: `${row.payment_ref} · ${billLabel(row.bill_id)}`,
+      bill_id: row.bill_id,
+      project_name: projectName(billById.get(row.bill_id)?.projects),
+      reversal: row.reverses_id !== null,
+    })),
+    ...advances
+      .filter((row) => inScope(row.project_id))
+      .map((row) => ({
+        id: row.id,
+        kind: "advance" as const,
+        on: row.paid_on,
+        amount: row.amount,
+        label: row.payment_ref,
+        bill_id: null,
+        project_name: projectName(row.projects),
+        reversal: row.reverses_id !== null,
+      })),
+    ...recoveries.map((row) => ({
+      id: row.id,
+      kind: "recovery" as const,
+      on: row.recovered_on,
+      amount: row.amount,
+      label: `Advance set against ${billLabel(row.bill_id)}`,
+      bill_id: row.bill_id,
+      project_name: projectName(billById.get(row.bill_id)?.projects),
+      reversal: row.reverses_id !== null,
+    })),
+  ];
+
+  const waiting = bills.filter((bill) => bill.status === "recorded" && inScope(bill.project_id));
+  return {
+    vendor,
+    rows: contractorLedger(entries),
+    waiting: {
+      count: waiting.length,
+      total: roundPaise(waiting.reduce((sum, bill) => sum + (bill.total_amount ?? 0), 0)),
+    },
+  };
 }

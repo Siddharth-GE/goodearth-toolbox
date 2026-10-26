@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   cashRequestFigures,
+  contractorLedger,
   contractorPosition,
   lineLeftToPay,
   mondayOf,
@@ -83,5 +84,26 @@ test("money is reversed once, by an approver, and an advance only once nothing i
   assert.match(
     blocked?.kind === "blocked" ? blocked.why : "",
     /25,000\.00 of it has been recovered/,
+  );
+});
+
+test("a contractor's ledger: bills add, payments and advances take away, a recovery moves nothing", () => {
+  const rows = contractorLedger([
+    { id: "p1", kind: "payment", on: "2026-10-12", amount: 60000 },
+    { id: "a1", kind: "advance", on: "2026-10-01", amount: 50000 },
+    { id: "b1", kind: "bill", on: "2026-10-12", amount: 100000 },
+    { id: "r1", kind: "recovery", on: "2026-10-12", amount: 40000 },
+    { id: "p2", kind: "payment", on: "2026-10-20", amount: -60000 },
+  ]);
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.balance]),
+    [
+      ["a1", -50000],
+      ["b1", 50000],
+      ["p1", -10000],
+      ["r1", -10000],
+      // A reversed payment puts what it paid back on what is owed.
+      ["p2", 50000],
+    ],
   );
 });
