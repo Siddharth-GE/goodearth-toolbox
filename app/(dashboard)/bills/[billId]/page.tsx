@@ -99,6 +99,8 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         description={
           <>
             {bill.vendor_name ?? "Direct labour — no vendor"}
+            {bill.vendor_contractor_no ? ` (${bill.vendor_contractor_no})` : ""}
+            {bill.vendor_seq ? ` · their bill ${bill.vendor_seq}` : ""}
             {` · ${bill.project_name}`}
             {bill.scope_name ? ` · ${bill.scope_name}` : " · General"}
             {bill.kind === "nmr" ? " · Labour, no work order" : ""}

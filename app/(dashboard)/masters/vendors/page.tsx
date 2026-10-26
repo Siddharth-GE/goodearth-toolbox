@@ -47,7 +47,7 @@ export default async function VendorsPage({
               id="q"
               name="q"
               defaultValue={q ?? ""}
-              placeholder="Name, contact or GST…"
+              placeholder="Name, contact, GST or CON no.…"
               autoComplete="off"
             />
           </div>
@@ -106,7 +106,9 @@ export default async function VendorsPage({
                       <Link href={`/masters/vendors/${vendor.id}`} className="hover:underline">
                         {vendor.name}
                       </Link>
-                      {vendor.is_contractor && <Badge variant="neutral">Contractor</Badge>}
+                      {vendor.is_contractor && (
+                        <Badge variant="neutral">{vendor.contractor_no ?? "Contractor"}</Badge>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell>{vendor.contact_name || "—"}</TableCell>
