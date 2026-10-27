@@ -49,6 +49,7 @@ async function settled(userId: string) {
   }
   refresh();
 }
+
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function failed(error: { message: string; code?: string }, fallback: string): ActionState {
@@ -82,14 +83,17 @@ export async function saveFigure(project: string, key: string, raw: string): Pro
     .from("saarang_collection_figures")
     .upsert({ project, key, value, updated_by: user.id }, { onConflict: "project,key" });
   if (error) return failed(error, "Could not save the figure. Try again.");
-  await settled(user.id);
+  // A typed figure is not part of what core.ts works out, so the kept figures stay as they are.
+  refresh();
   return undefined;
 }
 
+/** `settle: false` for a caller that settles once itself at its end (the upload). */
 async function saveSettings(
   userId: string,
   row: Record<string, string | number | boolean | null>,
   fallback: string,
+  settle = true,
 ): Promise<ActionState> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -99,7 +103,7 @@ async function saveSettings(
     .select("id");
   if (error) return failed(error, fallback);
   if (!data?.length) return { error: fallback };
-  await settled(userId);
+  if (settle) await settled(userId);
   return undefined;
 }
 
@@ -310,6 +314,7 @@ export async function uploadReports(_prev: UploadState, formData: FormData): Pro
         user.id,
         { report_date: reportDate, period_from: period.from, period_to: period.to },
         "The reports were saved, but the report date could not be moved. Set the period on Summary.",
+        false,
       );
       if (moved?.error) errors.push(moved.error);
       else

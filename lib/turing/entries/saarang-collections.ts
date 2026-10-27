@@ -59,7 +59,7 @@ export const SAARANG_COLLECTIONS = defineEntries([
     tool: TOOL,
     title: "A Saarang figure typed by hand",
     description:
-      "One shaded cell of the Saarang meeting summary. Saarang Plot and Saarang Villa type C, D, G, I, J, K, N, Q, R and T; Phase 3 types its whole row: C, E, N, O, P, F, M, H, MTD and T. Every other figure is worked out from the Zoho uploads (read them from saarang_collection_summary) and cannot be typed. N, O and Q are counts; the rest are rupees. Empty clears the cell.",
+      "One shaded cell of the Saarang meeting summary, kept in saarang_collection_figures. Saarang Plot and Saarang Villa type C, D, G, I, J, K, N, Q, R and T; Phase 3 types its whole row: C, E, N, O, P, F, M, H, MTD and T. N, O and Q are counts; the rest are rupees. Empty clears the cell. Every other figure is worked out from the Zoho uploads and cannot be typed: read it from saarang_collection_summary (Plot and Villa only), where L is collected but unused, S is OL-collection, O and Munits are counts, and a null value means that Zoho report is not uploaded. If that table is empty, or its computed_at is older than the newest saarang_collection_uploads.uploaded_at or saarang_collection_settings.updated_at, say the figures may be out of date: any save in the tool rewrites them.",
     check: (values) =>
       !("value" in values)
         ? "Say the figure, or send it empty to clear the cell."
