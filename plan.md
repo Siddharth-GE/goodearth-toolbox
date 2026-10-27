@@ -279,7 +279,7 @@ Fable's review waived by the founder, 2026-10-24 ("Waive, build it now"); an ind
   - The first pull request carries the Save and the most-used entries; the rest follow in small batches, each entry with its field test.
   - Verify: the photo of a paper indent → a proposed indent → Save → numbered and off for approval like any other; a 20-vendor sheet with two duplicates — both flagged, 18 saved, each with the admin as creator; a proposal the tool refuses shows the tool's own sentence.
 
-## Risks Fable checks
+## Risks the Opus review checks
 
 - The rule change above: the exception's edges, and whether `check:boundaries` holds them.
 - Vercel's function ceiling on the current plan against a long page build — streaming keeps the line open, but the ceiling is real.
@@ -307,7 +307,7 @@ Branch `feature/site-board` off `staging`, worktree `..\toolbox-os`. One pull re
 - **One supervisor per villa** ("who runs it") for a Mine / Everyone switch. Everyone still sees every villa (founder, 2026-08-20) — this is a filter, not a permission.
 - **Checklists belong to stages**: each checklist template is linked to the work groups it inspects (pre-filled from its old work codes, edited under Supervisors → Checklists). A working stage shows its checklist; marking a stage done with its checklist unsigned asks once, "Done without signing off the Blockwork checklist?" — a nudge, never a block (site work never waits), unless the founder decides otherwise.
 
-## Migration `0137_site_programme.sql` `[Opus drafts, Fable reviews unless waived]`
+## Migration `0137_site_programme.sql` `[Opus drafts; an independent Opus read reviews]`
 
 Supervisors' own tables, RLS `/supervisors` on every verb, write revokes and an assert at the end; no money anywhere.
 
@@ -446,7 +446,7 @@ Everything else below is new.
 - [ ] [Founder] After the import: send the works list to SketchUp again, and re-tag any model using old codes (FD.14 is now FD.03.03).
 - Found in the sheet, for the founder: the Finishes remarks sit one row low (fixed in code); FD.04.06 "Plinth Beam" and its works sit under FD.04 Pile Foundation; Engineering Consultation for villas (ENC.1–3) has no place in the new sheet and is switched off.
 
-### Migration `0131_works_families_and_item_gst.sql` `[Opus drafts, Fable reviews — touches Masters' open tables, no RLS change]`
+### Migration `0131_works_families_and_item_gst.sql` `[Opus drafts, an independent Opus read reviews — touches Masters' open tables, no RLS change]`
 
 - `work_categories.family text` — the sheet's Stage column: `Site Mobilisation`, `Infrastructure - Civil`, `Infrastructure - MEP`, `Buildings`, `Maintenance`. CHECK on those five. Backfill existing categories as `Buildings`.
 - `items.gst_pct numeric null check (gst_pct >= 0 and gst_pct <= 100)` — null means "not entered". Validated against active `gst_rates` in the action, no FK (the PO line copies the number the same way).
@@ -485,14 +485,14 @@ Everything else below is new.
 
 - [x] [Opus] Built with no migration, on `feature/os-updates` with Wave 1: 2 (stage links on the pull page), 7 (the Reporter dataset; the Inventory Items toggle is still to do), 9 (the order picker searches in the browser, not yet on the server), 10 (label "Contractor or supplier"; the Contractors page keeps its name), 11 (its own search form, since the page's toolbar owns `q`).
 - [x] [Opus] 1, 3, 5, 6 on `feature/os-updates-2` with `0132`: columns and invoker guards only (no view, definer, policy or money), so applied to staging after a dry run and `scripts/trials/small-fixes.sql`, run as a supervisor and a store-keeper and proven to fail with the request guard broken.
-- [ ] [Fable] 4 and 8 need `0133`: `send_labour_logs_to_bill()` is a definer and the charges are money. Drafted for review; nothing applied.
+- [ ] [Opus] 4 and 8 need `0133`: `send_labour_logs_to_bill()` is a definer and the charges are money. Drafted for review; nothing applied.
 
-One migration, `0132_small_fixes.sql` `[Opus drafts; Fable reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
+One migration, `0132_small_fixes.sql` `[Opus drafts; an independent Opus read reviews the Bills function and the Supervisors columns]`, holding every column below; each fix is its own commit.
 
 1. **Urgent indents** (E&P 1). `indents.is_urgent boolean default false`. A tick on the indent form, a red "Urgent" badge on the list, the approver's list sorted urgent-first, the welcome count. Editable while draft only (`indents_guard` tuple). The push notification text is unchanged.
 2. **Indent pull by stage** (E&P 3). On `/indents/[id]/pull-estimate`, a **Stage** select (work categories present on the official estimate) beside "Show every work"; `factsForWork` gains a category filter in `lib/indents/pull-rules.ts` (tested). No migration.
 3. **Deduction rows** (E&P 7). `estimator_estimate_line_measurements.is_deduction boolean default false`; the four `> 0` checks stay — a deduction is a positive row subtracted, so "2 × 1.2 × 2.1, deduct" reads plainly and prints with a minus. `measurementQuantity` / `sheetTotal` in `calc.ts` subtract deductions (tested); `syncLineQty` still refuses a total not above zero; model rows are never deductions (`0118`'s import never sets it); the copy function `estimator_copy_estimate_contents` must carry the column (assert it, as `0118` did for `from_model`). A "Deduct" tick on the row form and a −/opening label in the sheet. `estimator/PLAN.md` decision 6 updated ("additions only" goes).
-4. **Piece-work without a work order** (Supervisor 1). `send_labour_logs_to_bill()` accepts a null work order for piece-work: the bill is then kind `nmr` with the contractor as vendor, lines priced from the rate book's `work_labour_rate_facts` as the suggestion (no order line to suggest from). Send to Bill's picker becomes optional with the sentence "No work order — billed as a direct labour bill." `lib/bills/labour-billing.ts` tests cover both. Fable reviews the function (it is a definer that checks `/bills`).
+4. **Piece-work without a work order** (Supervisor 1). `send_labour_logs_to_bill()` accepts a null work order for piece-work: the bill is then kind `nmr` with the contractor as vendor, lines priced from the rate book's `work_labour_rate_facts` as the suggestion (no order line to suggest from). Send to Bill's picker becomes optional with the sentence "No work order — billed as a direct labour bill." `lib/bills/labour-billing.ts` tests cover both. An independent Opus read reviews the function (it is a definer that checks `/bills`).
 5. **Work classification** (Supervisor 4). `work_class text not null default 'standard' check in ('standard','additional','rework')` on `labour_logs` (added to `labour_logs_one_per_day` and the billed guard's tuple), `stock_issues` (header, beside the work — one issue, one work, one class), and `issue_requests` (so the supervisor's request carries it and Fulfil pre-fills it). Three-way segmented control on the labour form, the request form and the issue form; shown on the villa page's labour list, the issue note, Send to Bill's rows and the bill line description. `0104`'s `labour_logs_shape_matches_kind` untouched.
 6. **Invoice number from the GRN** (Commercial 1). `goods_receipts.invoice_no text`, `invoice_date date` (nullable; challan stays). The receive form asks for them. The bill form, once a PO is picked, lists that PO's receipts' invoice numbers and dates (not yet on an approved bill) and pre-fills when there is exactly one. Bills reads `goods_receipts` directly — a new read in STATUS.md's contract row for Bills. Shown on the receipt page.
 7. **Material issue report by location** (Commercial 2). A Reporter dataset `stock_issue_lines`: project, issue no, date, from store, to (plot or store), work, work class, item, code, quantity, unit — money-free, built on the open stock tables (`lib/reporter/datasets.ts`, `datasets/types.ts`). Plus an **Items** toggle on `/inventory/issues` that lists lines instead of headers under the same filters (plot, store, dates).
@@ -505,7 +505,7 @@ Verification per fix: the probe account (single grant) presses the one button; t
 
 ## Wave 3 — the three builds
 
-### 3a. Site checklists `[Fable designs here; Opus the tables; Sonnet the screens]`
+### 3a. Site checklists `[Opus designs here and builds the tables; Sonnet the screens]`
 
 Supervisors-owned. Migration `0134_site_checklists.sql` (drafted; numbers moved up one when Wave 2 took `0133`).
 
@@ -514,7 +514,7 @@ Supervisors-owned. Migration `0134_site_checklists.sql` (drafted; numbers moved 
 - Phone screens on the villa page: a **Checklists** section — start one (pick template, location/floor), tick items (Pass / Fail / N/A, remark), review notes shown in amber as hints, sign off. A print later if asked.
 - `supervisors/PLAN.md` gains the section; STATUS.md the line.
 
-### 3b. Site confirms what the store issued `[Fable designs here; Opus the function; Sonnet the screens]`
+### 3b. Site confirms what the store issued `[Opus designs here and builds the function; Sonnet the screens]`
 
 Migration `0135_site_receipt_confirmations.sql` (drafted, with the design change below). Inventory's tables, written by Supervisors through one definer — a new cross-tool write for `SECURITY.md`'s list.
 
@@ -523,7 +523,7 @@ Migration `0135_site_receipt_confirmations.sql` (drafted, with the design change
 - Supervisors villa page: **Deliveries to this villa** — issues and direct deliveries not yet confirmed, each opening a confirm form (quantities pre-filled, editable; a shortage asks why). Inventory's issue note and receipt page show "Confirmed by … on …" or the shortage in amber. Stock stays what was issued (quantities, never money); the shortage is a note for the store-keeper and accounts, not a movement — an adjustment stays Inventory's.
 - STATUS.md: Supervisors' row adds the write; `SECURITY.md` cross-tool list; `inventory/PLAN.md` and `supervisors/PLAN.md`.
 
-### 3c. Budget vs actual, and stage payments `[Fable designs here and reviews the view; Opus builds the view and the page; Sonnet the work-order shortcut]`
+### 3c. Budget vs actual, and stage payments `[Opus designs here, has the view reviewed independently, and builds the view and the page; Sonnet the work-order shortcut]`
 
 Migration `0136_villa_costs_and_stage_billing.sql` (drafted) — **a money view**, `money: true` in `scripts/view-manifest.ts`, gated in its own WHERE to `has_app('/estimator') or has_app('/bills') or has_app('/reporter')`, writes revoked. `SECURITY.md` _Money stays confined_ records that the Estimator now reads committed and actual money through this one view, by the founder's decision 2026-10-22.
 
@@ -531,14 +531,14 @@ Migration `0136_villa_costs_and_stage_billing.sql` (drafted) — **a money view*
 - **Estimator → villa → Budget vs actual** (`/estimator/villas/[unitId]/budget`): per category and per work: Estimated (the official estimate's frozen `estimator_estimate_line_costs`, labour and material apart), Committed (PO + work orders), Actual (material issued, labour billed), variance; a totals row; the official's number and date at the top; "unknown" where a figure cannot be known. `lib/estimator/budget-vs-actual.ts` pure and tested. Also reachable from Bills (a link on a villa's bills list) since `/bills` sees the view — the page's `requireTool` accepts either grant (the one page in the Estimator that does; written down in `estimator/PLAN.md`).
 - **Stage-based payments for Superstructure and MEP:** a work order's lines are already work + unit + quantity + rate, so the SS/MEP package works (Wave 1) are the stages. Build: (i) on the work-order form, **"Add every package work of a category"** — picks Superstructure or MEP, adds one line per package work at the rate book's rate with the villa's built-up sqft typed once (or read from the official estimate's package lines when present); (ii) `bill_lines.labour_contract_line_id` (nullable FK) so a bill names which stage line it bills, a `work_order_line_billing_facts` view (money, `/bills` or `/reporter`) of value and billed so far per line, the work-order page showing billed/remaining per stage, and `linesFromWorkOrder` pre-filling each line at value − billed so far (over-billing still warns, never blocks). `bills/PLAN.md` rule 6 and `SECURITY.md`'s window list updated.
 
-## For the Fable review — four drafts on `feature/os-updates-3`, none applied
+## For the Opus review — four drafts on `feature/os-updates-3`, none applied
 
 Each draft dry-runs clean on staging, alone and all four together. Each has a trial under `scripts/trials/` run as single-grant people. Each trial fails against a deliberately broken copy. Review against `SECURITY.md` and `BUGCATCHER.md`, then apply in order, `0133` to `0136`, regenerating types after each.
 
-- [ ] [Fable] **`0133` piece-work without a work order, and charges apart from the rate.** It redefines the definer `send_labour_logs_to_bill()`: piece-work with no order becomes a direct labour bill through `create_nmr_bill`, and every piece-work line now names an additional-work or rework class. It adds `charges_amount`, `charges_gst_pct` and `charges_note` to POs and bills. It redefines `bill_lines_roll_up` and adds a `bills_charges_roll_up` BEFORE UPDATE trigger, so the charges join taxable, GST and total. It redefines `po_billing_totals` (same columns, manifest note updated) so what was ordered counts the PO's charges. Trial: `piece-work-and-charges.sql`. It caught a CHECK that let charges through with no GST.
-- [ ] [Fable] **`0134` site checklists.** Four new tables, templates read by anyone signed in, and checklists that are `/supervisors` on every verb. Sign-off needs every item answered and a remark on each Fail and N/A, and a signed-off checklist never changes. Deletion reaches only an open checklist, and templates are switched off rather than deleted. It adds a private `site-checklists` bucket. Trial: `site-checklists.sql`, as a supervisor and as the probe.
-- [ ] [Fable] **`0135` site receipt: a design change from 3b.** Supervisors' own append-only `site_receipt_confirmations` (and lines) point at the issue or delivery instead of a definer writing Inventory's tables. Inventory's line tables carry quantity and permanence guards an update would wake, and this needs no cross-tool write, only a read for Inventory's issue note. One confirmation per document, never more than was sent, signed by the confirmer, and readable by `/supervisors` and `/inventory`. The shortage note is the action's rule, not the database's. Trial: `site-receipt.sql`.
-- [ ] [Fable] **`0136` villa costs and stage billing.** It adds `villa_cost_facts`, a money view gated to `/estimator`, `/bills` and `/reporter`. It carries the official estimate's labour and material figures, because `/bills` cannot read the Estimator's tables, so it is the one place estimate money leaves the Estimator. That needs a sentence in `SECURITY.md` at apply. Figures are before GST, and an unknown batch rate says `unpriced`. It adds `bill_lines.labour_contract_line_id`, checked in `bill_lines_guard`, and `work_order_line_billing_facts` (`/bills`, `/reporter`). Both views are in the manifest. Worth a look: the view's correlated plot lookups at scale. Trial: `villa-costs.sql`, as Bills, the probe and a supervisor.
+- [ ] [Opus] **`0133` piece-work without a work order, and charges apart from the rate.** It redefines the definer `send_labour_logs_to_bill()`: piece-work with no order becomes a direct labour bill through `create_nmr_bill`, and every piece-work line now names an additional-work or rework class. It adds `charges_amount`, `charges_gst_pct` and `charges_note` to POs and bills. It redefines `bill_lines_roll_up` and adds a `bills_charges_roll_up` BEFORE UPDATE trigger, so the charges join taxable, GST and total. It redefines `po_billing_totals` (same columns, manifest note updated) so what was ordered counts the PO's charges. Trial: `piece-work-and-charges.sql`. It caught a CHECK that let charges through with no GST.
+- [ ] [Opus] **`0134` site checklists.** Four new tables, templates read by anyone signed in, and checklists that are `/supervisors` on every verb. Sign-off needs every item answered and a remark on each Fail and N/A, and a signed-off checklist never changes. Deletion reaches only an open checklist, and templates are switched off rather than deleted. It adds a private `site-checklists` bucket. Trial: `site-checklists.sql`, as a supervisor and as the probe.
+- [ ] [Opus] **`0135` site receipt: a design change from 3b.** Supervisors' own append-only `site_receipt_confirmations` (and lines) point at the issue or delivery instead of a definer writing Inventory's tables. Inventory's line tables carry quantity and permanence guards an update would wake, and this needs no cross-tool write, only a read for Inventory's issue note. One confirmation per document, never more than was sent, signed by the confirmer, and readable by `/supervisors` and `/inventory`. The shortage note is the action's rule, not the database's. Trial: `site-receipt.sql`.
+- [ ] [Opus] **`0136` villa costs and stage billing.** It adds `villa_cost_facts`, a money view gated to `/estimator`, `/bills` and `/reporter`. It carries the official estimate's labour and material figures, because `/bills` cannot read the Estimator's tables, so it is the one place estimate money leaves the Estimator. That needs a sentence in `SECURITY.md` at apply. Figures are before GST, and an unknown batch rate says `unpriced`. It adds `bill_lines.labour_contract_line_id`, checked in `bill_lines_guard`, and `work_order_line_billing_facts` (`/bills`, `/reporter`). Both views are in the manifest. Worth a look: the view's correlated plot lookups at scale. Trial: `villa-costs.sql`, as Bills, the probe and a supervisor.
 - At apply: `SECURITY.md` _Money stays confined_ goes from eleven money views to thirteen and names both new views. Its cross-tool list gains nothing, since 0135 adds no write. STATUS's contract table gains Inventory reading the confirmations and the Estimator and Bills reading `villa_cost_facts`.
 
 ### Built after the review `[Opus, Sonnet]`
@@ -636,7 +636,7 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 - [ ] [Opus] Draft the App Store listing, privacy labels and review notes (the reviewer Gmail with Google sign-in, the 4.8 exemption, the native features to try); screenshots from TestFlight.
 - [x] [Founder] Android: live on Google Play, 2026-10-26 (`android/PLAN.md`).
 - [ ] [Founder] Submit to the App Store.
-- [ ] [Fable] Approval pass over the full diff before each merge, as `MODELS.md` says.
+- [ ] [Opus] Approval pass over the full diff before each merge, as `MODELS.md` says.
 
 # The refactor before production — done
 

@@ -33,7 +33,7 @@ The founder gives the steps. Before the switch:
 1. ~~The refactor before production~~ — done and vetted 2026-10-18 (`plan.md`).
 2. The vet list below, tried or accepted as is.
    - If the test project has been seeded again, delete it (Settings → Test project): its POs and bills use real vendors.
-3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
+3. An Opus pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
    - `toolbox.kaadalgroup.com` already serves `staging` (Vercel domain on the `staging` branch, DNS a Cloudflare CNAME, DNS only); it moves to the production deployment, and staging's Supabase Site URL follows;
@@ -115,7 +115,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 
 - **Dexter's Replace file removes the deck's old files before uploading the new ones**, so an upload that fails leaves the deck's link empty until it is replaced again (the page says so). Doing it safely means the new files go to a new folder and the deck then points at it: a folder column on `dexter_decks`, so a migration.
 
-- **The Supervisors board reads every official estimate line** (`lib/supervisors/board-queries.ts`) to know which stages each villa has. Fine at today's handful of estimates; at ~100 villas it is ~80 sequential pages, so give it a small view of distinct (unit, work group) before then — with its revokes, and a Fable review.
+- **The Supervisors board reads every official estimate line** (`lib/supervisors/board-queries.ts`) to know which stages each villa has. Fine at today's handful of estimates; at ~100 villas it is ~80 sequential pages, so give it a small view of distinct (unit, work group) before then — with its revokes, and an Opus review.
 
 - **Look ahead reads each villa with something starting in full** (`getVillaDetail`, for material readiness). Fine for a supervisor's own villas; on Everyone at ~40 villas it is hundreds of reads, so give readiness its own narrow read of the estimate's materials and what was issued, for the villas involved, before then.
 
