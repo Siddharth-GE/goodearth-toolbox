@@ -7,6 +7,7 @@ import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
+import type { ContractorNumbering } from "@/lib/masters/contractor-bill-number";
 import type { Filterable } from "@/lib/list-params";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
@@ -396,6 +397,7 @@ export type BillAnchorContract = {
   vendor_id: string;
   reference: string | null;
   description: string;
+  project_id: string;
   project_name: string;
   scope_name: string;
   contract_value: number;
@@ -416,6 +418,7 @@ export type BillFormOptions = {
   projects: { id: string; name: string; code: string | null }[];
   plots: BillScopedOption[];
   units: (BillScopedOption & { plot_id: string | null })[];
+  numbering: ContractorNumbering;
 };
 
 // Summed per labour contract; cache()d so one request never pages the bills table twice.
@@ -440,6 +443,48 @@ export const billedByContractTotals = cache(async function billedByContractTotal
   }
   return totals;
 });
+
+/** What the next contractor bill is numbered from (0164), so the screens show the number before it is sent. */
+export async function getContractorNumbering(): Promise<ContractorNumbering> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+  const [contractors, projects, companies, counts] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("vendors")
+        .select("id, bill_code")
+        .eq("is_contractor", true)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase.from("projects").select("id, company_id").order("id").range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase.from("companies").select("id, name, code").order("id").range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("contractor_bill_numbers")
+        .select("vendor_id, company_id, last_no")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const companyById = new Map(companies.map((company) => [company.id, company]));
+  return {
+    codes: Object.fromEntries(contractors.map((vendor) => [vendor.id, vendor.bill_code])),
+    companies: Object.fromEntries(
+      projects.map((project) => [
+        project.id,
+        (project.company_id && companyById.get(project.company_id)) || null,
+      ]),
+    ),
+    lastNo: Object.fromEntries(
+      counts.map((count) => [`${count.vendor_id}/${count.company_id}`, count.last_no]),
+    ),
+  };
+}
 
 /** Just the four masters lists the contract dialog needs, not the PO totals getBillFormOptions loads. */
 export async function getContractFormOptions() {
@@ -469,44 +514,54 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [vendors, projects, plots, units, contracts, poRows, totalRows, billedByContract] =
-    await Promise.all([
-      listVendors(),
-      listProjects(),
-      listPlots(),
-      listUnits(),
-      // Only approved, active contracts take bills (create_bill guards it too).
-      fetchAll((from, to) =>
-        supabase
-          .from("labour_contracts")
-          .select(
-            "id, reference, vendor_id, project_id, plot_id, unit_id, description, contract_value",
-          )
-          .eq("status", "approved")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .order("id")
-          .range(from, to),
-      ),
-      // fetchAll: a capped read would hide a real PO or under-count what is billed.
-      fetchAll((from, to) =>
-        supabase
-          .from("po_facts")
-          .select("id, vendor_id, project_id, reference, status")
-          .in("status", ["issued", "completed"])
-          .order("created_at", { ascending: false })
-          .order("id")
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("po_billing_totals")
-          .select("po_id, ordered_total, billed_total")
-          .order("po_id")
-          .range(from, to),
-      ),
-      billedByContractTotals(),
-    ]);
+  const [
+    vendors,
+    projects,
+    plots,
+    units,
+    contracts,
+    poRows,
+    totalRows,
+    billedByContract,
+    numbering,
+  ] = await Promise.all([
+    listVendors(),
+    listProjects(),
+    listPlots(),
+    listUnits(),
+    // Only approved, active contracts take bills (create_bill guards it too).
+    fetchAll((from, to) =>
+      supabase
+        .from("labour_contracts")
+        .select(
+          "id, reference, vendor_id, project_id, plot_id, unit_id, description, contract_value",
+        )
+        .eq("status", "approved")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    // fetchAll: a capped read would hide a real PO or under-count what is billed.
+    fetchAll((from, to) =>
+      supabase
+        .from("po_facts")
+        .select("id, vendor_id, project_id, reference, status")
+        .in("status", ["issued", "completed"])
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("po_billing_totals")
+        .select("po_id, ordered_total, billed_total")
+        .order("po_id")
+        .range(from, to),
+    ),
+    billedByContractTotals(),
+    getContractorNumbering(),
+  ]);
 
   const projectNames = new Map(projects.map((p) => [p.id, p.name]));
   const unitNames = new Map(units.map((u) => [u.id, u.name]));
@@ -544,6 +599,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       vendor_id: contract.vendor_id,
       reference: contract.reference,
       description: contract.description,
+      project_id: contract.project_id,
       project_name: projectName(contract.project_id),
       scope_name: contract.unit_id
         ? (unitNames.get(contract.unit_id) ?? "—")
@@ -562,5 +618,6 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       name,
       code,
     })),
+    numbering,
   };
 }

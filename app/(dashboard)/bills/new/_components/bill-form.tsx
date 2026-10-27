@@ -13,6 +13,7 @@ import { createBillWithLines } from "@/lib/bills/line-actions";
 import type { DeliveryForBill } from "@/lib/bills/line-queries";
 import {
   billLinesProblem,
+  isPieceWorkBill,
   lineMoneyOf,
   type BillLineDraft,
   type PoLineForBill,
@@ -24,6 +25,7 @@ import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { nextContractorBill } from "@/lib/masters/contractor-bill-number";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -35,6 +37,24 @@ import {
 } from "../../_components/bill-lines-editor";
 
 export type FormKind = "po" | "contract" | "nmr";
+
+function NextBillNote({
+  nextBill,
+}: {
+  nextBill: NonNullable<ReturnType<typeof nextContractorBill>>;
+}) {
+  return "problem" in nextBill ? (
+    <p className="text-warning text-xs font-medium" role="alert">
+      {nextBill.problem}
+    </p>
+  ) : (
+    <p className="text-muted text-xs">
+      {"Recording numbers it "}
+      <span className="text-foreground font-mono font-semibold">{nextBill.reference}</span>
+      {" — from the contractor's code and the project's company."}
+    </p>
+  );
+}
 
 // Labour logged on site is billed from Bills → Labour (Send to Bill); kind nmr here is labour with no work order: miscellaneous work or an unlogged muster roll. Over-billing warns, never blocks.
 export function BillForm({
@@ -144,8 +164,19 @@ export function BillForm({
   const drafts = draftsOf(lines);
   const totals = rollUpBill(drafts.map(lineMoneyOf));
   const overBilled = anchorId !== "" && exceedsAnchor(anchorTotal, alreadyBilled, totals.total);
+  const numberedVendor = kind === "nmr" ? nmrVendorId : (anchoredContract?.vendor_id ?? "");
+  const numberedProject = kind === "nmr" ? projectId : (anchoredContract?.project_id ?? "");
+  const nextBill =
+    numberedVendor && numberedProject
+      ? nextContractorBill(
+          options.numbering,
+          numberedVendor,
+          numberedProject,
+          kind === "contract" || isPieceWorkBill(drafts) ? "PW" : "NMR",
+        )
+      : null;
   const problem =
-    kind === "nmr"
+    (kind === "nmr"
       ? !projectId
         ? "Choose the project."
         : missingProjectCode || missingScopeCode
@@ -155,7 +186,7 @@ export function BillForm({
         ? kind === "po"
           ? "Choose the purchase order."
           : "Choose the work order."
-        : undefined;
+        : undefined) ?? (nextBill && "problem" in nextBill ? nextBill.problem : undefined);
   const linesProblem = billLinesProblem(drafts);
   const blocked =
     problem ??
@@ -279,6 +310,7 @@ export function BillForm({
                 <p className="text-foreground text-sm font-medium">
                   {vendorName.get(anchorVendorId) ?? "—"}
                 </p>
+                {nextBill && <NextBillNote nextBill={nextBill} />}
               </div>
             )}
           </div>
@@ -330,11 +362,8 @@ export function BillForm({
                 {scopedSite?.name} has no short code yet, so it can&apos;t number bills. Set one in
                 Masters first.
               </p>
-            ) : nmrVendorId ? (
-              <p className="text-muted text-xs">
-                Numbered from the contractor&apos;s bill code and the project&apos;s company, e.g.
-                RAJU-NMR-ED-08 — PW instead when it has piece-work and no daily wages.
-              </p>
+            ) : nextBill ? (
+              <NextBillNote nextBill={nextBill} />
             ) : (
               project?.code && (
                 <p className="text-muted text-xs">

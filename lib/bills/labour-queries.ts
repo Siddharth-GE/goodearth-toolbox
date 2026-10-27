@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import type { ContractorNumbering } from "@/lib/masters/contractor-bill-number";
 import { WORK_CLASS_LABEL, isWorkClass } from "@/lib/masters/work-classes";
 import { listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -8,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { WorkOrderRate } from "./labour-billing";
 import { dayRatesFromLines, type DayRates } from "./lines";
+import { getContractorNumbering } from "./queries";
 
 // Bills reads labour_logs (0104 widened their one SELECT policy to /supervisors or /bills) and the rate book's rate through work_labour_rate_facts. Contract table: Bills → labour_logs.
 
@@ -111,6 +113,7 @@ export type LabourBillingOptions = {
   workOrders: BillableWorkOrder[];
   rateBook: Record<string, number>;
   dayRates: Record<string, DayRates>;
+  numbering: ContractorNumbering;
 };
 
 export async function getLabourBillingOptions(
@@ -120,7 +123,7 @@ export async function getLabourBillingOptions(
   const supabase = await createClient();
   const ids = [...new Set(contractorIds)];
 
-  const [orders, orderLines, rates, nmrBills] = await Promise.all([
+  const [orders, orderLines, rates, nmrBills, numbering] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("labour_contracts")
@@ -160,6 +163,7 @@ export async function getLabourBillingOptions(
             .range(from, to),
         )
       : Promise.resolve([]),
+    getContractorNumbering(),
   ]);
 
   const linesByOrder = new Map<string, WorkOrderRate[]>();
@@ -195,5 +199,6 @@ export async function getLabourBillingOptions(
       ),
     ),
     dayRates,
+    numbering,
   };
 }
