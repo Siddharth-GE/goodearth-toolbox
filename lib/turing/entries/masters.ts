@@ -90,6 +90,8 @@ const company = [
   words("legal_name", "Legal name"),
   words("address", "Address"),
   words("gstin", "GSTIN"),
+  words("pan", "PAN"),
+  words("msme_number", "MSME (Udyam) number"),
   { key: "state", label: "State", kind: "text", optional: true, start: "Kerala" },
   words("phone", "Phone"),
   words("email", "Email"),

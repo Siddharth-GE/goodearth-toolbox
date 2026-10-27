@@ -10,8 +10,9 @@ import {
   Signatures,
   type Column,
 } from "@/lib/pdf/document";
+import { QrCode } from "@/lib/pdf/qr";
 import { pdf } from "@/lib/pdf/theme";
-import type { InvoiceLine, InvoicePrint } from "./invoice";
+import { upiPayLink, type InvoiceLine, type InvoicePrint } from "./invoice";
 import { nightsBetween } from "./money";
 
 /** The letterhead comes from Masters, never typed or invented (PRODUCT.md). Amounts are digits to the paisa
@@ -43,6 +44,9 @@ const styles = StyleSheet.create({
   payBlock: { flexDirection: "row", gap: 16, marginTop: 4 },
   payColumn: { flex: 1 },
   payText: { fontSize: pdf.size.small, lineHeight: 1.5 },
+  upiColumn: { flexDirection: "row", gap: 8, marginTop: -6 },
+  upiText: { flex: 1 },
+  qrCaption: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
 const paise = (value: number) => formatAmount(value, { paise: true });
@@ -84,6 +88,7 @@ const TAX_COLUMNS: Column<InvoicePrint["taxSummary"][number]>[] = [
 
 export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
   const draft = invoice.mode === "draft";
+  const payLink = upiPayLink(invoice);
   const company = invoice.company;
   const issuer = company?.legal_name || company?.name || null;
   const nights = invoice.stay.arrival
@@ -115,6 +120,7 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
           items={[
             { label: "Invoice date", value: invoice.issuedOn ? formatDate(invoice.issuedOn) : "—" },
             { label: "Billed to", value: invoice.billTo.name || "—" },
+            { label: "Guest phone", value: invoice.stay.guestPhone ?? "—" },
             { label: "Their GSTIN", value: invoice.billTo.gstin ?? "—" },
             { label: "Place of supply", value: invoice.placeOfSupply ?? "—" },
             {
@@ -125,7 +131,6 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
             },
             { label: "Nights", value: nights ? String(nights) : "Day visit" },
             { label: "Guests", value: invoice.stay.guests ? String(invoice.stay.guests) : "—" },
-            { label: "Issued by", value: issuer ?? "—" },
           ]}
         />
         {invoice.billTo.address && (
@@ -185,8 +190,12 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
                 </View>
               )}
               {invoice.upiId && (
-                <View style={styles.payColumn}>
-                  <Text style={styles.payText}>UPI: {invoice.upiId}</Text>
+                <View style={[styles.payColumn, styles.upiColumn]}>
+                  {payLink && <QrCode value={payLink} size={72} />}
+                  <View style={styles.upiText}>
+                    <Text style={styles.payText}>UPI: {invoice.upiId}</Text>
+                    {payLink && <Text style={styles.qrCaption}>Scan to pay with any UPI app</Text>}
+                  </View>
                 </View>
               )}
             </View>

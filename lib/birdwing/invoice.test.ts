@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { printDraft, printFromSnapshot } from "./invoice";
+import { printDraft, printFromSnapshot, upiPayLink } from "./invoice";
 
 const stay = {
   ref: "BW-0001",
@@ -23,7 +23,13 @@ test("a snapshot prints its lines, letterhead and totals", () => {
     bill_to_address: null,
     discount: "30",
     snapshot: {
-      company: { name: "Maloor", legal_name: "MALOOR ECO FARMS", gstin: "32AAOCM4043Q1Z1" },
+      company: {
+        name: "Maloor",
+        legal_name: "MALOOR ECO FARMS",
+        gstin: "32AAOCM4043Q1Z1",
+        pan: "AAOCM4043Q",
+        msme_number: "UDYAM-KR-03-0539542",
+      },
       place_of_supply: "Kannur, Kerala (32)",
       upi_id: "x@cnrb",
       lines: [
@@ -35,6 +41,8 @@ test("a snapshot prints its lines, letterhead and totals", () => {
   });
   assert.equal(print.mode, "issued");
   assert.equal(print.company?.legal_name, "MALOOR ECO FARMS");
+  assert.equal(print.company?.pan, "AAOCM4043Q");
+  assert.equal(print.company?.msme_number, "UDYAM-KR-03-0539542");
   assert.equal(print.lines[1].taxable, 1800);
   assert.equal(print.total, 10104);
   assert.equal(print.taxable, 9400);
@@ -88,4 +96,29 @@ test("a draft is unnumbered and made out to the guest", () => {
   assert.equal(print.billTo.name, "Trial Guest");
   assert.equal(print.lines[0].taxable, 1000);
   assert.equal(print.payable, 1050);
+});
+
+test("only an issued invoice with a UPI ID gets a pay link, and it carries no amount", () => {
+  const issued = printFromSnapshot({
+    number: "MEF/GH/136",
+    status: "issued",
+    issued_on: "2026-10-13",
+    cancel_reason: null,
+    bill_to_name: "Trial Guest",
+    bill_to_gstin: null,
+    bill_to_address: null,
+    discount: 0,
+    snapshot: {
+      company: { name: "Maloor", legal_name: "Maloor Eco Farms" },
+      upi_id: " 328556986208737@cnrb ",
+    },
+  });
+  assert.equal(
+    upiPayLink(issued),
+    "upi://pay?pa=328556986208737@cnrb&pn=Maloor%20Eco%20Farms&tn=Invoice%20MEF%2FGH%2F136&cu=INR",
+  );
+  assert.equal(upiPayLink({ ...issued, mode: "cancelled" }), null);
+  assert.equal(upiPayLink({ ...issued, upiId: null }), null);
+  assert.equal(upiPayLink({ ...issued, upiId: "not a upi id" }), null);
+  assert.equal(upiPayLink({ ...issued, mode: "draft", number: null }), null);
 });

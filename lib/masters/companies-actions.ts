@@ -9,13 +9,21 @@ import { deleteMaster } from "./delete-master";
 
 // GSTIN shape, loose on purpose: catches a pasted PAN or a missing character; the checksum is the tax portal's job.
 const GSTIN_SHAPE = /^[0-9]{2}[A-Z0-9]{13}$/;
+const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+// Loose: the Udyam number and the older Udyog Aadhaar are both still printed.
+const MSME_SHAPE = /^[A-Z0-9-]{6,40}$/;
+
+const code = (formData: FormData, key: string) =>
+  rawText(formData, key).toUpperCase().replace(/\s+/g, "") || null;
 
 function readCompanyForm(formData: FormData) {
   return {
     name: text(formData, "name"),
     legal_name: optionalText(formData, "legal_name"),
     address: optionalText(formData, "address"),
-    gstin: rawText(formData, "gstin").toUpperCase().replace(/\s+/g, "") || null,
+    gstin: code(formData, "gstin"),
+    pan: code(formData, "pan"),
+    msme_number: code(formData, "msme_number"),
     state: text(formData, "state"),
     phone: optionalText(formData, "phone"),
     email: optionalText(formData, "email"),
@@ -29,6 +37,12 @@ function validate(form: ReturnType<typeof readCompanyForm>): string | undefined 
     return "Enter the company's state — POs compare it with each vendor's GST state.";
   if (form.gstin && !GSTIN_SHAPE.test(form.gstin)) {
     return "A GSTIN is 15 letters and digits, starting with the state's two digits, e.g. 32ABCDE1234F1Z5.";
+  }
+  if (form.pan && !PAN_SHAPE.test(form.pan)) {
+    return "A PAN is 10 characters: five letters, four digits, then a letter, e.g. ABCDE1234F.";
+  }
+  if (form.msme_number && !MSME_SHAPE.test(form.msme_number)) {
+    return "An MSME number is letters, digits and dashes, e.g. UDYAM-KR-03-0539542.";
   }
   if (form.email && !form.email.includes("@")) return "That email address looks incomplete.";
   return undefined;
