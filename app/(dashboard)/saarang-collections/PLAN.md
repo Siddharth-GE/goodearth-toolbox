@@ -17,6 +17,7 @@ The monthly Saarang collection and expense meeting, worked out from eight Zoho e
 - **Typed figures** are the summary's C D G I J K N Q R and the meeting's T for each project, and the whole Phase 3 row. Each saves when the person leaves the cell; a calculated cell can't be typed (the database's CHECK says so).
 - **Who did it**: every typed figure, rule change and rule-list row records its person, pinned to the caller by the policies; the audit trigger keeps the history of everything but the uploads, which are their own record.
 - **The Excel download** is written by `writeWorkbookBytes` (`lib/xlsx.ts`), no spreadsheet library.
+- **Turing reads the kept figures** in `saarang_collection_summary` (`0162`), since it reads tables, not code. Every save that changes an upload, a rule or the period ends with `settled()` in `actions.ts`, which works the Summary out and rewrites them; a typed figure does not, as it is not part of that working. A new figure in `core.ts` fails to compile in `shared.ts` (`KEPT`) until it is kept too, and 0162's CHECK is widened in a new migration. Turing's own copy of the typed cells (`lib/turing/entries/saarang-collections.ts`) follows 0161's CHECK by hand, as the boundary rule keeps it from importing this tool.
 
 ## Reads outside itself
 

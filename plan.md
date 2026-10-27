@@ -38,7 +38,15 @@ The reference lives outside the repo, in `Documents/Custom Office Templates/coll
 - [x] [Sonnet] Screens in `app/(dashboard)/saarang-collections/`: `page.tsx` (welcome), `summary/`, `reports/`, `rules/`, each with `loading.tsx`, a `ToolNav`, and `_components/`. The selected cell (`?cell=plot.F`) and the project filter (`?project=`) live in the URL, so the breakdown renders on the server. `download/route.ts` serves the meeting workbook in the HTML's layout (Summary Sheet plus the supporting sheets), the same way the existing CSV export routes work. Opus vets each screen. Vetted.
 - [x] [Opus] Phone check at 390 px: tiles stack, and the wide tables scroll inside their cards. The page itself must not scroll sideways. Seen with made-up data in headless Chrome at a true 390 px (the page measures 390): tiles stack, every table scrolls in its card with the project column pinned; a breakdown row was made to stay on one line.
 - [x] [Opus] Docs: the tool's `PLAN.md` (its rules and what bites), STATUS.md (the tool and its contract row), and TODO.md's vet list.
-- [ ] [Opus] Smoke test as the probe with only `/saarang-collections`, and as a no-grant account (refused). Then an independent Opus review of the full diff against this plan, SECURITY.md and BUGCATCHER.md. One pull request into `staging`, CI green, merged on the founder's word. The founder chose to skip the signed-in probe run (2026-10-27): their staging try is the first signed-in look.
+- [x] [Opus] Smoke test as the probe with only `/saarang-collections`, and as a no-grant account (refused). Then an independent Opus review of the full diff against this plan, SECURITY.md and BUGCATCHER.md. One pull request into `staging`, CI green, merged on the founder's word. The founder chose to skip the signed-in probe run (2026-10-27): their staging try is the first signed-in look. The review found nothing blocking; its fixes are in; merged as #182.
+
+## Turing uses it too (asked 2026-10-27: "make sure turing can use collections as well")
+
+Turing reads tables, and the Summary's figures are worked out in code, so it could only have read raw uploads and guessed.
+
+- [x] [Opus] `0162_saarang_collection_summary`: each project's worked-out figures (E F H L M MTD Munits O P S) with their labels, rewritten after every save by `settled()` in `actions.ts`; a failed rewrite never fails the save. Trial `scripts/trials/saarang-summary.sql`; an independent Opus read found nothing blocking, its fixes are in.
+- [x] [Opus] Turing's catalogue, `lib/turing/entries/saarang-collections.ts` and its runners: a figure typed by hand, the period, the rules, and adding or removing a left-out receipt, a correction or a unit added by hand — each through the tool's own save, after the admin's Save. Uploads stay on the Reports screen, as Dexter's files do.
+- [ ] Founder: ask Turing about the Saarang figures once the 21 Oct set is in, and have it propose a correction.
 - [ ] Founder vets on staging. Grant the tool to the people who prepare the meeting, give it a team in Settings → Teams, and type the starting figures from the 21 Oct sheet.
 
 ## The founder's checklist on staging
