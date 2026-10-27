@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
 import { checkUploads, uploadReports } from "@/lib/saarang-collections/actions";
@@ -11,37 +12,42 @@ import { Upload } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 const lines = (text: string | undefined) => (text ? text.split("\n") : []);
+const plural = (n: number, one: string) => `${formatCount(n)} ${n === 1 ? one : `${one}s`}`;
 
 const totalText = (total: ReportCheck["total"]) =>
-  "units" in total ? `${formatCount(total.units)} units` : formatMoney(total.amount);
+  "units" in total ? plural(total.units, "unit") : formatMoney(total.amount);
+
+const NOT_SENT = "Those files changed or could not be sent. Drop them again.";
 
 /** One dropped file before it is saved: what it was read as, beside what is loaded now. */
 function CheckCard({ check }: { check: ReportCheck }) {
   return (
-    <li className="border-border bg-surface-raised space-y-1 rounded-xl border p-4 text-left text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-foreground font-medium">{check.label}</span>
-        {check.warnings.length > 0 ? (
-          <Badge variant="warning">Check this</Badge>
-        ) : (
-          <Badge variant="success">Looks right</Badge>
-        )}
-      </div>
-      <p className="text-muted text-xs">{check.file}</p>
-      <p className="text-foreground tabular-nums">
-        {formatCount(check.rows)} rows · {totalText(check.total)}
-        {check.asOf ? ` · as of ${formatDate(check.asOf)}` : ""}
-      </p>
-      <p className="text-muted text-xs tabular-nums">
-        {check.now
-          ? `Loaded now: ${formatCount(check.now.rowCount)} rows${check.now.asOf ? `, as of ${formatDate(check.now.asOf)}` : ""}`
-          : "Nothing loaded for this report yet."}
-      </p>
-      {check.warnings.map((warning) => (
-        <p key={warning} className="text-warning font-medium">
-          {warning}
+    <li>
+      <Card className="bg-surface-raised space-y-1 p-4 text-left text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-foreground font-medium">{check.label}</span>
+          {check.warnings.length > 0 ? (
+            <Badge variant="warning">Check this</Badge>
+          ) : (
+            <Badge variant="success">Looks right</Badge>
+          )}
+        </div>
+        <p className="text-muted text-xs [overflow-wrap:anywhere]">{check.file}</p>
+        <p className="text-foreground tabular-nums">
+          {plural(check.rows, "row")} · {totalText(check.total)}
+          {check.asOf ? ` · as of ${formatDate(check.asOf)}` : ""}
         </p>
-      ))}
+        <p className="text-muted text-xs tabular-nums">
+          {check.now
+            ? `Loaded now: ${plural(check.now.rowCount, "row")}${check.now.asOf ? `, as of ${formatDate(check.now.asOf)}` : ""}`
+            : "Nothing loaded for this report yet."}
+        </p>
+        {check.warnings.map((warning) => (
+          <p key={warning} className="text-warning font-medium">
+            {warning}
+          </p>
+        ))}
+      </Card>
     </li>
   );
 }
@@ -54,6 +60,7 @@ export function DropZone() {
   const [files, setFiles] = useState<File[]>([]);
   const [check, setCheck] = useState<CheckState>();
   const [result, setResult] = useState<UploadState>();
+  const [doing, setDoing] = useState<"reading" | "saving">("reading");
   const [pending, startTransition] = useTransition();
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,22 +72,38 @@ export function DropZone() {
   };
 
   const read = (chosen: File[]) => {
-    if (chosen.length === 0) return;
+    if (pending || chosen.length === 0) return;
     setFiles(chosen);
     setResult(undefined);
+    setDoing("reading");
     startTransition(async () => {
-      setCheck(await checkUploads(undefined, formOf(chosen)));
+      try {
+        setCheck(await checkUploads(undefined, formOf(chosen)));
+      } catch {
+        setCheck({ error: NOT_SENT });
+      }
       // So picking the same file again, after fixing it, still reads it.
       if (inputRef.current) inputRef.current.value = "";
     });
   };
 
-  const save = () =>
+  const save = () => {
+    setDoing("saving");
     startTransition(async () => {
-      setResult(await uploadReports(undefined, formOf(files)));
-      setCheck(undefined);
-      setFiles([]);
+      let saved: UploadState;
+      try {
+        saved = await uploadReports(undefined, formOf(files));
+      } catch {
+        saved = { error: NOT_SENT };
+      }
+      setResult(saved);
+      // A save that failed outright keeps the cards, so Save can be pressed again.
+      if (saved?.saved || !saved?.error) {
+        setCheck(undefined);
+        setFiles([]);
+      }
     });
+  };
 
   const cancel = () => {
     setCheck(undefined);
@@ -99,12 +122,13 @@ export function DropZone() {
   }, []);
 
   const checks = check?.checks ?? [];
+  const errors = lines(result?.error ?? check?.error);
 
   return (
     <div
       onDragOver={(event) => {
         event.preventDefault();
-        setOver(true);
+        if (!pending) setOver(true);
       }}
       onDragLeave={() => setOver(false)}
       onDrop={(event) => {
@@ -152,7 +176,9 @@ export function DropZone() {
           <div className="flex flex-wrap justify-center gap-2">
             <Button type="button" disabled={pending} onClick={save}>
               {pending
-                ? "Saving…"
+                ? doing === "saving"
+                  ? "Saving…"
+                  : "Reading…"
                 : checks.length === 1
                   ? "Save this report"
                   : `Save these ${checks.length} reports`}
@@ -171,20 +197,20 @@ export function DropZone() {
           </div>
         )}
         {!pending &&
-          lines(check?.notice).map((line) => (
-            <p key={line} role="status" className="text-muted">
+          lines(check?.notice).map((line, i) => (
+            <p key={`n${i}`} role="status" className="text-muted">
               {line}
             </p>
           ))}
         {!pending &&
-          lines(result?.saved).map((line) => (
-            <p key={line} role="status" className="text-success font-medium">
+          lines(result?.saved).map((line, i) => (
+            <p key={`s${i}`} role="status" className="text-success font-medium">
               {line}
             </p>
           ))}
         {!pending &&
-          lines(check?.error ?? result?.error).map((line) => (
-            <p key={line} role="alert" className="text-danger font-medium">
+          errors.map((line, i) => (
+            <p key={`e${i}`} role="alert" className="text-danger font-medium">
               {line}
             </p>
           ))}

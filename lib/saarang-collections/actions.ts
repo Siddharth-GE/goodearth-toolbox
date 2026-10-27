@@ -266,11 +266,6 @@ export async function removeRule(list: keyof typeof RULE_TABLES, id: string): Pr
 // Under the 4 MB a server action takes, so the person gets this sentence rather than a failed request.
 const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
 
-/**
- * The dropped Zoho exports. Every file is kept as its own upload; the Summary uses the latest per report.
- * A newer as-of date moves the report date forward and resets the period to the month before, as the page did.
- * What saved and what was refused are said apart: one refused file does not hide seven saved ones.
- */
 /** The dropped files' bytes, or why there are none to read. */
 async function droppedFiles(
   formData: FormData,
@@ -294,23 +289,26 @@ export async function checkUploads(_prev: CheckState, formData: FormData): Promi
   const dropped = await droppedFiles(formData);
   if ("error" in dropped) return dropped;
   const { reports, errors, notices } = readReports(dropped, null);
+  if (reports.length === 0) return { error: errors.join("\n") || undefined };
 
+  // The latest upload of each dropped report, one exact read each, as getCollections orders them.
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("saarang_collection_uploads")
-    .select("slot, as_of, row_count")
-    .in(
-      "slot",
-      reports.map((report) => report.slot),
-    )
-    .order("uploaded_at", { ascending: false })
-    .order("id")
-    .limit(500);
-  if (error) return failed(error, "Could not read the reports loaded now. Try again.");
+  const latest = await Promise.all(
+    reports.map((report) =>
+      supabase
+        .from("saarang_collection_uploads")
+        .select("slot, as_of, row_count")
+        .eq("slot", report.slot)
+        .order("uploaded_at", { ascending: false })
+        .order("id")
+        .limit(1)
+        .maybeSingle(),
+    ),
+  );
   const loaded: Loaded = {};
-  for (const row of data ?? []) {
-    const slot = row.slot as keyof Loaded;
-    if (!loaded[slot]) loaded[slot] = { asOf: row.as_of, rowCount: row.row_count };
+  for (const { data, error } of latest) {
+    if (error) return failed(error, "Could not read the reports loaded now. Try again.");
+    if (data) loaded[data.slot as keyof Loaded] = { asOf: data.as_of, rowCount: data.row_count };
   }
 
   return {
@@ -320,6 +318,11 @@ export async function checkUploads(_prev: CheckState, formData: FormData): Promi
   };
 }
 
+/**
+ * The checked Zoho exports, read again here. Every file is kept as its own upload; the Summary uses the latest per report.
+ * A newer as-of date moves the report date forward and resets the period to the month before, as the page did.
+ * What saved and what was refused are said apart: one refused file does not hide seven saved ones.
+ */
 export async function uploadReports(_prev: UploadState, formData: FormData): Promise<UploadState> {
   const user = await requireTool(GRANT);
   const dropped = await droppedFiles(formData);

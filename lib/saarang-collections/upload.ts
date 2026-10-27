@@ -1,6 +1,6 @@
 /** Dropped files to recognised reports, and the check shown before anything is saved. Pure: the upload actions call it. */
 import { parseCsv } from "@/lib/csv";
-import { formatDate } from "@/lib/format";
+import { formatCount, formatDate } from "@/lib/format";
 import { readWorkbookBytes } from "@/lib/xlsx";
 import { oldExcelRefusal, parse, SLOT_LABEL, type ParsedReport, type Slot } from "./core";
 
@@ -99,10 +99,15 @@ export function checkReports(reports: ParsedReport[], loaded: Loaded): ReportChe
         `Older than the one loaded: as of ${formatDate(report.meta.asOf)}, against ${formatDate(now.asOf)}.`,
       );
     }
-    if (now && report.rows.length < now.rowCount) {
+    // Outstanding lists unpaid invoices, which rightly shrink as they are paid; the other three only grow.
+    if (now && report.kind !== "outstanding" && report.rows.length < now.rowCount) {
       warnings.push(
-        `Fewer rows than the one loaded: ${report.rows.length} against ${now.rowCount}. Was a filter left on in Zoho?`,
+        `Fewer rows than the one loaded: ${formatCount(report.rows.length)} against ${formatCount(now.rowCount)}. Was a filter left on in Zoho?`,
       );
+    }
+    if (report.rows.length === 0) warnings.push("This export has no rows in it.");
+    if (!report.meta.asOf && report.kind !== "outstanding") {
+      warnings.push("Zoho printed no date on this export, so it will not move the report date.");
     }
     return {
       slot: report.slot,
