@@ -33,6 +33,8 @@ const LINE_GUARD_PHRASES = [
   "has arrived",
   "bill code",
   "no company yet",
+  "muster roll or bill reference",
+  "invoice number as printed",
 ] as const;
 
 type Client = Awaited<ReturnType<typeof createClient>>;
@@ -317,7 +319,9 @@ export type BillWithLinesInput = {
 /** Header minted at the lines' figures (create_bill or create_nmr_bill), then lines go in and the database rolls the header up, same figures to the paisa. */
 export async function createBillWithLines(input: BillWithLinesInput): Promise<ActionState> {
   const user = await requireTool("/bills");
-  if (!input.invoiceNo.trim()) return { error: "Type the invoice number as printed on the bill." };
+  // A labour bill may leave it blank for the database to decide: a contractor's bill fills it with its own number (0165).
+  if (!input.invoiceNo.trim() && (input.kind === "po" || (input.kind === "nmr" && !input.vendorId)))
+    return { error: "Type the invoice number as printed on the bill." };
   if (!input.invoiceDate) return { error: "Pick the invoice date." };
   const problem = billLinesProblem(input.lines);
   if (problem) return { error: problem };

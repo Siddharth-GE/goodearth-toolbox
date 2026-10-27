@@ -175,6 +175,8 @@ export function BillForm({
           kind === "contract" || isPieceWorkBill(drafts) ? "PW" : "NMR",
         )
       : null;
+  // A contractor's bill carries its own number where their reference is left blank (0165).
+  const numbered = Boolean(nextBill && "reference" in nextBill);
   const problem =
     (kind === "nmr"
       ? !projectId
@@ -190,7 +192,7 @@ export function BillForm({
   const linesProblem = billLinesProblem(drafts);
   const blocked =
     problem ??
-    (!invoiceNo.trim()
+    (!invoiceNo.trim() && !numbered
       ? "Type the invoice number."
       : !invoiceDate
         ? "Pick the date."
@@ -393,13 +395,23 @@ export function BillForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="bill-invoice-no">
-              {kind === "nmr" ? "Contractor's bill or muster roll reference" : "Invoice number"}
+              {numbered
+                ? "Contractor's own reference (optional)"
+                : kind === "nmr"
+                  ? "Contractor's bill or muster roll reference"
+                  : "Invoice number"}
             </Label>
             <Input
               id="bill-invoice-no"
               value={invoiceNo}
               onChange={(event) => setInvoiceNo(event.target.value)}
-              placeholder={kind === "nmr" ? "e.g. Misc week 32" : "As printed on the bill"}
+              placeholder={
+                numbered
+                  ? "Blank uses the bill's number"
+                  : kind === "nmr"
+                    ? "e.g. Misc week 32"
+                    : "As printed on the bill"
+              }
               autoComplete="off"
             />
             {kind === "po" && fromDelivery?.invoiceNo && (

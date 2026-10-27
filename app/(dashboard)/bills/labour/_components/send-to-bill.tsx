@@ -137,6 +137,8 @@ export function SendToBill({
           isDaily ? "NMR" : "PW",
         )
       : null;
+  // A contractor's bill carries its own number where their reference is left blank (0165).
+  const numbered = Boolean(nextBill && "reference" in nextBill);
 
   const problem =
     groupProblem ??
@@ -151,7 +153,7 @@ export function SendToBill({
         : Object.values(pieceRateValues).some((rate) => rate === null)
           ? "Give a rate for every piece-work entry."
           : undefined) ??
-    (!reference.trim()
+    (!reference.trim() && !numbered
       ? "Type their muster roll or bill reference."
       : !billDate
         ? "Pick the bill date."
@@ -353,12 +355,16 @@ export function SendToBill({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="labour-reference">Their muster roll / bill reference</Label>
+                <Label htmlFor="labour-reference">
+                  {numbered ? "Their reference (optional)" : "Their muster roll / bill reference"}
+                </Label>
                 <Input
                   id="labour-reference"
                   value={reference}
                   onChange={(event) => setReference(event.target.value)}
-                  placeholder="e.g. Muster roll week 41"
+                  placeholder={
+                    numbered ? "Blank uses the bill's number" : "e.g. Muster roll week 41"
+                  }
                   autoComplete="off"
                 />
               </div>
