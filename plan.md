@@ -2,7 +2,7 @@
 
 **The founder's ask** (2026-10-27): a contractor's bill numbers itself as `<four letters of the name>-<PW or NMR>-<ED, EF or EP>-<number>`, continuing from the last numbers in their contractors sheet (one tab per company), the codes kept in Masters. Settled the same day: **one count per contractor per company**, shared by PW and NMR; **one code per contractor everywhere** (the sheet's per-company codes are not kept).
 
-- [x] `[Opus]` `0164_contractor_bill_numbers.sql`: `companies.code`, `vendors.bill_code` (made from the name, permanent once on bills), `bills.work_type`, Masters' `contractor_bill_numbers` and the trigger-only definer that counts it. An independent Opus read found the 100th bill would have been cut to `-10`; fixed, with three hardenings. Trial `scripts/trials/contractor-bill-numbers.sql`. On staging.
+- [x] `[Opus]` `0164_contractor_bill_numbers.sql`: `companies.code`, `vendors.bill_code` (made from the name, permanent once on bills), `bills.work_type`, Masters' `contractor_bill_numbers` and the trigger-only definer that counts it. Reviewed independently by Opus. Trial `scripts/trials/contractor-bill-numbers.sql`. On staging.
 - [x] `[Opus]` Masters: the code on the vendor form, list and page; "Bill numbers" per company on a contractor's page; the company's bill code. A hand-made labour bill tells the database PW when it is piece-work with no daily wages. Turing's vendor and company forms carry both codes.
 - [x] `[Opus]` `scripts/import-contractor-bill-numbers.ts` run on staging: ED, EF, EP given; 151 last numbers set from exact name matches. Loose matches and unmatched names are the founder's (TODO.md).
 

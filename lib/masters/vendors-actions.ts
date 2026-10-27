@@ -53,10 +53,10 @@ export async function createVendor(_state: ActionState, formData: FormData): Pro
   if (error) {
     if (error.code === "23505") return { error: DUPLICATE_CODE };
     console.error("createVendor failed:", error);
-    return { error: "Could not create vendor. Try again." };
+    return guardError(error, "Could not create vendor. Try again.", ["bill code"]);
   }
 
-  revalidatePath("/masters/vendors");
+  revalidatePath("/masters/vendors", "layout");
   return undefined;
 }
 
@@ -79,10 +79,13 @@ export async function updateVendor(
   if (error) {
     if (error.code === "23505") return { error: DUPLICATE_CODE };
     console.error("updateVendor failed:", error);
-    return guardError(error, "Could not update vendor. Try again.", ["can no longer change"]);
+    return guardError(error, "Could not update vendor. Try again.", [
+      "can no longer change",
+      "bill code",
+    ]);
   }
 
-  revalidatePath("/masters/vendors");
+  revalidatePath("/masters/vendors", "layout");
   return undefined;
 }
 
@@ -100,6 +103,20 @@ export async function saveContractorBillNumber(
     return { error: "The last bill number is a whole number, 0 if there was none." };
 
   const supabase = await createClient();
+  // A 0 with nothing kept writes nothing: a row would stop a vendor made in error from being deleted.
+  if (lastNo === 0) {
+    const { data: kept, error: keptError } = await supabase
+      .from("contractor_bill_numbers")
+      .select("id")
+      .eq("vendor_id", vendorId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (keptError) {
+      console.error("saveContractorBillNumber read failed:", keptError);
+      return { error: "Could not save the bill number. Try again." };
+    }
+    if (!kept) return undefined;
+  }
   const { error } = await supabase
     .from("contractor_bill_numbers")
     .upsert(
