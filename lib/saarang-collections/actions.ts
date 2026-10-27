@@ -9,6 +9,7 @@ import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { GRANT, isFigureCell, previousMonth, UNIT_PATTERN } from "./shared";
+import { readReports } from "./upload";
 
 /** Saarang Collections' saves. Anyone holding the grant edits the whole report (0161); each write names its caller. */
 
@@ -184,12 +185,72 @@ const RULE_TABLES = {
 
 export async function removeRule(list: keyof typeof RULE_TABLES, id: string): Promise<ActionState> {
   await requireTool(GRANT);
+  // Both arrive from the browser as plain strings, whatever the type says.
+  if (!Object.hasOwn(RULE_TABLES, list)) return { error: "That list doesn't exist." };
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "That rule doesn't exist." };
   const table = RULE_TABLES[list];
-  if (!table) return { error: "That list doesn't exist." };
   const supabase = await createClient();
   const { data, error } = await supabase.from(table).delete().eq("id", id).select("id");
   if (error) return failed(error, "Could not remove it.");
   if (!data?.length) return { error: "It was already removed." };
   refresh();
   return undefined;
+}
+
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/**
+ * The dropped Zoho exports. Every file is kept as its own upload; the Summary uses the latest per report.
+ * A newer as-of date moves the report date forward and resets the period to the month before, as the page did.
+ */
+export async function uploadReports(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "Choose the Zoho exports to upload." };
+  if (files.reduce((n, f) => n + f.size, 0) > MAX_UPLOAD_BYTES) {
+    return { error: "Those files are over 4 MB together. Upload them a few at a time." };
+  }
+
+  const supabase = await createClient();
+  const settings = await supabase
+    .from("saarang_collection_settings")
+    .select("report_date")
+    .single();
+  if (settings.error) return failed(settings.error, "Could not read the report date. Try again.");
+
+  const dropped = await Promise.all(
+    files.map(async (file) => ({
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })),
+  );
+  const { reports, errors, reportDate } = readReports(dropped, settings.data.report_date);
+
+  if (reports.length > 0) {
+    const { error } = await supabase.from("saarang_collection_uploads").insert(
+      reports.map((report) => ({
+        slot: report.slot,
+        file_name: report.meta.file.slice(0, 255),
+        as_of: report.meta.asOf,
+        period_from: report.meta.periodFrom,
+        period_to: report.meta.periodTo,
+        row_count: report.rows.length,
+        rows: report.rows,
+        uploaded_by: user.id,
+      })),
+    );
+    if (error) return failed(error, "Could not save the reports. Try again.");
+
+    if (reportDate && reportDate !== settings.data.report_date) {
+      const period = previousMonth(reportDate);
+      const moved = await saveSettings(
+        user.id,
+        { report_date: reportDate, period_from: period.from, period_to: period.to },
+        "The reports were saved, but the report date could not be moved. Set the period on Rules.",
+      );
+      if (moved?.error) return moved;
+    }
+    refresh();
+  }
+  return errors.length ? { error: errors.join("\n") } : undefined;
 }

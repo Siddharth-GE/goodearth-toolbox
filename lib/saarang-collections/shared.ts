@@ -1,9 +1,9 @@
-/** Saarang Collections' vocabulary: 0161's CHECK lists and small pure helpers. Imports nothing, so "use server" files and client components can share it. */
+/** Saarang Collections' vocabulary: 0161's CHECK lists and small pure helpers, safe in "use server" files and client components. */
+import { lastDayOfMonth, shiftMonth } from "@/lib/dates";
+import type { Project } from "./core";
 
 export const GRANT = "/saarang-collections";
 
-export const PROJECTS = ["plot", "villa"] as const;
-export type Project = (typeof PROJECTS)[number];
 export const PROJECT_NAMES: Record<Project, string> = {
   plot: "Saarang Plot",
   villa: "Saarang Villa",
@@ -26,12 +26,8 @@ export function isFigureCell(project: string, key: string): project is FigurePro
 
 /** The calendar month before the one `iso` falls in: the collection period the page offers. */
 export function previousMonth(iso: string): { from: string; to: string } {
-  const [year, month] = iso.split("-").map(Number);
-  const y = month === 1 ? year - 1 : year;
-  const m = month === 1 ? 12 : month - 1;
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const mm = String(m).padStart(2, "0");
-  return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+  const month = shiftMonth(iso.slice(0, 7), -1);
+  return { from: `${month}-01`, to: lastDayOfMonth(month) };
 }
 
 export const UNIT_PATTERN = /^SAARANG-(PLOT|VILLA)-/;
