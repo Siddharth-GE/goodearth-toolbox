@@ -63,3 +63,30 @@ test("the whole-project figures are not changed by looking at a period", () => {
   periodOf(whole, october);
   assert.equal(whole.values.F, 1000);
 });
+
+test("over the saved period, Collected in the period is the whole view's Last month collection", () => {
+  const whole = compute(datasets, DEFAULT_RULES, {
+    periodFrom: october.from,
+    periodTo: october.to,
+  }).plot;
+  assert.equal(periodOf(whole, october).values.F, whole.values.H);
+});
+
+test("a unit added by hand has no due date, and the period says it was added by hand", () => {
+  const rules = {
+    ...DEFAULT_RULES,
+    extra_units: [
+      {
+        unit: "SAARANG-PLOT-29",
+        applicant: "X",
+        sold_value: 10,
+        completed: 10,
+        pending: 0,
+        note: null,
+      },
+    ],
+  };
+  const period = periodOf(compute(datasets, rules).plot, october);
+  const added = period.detail.P?.left.find((row) => row.cells[0] === "SAARANG-PLOT-29");
+  assert.equal(added?.why, "No due date (added by hand)");
+});

@@ -9,12 +9,12 @@ import {
   type DetailKey,
   type Project,
 } from "@/lib/saarang-collections/core";
-import { PERIOD_FIGURES, periodsOf } from "@/lib/saarang-collections/period";
+import { PERIOD_FIGURES, periodsOf, type Window } from "@/lib/saarang-collections/period";
 import { LABEL, periodRange } from "@/lib/saarang-collections/summary";
 import { PROJECT_NAMES } from "@/lib/saarang-collections/shared";
 import { CalendarRange, Upload } from "lucide-react";
 import { PeriodControls } from "../_components/period-controls";
-import { PeriodTable, PeriodTiles, ViewSwitch } from "../_components/period-parts";
+import { PeriodPicker, PeriodTable, PeriodTiles, ViewSwitch } from "../_components/period-parts";
 import {
   Breakdown,
   MeetingTable,
@@ -24,28 +24,39 @@ import {
   type Filter,
 } from "../_components/summary-parts";
 
-// The view and the cell live in the URL (`?view=period&cell=plot.F`), so the breakdown renders on the server.
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : "");
+
+/** The period view's own dates from the address, when both are real and in order. */
+function windowOf(from: string, to: string): Window | null {
+  return DATE.test(from) && DATE.test(to) && from <= to ? { from, to } : null;
+}
+
+const B = "text-foreground font-medium";
+
+// The view, its dates and the open cell live in the URL, so the breakdown renders on the server and looking saves nothing.
 export default async function SummaryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string; cell?: string; view?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
   const collections = await getCollections();
   const { settings } = collections;
   const view = { figures: collections.figures, result: collections.result };
-  const inPeriod = params.view === "period";
-  const window =
-    settings.periodFrom && settings.periodTo
-      ? { from: settings.periodFrom, to: settings.periodTo }
-      : null;
-  const periods = inPeriod && window ? periodsOf(collections.result, window) : null;
-  const range = periodRange(settings.periodFrom, settings.periodTo);
+  const inPeriod = one(params.view) === "period";
+  const saved = windowOf(settings.periodFrom ?? "", settings.periodTo ?? "");
+  // The period view opens on the saved period; its own dates change only what this screen shows.
+  const shown = windowOf(one(params.from), one(params.to)) ?? saved;
+  const periods = inPeriod && shown ? periodsOf(collections.result, shown) : null;
+  const shownRange = shown ? periodRange(shown.from, shown.to) : "";
+  const savedRange = periodRange(settings.periodFrom, settings.periodTo);
+  const pastReports =
+    shown && settings.reportDate && shown.to > settings.reportDate ? settings.reportDate : null;
 
-  const filter: Filter = PROJECTS.includes(params.project as Project)
-    ? (params.project as Project)
-    : "all";
-  const [cellProject, cellKey] = (params.cell ?? "").split(".");
+  const project = one(params.project);
+  const filter: Filter = PROJECTS.includes(project as Project) ? (project as Project) : "all";
+  const [cellProject, cellKey] = one(params.cell).split(".");
   const selected =
     PROJECTS.includes(cellProject as Project) && cellKey
       ? { project: cellProject as Project, k: cellKey }
@@ -86,53 +97,66 @@ export default async function SummaryPage({
       <div className="space-y-2">
         <ViewSwitch
           period={inPeriod}
+          shown={shown}
           filter={filter}
           reportDate={settings.reportDate}
-          range={range}
+          range={shownRange}
         />
         <p className="text-muted max-w-prose text-sm">
           {inPeriod ? (
-            <>
-              Showing only what Zoho dates between{" "}
-              <b className="text-foreground font-medium">{formatDate(settings.periodFrom)}</b> and{" "}
-              <b className="text-foreground font-medium">{formatDate(settings.periodTo)}</b>, both
-              days included. Sold value, units and the figures typed by hand have no date in Zoho,
-              so they are not part of this view.
-            </>
+            shown ? (
+              <>
+                Showing only what Zoho dates between <b className={B}>{formatDate(shown.from)}</b>{" "}
+                and <b className={B}>{formatDate(shown.to)}</b>, both days included.
+                {pastReports ? (
+                  <>
+                    {" "}
+                    Zoho&apos;s reports run to <b className={B}>{formatDate(pastReports)}</b>, so
+                    nothing after it is counted yet.
+                  </>
+                ) : null}{" "}
+                Sold value, units and the figures typed by hand have no date in Zoho, so they are
+                not part of this view. Download Excel is always the whole project.
+              </>
+            ) : (
+              <>Pick the period&apos;s two days below.</>
+            )
           ) : (
             <>
               The whole project to{" "}
-              <b className="text-foreground font-medium">
-                {settings.reportDate ? formatDate(settings.reportDate) : "date"}
-              </b>
-              , as the meeting sheet counts it. Only &ldquo;Last month collection&rdquo; uses the
-              period{range ? ` (${range})` : ""}.
+              <b className={B}>{settings.reportDate ? formatDate(settings.reportDate) : "date"}</b>,
+              as the meeting sheet counts it. Only &ldquo;Last month collection&rdquo; uses the
+              collection period{savedRange ? ` (${savedRange})` : ""}, set below.
             </>
           )}
         </p>
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <ProjectFilter filter={filter} cell={cell} period={inPeriod} />
-        <PeriodControls from={settings.periodFrom} to={settings.periodTo} />
+        <ProjectFilter filter={filter} cell={cell} period={inPeriod ? (shown ?? true) : null} />
+        {inPeriod ? (
+          <PeriodPicker shown={shown} filter={filter} />
+        ) : (
+          <PeriodControls from={settings.periodFrom} to={settings.periodTo} />
+        )}
       </div>
 
       {inPeriod ? (
-        periods ? (
+        periods && shown ? (
           <>
             <PeriodTiles periods={periods} filter={filter} />
             <Section
-              title={`${range}`}
+              title={`Collected and invoiced, ${shownRange}`}
               note="Rupees. Click a figure to see its rows, and what was left out of it."
             >
-              <PeriodTable periods={periods} filter={filter} cell={cell} />
+              <PeriodTable periods={periods} shown={shown} filter={filter} cell={cell} />
             </Section>
           </>
         ) : (
           <EmptyState
             icon={CalendarRange}
-            title="Set the period's two dates"
-            description="Pick the first and last day above, then Set period."
+            title="Pick the period's two days"
+            description="Choose the first and last day above, then Show this period."
           />
         )
       ) : (
@@ -150,10 +174,10 @@ export default async function SummaryPage({
       {selected && detail && (
         <Breakdown
           detail={detail}
-          title={`${(inPeriod ? periodLabel : LABEL[selected.k]) ?? selected.k} · ${PROJECT_NAMES[selected.project]}${inPeriod ? ` · ${range}` : ""}`}
+          title={`${(inPeriod ? periodLabel : LABEL[selected.k]) ?? selected.k} · ${PROJECT_NAMES[selected.project]}${inPeriod ? ` · ${shownRange}` : ""}`}
           k={selected.k}
           filter={filter}
-          period={inPeriod}
+          period={inPeriod ? shown : null}
         />
       )}
 

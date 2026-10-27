@@ -19,6 +19,7 @@ import {
   type DetailKey,
   type Project,
 } from "@/lib/saarang-collections/core";
+import type { Window } from "@/lib/saarang-collections/period";
 import { PROJECT_NAMES } from "@/lib/saarang-collections/shared";
 import {
   COLUMNS,
@@ -42,9 +43,18 @@ type Period = { periodFrom: string | null; periodTo: string | null; reportDate: 
 const NUMBER = "font-mono tabular-nums text-right";
 const CELL = "block px-3 py-3 text-right font-mono tabular-nums";
 
-export function summaryHref(filter: Filter, cell: string | null, period = false): string {
+/** `period`: the period view, with its own dates when known — looking at a period never saves one. */
+export function summaryHref(
+  filter: Filter,
+  cell: string | null,
+  period: Window | true | null = null,
+): string {
   const query = new URLSearchParams();
   if (period) query.set("view", "period");
+  if (period && period !== true) {
+    query.set("from", period.from);
+    query.set("to", period.to);
+  }
   if (filter !== "all") query.set("project", filter);
   if (cell) query.set("cell", cell);
   const qs = query.toString();
@@ -54,11 +64,11 @@ export function summaryHref(filter: Filter, cell: string | null, period = false)
 export function ProjectFilter({
   filter,
   cell,
-  period = false,
+  period = null,
 }: {
   filter: Filter;
   cell: string | null;
-  period?: boolean;
+  period?: Window | true | null;
 }) {
   const options: { value: Filter; label: string }[] = [
     { value: "all", label: "All projects" },
@@ -380,13 +390,13 @@ export function Breakdown({
   title,
   k,
   filter,
-  period = false,
+  period = null,
 }: {
   detail: Detail;
   title: string;
   k: string;
   filter: Filter;
-  period?: boolean;
+  period?: Window | null;
 }) {
   const valueAt = k === "L" ? 5 : ["F", "H", "MTD"].includes(k) ? 4 : detail.cols.length - 1;
   const sum = detail.rows.reduce((total, row) => total + (Number(row[valueAt]) || 0), 0);

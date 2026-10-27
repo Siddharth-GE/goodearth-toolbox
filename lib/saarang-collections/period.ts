@@ -10,7 +10,7 @@ export type Window = { from: string; to: string };
 export const PERIOD_FIGURES = [
   { k: "F", label: "Collected in the period", hint: "receipts dated in it" },
   { k: "L", label: "Unused, from those receipts", hint: "receipts dated in it, not yet applied" },
-  { k: "P", label: "Invoiced in the period", hint: "completed milestones due in it" },
+  { k: "P", label: "Invoiced, due in the period", hint: "completed milestones due in it" },
   { k: "S", label: "Scheduled in the period", hint: "every milestone due in it" },
   { k: "M", label: "Unpaid on invoices due in the period", hint: "balance on invoices due in it" },
 ] as const;
@@ -47,15 +47,18 @@ function keep(detail: Detail, k: PeriodKey, window: Window): Detail {
     return day !== "" && day >= window.from && day <= window.to;
   };
   const undated = (cells: DetailCell[]) => String(cells[date] ?? "") === "";
+  // A unit added on the Rules page carries "(added by hand)" in its milestone, and never came from Zoho.
+  const noDate = (cells: DetailCell[]) =>
+    String(cells[2] ?? "").includes("(added by hand)") ? "No due date (added by hand)" : NO_DATE[k];
   return {
     cols: detail.cols,
     rows: detail.rows.filter(inside),
     left: [
       ...detail.left.filter((row) => inside(row.cells)),
-      ...detail.rows.filter(undated).map((cells): DetailRow => ({ cells, why: NO_DATE[k] })),
+      ...detail.rows.filter(undated).map((cells): DetailRow => ({ cells, why: noDate(cells) })),
       ...detail.left
         .filter((row) => undated(row.cells))
-        .map((row): DetailRow => ({ cells: row.cells, why: `${row.why}; ${NO_DATE[k]}` })),
+        .map((row): DetailRow => ({ cells: row.cells, why: `${row.why}; ${noDate(row.cells)}` })),
     ],
   };
 }

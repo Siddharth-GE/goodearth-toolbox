@@ -1,5 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { chipClassName } from "@/components/ui/choice-chips";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -15,6 +18,7 @@ import {
   PERIOD_FIGURES,
   type PeriodKey,
   type PeriodResult,
+  type Window,
 } from "@/lib/saarang-collections/period";
 import { PROJECT_NAMES } from "@/lib/saarang-collections/shared";
 import { cn } from "@/lib/utils";
@@ -28,11 +32,14 @@ const SUB = "text-muted mt-1 block text-[11px] font-normal tracking-normal norma
 /** Whole project (the meeting sheet) or one period: two views, never mixed on one screen. */
 export function ViewSwitch({
   period,
+  shown,
   filter,
   reportDate,
   range,
 }: {
   period: boolean;
+  /** The period this view shows, or opens on: its own dates, else the saved period. */
+  shown: Window | null;
   filter: Filter;
   reportDate: string | null;
   range: string;
@@ -40,13 +47,13 @@ export function ViewSwitch({
   const options = [
     {
       on: !period,
-      href: summaryHref(filter, null, false),
+      href: summaryHref(filter, null),
       label: "Whole project",
       hint: reportDate ? `to ${formatDate(reportDate)}` : "to date",
     },
     {
       on: period,
-      href: summaryHref(filter, null, true),
+      href: summaryHref(filter, null, shown ?? true),
       label: "This period",
       hint: range || "set the dates",
     },
@@ -110,7 +117,7 @@ export function PeriodTiles({
       hint: missingNote(periods, "F", projects) ?? `${formatCrore(unused)} of it not yet applied`,
     },
     {
-      label: "Invoiced in the period",
+      label: "Invoiced, due in the period",
       value: total(periods, "P", projects),
       hint: missingNote(periods, "P", projects) ?? `of ${formatCrore(scheduled)} due in it`,
     },
@@ -143,10 +150,12 @@ export function PeriodTiles({
 
 export function PeriodTable({
   periods,
+  shown,
   filter,
   cell,
 }: {
   periods: Record<Project, PeriodResult>;
+  shown: Window;
   filter: Filter;
   cell: string | null;
 }) {
@@ -190,7 +199,7 @@ export function PeriodTable({
               return (
                 <TableCell key={f.k} className="p-0">
                   <Link
-                    href={summaryHref(filter, on ? null : `${p}.${f.k}`, true)}
+                    href={summaryHref(filter, on ? null : `${p}.${f.k}`, shown)}
                     aria-current={on ? "true" : undefined}
                     title="Show the rows behind this number"
                     className={cn(
@@ -224,5 +233,43 @@ export function PeriodTable({
         </TableRow>
       </TableFoot>
     </Table>
+  );
+}
+
+/**
+ * The dates the period view shows: a plain GET form, so looking at a period saves nothing and
+ * changes nobody else's Last month collection, meeting view or Excel.
+ */
+export function PeriodPicker({ shown, filter }: { shown: Window | null; filter: Filter }) {
+  return (
+    <form action="/saarang-collections/summary" className="flex flex-wrap items-end gap-3">
+      <input type="hidden" name="view" value="period" />
+      {filter !== "all" && <input type="hidden" name="project" value={filter} />}
+      <div className="space-y-1.5">
+        <Label htmlFor="look_from">Period from</Label>
+        <Input
+          id="look_from"
+          name="from"
+          type="date"
+          defaultValue={shown?.from ?? ""}
+          required
+          className="w-44"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="look_to">to</Label>
+        <Input
+          id="look_to"
+          name="to"
+          type="date"
+          defaultValue={shown?.to ?? ""}
+          required
+          className="w-44"
+        />
+      </div>
+      <Button type="submit" variant="secondary">
+        Show this period
+      </Button>
+    </form>
   );
 }
