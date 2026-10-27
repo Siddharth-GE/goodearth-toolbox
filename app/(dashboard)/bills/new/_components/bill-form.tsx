@@ -49,7 +49,7 @@ function NextBillNote({
     </p>
   ) : (
     <p className="text-muted text-xs">
-      {"Recording numbers it "}
+      {"This bill will be numbered "}
       <span className="text-foreground font-mono font-semibold">{nextBill.reference}</span>
       {" — from the contractor's code and the project's company."}
     </p>
@@ -362,7 +362,7 @@ export function BillForm({
                 {scopedSite?.name} has no short code yet, so it can&apos;t number bills. Set one in
                 Masters first.
               </p>
-            ) : nextBill ? (
+            ) : nextBill && !missingProjectCode ? (
               <NextBillNote nextBill={nextBill} />
             ) : (
               project?.code && (

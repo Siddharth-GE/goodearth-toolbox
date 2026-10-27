@@ -129,7 +129,7 @@ export function SendToBill({
     : pieceWorkTotal(chosenEntries, pieceRateValues, gstPct);
   const overrideValue = parseNumber(override);
   const nextBill =
-    first && !groupProblem
+    first?.project_id && !groupProblem
       ? nextContractorBill(
           options.numbering,
           first.contractor_id,
@@ -268,7 +268,7 @@ export function SendToBill({
           </p>
           {nextBill && "reference" in nextBill && (
             <p className="text-foreground text-sm">
-              {"Sending numbers it "}
+              {"This bill will be numbered "}
               <span className="font-mono font-semibold">{nextBill.reference}</span>
               <span className="text-muted">
                 {" — from the contractor's code and the project's company."}
