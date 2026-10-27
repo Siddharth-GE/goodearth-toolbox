@@ -8,7 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { billLinesProblem, lineMoneyOf, receivedCapProblem, type BillLineDraft } from "./lines";
+import {
+  billLinesProblem,
+  isPieceWorkBill,
+  lineMoneyOf,
+  receivedCapProblem,
+  type BillLineDraft,
+} from "./lines";
 import { rollUpBill } from "./math";
 import { documentChargesProblem, roundPaise, type DocumentCharges } from "@/lib/line-money";
 
@@ -25,6 +31,8 @@ const LINE_GUARD_PHRASES = [
   "no longer exists",
   "issued purchase order",
   "has arrived",
+  "bill code",
+  "no company yet",
 ] as const;
 
 type Client = Awaited<ReturnType<typeof createClient>>;
@@ -345,6 +353,7 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
           p_gst_amount: totals.gst,
           p_total_amount: totals.total,
           p_note: (input.note?.trim() || null) as unknown as string,
+          p_piece_work: isPieceWorkBill(input.lines),
         })
       : await supabase.rpc("create_bill", {
           p_po_id: (input.poId || null) as unknown as string,

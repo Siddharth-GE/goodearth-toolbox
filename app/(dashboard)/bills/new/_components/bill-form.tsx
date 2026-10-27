@@ -330,6 +330,11 @@ export function BillForm({
                 {scopedSite?.name} has no short code yet, so it can&apos;t number bills. Set one in
                 Masters first.
               </p>
+            ) : nmrVendorId ? (
+              <p className="text-muted text-xs">
+                Numbered from the contractor&apos;s bill code and the project&apos;s company, e.g.
+                RAJU-NMR-ED-08 — PW instead when it has piece-work and no daily wages.
+              </p>
             ) : (
               project?.code && (
                 <p className="text-muted text-xs">

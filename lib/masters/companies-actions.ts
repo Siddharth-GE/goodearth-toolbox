@@ -12,6 +12,7 @@ const GSTIN_SHAPE = /^[0-9]{2}[A-Z0-9]{13}$/;
 const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 // Loose: the Udyam number and the older Udyog Aadhaar are both still printed.
 const MSME_SHAPE = /^[A-Z0-9-]{6,40}$/;
+const BILL_CODE_SHAPE = /^[A-Z]{2,4}$/;
 
 const code = (formData: FormData, key: string) =>
   rawText(formData, key).toUpperCase().replace(/\s+/g, "") || null;
@@ -20,6 +21,7 @@ function readCompanyForm(formData: FormData) {
   return {
     name: text(formData, "name"),
     legal_name: optionalText(formData, "legal_name"),
+    code: code(formData, "code"),
     address: optionalText(formData, "address"),
     gstin: code(formData, "gstin"),
     pan: code(formData, "pan"),
@@ -35,6 +37,9 @@ function validate(form: ReturnType<typeof readCompanyForm>): string | undefined 
   if (!form.name) return "Enter the company's name.";
   if (!form.state)
     return "Enter the company's state — POs compare it with each vendor's GST state.";
+  if (form.code && !BILL_CODE_SHAPE.test(form.code)) {
+    return "A bill code is two to four letters, e.g. ED.";
+  }
   if (form.gstin && !GSTIN_SHAPE.test(form.gstin)) {
     return "A GSTIN is 15 letters and digits, starting with the state's two digits, e.g. 32ABCDE1234F1Z5.";
   }
@@ -47,6 +52,11 @@ function validate(form: ReturnType<typeof readCompanyForm>): string | undefined 
   if (form.email && !form.email.includes("@")) return "That email address looks incomplete.";
   return undefined;
 }
+
+const taken = (error: { message: string }) =>
+  error.message.includes("companies_code_unique")
+    ? "Another company already has that bill code."
+    : "Another company already has that name.";
 
 function refresh() {
   revalidatePath("/masters/companies");
@@ -63,7 +73,7 @@ export async function createCompany(_state: ActionState, formData: FormData): Pr
   const supabase = await createClient();
   const { error } = await supabase.from("companies").insert({ ...form, created_by: user.id });
   if (error) {
-    if (error.code === "23505") return { error: "Another company already has that name." };
+    if (error.code === "23505") return { error: taken(error) };
     console.error("createCompany failed:", error);
     return { error: "Could not add the company. Try again." };
   }
@@ -89,7 +99,7 @@ export async function updateCompany(
     .update({ ...form, updated_by: user.id })
     .eq("id", id);
   if (error) {
-    if (error.code === "23505") return { error: "Another company already has that name." };
+    if (error.code === "23505") return { error: taken(error) };
     console.error("updateCompany failed:", error);
     return { error: "Could not save the company. Try again." };
   }

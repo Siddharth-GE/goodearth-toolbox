@@ -67,6 +67,11 @@ export function billLineProblem(line: BillLineDraft): string | undefined {
   return undefined;
 }
 
+/** A labour bill with no work order is PW when it is piece-work with no daily wages, else NMR (0164). */
+export const isPieceWorkBill = (lines: BillLineDraft[]): boolean =>
+  lines.some((line) => line.kind === "pw_qty" || line.kind === "pw_lump") &&
+  !lines.some((line) => line.kind === "nmr");
+
 export function billLinesProblem(lines: BillLineDraft[]): string | undefined {
   if (lines.length === 0) return "A bill needs at least one line.";
   for (const line of lines) {

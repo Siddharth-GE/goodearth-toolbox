@@ -99,6 +99,22 @@ export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
         <Checkbox name="is_contractor" value="1" defaultChecked={vendor?.is_contractor ?? false} />
         Contractor (does labour work at site)
       </label>
+      <div className="space-y-1.5">
+        <Label htmlFor="bill_code">Bill code</Label>
+        <Input
+          id="bill_code"
+          name="bill_code"
+          defaultValue={vendor?.bill_code ?? ""}
+          autoComplete="off"
+          maxLength={4}
+          placeholder="Made from the name"
+          className="font-mono uppercase sm:w-48"
+        />
+        <p className="text-muted text-xs">
+          Contractors only: four letters or digits that start their bill numbers, as RAJU in
+          RAJU-PW-ED-08. Leave it blank and it is made from the name.
+        </p>
+      </div>
       <label className="text-foreground flex items-center gap-2 text-sm">
         <Checkbox name="is_active" value="1" defaultChecked={vendor?.is_active ?? true} />
         Active

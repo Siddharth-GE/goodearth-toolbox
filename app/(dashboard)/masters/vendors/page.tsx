@@ -107,7 +107,11 @@ export default async function VendorsPage({
                         {vendor.name}
                       </Link>
                       {vendor.is_contractor && (
-                        <Badge variant="neutral">{vendor.contractor_no ?? "Contractor"}</Badge>
+                        <Badge variant="neutral">
+                          {[vendor.contractor_no ?? "Contractor", vendor.bill_code]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </Badge>
                       )}
                     </span>
                   </TableCell>

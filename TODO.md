@@ -2,6 +2,14 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## Waiting on the founder — contractor bill numbers on staging
+
+`plan.md`, top section, has the checklist. From the contractors sheet:
+
+- **Eight guesses to confirm**, then type in Masters → Vendors → the contractor → Bill numbers: Raju Kandian as "Raju K" (ED 1, EF 1), Sreejayan as "Sreejayan PE" (EF 1, EP 4), Sukumaran P (EP 23), Balachandran K R (EP 3), Suresh Earayi as "Suresh" (ED 3), Suryakiran K (EF 4).
+- **About 60 sheet names are not contractors in Masters** (Dipak Roy, Subodh Roy, Anooja P, Abdul Sattar…): add them, then type their last number. The dry run lists them all: `npx tsx scripts/import-contractor-bill-numbers.ts --project <ref> --xlsx <sheet>`.
+- Maloor Eco Farms has no bill code; Baveli has no company — a contractor bill there is refused until it has.
+
 ## Waiting on the founder — Saarang Collections on staging
 
 The Zoho-exports meeting summary as its own tool (`0161`). Try it with `plan.md`'s top-section checklist: grant it, give it a team, drop the 21 Oct set with Villa Outstanding re-exported as `.xlsx`, add Plot 29 and the two Plot corrections, type the hand figures, and compare. Its Plot Total sold reads 39 where the 21 Oct sheet says 38 — the sheet counts Plot 29's money but not the unit.

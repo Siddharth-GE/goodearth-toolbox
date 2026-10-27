@@ -19,6 +19,7 @@ const USERS: Record<string, string> = {
   client_actions: "Client Relations actions",
   client_engagements: "Client Relations plots",
   client_receipts: "Client receipts",
+  contractor_bill_numbers: "Contractor bill numbers",
   contractor_advances: "Contractor advances",
   design_actions: "Design actions",
   design_step_events: "The design board",
