@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
   payColumn: { flex: 1 },
   payText: { fontSize: pdf.size.small, lineHeight: 1.5 },
   upiColumn: { flexDirection: "row", gap: 8, marginTop: -6 },
+  upiText: { flex: 1 },
   qrCaption: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
@@ -191,7 +192,7 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
               {invoice.upiId && (
                 <View style={[styles.payColumn, styles.upiColumn]}>
                   {payLink && <QrCode value={payLink} size={72} />}
-                  <View>
+                  <View style={styles.upiText}>
                     <Text style={styles.payText}>UPI: {invoice.upiId}</Text>
                     {payLink && <Text style={styles.qrCaption}>Scan to pay with any UPI app</Text>}
                   </View>
