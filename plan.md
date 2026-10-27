@@ -4,7 +4,7 @@
 
 - [x] `[Opus]` `0164_contractor_bill_numbers.sql`: `companies.code`, `vendors.bill_code` (made from the name, permanent once on bills), `bills.work_type`, Masters' `contractor_bill_numbers` and the trigger-only definer that counts it. Reviewed independently by Opus. Trial `scripts/trials/contractor-bill-numbers.sql`. On staging.
 - [x] `[Opus]` Masters: the code on the vendor form, list and page; "Bill numbers" per company on a contractor's page; the company's bill code. A hand-made labour bill tells the database PW when it is piece-work with no daily wages. Turing's vendor and company forms carry both codes.
-- [x] `[Opus]` `scripts/import-contractor-bill-numbers.ts` run on staging: ED, EF, EP given; 151 last numbers set from exact name matches. Loose matches and unmatched names are the founder's (TODO.md).
+- [x] `[Opus]` `scripts/import-contractor-bill-numbers.ts` run on staging: ED, EF, EP and MEF (Maloor) given; 166 last numbers set from exact names and `SAME_PERSON`, the matches checked by hand (founder: "you do what you think works"). People Masters lacks are the founder's (TODO.md).
 
 **Try it on staging:**
 
