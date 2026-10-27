@@ -4,9 +4,9 @@ import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+import { GRANT } from "./shared";
 
 // Every function opens with requireTool: 0161's policies gate SELECT too. Reads nothing outside the tool.
-const GRANT = "/saarang-collections";
 const TOOL = "Saarang Collections";
 
 /** Counts and dates only — the welcome screen never shows a rupee. */
