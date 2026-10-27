@@ -8,13 +8,47 @@ import { checked, optionalText, parseNumber, text } from "@/lib/form-data";
 import { formatDate, todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { SLOT_LABEL } from "./core";
-import { GRANT, isFigureCell, previousMonth, UNIT_PATTERN } from "./shared";
+import { PROJECTS, SLOT_LABEL } from "./core";
+import { getCollections } from "./queries";
+import { GRANT, isFigureCell, previousMonth, SUMMARY_KEYS, UNIT_PATTERN } from "./shared";
+import { LABEL } from "./summary";
 import { readReports, type UploadState } from "./upload";
 
 /** Saarang Collections' saves. Anyone holding the grant edits the whole report (0161); each write names its caller. */
 
 const refresh = () => revalidatePath("/saarang-collections", "layout");
+
+/**
+ * After a save: the figures the Summary now shows, kept for Turing to read (0162), then the screens.
+ * Keeping them never fails the save; the screen works them out live either way.
+ */
+async function settled(userId: string) {
+  try {
+    const { result } = await getCollections();
+    const at = new Date().toISOString();
+    const rows = PROJECTS.flatMap((project) =>
+      SUMMARY_KEYS.map((key) => {
+        const value = result[project].values[key];
+        return {
+          project,
+          key,
+          label: key === "Munits" ? "Units with a balance" : LABEL[key],
+          value: value === null ? null : Math.round(value * 100) / 100,
+          computed_by: userId,
+          computed_at: at,
+        };
+      }),
+    );
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("saarang_collection_summary")
+      .upsert(rows, { onConflict: "project,key" });
+    if (error) console.error("saarang-collections: the kept figures were not refreshed", error);
+  } catch (thrown) {
+    console.error("saarang-collections: the kept figures were not refreshed", thrown);
+  }
+  refresh();
+}
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function failed(error: { message: string; code?: string }, fallback: string): ActionState {
@@ -48,7 +82,7 @@ export async function saveFigure(project: string, key: string, raw: string): Pro
     .from("saarang_collection_figures")
     .upsert({ project, key, value, updated_by: user.id }, { onConflict: "project,key" });
   if (error) return failed(error, "Could not save the figure. Try again.");
-  refresh();
+  await settled(user.id);
   return undefined;
 }
 
@@ -65,7 +99,7 @@ async function saveSettings(
     .select("id");
   if (error) return failed(error, fallback);
   if (!data?.length) return { error: fallback };
-  refresh();
+  await settled(userId);
   return undefined;
 }
 
@@ -138,21 +172,16 @@ export async function addExcludedReceipt(
     added_by: user.id,
   });
   if (error) return failed(error, "Could not leave the receipt out.");
-  refresh();
+  await settled(user.id);
   return undefined;
 }
 
-function unitOf(formData: FormData): string | { error: string } {
-  const unit = text(formData, "unit").toUpperCase();
-  if (!UNIT_PATTERN.test(unit))
-    return { error: "Type the unit as Zoho has it, like SAARANG-PLOT-07." };
-  return unit;
-}
+const UNIT_HELP = "Type the unit as Zoho has it, like SAARANG-PLOT-07.";
 
 export async function addCorrection(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const unit = unitOf(formData);
-  if (typeof unit !== "string") return unit;
+  const unit = text(formData, "unit").toUpperCase();
+  if (!UNIT_PATTERN.test(unit)) return { error: UNIT_HELP };
   const delta = parseNumber(formData.get("delta"));
   if (delta === null || !Number.isFinite(delta) || delta === 0) {
     return { error: "Type the amount to add or take off, like -1,00,000." };
@@ -169,14 +198,14 @@ export async function addCorrection(_prev: ActionState, formData: FormData): Pro
     added_by: user.id,
   });
   if (error) return failed(error, "Could not add the correction.");
-  refresh();
+  await settled(user.id);
   return undefined;
 }
 
 export async function addExtraUnit(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const unit = unitOf(formData);
-  if (typeof unit !== "string") return unit;
+  const unit = text(formData, "unit").toUpperCase();
+  if (!UNIT_PATTERN.test(unit)) return { error: UNIT_HELP };
   const soldValue = parseNumber(formData.get("sold_value"));
   const completed = parseNumber(formData.get("completed")) ?? 0;
   const pending = parseNumber(formData.get("pending")) ?? 0;
@@ -200,7 +229,7 @@ export async function addExtraUnit(_prev: ActionState, formData: FormData): Prom
     added_by: user.id,
   });
   if (error) return failed(error, "Could not add the unit.");
-  refresh();
+  await settled(user.id);
   return undefined;
 }
 
@@ -211,7 +240,7 @@ const RULE_TABLES = {
 } as const;
 
 export async function removeRule(list: keyof typeof RULE_TABLES, id: string): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   // Both arrive from the browser as plain strings, whatever the type says.
   if (!Object.hasOwn(RULE_TABLES, list)) return { error: "That list doesn't exist." };
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "That rule doesn't exist." };
@@ -220,7 +249,7 @@ export async function removeRule(list: keyof typeof RULE_TABLES, id: string): Pr
   const { data, error } = await supabase.from(table).delete().eq("id", id).select("id");
   if (error) return failed(error, "Could not remove it.");
   if (!data?.length) return { error: "It was already removed." };
-  refresh();
+  await settled(user.id);
   return undefined;
 }
 
@@ -288,7 +317,7 @@ export async function uploadReports(_prev: UploadState, formData: FormData): Pro
           `Collection period set to ${formatDate(period.from)} – ${formatDate(period.to)}.`,
         );
     }
-    refresh();
+    await settled(user.id);
   }
   return {
     saved: [...said, ...notices].join("\n") || undefined,

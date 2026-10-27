@@ -22,6 +22,7 @@ import { MONEY } from "./entries/money";
 import { CASH_REQUESTS } from "./entries/cash-requests";
 import { RELAY } from "./entries/relay";
 import { REPORTER_DEXTER } from "./entries/reporter-dexter";
+import { SAARANG_COLLECTIONS } from "./entries/saarang-collections";
 import { SUPERVISORS } from "./entries/supervisors";
 import { SUPERVISORS_SITE } from "./entries/supervisors-site";
 import { WORK_ORDERS } from "./entries/work-orders";
@@ -116,7 +117,10 @@ export type IdTable =
   | "business_plans"
   | "reports"
   | "dexter_projects"
-  | "dexter_decks";
+  | "dexter_decks"
+  | "saarang_collection_excluded_receipts"
+  | "saarang_collection_corrections"
+  | "saarang_collection_extra_units";
 
 const FROM: Record<IdTable, string> = {
   plots: "plots (the villa's plot)",
@@ -210,6 +214,12 @@ const FROM: Record<IdTable, string> = {
   reports: "reports (a saved Reporter report)",
   dexter_projects: "dexter_projects (a Dexter project: a folder of pitch decks)",
   dexter_decks: "dexter_decks (a Dexter deck: an uploaded pitch with a client link)",
+  saarang_collection_excluded_receipts:
+    "saarang_collection_excluded_receipts (a Zoho receipt left out of the Saarang figures)",
+  saarang_collection_corrections:
+    "saarang_collection_corrections (an amount added to or taken off a Saarang unit's milestone)",
+  saarang_collection_extra_units:
+    "saarang_collection_extra_units (a sold Saarang unit added because Zoho is missing it)",
 };
 
 export type Field = {
@@ -315,6 +325,7 @@ export const ENTRIES = [
   ...CASH_REQUESTS,
   ...BUSINESS_PLANNING,
   ...REPORTER_DEXTER,
+  ...SAARANG_COLLECTIONS,
 ];
 export type EntryKey = (typeof ENTRIES)[number]["key"];
 

@@ -22,6 +22,7 @@ import { CASH_REQUEST_RUNNERS } from "./runners/cash-requests";
 import { PO_RUNNERS } from "./runners/purchase-orders";
 import { RELAY_RUNNERS } from "./runners/relay";
 import { REPORTER_DEXTER_RUNNERS } from "./runners/reporter-dexter";
+import { SAARANG_COLLECTIONS_RUNNERS } from "./runners/saarang-collections";
 import type { Runners } from "./runners/kit";
 import { SUPERVISOR_RUNNERS } from "./runners/supervisors";
 import { SUPERVISORS_SITE_RUNNERS } from "./runners/supervisors-site";
@@ -50,4 +51,5 @@ export const RUNNERS: Runners<EntryKey> = {
   ...CASH_REQUEST_RUNNERS,
   ...BUSINESS_PLANNING_RUNNERS,
   ...REPORTER_DEXTER_RUNNERS,
+  ...SAARANG_COLLECTIONS_RUNNERS,
 };

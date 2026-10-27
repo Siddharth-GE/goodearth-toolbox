@@ -85,6 +85,9 @@ const NAMED_BY: Record<
     | "cash_request_items"
     | "item_requests"
     | "dexter_decks"
+    | "saarang_collection_excluded_receipts"
+    | "saarang_collection_corrections"
+    | "saarang_collection_extra_units"
   >,
   "name" | "code name" | "code or name"
 > = {
@@ -552,6 +555,34 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   );
   for (const one of itemRequests)
     names[one.id] = `${one.requested_name} (item request, ${one.status})`;
+  // Saarang's rules by what they say: a receipt, a unit's correction, a unit added by hand.
+  const [excluded, corrections, extraUnits] = await Promise.all([
+    readIn(list("saarang_collection_excluded_receipts"), (chunk) =>
+      supabase
+        .from("saarang_collection_excluded_receipts")
+        .select("id, receipt_no")
+        .in("id", chunk),
+    ),
+    readIn(list("saarang_collection_corrections"), (chunk) =>
+      supabase
+        .from("saarang_collection_corrections")
+        .select("id, unit, stage, delta")
+        .in("id", chunk),
+    ),
+    readIn(list("saarang_collection_extra_units"), (chunk) =>
+      supabase
+        .from("saarang_collection_extra_units")
+        .select("id, unit, sold_value")
+        .in("id", chunk),
+    ),
+  ]);
+  for (const one of excluded) names[one.id] = `${one.receipt_no} (left out)`;
+  for (const one of corrections)
+    names[one.id] =
+      `${one.unit}, ${one.stage ?? "first milestone"}, ${formatMoney(Number(one.delta))}`;
+  for (const one of extraUnits)
+    names[one.id] = `${one.unit} (added by hand, ${formatMoney(Number(one.sold_value))})`;
+
   // A deck by its title and project, and whether its link opens.
   const decks = await readIn(list("dexter_decks"), (chunk) =>
     supabase.from("dexter_decks").select("id, title, project_id, share_enabled").in("id", chunk),

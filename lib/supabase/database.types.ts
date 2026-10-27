@@ -9155,6 +9155,44 @@ export type Database = {
           },
         ]
       }
+      saarang_collection_summary: {
+        Row: {
+          computed_at: string
+          computed_by: string
+          id: string
+          key: string
+          label: string
+          project: string
+          value: number | null
+        }
+        Insert: {
+          computed_at?: string
+          computed_by?: string
+          id?: string
+          key: string
+          label: string
+          project: string
+          value?: number | null
+        }
+        Update: {
+          computed_at?: string
+          computed_by?: string
+          id?: string
+          key?: string
+          label?: string
+          project?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_summary_computed_by_fkey"
+            columns: ["computed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saarang_collection_uploads: {
         Row: {
           as_of: string | null

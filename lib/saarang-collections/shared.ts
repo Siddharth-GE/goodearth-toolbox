@@ -1,6 +1,6 @@
 /** Saarang Collections' vocabulary: 0161's CHECK lists and small pure helpers, safe in "use server" files and client components. */
 import { lastDayOfMonth, shiftMonth } from "@/lib/dates";
-import type { Project } from "./core";
+import type { Project, ValueKey } from "./core";
 
 export const GRANT = "/saarang-collections";
 
@@ -31,3 +31,20 @@ export function previousMonth(iso: string): { from: string; to: string } {
 }
 
 export const UNIT_PATTERN = /^SAARANG-(PLOT|VILLA)-/;
+
+// A Record, so a figure core.ts gains fails to compile until it is kept too (and 0162's CHECK widened).
+const KEPT: Record<ValueKey, true> = {
+  E: true,
+  F: true,
+  H: true,
+  L: true,
+  M: true,
+  MTD: true,
+  Munits: true,
+  O: true,
+  P: true,
+  S: true,
+};
+
+/** The worked-out figures kept for Turing, as 0162's CHECK lists them. */
+export const SUMMARY_KEYS = Object.keys(KEPT) as ValueKey[];

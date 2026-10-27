@@ -2406,6 +2406,18 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "saarang_collection_summary": {
+    "kind": "table",
+    "columns": {
+      "computed_at": "string",
+      "computed_by": "string",
+      "id": "string",
+      "key": "string",
+      "label": "string",
+      "project": "string",
+      "value": "number | null"
+    }
+  },
   "saarang_collection_uploads": {
     "kind": "table",
     "columns": {
