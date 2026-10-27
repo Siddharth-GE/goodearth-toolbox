@@ -1,5 +1,6 @@
-/** Dropped files to recognised reports, before anything is saved. Pure: the upload action calls it. */
+/** Dropped files to recognised reports, and the check shown before anything is saved. Pure: the upload actions call it. */
 import { parseCsv } from "@/lib/csv";
+import { formatCount, formatDate } from "@/lib/format";
 import { readWorkbookBytes } from "@/lib/xlsx";
 import { oldExcelRefusal, parse, SLOT_LABEL, type ParsedReport, type Slot } from "./core";
 
@@ -54,4 +55,69 @@ export function readReports(
     if (report.kind !== "outstanding" && asOf && (!newest || asOf > newest)) newest = asOf;
   }
   return { reports: [...bySlot.values()], errors, notices, reportDate: newest };
+}
+
+/** What is loaded now for a report: the latest upload's as-of date and row count. */
+export type Loaded = Partial<Record<Slot, { asOf: string | null; rowCount: number }>>;
+
+/** One dropped file, as the check step shows it before anything is saved. */
+export type ReportCheck = {
+  slot: Slot;
+  label: string;
+  file: string;
+  asOf: string | null;
+  rows: number;
+  /** Rupees for receipts, invoices and milestones; units for a sold-units report. */
+  total: { amount: number } | { units: number };
+  now: { asOf: string | null; rowCount: number } | null;
+  warnings: string[];
+};
+
+/** What the check step says: each file read, or why the drop was refused. */
+export type CheckState = { checks?: ReportCheck[]; error?: string; notice?: string } | undefined;
+
+const totalOf = (report: ParsedReport): ReportCheck["total"] => {
+  switch (report.kind) {
+    case "payments":
+      return { amount: report.rows.reduce((sum, row) => sum + row[5], 0) };
+    case "outstanding":
+      return { amount: report.rows.reduce((sum, row) => sum + row[7], 0) };
+    case "milestones":
+      return { amount: report.rows.reduce((sum, row) => sum + row[4], 0) };
+    case "sold":
+      return { units: new Set(report.rows.map((row) => row[0])).size };
+  }
+};
+
+/** Each recognised file beside what is loaded for its report, with what looks wrong said plainly. */
+export function checkReports(reports: ParsedReport[], loaded: Loaded): ReportCheck[] {
+  return reports.map((report) => {
+    const now = loaded[report.slot] ?? null;
+    const warnings: string[] = [];
+    if (now?.asOf && report.meta.asOf && report.meta.asOf < now.asOf) {
+      warnings.push(
+        `Older than the one loaded: as of ${formatDate(report.meta.asOf)}, against ${formatDate(now.asOf)}.`,
+      );
+    }
+    // Outstanding lists unpaid invoices, which rightly shrink as they are paid; the other three only grow.
+    if (now && report.kind !== "outstanding" && report.rows.length < now.rowCount) {
+      warnings.push(
+        `Fewer rows than the one loaded: ${formatCount(report.rows.length)} against ${formatCount(now.rowCount)}. Was a filter left on in Zoho?`,
+      );
+    }
+    if (report.rows.length === 0) warnings.push("This export has no rows in it.");
+    if (!report.meta.asOf && report.kind !== "outstanding") {
+      warnings.push("Zoho printed no date on this export, so it will not move the report date.");
+    }
+    return {
+      slot: report.slot,
+      label: SLOT_LABEL[report.slot],
+      file: report.meta.file,
+      asOf: report.meta.asOf,
+      rows: report.rows.length,
+      total: totalOf(report),
+      now,
+      warnings,
+    };
+  });
 }
