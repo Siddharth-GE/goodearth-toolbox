@@ -33,7 +33,7 @@ export type SendToBillInput = {
 export async function sendLabourToBill(input: SendToBillInput): Promise<ActionState> {
   await requireTool("/bills");
   if (input.logIds.length === 0) return { error: "Tick the labour entries to bill." };
-  if (!input.billReference.trim()) return { error: "Type the muster roll or bill reference." };
+  // A blank reference is the database's call: a contractor's bill fills it with its own number (0165).
   if (!input.billDate) return { error: "Pick the bill date." };
   if (!Number.isFinite(input.gstPct) || input.gstPct < 0 || input.gstPct > 100) {
     return { error: "GST must be between 0% and 100%." };
