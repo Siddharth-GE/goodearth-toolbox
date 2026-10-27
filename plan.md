@@ -15,20 +15,20 @@ The reference lives outside the repo, in `Documents/Custom Office Templates/coll
 - **No new library.** `.xlsx` is read by `lib/xlsx.ts` and CSV by `lib/csv.ts`. An old-format `.xls` (two of the samples) is refused in a sentence: "Export this report from Zoho as XLSX or CSV." The Excel download is written with `fflate`, already a dependency.
 - **The starting figures are typed**, not seeded: project value, expenses, next month's figures, units and Phase 3, from the 21 Oct sheet. A migration never carries real money.
 
-## Migration `0155_saarang_collections.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
+## Migration `0161_saarang_collections.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
 
 - `/saarang-collections` added to **both** `user_apps_app_known` and `role_apps_app_known` (redefined in full from the latest, as `0115` did).
 - `saarang_collection_uploads`: `slot` (CHECK: the eight `plot_|villa_` × `payments|outstanding|sold|milestones`), `file_name`, `as_of`, `period_from`, `period_to`, `row_count`, `rows jsonb`, `uploaded_by` (default `auth.uid()`), `uploaded_at`. Read and insert only: an upload is never edited or deleted. Index `(slot, uploaded_at desc)`.
-- `saarang_collection_settings`: one row (`id boolean primary key default true check (id)`). It holds `test_suffix` ('-100'), `dedupe` (true), `gst_plot` (0), `gst_villa` (18), `sold_field_plot` ('price') and `sold_field_villa` ('incl'), both CHECK `price|incl`, plus `period_from`, `period_to`, `report_date`, `updated_by` and `updated_at`. The row is seeded with these rule defaults; there is no money in it.
-- `saarang_collection_figures`: `(project, key)` primary key. `project` CHECK `plot|villa|phase3`, `key` CHECK the hand-typed columns (C D G I J K N Q R T for the projects; C E N O P F M H MTD T for Phase 3), `value numeric` (null = blank), `updated_by`, `updated_at`.
+- `saarang_collection_settings`: one row (a uuid `id`, because `audit_log` keys rows by one, and `one_row boolean unique check (one_row)`). It holds `test_suffix` ('-100'), `dedupe` (true), `gst_plot` (0), `gst_villa` (18), `sold_field_plot` ('price') and `sold_field_villa` ('incl'), both CHECK `price|incl`, plus `period_from`, `period_to`, `report_date`, `updated_by` and `updated_at`. The row is seeded with these rule defaults; there is no money in it.
+- `saarang_collection_figures`: a uuid `id`, `(project, key)` unique. `project` CHECK `plot|villa|phase3`, `key` CHECK the hand-typed columns (C D G I J K N Q R T for the projects; C E N O P F M H MTD T for Phase 3), `value numeric` (null = blank), `updated_by`, `updated_at`.
 - `saarang_collection_excluded_receipts` (`receipt_no` unique, upper-cased; `reason`), `saarang_collection_corrections` (`unit`, `stage`, `delta`, `note`), `saarang_collection_extra_units` (`unit` CHECK `^SAARANG-(PLOT|VILLA)-`, `applicant`, `sold_value`, `completed`, `pending`, `note`). Each has `added_by` and `added_at`.
-- RLS on every table; each verb's policy is `(select has_app('/saarang-collections'))`. Writes revoked from `anon`. No views, no functions. The shared audit trigger goes on the settings, figures and three rules tables, as other tools do; uploads are their own record.
-- Re-runnable; dry-run first; staging only (`--project` named, `--only 0155`).
+- RLS on every table; each verb's policy is `(select has_app('/saarang-collections'))`, and a write's `uploaded_by`, `updated_by` or `added_by` must be the caller. Writes revoked from `anon`. The trial is `scripts/trials/saarang-collections.sql`. No views, no functions. The shared audit trigger goes on the settings, figures and three rules tables, as other tools do; uploads are their own record.
+- Re-runnable; dry-run first; staging only (`--project` named, `--only 0161`).
 
 ## Steps
 
 - [ ] [Opus] `feature/saarang-collections` in its own worktree (this plan). Registry entry in `lib/tools.ts` (icon `Banknote`, added to `TOOL_ICONS`), `built: true` with the welcome page.
-- [ ] [Opus] Draft `0155`, dry-run, independent Opus read, then apply to staging and `npm run db:types`.
+- [ ] [Opus] Draft `0161`, dry-run, independent Opus read, then apply to staging and `npm run db:types`.
 - [ ] [Sonnet] `lib/saarang-collections/core.ts`: `Core.parse` and `Core.compute` ported to typed, pure functions. Cells arrive as text from `lib/xlsx.ts` and `parseCsv`, so `toISO` and `money` also take numeric strings (Excel serials such as `46300.0`). `core.test.ts` covers small inline fixtures for each kind: recognised by columns, plot or villa by its units, test units left out, the stale duplicate dropped, a correction applied once, a missing unit counted only while Zoho lacks it, GST, period and MTD, units with a balance, and a refused `.xls`. Opus vets.
 - [ ] [Opus] `scripts/check-saarang-collections.ts` (not CI): runs a folder of exports through `core.ts` with the meeting's rules and prints each figure beside the meeting workbook's. It is run on the 5 Oct set and the 21 Oct set, and the results are recorded here. A difference other than the README's 11 receipts stops the build.
 - [ ] [Sonnet] `writeWorkbookBytes(sheets)` in `lib/xlsx.ts`: minimal SpreadsheetML with inline strings and numbers, zipped by `fflate`. A round-trip test reads it back with `readWorkbookBytes`. Opus vets.

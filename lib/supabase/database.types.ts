@@ -8950,6 +8950,258 @@ export type Database = {
           },
         ]
       }
+      saarang_collection_corrections: {
+        Row: {
+          added_at: string
+          added_by: string
+          delta: number
+          id: string
+          note: string | null
+          stage: string | null
+          unit: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string
+          delta: number
+          id?: string
+          note?: string | null
+          stage?: string | null
+          unit: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          delta?: number
+          id?: string
+          note?: string | null
+          stage?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_corrections_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saarang_collection_excluded_receipts: {
+        Row: {
+          added_at: string
+          added_by: string
+          id: string
+          reason: string | null
+          receipt_no: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          reason?: string | null
+          receipt_no: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          reason?: string | null
+          receipt_no?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_excluded_receipts_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saarang_collection_extra_units: {
+        Row: {
+          added_at: string
+          added_by: string
+          applicant: string | null
+          completed: number
+          id: string
+          note: string | null
+          pending: number
+          sold_value: number
+          unit: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string
+          applicant?: string | null
+          completed?: number
+          id?: string
+          note?: string | null
+          pending?: number
+          sold_value: number
+          unit: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          applicant?: string | null
+          completed?: number
+          id?: string
+          note?: string | null
+          pending?: number
+          sold_value?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_extra_units_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saarang_collection_figures: {
+        Row: {
+          id: string
+          key: string
+          project: string
+          updated_at: string
+          updated_by: string
+          value: number | null
+        }
+        Insert: {
+          id?: string
+          key: string
+          project: string
+          updated_at?: string
+          updated_by?: string
+          value?: number | null
+        }
+        Update: {
+          id?: string
+          key?: string
+          project?: string
+          updated_at?: string
+          updated_by?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_figures_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saarang_collection_settings: {
+        Row: {
+          dedupe: boolean
+          gst_plot: number
+          gst_villa: number
+          id: string
+          one_row: boolean
+          period_from: string | null
+          period_to: string | null
+          report_date: string | null
+          sold_field_plot: string
+          sold_field_villa: string
+          test_suffix: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          dedupe?: boolean
+          gst_plot?: number
+          gst_villa?: number
+          id?: string
+          one_row?: boolean
+          period_from?: string | null
+          period_to?: string | null
+          report_date?: string | null
+          sold_field_plot?: string
+          sold_field_villa?: string
+          test_suffix?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          dedupe?: boolean
+          gst_plot?: number
+          gst_villa?: number
+          id?: string
+          one_row?: boolean
+          period_from?: string | null
+          period_to?: string | null
+          report_date?: string | null
+          sold_field_plot?: string
+          sold_field_villa?: string
+          test_suffix?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saarang_collection_uploads: {
+        Row: {
+          as_of: string | null
+          file_name: string
+          id: string
+          period_from: string | null
+          period_to: string | null
+          row_count: number
+          rows: Json
+          slot: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          as_of?: string | null
+          file_name: string
+          id?: string
+          period_from?: string | null
+          period_to?: string | null
+          row_count: number
+          rows: Json
+          slot: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Update: {
+          as_of?: string | null
+          file_name?: string
+          id?: string
+          period_from?: string | null
+          period_to?: string | null
+          row_count?: number
+          rows?: Json
+          slot?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saarang_collection_uploads_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       selection_lines: {
         Row: {
           created_at: string
