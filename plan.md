@@ -27,8 +27,8 @@ The reference lives outside the repo, in `Documents/Custom Office Templates/coll
 
 ## Steps
 
-- [ ] [Opus] `feature/saarang-collections` in its own worktree (this plan). Registry entry in `lib/tools.ts` (icon `Banknote`, added to `TOOL_ICONS`), `built: true` with the welcome page.
-- [ ] [Opus] Draft `0161`, dry-run, independent Opus read, then apply to staging and `npm run db:types`.
+- [x] [Opus] `feature/saarang-collections` in its own worktree (this plan). Registry entry in `lib/tools.ts` (icon `Banknote`, added to `TOOL_ICONS`), `built: true` with the welcome page.
+- [x] [Opus] Draft `0161`, dry-run, independent Opus read, then apply to staging and `npm run db:types`. Applied 2026-10-27; the read found nothing blocking, and its fixes (a blank correction stage means the first milestone, uploads ordered by `clock_timestamp()`, a fuller trial) are in.
 - [ ] [Sonnet] `lib/saarang-collections/core.ts`: `Core.parse` and `Core.compute` ported to typed, pure functions. Cells arrive as text from `lib/xlsx.ts` and `parseCsv`, so `toISO` and `money` also take numeric strings (Excel serials such as `46300.0`). `core.test.ts` covers small inline fixtures for each kind: recognised by columns, plot or villa by its units, test units left out, the stale duplicate dropped, a correction applied once, a missing unit counted only while Zoho lacks it, GST, period and MTD, units with a balance, and a refused `.xls`. Opus vets.
 - [ ] [Opus] `scripts/check-saarang-collections.ts` (not CI): runs a folder of exports through `core.ts` with the meeting's rules and prints each figure beside the meeting workbook's. It is run on the 5 Oct set and the 21 Oct set, and the results are recorded here. A difference other than the README's 11 receipts stops the build.
 - [ ] [Sonnet] `writeWorkbookBytes(sheets)` in `lib/xlsx.ts`: minimal SpreadsheetML with inline strings and numbers, zipped by `fflate`. A round-trip test reads it back with `readWorkbookBytes`. Opus vets.
