@@ -132,6 +132,20 @@ export function printFromSnapshot(row: {
   };
 }
 
+const UPI_ID = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
+
+/** The scan-to-pay link behind the invoice's QR. No amount: an advance is usually paid already, so the guest types what is left.
+ * Only an issued invoice gets one; nobody should pay against a draft or a cancelled number. */
+export function upiPayLink(invoice: InvoicePrint): string | null {
+  const upiId = invoice.upiId?.trim();
+  if (invoice.mode !== "issued" || !invoice.number || !upiId || !UPI_ID.test(upiId)) return null;
+  const params = [`pa=${upiId}`];
+  const payee = invoice.company?.legal_name || invoice.company?.name;
+  if (payee) params.push(`pn=${encodeURIComponent(payee)}`);
+  params.push(`tn=${encodeURIComponent(`Invoice ${invoice.number}`)}`, "cu=INR");
+  return `upi://pay?${params.join("&")}`;
+}
+
 export function printDraft(input: {
   company: LetterheadCompany | null;
   placeOfSupply: string | null;
