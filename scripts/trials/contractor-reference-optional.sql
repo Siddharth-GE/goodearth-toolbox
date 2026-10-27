@@ -15,6 +15,7 @@ declare
   v_supplier uuid;
   v_log uuid;
   v_wo uuid;
+  v_supplier_wo uuid;
   v_bill uuid;
   v_ref text;
   v_invoice text;
@@ -38,6 +39,9 @@ begin
   insert into labour_contracts (vendor_id, project_id, plot_id, description, contract_value, created_by, updated_by)
   values (v_contractor, v_project, v_plot, 'Trial 0165 order', 1, v_user, v_user) returning id into v_wo;
   update labour_contracts set status = 'approved', approved_by = v_user, approved_at = now() where id = v_wo;
+  insert into labour_contracts (vendor_id, project_id, plot_id, description, contract_value, created_by, updated_by)
+  values (v_supplier, v_project, v_plot, 'Trial 0165 supplier order', 1, v_user, v_user) returning id into v_supplier_wo;
+  update labour_contracts set status = 'approved', approved_by = v_user, approved_at = now() where id = v_supplier_wo;
 
   delete from user_apps where user_id = v_user;
   insert into user_apps (user_id, app) values (v_user, '/bills');
@@ -84,6 +88,14 @@ begin
   end;
   if v_message is distinct from 'Type the muster roll or bill reference' then
     raise exception 'TRIAL 3 FAILED: a blank supplier''s labour bill gave "%"', v_message;
+  end if;
+  v_message := null;
+  begin
+    v_bill := create_bill(null, v_supplier_wo, '', current_date, 1, 0, 1, null);
+  exception when raise_exception then v_message := sqlerrm;
+  end;
+  if v_message is distinct from 'Type the invoice number as printed on the vendor''s bill' then
+    raise exception 'TRIAL 3 FAILED: a blank work order for a non-contractor gave "%"', v_message;
   end if;
 
   reset role;
