@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { writeWorkbookBytes } from "@/lib/xlsx";
-import { readReports, type DroppedFile } from "./upload";
+import { checkReports, readReports, type DroppedFile } from "./upload";
 
 const csv = (name: string, lines: string[]): DroppedFile => ({
   name,
@@ -94,4 +94,35 @@ test("an .xlsx is read from its first sheet", () => {
   const out = readReports([{ name: "Plot.xlsx", bytes }], null);
   assert.deepEqual(out.errors, []);
   assert.deepEqual(out.reports[0].rows[0].slice(0, 2), ["SAARANG-PR-9", "2026-10-05"]);
+});
+
+test("the check sets each file beside what is loaded, and says when it is older or shorter", () => {
+  const { reports } = readReports(
+    [
+      payments("Plot pay.csv", "Oct 1, 2026", "250"),
+      csv("Villa sold.csv", [
+        "Unit Name",
+        "SAARANG-VILLA-01",
+        "SAARANG-VILLA-01",
+        "SAARANG-VILLA-02",
+      ]),
+    ],
+    null,
+  );
+  const [pay, sold] = checkReports(reports, {
+    plot_payments: { asOf: "2026-10-05", rowCount: 3 },
+  });
+  assert.deepEqual(pay.total, { amount: 250 });
+  assert.equal(pay.warnings.length, 2);
+  assert.match(pay.warnings[0], /Older than the one loaded/);
+  assert.match(pay.warnings[1], /Fewer rows than the one loaded: 1 against 3/);
+  assert.deepEqual(sold.total, { units: 2 });
+  assert.equal(sold.now, null);
+  assert.deepEqual(sold.warnings, []);
+});
+
+test("a newer, fuller file than the one loaded raises nothing", () => {
+  const { reports } = readReports([payments("Plot pay.csv", "Oct 21, 2026", "10")], null);
+  const [pay] = checkReports(reports, { plot_payments: { asOf: "2026-10-05", rowCount: 1 } });
+  assert.deepEqual(pay.warnings, []);
 });

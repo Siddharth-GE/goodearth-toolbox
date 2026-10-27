@@ -12,7 +12,13 @@ import { PROJECTS, SLOT_LABEL } from "./core";
 import { getCollections } from "./queries";
 import { GRANT, isFigureCell, previousMonth, SUMMARY_KEYS, UNIT_PATTERN } from "./shared";
 import { LABEL } from "./summary";
-import { readReports, type UploadState } from "./upload";
+import {
+  checkReports,
+  readReports,
+  type CheckState,
+  type Loaded,
+  type UploadState,
+} from "./upload";
 
 /** Saarang Collections' saves. Anyone holding the grant edits the whole report (0161); each write names its caller. */
 
@@ -265,13 +271,59 @@ const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
  * A newer as-of date moves the report date forward and resets the period to the month before, as the page did.
  * What saved and what was refused are said apart: one refused file does not hide seven saved ones.
  */
-export async function uploadReports(_prev: UploadState, formData: FormData): Promise<UploadState> {
-  const user = await requireTool(GRANT);
+/** The dropped files' bytes, or why there are none to read. */
+async function droppedFiles(
+  formData: FormData,
+): Promise<{ name: string; bytes: Uint8Array }[] | { error: string }> {
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { error: "Choose the Zoho exports to upload." };
   if (files.reduce((n, f) => n + f.size, 0) > MAX_UPLOAD_BYTES) {
     return { error: "Those files are over 3.5 MB together. Upload them a few at a time." };
   }
+  return Promise.all(
+    files.map(async (file) => ({
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })),
+  );
+}
+
+/** The check step: each dropped file read and set beside what is loaded now. Nothing is saved. */
+export async function checkUploads(_prev: CheckState, formData: FormData): Promise<CheckState> {
+  await requireTool(GRANT);
+  const dropped = await droppedFiles(formData);
+  if ("error" in dropped) return dropped;
+  const { reports, errors, notices } = readReports(dropped, null);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("saarang_collection_uploads")
+    .select("slot, as_of, row_count")
+    .in(
+      "slot",
+      reports.map((report) => report.slot),
+    )
+    .order("uploaded_at", { ascending: false })
+    .order("id")
+    .limit(500);
+  if (error) return failed(error, "Could not read the reports loaded now. Try again.");
+  const loaded: Loaded = {};
+  for (const row of data ?? []) {
+    const slot = row.slot as keyof Loaded;
+    if (!loaded[slot]) loaded[slot] = { asOf: row.as_of, rowCount: row.row_count };
+  }
+
+  return {
+    checks: checkReports(reports, loaded),
+    error: errors.join("\n") || undefined,
+    notice: notices.join("\n") || undefined,
+  };
+}
+
+export async function uploadReports(_prev: UploadState, formData: FormData): Promise<UploadState> {
+  const user = await requireTool(GRANT);
+  const dropped = await droppedFiles(formData);
+  if ("error" in dropped) return dropped;
 
   const supabase = await createClient();
   const settings = await supabase
@@ -280,12 +332,6 @@ export async function uploadReports(_prev: UploadState, formData: FormData): Pro
     .single();
   if (settings.error) return failed(settings.error, "Could not read the report date. Try again.");
 
-  const dropped = await Promise.all(
-    files.map(async (file) => ({
-      name: file.name,
-      bytes: new Uint8Array(await file.arrayBuffer()),
-    })),
-  );
   const { reports, errors, notices, reportDate } = readReports(dropped, settings.data.report_date);
   const said: string[] = [];
 
