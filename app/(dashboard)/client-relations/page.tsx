@@ -12,7 +12,7 @@ export default async function ClientRelationsPage() {
       icon="Handshake"
       intro={[
         "Every client and plot in one place, from the first site visit to the handover. Every promise to a client is an action with an owner and a date, so nothing waits on someone's memory.",
-        "Actions is what to do next, overdue first. Plots shows each villa's paperwork, build and interiors at a glance; Clients is the people; Collections is the money due.",
+        "Actions is what to do next, overdue first. Plots shows each villa's paperwork, build and interiors at a glance, with its payment schedule; Clients is the people.",
       ]}
       stats={[
         { label: "Overdue", value: actions.overdue, hint: "actions past their date" },
@@ -28,7 +28,6 @@ export default async function ClientRelationsPage() {
         { label: "Actions", href: "/client-relations/actions", primary: true },
         { label: "Plots", href: "/client-relations/plots" },
         { label: "Clients", href: "/client-relations/clients" },
-        { label: "Collections", href: "/client-relations/dues" },
       ]}
     />
   );

@@ -5,7 +5,7 @@ const TABS = [
   { key: "actions", href: "/client-relations/actions", label: "Actions" },
   { key: "plots", href: "/client-relations/plots", label: "Plots" },
   { key: "clients", href: "/client-relations/clients", label: "Clients" },
-  { key: "dues", href: "/client-relations/dues", label: "Collections" },
+  // Collections (/client-relations/dues) is off the strip while the Zoho figures are Saarang Collections'; the page still answers.
 ] as const;
 
 export function CrmNav() {
