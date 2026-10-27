@@ -8,10 +8,10 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 - **People on the sheet who are not contractors in Masters.** Add each as a contractor, then type the last number on their page (ED / EF / EP):
   - In more than one company: Dipak Roy (ED 246, EF 39, EP 4), Subodh Roy (ED 30, EF 31, EP 2), Anooja P (ED 2, EF 22, EP 1), Abdul Sattar (EF 2, EP 2), Merin George (ED 2, EF 11), Muhammed Shinas P (ED 3, EF 3), Binoy John (ED 1, EF 1), Sarath Kumar N K (EF 3, EP 33), Aswajith K (ED 7, EF 1), Devika K P, "minnus" (ED 4, EF 2).
-  - Developments: Kunnath Sinoj 3, Siraju V 1, Dinesh 1, Kalabham 4, Shinto 2, Subin C B 2, Melwin Thomas M 1, Ismail 1, Ravindran P 1, Subesh 3, Aneesh Ananthan 12, Santha B 3, Chandran K 1, Anitha V V 4.
+  - Developments: Raiju K 7 (not Raju Kandian), Kunnath Sinoj 3, Siraju V 1, Dinesh 1, Kalabham 4, Shinto 2, Subin C B 2, Melwin Thomas M 1, Ismail 1, Ravindran P 1, Subesh 3, Aneesh Ananthan 12, Santha B 3, Chandran K 1, Anitha V V 4.
   - Futures: Tapas Roy 75, Nisar Mariyadan 12, Shyniya T P 11, Chandramathi K 10, Kiran Nath K 7, Jijesh 6, Bijesh Kattan 5, Jibisha V K 4, Vijeesh Manappatti 4, Shinija T K 3, Biju P V 3, Rajesh V K 2, Samaju S 2, Lijina Karippayi 1, Taiyab Miya Lahera 1, Sudhakaran 1, Ratheesh K 1, Joyish Joseph 1, Nishad K 1, Amal Raj V 1.
   - Projects: Saritha P P 1.
-- **Two the founder may know**: "Raiju K" (ED 7) — Raju Kandian already took "Raju K"'s ED 1; "Suresh K" (EF 10) — perhaps Suresh Earayi.
+- **One the founder may know**: "Suresh K" (EF 10) — perhaps Suresh Earayi.
 - Baveli has no company — a contractor bill there is refused until it has one.
 
 ## Waiting on the founder — Saarang Collections on staging
