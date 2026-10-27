@@ -347,7 +347,11 @@ function DetailTable({ cols, lines, out }: { cols: string[]; lines: DetailLine[]
               return (
                 <TableCell
                   key={c}
-                  className={cn("px-3 py-2 text-[13px]", isNumber && NUMBER, out && "text-muted")}
+                  className={cn(
+                    "px-3 py-2 text-[13px] whitespace-nowrap",
+                    isNumber && NUMBER,
+                    out && "text-muted",
+                  )}
                 >
                   {text}
                 </TableCell>
