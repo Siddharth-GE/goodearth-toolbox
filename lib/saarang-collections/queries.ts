@@ -56,6 +56,19 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
+/** The as-of date for the page header, and whether any report is loaded. */
+export async function getReportDate(): Promise<{ reportDate: string | null; hasReports: boolean }> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const [settings, uploads] = await Promise.all([
+    supabase.from("saarang_collection_settings").select("report_date").maybeSingle(),
+    supabase.from("saarang_collection_uploads").select("id", { count: "exact", head: true }),
+  ]);
+  assertRead(TOOL, "the report date", settings.error);
+  assertRead(TOOL, "the uploaded reports", uploads.error);
+  return { reportDate: settings.data?.report_date ?? null, hasReports: (uploads.count ?? 0) > 0 };
+}
+
 export type SlotState = {
   slot: Slot;
   /** null: Missing. `fresh`: came in with the newest set, within an hour of it ("Updated"), else "Loaded". */
