@@ -1,4 +1,5 @@
 import {
+  Banknote,
   Bed,
   BookOpen,
   Boxes,
@@ -25,6 +26,7 @@ import {
 
 // Icons are stored as a lookup key: component references can't cross the Server to Client boundary.
 export const TOOL_ICONS = {
+  Banknote,
   Bed,
   BookOpen,
   Boxes,
@@ -202,6 +204,15 @@ export const TOOLS: Tool[] = [
     built: true,
     // Each person sees the plots and actions assigned to them (0123).
     scoped: true,
+  },
+  {
+    name: "Saarang Collections",
+    description: "The monthly Saarang collection meeting, from the Zoho exports.",
+    href: "/saarang-collections",
+    icon: "Banknote",
+    built: true,
+    grantWarning:
+      "Shows every Saarang unit's sold value, every receipt and unpaid invoice from Zoho, and the project's expense figures.",
   },
   {
     name: "Financial Management",

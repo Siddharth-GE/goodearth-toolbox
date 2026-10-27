@@ -2,9 +2,13 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Building now — the team's additions
+## Waiting on the founder — Saarang Collections on staging
 
-`plan.md`, top section: six pull requests, A to F, each vetted on staging before the next.
+The Zoho-exports meeting summary as its own tool (`0161`). Try it with `plan.md`'s top-section checklist: grant it, give it a team, drop the 21 Oct set with Villa Outstanding re-exported as `.xlsx`, add Plot 29 and the two Plot corrections, type the hand figures, and compare. Its Plot Total sold reads 39 where the 21 Oct sheet says 38 — the sheet counts Plot 29's money but not the unit.
+
+## The team's additions
+
+`plan.md`, second section: six pull requests, A to F, each vetted on staging before the next.
 
 ## Turing, the admins' assistant
 

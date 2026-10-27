@@ -1,3 +1,60 @@
+# Saarang Collections `[Opus planned 2026-10-26; the founder said start, 2026-10-27]`
+
+**The founder's ask** (2026-10-26): bring the self-hosted "Saarang Collections" page into the toolbox — "the html has the exact design required". It turns the eight Zoho exports into the monthly Saarang collection and expense meeting summary. Settled the same day: **a separate tool, not a Client Relations tab** ("seperate tool then") — Client Relations shows each member only their own plots, and this report is every unit's money plus the expense figures.
+
+The reference lives outside the repo, in `Documents/Custom Office Templates/collections/`: `1/index.html` (the tool; `2.html` is the same page as hosted on claude.ai), `1/README.txt`, and `1/reports/` (three sets of Zoho exports, and the 5 Oct and 21 Oct meeting workbooks). **The sample files are real clients' money: never copy them into the repo.**
+
+## The shape
+
+- **Its own tool**: "Saarang Collections", `/saarang-collections`, grant-gated, not `scoped`. Anyone granted sees and edits the whole report, as on the shared claude.ai copy. A `grantWarning`: "Shows every Saarang unit's sold value, every receipt and unpaid invoice from Zoho, and the project's expense figures." It sits under Other until the founder gives it a team (beside Client Relations).
+- **The HTML's flow and layout, the toolbox's materials** (DESIGN.md; as Client Relations took the Saarang tracker's). The heading carries the as-of date and **Download Excel**. Below it are three tabs. **Summary**: eight tiles, a project filter and the collection period with **Previous month**, then the summary table. A calculated cell opens its rows with "Left out of this number" beneath them. A hand-typed cell is shaded and saves when you leave it. Last comes the meeting view, with its hand-typed Phase 3 row. **Reports**: the drop zone and eight slots, each Missing, Loaded or Updated. **Rules**: the collection period, test units, duplicate schedules, GST, sold value, excluded receipts, corrections, sold units missing from Zoho, and "How each number is worked out". Not the HTML's paint: no dark-first Geist palette.
+- **A welcome screen first**, as every Operations and Management tool has: reports loaded out of eight, the as-of date, the rules in force. Counts and dates only, never rupees.
+- **Zoho is the source.** The tool reads only the uploaded exports, its typed figures and its rules. Nothing from Client Relations or any other tool, so its contract row says "nothing outside the shared surfaces".
+- **The calculations are the HTML's `Core`, ported as they are**: same recognition by columns, same rules, same figures. Its README says the 5 Oct set reproduces `Saarang_Collection_Meeting_5Oct.xlsx`, except Plot collection, which now counts the 11 receipts (Rs 1,01,12,347) the sheet's SUM range missed. That is the check.
+- **Uploads are kept**, one row each; the Summary uses the latest per slot. Every typed figure and rule records who and when.
+- **No new library.** `.xlsx` is read by `lib/xlsx.ts` and CSV by `lib/csv.ts`. An old-format `.xls` (two of the samples) is refused in a sentence: "Export this report from Zoho as XLSX or CSV." The Excel download is written with `fflate`, already a dependency.
+- **The starting figures are typed**, not seeded: project value, expenses, next month's figures, units and Phase 3, from the 21 Oct sheet. A migration never carries real money.
+
+## Migration `0161_saarang_collections.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
+
+- `/saarang-collections` added to **both** `user_apps_app_known` and `role_apps_app_known` (redefined in full from the latest, as `0115` did).
+- `saarang_collection_uploads`: `slot` (CHECK: the eight `plot_|villa_` × `payments|outstanding|sold|milestones`), `file_name`, `as_of`, `period_from`, `period_to`, `row_count`, `rows jsonb`, `uploaded_by` (default `auth.uid()`), `uploaded_at`. Read and insert only: an upload is never edited or deleted. Index `(slot, uploaded_at desc)`.
+- `saarang_collection_settings`: one row (a uuid `id`, because `audit_log` keys rows by one, and `one_row boolean unique check (one_row)`). It holds `test_suffix` ('-100'), `dedupe` (true), `gst_plot` (0), `gst_villa` (18), `sold_field_plot` ('price') and `sold_field_villa` ('incl'), both CHECK `price|incl`, plus `period_from`, `period_to`, `report_date`, `updated_by` and `updated_at`. The row is seeded with these rule defaults; there is no money in it.
+- `saarang_collection_figures`: a uuid `id`, `(project, key)` unique. `project` CHECK `plot|villa|phase3`, `key` CHECK the hand-typed columns (C D G I J K N Q R T for the projects; C E N O P F M H MTD T for Phase 3), `value numeric` (null = blank), `updated_by`, `updated_at`.
+- `saarang_collection_excluded_receipts` (`receipt_no` unique, upper-cased; `reason`), `saarang_collection_corrections` (`unit`, `stage`, `delta`, `note`), `saarang_collection_extra_units` (`unit` CHECK `^SAARANG-(PLOT|VILLA)-`, `applicant`, `sold_value`, `completed`, `pending`, `note`). Each has `added_by` and `added_at`.
+- RLS on every table; each verb's policy is `(select has_app('/saarang-collections'))`, and a write's `uploaded_by`, `updated_by` or `added_by` must be the caller. Writes revoked from `anon`. The trial is `scripts/trials/saarang-collections.sql`. No views, no functions. The shared audit trigger goes on the settings, figures and three rules tables, as other tools do; uploads are their own record.
+- Re-runnable; dry-run first; staging only (`--project` named, `--only 0161`).
+
+## Steps
+
+- [x] [Opus] `feature/saarang-collections` in its own worktree (this plan). Registry entry in `lib/tools.ts` (icon `Banknote`, added to `TOOL_ICONS`), `built: true` with the welcome page.
+- [x] [Opus] Draft `0161`, dry-run, independent Opus read, then apply to staging and `npm run db:types`. Applied 2026-10-27; the read found nothing blocking, and its fixes (a blank correction stage means the first milestone, uploads ordered by `clock_timestamp()`, a fuller trial) are in.
+- [x] [Sonnet] `lib/saarang-collections/core.ts`: `Core.parse` and `Core.compute` ported to typed, pure functions. Cells arrive as text from `lib/xlsx.ts` and `parseCsv`, so `toISO` and `money` also take numeric strings (Excel serials such as `46300.0`). `core.test.ts` covers small inline fixtures for each kind: recognised by columns, plot or villa by its units, test units left out, the stale duplicate dropped, a correction applied once, a missing unit counted only while Zoho lacks it, GST, period and MTD, units with a balance, and a refused `.xls`. Opus vets. Vetted: a port line for line; a missing report gives null, never 0; a blank correction stage means the first milestone.
+- [x] [Opus] `scripts/check-saarang-collections.ts` (not CI): runs a folder of exports through `core.ts` with the meeting's rules and prints each figure beside the meeting workbook's. It is run on the 5 Oct set and the 21 Oct set, and the results are recorded here. A difference other than the README's 11 receipts stops the build.
+  - **5 Oct set** (rules: the two Plot 07/08 corrections, period 9 Sep–5 Oct): all sixteen figures match but Plot's Total collection (+1,01,12,347) and Collected but unused (+2,00,010) — exactly the sheet's rows 2–12 on Saarang Plot Received, the README's 11 receipts its SUM ranges missed.
+  - **21 Oct set** (rules plus Plot 29 added by hand, period 1–21 Oct as the sheet labels it): every figure matches but two. Villa outstanding is unchecked: its export is an old `.xls`, refused as planned, so it waits for an `.xlsx`. Plot's Total sold is 39 against the sheet's 38: the sheet counts Plot 29's 62,58,387 in sold value, invoice value and OL-collection but not in its unit count, so 39 is the consistent figure. Without Plot 29 the count is 38 and those three are short by exactly that sum.
+- [x] [Sonnet] `writeWorkbookBytes(sheets)` in `lib/xlsx.ts`: minimal SpreadsheetML with inline strings and numbers, zipped by `fflate`. A round-trip test reads it back with `readWorkbookBytes`. Opus vets. Vetted; whether Excel opens it without a repair prompt is checklist item 6.
+- [x] [Opus] `lib/saarang-collections/queries.ts`: the latest upload per slot, settings, figures and rules, each `requireTool` first and every `error` checked. `actions.ts`: upload (one or many files, under 4 MB in total; recognise, store, move the report date forward and reset the period to the previous month, as the HTML does), set a figure, set the period, change a rule, and add or remove an excluded receipt, a correction or a missing unit. Each returns `ActionState` and revalidates `/saarang-collections` with `"layout"`.
+- [x] [Sonnet] Screens in `app/(dashboard)/saarang-collections/`: `page.tsx` (welcome), `summary/`, `reports/`, `rules/`, each with `loading.tsx`, a `ToolNav`, and `_components/`. The selected cell (`?cell=plot.F`) and the project filter (`?project=`) live in the URL, so the breakdown renders on the server. `download/route.ts` serves the meeting workbook in the HTML's layout (Summary Sheet plus the supporting sheets), the same way the existing CSV export routes work. Opus vets each screen. Vetted.
+- [x] [Opus] Phone check at 390 px: tiles stack, and the wide tables scroll inside their cards. The page itself must not scroll sideways. Seen with made-up data in headless Chrome at a true 390 px (the page measures 390): tiles stack, every table scrolls in its card with the project column pinned; a breakdown row was made to stay on one line.
+- [x] [Opus] Docs: the tool's `PLAN.md` (its rules and what bites), STATUS.md (the tool and its contract row), and TODO.md's vet list.
+- [ ] [Opus] Smoke test as the probe with only `/saarang-collections`, and as a no-grant account (refused). Then an independent Opus review of the full diff against this plan, SECURITY.md and BUGCATCHER.md. One pull request into `staging`, CI green, merged on the founder's word. The founder chose to skip the signed-in probe run (2026-10-27): their staging try is the first signed-in look.
+- [ ] Founder vets on staging. Grant the tool to the people who prepare the meeting, give it a team in Settings → Teams, and type the starting figures from the 21 Oct sheet.
+
+## The founder's checklist on staging
+
+1. Open Saarang Collections. The welcome page says 0 of 8 reports.
+2. Reports: drop the eight files from the 21 Oct set, with the two outstanding reports exported again as `.xlsx`. Each slot turns Updated, and the as-of date reads 21 Oct 2026.
+3. Rules: add SAARANG-PLOT-29 as missing from Zoho (as on the 21 Oct sheet), and the two −1,00,000 corrections on Plots 07 and 08 at On Sale Deed.
+4. Summary: type the hand figures from `Saarang_Collection_Meeting_21Oct.xlsx`. Compare every column with the sheet.
+5. Click Total collection for Saarang Plot. The receipts list opens, and the total matches the cell.
+6. Download Excel and open it. It has the meeting layout and the supporting sheets.
+7. On a phone, open the Summary. The tables scroll sideways inside their cards.
+
+## Not in this build
+
+A frozen copy of each meeting's numbers; Total expense from the toolbox's own Bills (`villa_cost_facts`) instead of typed; reading Client Relations' own payment schedules once they replace Zoho.
+
 # The team's additions (asked 2026-10-26) `[Opus plans, builds and independently reviews]`
 
 **The ask:** the team's list across the Estimator, Supervisors, Indents, Bills and Inventory, plus "a person must always know what is sitting on their plate". **Settled with the founder, 2026-10-26:**
