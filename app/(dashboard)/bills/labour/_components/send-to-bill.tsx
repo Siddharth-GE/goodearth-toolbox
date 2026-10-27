@@ -28,6 +28,7 @@ import {
 } from "@/lib/bills/labour-billing";
 import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-queries";
 import { parseNumber } from "@/lib/form-data";
+import { nextContractorBill } from "@/lib/masters/contractor-bill-number";
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
@@ -127,9 +128,19 @@ export function SendToBill({
     ? dailyWagesTotal(heads, rates, gstPct)
     : pieceWorkTotal(chosenEntries, pieceRateValues, gstPct);
   const overrideValue = parseNumber(override);
+  const nextBill =
+    first?.project_id && !groupProblem
+      ? nextContractorBill(
+          options.numbering,
+          first.contractor_id,
+          first.project_id,
+          isDaily ? "NMR" : "PW",
+        )
+      : null;
 
   const problem =
     groupProblem ??
+    (nextBill && "problem" in nextBill ? nextBill.problem : undefined) ??
     (chosen.length === 0
       ? "Tick the labour entries to bill."
       : isDaily
@@ -141,7 +152,7 @@ export function SendToBill({
           ? "Give a rate for every piece-work entry."
           : undefined) ??
     (!reference.trim()
-      ? "Type the muster roll or bill reference."
+      ? "Type their muster roll or bill reference."
       : !billDate
         ? "Pick the bill date."
         : undefined);
@@ -255,6 +266,15 @@ export function SendToBill({
               <span className="text-muted font-normal">{` · ${first.contractor_name} · ${first.project_name}`}</span>
             )}
           </p>
+          {nextBill && "reference" in nextBill && (
+            <p className="text-foreground text-sm">
+              {"This bill will be numbered "}
+              <span className="font-mono font-semibold">{nextBill.reference}</span>
+              <span className="text-muted">
+                {" — from the contractor's code and the project's company."}
+              </span>
+            </p>
+          )}
 
           {!groupProblem && isDaily && (
             <div className="space-y-2">
@@ -333,7 +353,7 @@ export function SendToBill({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="labour-reference">Muster roll / bill reference</Label>
+                <Label htmlFor="labour-reference">Their muster roll / bill reference</Label>
                 <Input
                   id="labour-reference"
                   value={reference}
