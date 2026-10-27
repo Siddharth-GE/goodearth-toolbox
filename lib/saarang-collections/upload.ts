@@ -5,6 +5,9 @@ import { oldExcelRefusal, parse, SLOT_LABEL, type ParsedReport, type Slot } from
 
 export type DroppedFile = { name: string; bytes: Uint8Array };
 
+/** What an upload says: what was saved, what was refused. ActionState's shape plus the saved line. */
+export type UploadState = { error?: string; saved?: string } | undefined;
+
 function firstSheet(file: DroppedFile) {
   if (/\.csv$/i.test(file.name)) return parseCsv(new TextDecoder().decode(file.bytes));
   return [...readWorkbookBytes(file.bytes, file.name).values()][0]?.map((row) => row.cells) ?? [];
@@ -17,9 +20,10 @@ function firstSheet(file: DroppedFile) {
 export function readReports(
   files: DroppedFile[],
   reportDate: string | null,
-): { reports: ParsedReport[]; errors: string[]; reportDate: string | null } {
+): { reports: ParsedReport[]; errors: string[]; notices: string[]; reportDate: string | null } {
   const bySlot = new Map<Slot, ParsedReport>();
   const errors: string[] = [];
+  const notices: string[] = [];
   for (const file of files) {
     const refusal = oldExcelRefusal(file.name, file.bytes);
     if (refusal) {
@@ -38,7 +42,7 @@ export function readReports(
       continue;
     }
     if (bySlot.has(report.slot)) {
-      errors.push(
+      notices.push(
         `${bySlot.get(report.slot)!.meta.file}: replaced by ${file.name}, which is also the ${SLOT_LABEL[report.slot]} report.`,
       );
     }
@@ -49,5 +53,5 @@ export function readReports(
     const asOf = report.meta.asOf;
     if (report.kind !== "outstanding" && asOf && (!newest || asOf > newest)) newest = asOf;
   }
-  return { reports: [...bySlot.values()], errors, reportDate: newest };
+  return { reports: [...bySlot.values()], errors, notices, reportDate: newest };
 }

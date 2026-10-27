@@ -24,7 +24,7 @@ export function ManualFigure({
   const shown = value === null ? "" : count ? String(value) : formatAmount(value);
   const [text, setText] = useState(shown);
   const [error, setError] = useState<string>();
-  const [, startTransition] = useTransition();
+  const [saving, startTransition] = useTransition();
 
   const save = () => {
     if (text === shown) return;
@@ -47,8 +47,10 @@ export function ManualFigure({
         autoComplete="off"
         placeholder="—"
         aria-label={label}
+        aria-busy={saving}
         className="h-10 min-w-28 rounded-none border-0 bg-transparent px-3 text-right font-mono"
       />
+      {saving && <p className="text-muted px-3 pb-1 text-right text-xs">Saving…</p>}
       <FormMessage error={error} size="xs" className="px-3 pb-1 text-right" />
     </div>
   );

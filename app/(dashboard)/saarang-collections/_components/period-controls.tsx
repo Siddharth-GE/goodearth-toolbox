@@ -9,22 +9,14 @@ import { useState, useTransition } from "react";
 import { useFormSubmit } from "./use-form-submit";
 
 /** The collection period: any two days, or the whole month before the report date. */
-export function PeriodControls({
-  from,
-  to,
-  reportDate,
-}: {
-  from: string | null;
-  to: string | null;
-  reportDate: string | null;
-}) {
+export function PeriodControls({ from, to }: { from: string | null; to: string | null }) {
   const form = useFormSubmit(savePeriod);
   const [error, setError] = useState<string>();
   const [moving, startTransition] = useTransition();
 
   const previous = () =>
     startTransition(async () => {
-      const result = await setPreviousMonth(reportDate);
+      const result = await setPreviousMonth();
       setError(result?.error);
     });
 

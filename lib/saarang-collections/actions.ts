@@ -5,11 +5,12 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
 import { checked, optionalText, parseNumber, text } from "@/lib/form-data";
-import { todayInIndia } from "@/lib/format";
+import { formatDate, todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { SLOT_LABEL } from "./core";
 import { GRANT, isFigureCell, previousMonth, UNIT_PATTERN } from "./shared";
-import { readReports } from "./upload";
+import { readReports, type UploadState } from "./upload";
 
 /** Saarang Collections' saves. Anyone holding the grant edits the whole report (0161); each write names its caller. */
 
@@ -21,6 +22,19 @@ function failed(error: { message: string; code?: string }, fallback: string): Ac
   console.error(`saarang-collections: ${fallback}`, error);
   return { error: dbErrorMessage(error, fallback) };
 }
+
+/** Each field's length as 0161 allows it, said in words before the database says it in its own. */
+function longest(formData: FormData, limits: Record<string, number>): ActionState {
+  for (const [field, max] of Object.entries(limits)) {
+    if (text(formData, field).length > max) {
+      return { error: `Keep the ${field} under ${max} letters.` };
+    }
+  }
+  return undefined;
+}
+
+/** Rupees as 0161's numeric(14, 2) holds them: below a lakh crore. */
+const tooLarge = (n: number) => Math.abs(n) >= 1e12;
 
 /** One hand-typed cell, saved when the person leaves it. Blank clears it. */
 export async function saveFigure(project: string, key: string, raw: string): Promise<ActionState> {
@@ -65,10 +79,15 @@ export async function savePeriod(_prev: ActionState, formData: FormData): Promis
 }
 
 /** The calendar month before the report date (or before today, with no reports yet). */
-export async function setPreviousMonth(reportDate: string | null): Promise<ActionState> {
+export async function setPreviousMonth(): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const anchor = reportDate && DATE.test(reportDate) ? reportDate : todayInIndia();
-  const { from, to } = previousMonth(anchor);
+  const supabase = await createClient();
+  const settings = await supabase
+    .from("saarang_collection_settings")
+    .select("report_date")
+    .single();
+  if (settings.error) return failed(settings.error, "Could not read the report date. Try again.");
+  const { from, to } = previousMonth(settings.data.report_date ?? todayInIndia());
   return saveSettings(user.id, { period_from: from, period_to: to }, "Could not set the period.");
 }
 
@@ -110,6 +129,8 @@ export async function addExcludedReceipt(
   const receiptNo = text(formData, "receipt_no").toUpperCase();
   if (!receiptNo) return { error: "Type the receipt number." };
   if (receiptNo.length > 60) return { error: "That receipt number is too long." };
+  const tooLong = longest(formData, { reason: 500 });
+  if (tooLong) return tooLong;
   const supabase = await createClient();
   const { error } = await supabase.from("saarang_collection_excluded_receipts").insert({
     receipt_no: receiptNo,
@@ -136,6 +157,9 @@ export async function addCorrection(_prev: ActionState, formData: FormData): Pro
   if (delta === null || !Number.isFinite(delta) || delta === 0) {
     return { error: "Type the amount to add or take off, like -1,00,000." };
   }
+  if (tooLarge(delta)) return { error: "That amount is too large." };
+  const tooLong = longest(formData, { stage: 200, note: 500 });
+  if (tooLong) return tooLong;
   const supabase = await createClient();
   const { error } = await supabase.from("saarang_collection_corrections").insert({
     unit,
@@ -162,6 +186,9 @@ export async function addExtraUnit(_prev: ActionState, formData: FormData): Prom
   if (![completed, pending].every((n) => Number.isFinite(n) && n >= 0)) {
     return { error: "Completed and pending milestones are amounts of zero or more." };
   }
+  if ([soldValue, completed, pending].some(tooLarge)) return { error: "That amount is too large." };
+  const tooLong = longest(formData, { applicant: 200, note: 500 });
+  if (tooLong) return tooLong;
   const supabase = await createClient();
   const { error } = await supabase.from("saarang_collection_extra_units").insert({
     unit,
@@ -197,18 +224,20 @@ export async function removeRule(list: keyof typeof RULE_TABLES, id: string): Pr
   return undefined;
 }
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+// Under the 4 MB a server action takes, so the person gets this sentence rather than a failed request.
+const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
 
 /**
  * The dropped Zoho exports. Every file is kept as its own upload; the Summary uses the latest per report.
  * A newer as-of date moves the report date forward and resets the period to the month before, as the page did.
+ * What saved and what was refused are said apart: one refused file does not hide seven saved ones.
  */
-export async function uploadReports(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function uploadReports(_prev: UploadState, formData: FormData): Promise<UploadState> {
   const user = await requireTool(GRANT);
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { error: "Choose the Zoho exports to upload." };
   if (files.reduce((n, f) => n + f.size, 0) > MAX_UPLOAD_BYTES) {
-    return { error: "Those files are over 4 MB together. Upload them a few at a time." };
+    return { error: "Those files are over 3.5 MB together. Upload them a few at a time." };
   }
 
   const supabase = await createClient();
@@ -224,7 +253,8 @@ export async function uploadReports(_prev: ActionState, formData: FormData): Pro
       bytes: new Uint8Array(await file.arrayBuffer()),
     })),
   );
-  const { reports, errors, reportDate } = readReports(dropped, settings.data.report_date);
+  const { reports, errors, notices, reportDate } = readReports(dropped, settings.data.report_date);
+  const said: string[] = [];
 
   if (reports.length > 0) {
     const { error } = await supabase.from("saarang_collection_uploads").insert(
@@ -240,17 +270,28 @@ export async function uploadReports(_prev: ActionState, formData: FormData): Pro
       })),
     );
     if (error) return failed(error, "Could not save the reports. Try again.");
+    const names = reports.map((report) => SLOT_LABEL[report.slot]).join(", ");
+    said.push(
+      `Saved ${reports.length === 1 ? "1 report" : `${reports.length} reports`}: ${names}.`,
+    );
 
     if (reportDate && reportDate !== settings.data.report_date) {
       const period = previousMonth(reportDate);
       const moved = await saveSettings(
         user.id,
         { report_date: reportDate, period_from: period.from, period_to: period.to },
-        "The reports were saved, but the report date could not be moved. Set the period on Rules.",
+        "The reports were saved, but the report date could not be moved. Set the period on Summary.",
       );
-      if (moved?.error) return moved;
+      if (moved?.error) errors.push(moved.error);
+      else
+        said.push(
+          `Collection period set to ${formatDate(period.from)} – ${formatDate(period.to)}.`,
+        );
     }
     refresh();
   }
-  return errors.length ? { error: errors.join("\n") } : undefined;
+  return {
+    saved: [...said, ...notices].join("\n") || undefined,
+    error: errors.join("\n") || undefined,
+  };
 }

@@ -60,7 +60,8 @@ test("two files for one report: the later one counts, and the person is told", (
   );
   assert.equal(out.reports.length, 1);
   assert.equal(out.reports[0].meta.file, "second.csv");
-  assert.match(out.errors[0], /first\.csv: replaced by second\.csv/);
+  assert.deepEqual(out.errors, []);
+  assert.match(out.notices[0], /first\.csv: replaced by second\.csv/);
 });
 
 test("an old .xls, an unreadable file and an unknown report are refused, the rest still read", () => {

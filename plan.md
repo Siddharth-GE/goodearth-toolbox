@@ -45,7 +45,7 @@ The reference lives outside the repo, in `Documents/Custom Office Templates/coll
 
 1. Open Saarang Collections. The welcome page says 0 of 8 reports.
 2. Reports: drop the eight files from the 21 Oct set, with the two outstanding reports exported again as `.xlsx`. Each slot turns Updated, and the as-of date reads 21 Oct 2026.
-3. Rules: add SAARANG-PLOT-29 as missing from Zoho (Nithya, 62,58,387), and the two −1,00,000 corrections on Plots 07 and 08 at On Sale Deed.
+3. Rules: add SAARANG-PLOT-29 as missing from Zoho (as on the 21 Oct sheet), and the two −1,00,000 corrections on Plots 07 and 08 at On Sale Deed.
 4. Summary: type the hand figures from `Saarang_Collection_Meeting_21Oct.xlsx`. Compare every column with the sheet.
 5. Click Total collection for Saarang Plot. The receipts list opens, and the total matches the cell.
 6. Download Excel and open it. It has the meeting layout and the supporting sheets.

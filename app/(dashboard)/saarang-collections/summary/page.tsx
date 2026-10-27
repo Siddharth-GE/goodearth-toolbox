@@ -35,9 +35,11 @@ export default async function SummaryPage({
     PROJECTS.includes(cellProject as Project) && cellKey
       ? { project: cellProject as Project, k: cellKey }
       : null;
-  const detail = selected
-    ? view.result[selected.project].detail[selected.k as DetailKey]
-    : undefined;
+  // An own key only: "constructor" in the address is not a figure.
+  const detail =
+    selected && Object.hasOwn(view.result[selected.project].detail, selected.k)
+      ? view.result[selected.project].detail[selected.k as DetailKey]
+      : undefined;
   const cell = selected && detail ? `${selected.project}.${selected.k}` : null;
 
   const loaded = collections.slots.some((slot) => slot.upload);
@@ -62,11 +64,7 @@ export default async function SummaryPage({
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <ProjectFilter filter={filter} cell={cell} />
-        <PeriodControls
-          from={settings.periodFrom}
-          to={settings.periodTo}
-          reportDate={settings.reportDate}
-        />
+        <PeriodControls from={settings.periodFrom} to={settings.periodTo} />
       </div>
 
       <Section

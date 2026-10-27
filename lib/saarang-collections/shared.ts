@@ -19,7 +19,7 @@ export type FigureProject = keyof typeof FIGURE_KEYS;
 
 export function isFigureCell(project: string, key: string): project is FigureProject {
   return (
-    project in FIGURE_KEYS &&
+    Object.hasOwn(FIGURE_KEYS, project) &&
     (FIGURE_KEYS[project as FigureProject] as readonly string[]).includes(key)
   );
 }
