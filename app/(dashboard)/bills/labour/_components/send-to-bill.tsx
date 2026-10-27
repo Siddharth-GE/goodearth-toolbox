@@ -137,8 +137,10 @@ export function SendToBill({
           isDaily ? "NMR" : "PW",
         )
       : null;
-  // A contractor's bill carries its own number where their reference is left blank (0165).
-  const numbered = Boolean(nextBill && "reference" in nextBill);
+  // A contractor's bill shows its number in the box; left untouched it is sent blank and the database writes the
+  // number it actually mints there (0165), so a bill made meanwhile cannot leave a stale one behind.
+  const autoReference = nextBill && "reference" in nextBill ? nextBill.reference : "";
+  const numbered = autoReference !== "";
 
   const problem =
     groupProblem ??
@@ -356,15 +358,13 @@ export function SendToBill({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="labour-reference">
-                  {numbered ? "Their reference (optional)" : "Their muster roll / bill reference"}
+                  {numbered ? "Reference" : "Their muster roll / bill reference"}
                 </Label>
                 <Input
                   id="labour-reference"
-                  value={reference}
+                  value={reference || autoReference}
                   onChange={(event) => setReference(event.target.value)}
-                  placeholder={
-                    numbered ? "Blank uses the bill's number" : "e.g. Muster roll week 41"
-                  }
+                  placeholder="e.g. Muster roll week 41"
                   autoComplete="off"
                 />
               </div>

@@ -175,8 +175,10 @@ export function BillForm({
           kind === "contract" || isPieceWorkBill(drafts) ? "PW" : "NMR",
         )
       : null;
-  // A contractor's bill carries its own number where their reference is left blank (0165).
-  const numbered = Boolean(nextBill && "reference" in nextBill);
+  // A contractor's bill shows its number in the box; left untouched it is sent blank and the database writes the
+  // number it actually mints there (0165), so a bill made meanwhile cannot leave a stale one behind.
+  const autoReference = nextBill && "reference" in nextBill ? nextBill.reference : "";
+  const numbered = autoReference !== "";
   const problem =
     (kind === "nmr"
       ? !projectId
@@ -396,22 +398,16 @@ export function BillForm({
           <div className="space-y-1.5">
             <Label htmlFor="bill-invoice-no">
               {numbered
-                ? "Contractor's own reference (optional)"
+                ? "Reference"
                 : kind === "nmr"
                   ? "Contractor's bill or muster roll reference"
                   : "Invoice number"}
             </Label>
             <Input
               id="bill-invoice-no"
-              value={invoiceNo}
+              value={invoiceNo || autoReference}
               onChange={(event) => setInvoiceNo(event.target.value)}
-              placeholder={
-                numbered
-                  ? "Blank uses the bill's number"
-                  : kind === "nmr"
-                    ? "e.g. Misc week 32"
-                    : "As printed on the bill"
-              }
+              placeholder={kind === "nmr" ? "e.g. Misc week 32" : "As printed on the bill"}
               autoComplete="off"
             />
             {kind === "po" && fromDelivery?.invoiceNo && (
