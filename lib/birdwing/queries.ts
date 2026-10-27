@@ -124,6 +124,8 @@ export type InvoiceCompany = {
   legal_name: string | null;
   address: string | null;
   gstin: string | null;
+  pan: string | null;
+  msme_number: string | null;
   state: string;
   phone: string | null;
   email: string | null;
@@ -155,7 +157,7 @@ export async function getSettings(): Promise<BirdwingSettings> {
   if (data?.company_id) {
     const { data: row, error: companyError } = await supabase
       .from("companies")
-      .select("id, name, legal_name, address, gstin, state, phone, email")
+      .select("id, name, legal_name, address, gstin, pan, msme_number, state, phone, email")
       .eq("id", data.company_id)
       .maybeSingle();
     if (companyError) fail("the invoicing company", companyError);

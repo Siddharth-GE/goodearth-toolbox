@@ -120,6 +120,7 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
           items={[
             { label: "Invoice date", value: invoice.issuedOn ? formatDate(invoice.issuedOn) : "—" },
             { label: "Billed to", value: invoice.billTo.name || "—" },
+            { label: "Guest phone", value: invoice.stay.guestPhone ?? "—" },
             { label: "Their GSTIN", value: invoice.billTo.gstin ?? "—" },
             { label: "Place of supply", value: invoice.placeOfSupply ?? "—" },
             {
@@ -130,7 +131,6 @@ export function InvoiceDocument({ invoice }: { invoice: InvoicePrint }) {
             },
             { label: "Nights", value: nights ? String(nights) : "Day visit" },
             { label: "Guests", value: invoice.stay.guests ? String(invoice.stay.guests) : "—" },
-            { label: "Issued by", value: issuer ?? "—" },
           ]}
         />
         {invoice.billTo.address && (

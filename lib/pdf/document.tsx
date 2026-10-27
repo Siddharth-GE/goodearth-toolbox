@@ -84,11 +84,13 @@ export type LetterheadCompany = {
   legal_name: string | null;
   address: string | null;
   gstin: string | null;
+  pan?: string | null;
+  msme_number?: string | null;
   phone: string | null;
   email: string | null;
 };
 
-/** Company identity block from Masters (name, address, GSTIN, contacts), never invented; without one, the placeholder wordmark. */
+/** Company identity block from Masters (name, address, GSTIN, PAN, MSME, contacts), never invented; without one, the placeholder wordmark. */
 function Letterhead({
   documentType,
   reference,
@@ -104,15 +106,23 @@ function Letterhead({
     .map((part) => part.trim().replace(/,$/, ""))
     .filter(Boolean)
     .join(", ");
-  const contacts = company
-    ? [company.gstin && `GSTIN ${company.gstin}`, company.phone, company.email].filter(Boolean)
+  const registrations = company
+    ? [
+        company.gstin && `GSTIN ${company.gstin}`,
+        company.pan && `PAN ${company.pan}`,
+        company.msme_number && `MSME ${company.msme_number}`,
+      ].filter(Boolean)
     : [];
+  const contacts = company ? [company.phone, company.email].filter(Boolean) : [];
   return (
     <View style={styles.letterhead} fixed>
       {company ? (
         <View style={styles.companyBlock}>
           <Text style={styles.companyName}>{company.legal_name || company.name}</Text>
           {address && <Text style={styles.companyLine}>{address}</Text>}
+          {registrations.length > 0 && (
+            <Text style={styles.companyLine}>{registrations.join(" · ")}</Text>
+          )}
           {contacts.length > 0 && <Text style={styles.companyLine}>{contacts.join(" · ")}</Text>}
         </View>
       ) : (

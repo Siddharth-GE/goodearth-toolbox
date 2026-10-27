@@ -3445,7 +3445,9 @@ export type Database = {
           id: string
           is_active: boolean
           legal_name: string | null
+          msme_number: string | null
           name: string
+          pan: string | null
           phone: string | null
           state: string
           updated_at: string
@@ -3460,7 +3462,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           legal_name?: string | null
+          msme_number?: string | null
           name: string
+          pan?: string | null
           phone?: string | null
           state?: string
           updated_at?: string
@@ -3475,7 +3479,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           legal_name?: string | null
+          msme_number?: string | null
           name?: string
+          pan?: string | null
           phone?: string | null
           state?: string
           updated_at?: string

@@ -81,6 +81,31 @@ export function CompanyFormDialog({ company }: { company?: CompanyRow }) {
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
+          <Label htmlFor="pan">PAN</Label>
+          <Input
+            id="pan"
+            name="pan"
+            defaultValue={company?.pan ?? ""}
+            autoComplete="off"
+            maxLength={12}
+            className="font-mono uppercase"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="msme_number">MSME (Udyam) number</Label>
+          <Input
+            id="msme_number"
+            name="msme_number"
+            defaultValue={company?.msme_number ?? ""}
+            autoComplete="off"
+            maxLength={40}
+            placeholder="UDYAM-KR-03-0000000"
+            className="font-mono uppercase"
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
           <Label htmlFor="phone">Phone</Label>
           <Input
             id="phone"

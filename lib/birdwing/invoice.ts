@@ -111,6 +111,8 @@ export function printFromSnapshot(row: {
           legal_name: str(company.legal_name),
           address: str(company.address),
           gstin: str(company.gstin),
+          pan: str(company.pan),
+          msme_number: str(company.msme_number),
           phone: str(company.phone),
           email: str(company.email),
         }

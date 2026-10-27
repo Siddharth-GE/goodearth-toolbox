@@ -23,7 +23,13 @@ test("a snapshot prints its lines, letterhead and totals", () => {
     bill_to_address: null,
     discount: "30",
     snapshot: {
-      company: { name: "Maloor", legal_name: "MALOOR ECO FARMS", gstin: "32AAOCM4043Q1Z1" },
+      company: {
+        name: "Maloor",
+        legal_name: "MALOOR ECO FARMS",
+        gstin: "32AAOCM4043Q1Z1",
+        pan: "AAOCM4043Q",
+        msme_number: "UDYAM-KR-03-0539542",
+      },
       place_of_supply: "Kannur, Kerala (32)",
       upi_id: "x@cnrb",
       lines: [
@@ -35,6 +41,8 @@ test("a snapshot prints its lines, letterhead and totals", () => {
   });
   assert.equal(print.mode, "issued");
   assert.equal(print.company?.legal_name, "MALOOR ECO FARMS");
+  assert.equal(print.company?.pan, "AAOCM4043Q");
+  assert.equal(print.company?.msme_number, "UDYAM-KR-03-0539542");
   assert.equal(print.lines[1].taxable, 1800);
   assert.equal(print.total, 10104);
   assert.equal(print.taxable, 9400);

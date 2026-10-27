@@ -10,6 +10,9 @@ export type CompanyRow = {
   legal_name: string | null;
   address: string | null;
   gstin: string | null;
+  pan: string | null;
+  /** Udyam registration, e.g. UDYAM-KR-03-0539542. */
+  msme_number: string | null;
   /** Compared with each vendor's GST state: same means CGST + SGST, else IGST. */
   state: string;
   phone: string | null;
@@ -19,7 +22,7 @@ export type CompanyRow = {
 };
 
 const COMPANY_COLUMNS =
-  "id, name, legal_name, address, gstin, state, phone, email, is_active, created_at";
+  "id, name, legal_name, address, gstin, pan, msme_number, state, phone, email, is_active, created_at";
 
 export async function listCompanies(): Promise<CompanyRow[]> {
   const supabase = await createClient();
