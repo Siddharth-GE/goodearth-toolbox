@@ -20,6 +20,8 @@ export type VendorRow = {
   is_contractor: boolean;
   /** CON/012, given by the database once a vendor is a contractor and kept for good (0156). */
   contractor_no: string | null;
+  /** RAJU: the contractor's part of their bill numbers, made from the name by the database, editable (0164). */
+  bill_code: string | null;
   created_at: string;
   updated_at: string | null;
   updated_by: string | null;
@@ -65,7 +67,7 @@ export async function listVendorsPage(
       if (filters.type === "supplier") query = query.eq("is_contractor", false);
       if (search) {
         query = query.or(
-          `name.ilike.%${search}%,contact_name.ilike.%${search}%,gst_no.ilike.%${search}%,contractor_no.ilike.%${search}%`,
+          `name.ilike.%${search}%,contact_name.ilike.%${search}%,gst_no.ilike.%${search}%,contractor_no.ilike.%${search}%,bill_code.ilike.%${search}%`,
         );
       }
       return query;

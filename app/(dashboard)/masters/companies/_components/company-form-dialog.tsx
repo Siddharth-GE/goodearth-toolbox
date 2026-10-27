@@ -43,6 +43,22 @@ export function CompanyFormDialog({ company }: { company?: CompanyRow }) {
         <p className="text-muted text-xs">As registered — printed at the top of every document.</p>
       </div>
       <div className="space-y-1.5">
+        <Label htmlFor="code">Bill code</Label>
+        <Input
+          id="code"
+          name="code"
+          defaultValue={company?.code ?? ""}
+          autoComplete="off"
+          maxLength={4}
+          placeholder="ED"
+          className="font-mono uppercase sm:w-32"
+        />
+        <p className="text-muted text-xs">
+          Two to four letters. A contractor&apos;s bill on this company&apos;s projects carries it,
+          as ED in RAJU-PW-ED-08.
+        </p>
+      </div>
+      <div className="space-y-1.5">
         <Label htmlFor="address">Registered address</Label>
         <Textarea
           id="address"

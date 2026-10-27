@@ -42,6 +42,7 @@ export default async function CompaniesPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Name</TableHeaderCell>
+              <TableHeaderCell>Bill code</TableHeaderCell>
               <TableHeaderCell>GSTIN</TableHeaderCell>
               <TableHeaderCell>State</TableHeaderCell>
               <TableHeaderCell>Projects</TableHeaderCell>
@@ -60,6 +61,7 @@ export default async function CompaniesPage() {
                       <p className="text-muted text-xs">{company.legal_name}</p>
                     )}
                   </TableCell>
+                  <TableCell className="font-mono text-xs">{company.code || "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{company.gstin || "—"}</TableCell>
                   <TableCell>{company.state}</TableCell>
                   <TableCell>{names.length > 0 ? names.join(", ") : "—"}</TableCell>

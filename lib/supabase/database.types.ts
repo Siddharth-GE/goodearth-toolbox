@@ -600,6 +600,7 @@ export type Database = {
           updated_by: string | null
           vendor_id: string | null
           vendor_seq: number | null
+          work_type: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -635,6 +636,7 @@ export type Database = {
           updated_by?: string | null
           vendor_id?: string | null
           vendor_seq?: number | null
+          work_type?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -670,6 +672,7 @@ export type Database = {
           updated_by?: string | null
           vendor_id?: string | null
           vendor_seq?: number | null
+          work_type?: string | null
         }
         Relationships: [
           {
@@ -3438,6 +3441,7 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          code: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -3455,6 +3459,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          code?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3472,6 +3477,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          code?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3649,6 +3655,58 @@ export type Database = {
           },
           {
             foreignKeyName: "contractor_advances_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contractor_bill_numbers: {
+        Row: {
+          app_numbering: boolean
+          company_id: string
+          id: string
+          last_no: number
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          app_numbering?: boolean
+          company_id: string
+          id?: string
+          last_no?: number
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          app_numbering?: boolean
+          company_id?: string
+          id?: string
+          last_no?: number
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contractor_bill_numbers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contractor_bill_numbers_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contractor_bill_numbers_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -11643,6 +11701,7 @@ export type Database = {
       vendors: {
         Row: {
           address: string | null
+          bill_code: string | null
           contact_designation: string | null
           contact_name: string | null
           contractor_no: string | null
@@ -11661,6 +11720,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          bill_code?: string | null
           contact_designation?: string | null
           contact_name?: string | null
           contractor_no?: string | null
@@ -11679,6 +11739,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          bill_code?: string | null
           contact_designation?: string | null
           contact_name?: string | null
           contractor_no?: string | null
@@ -13294,6 +13355,7 @@ export type Database = {
           p_invoice_date: string
           p_invoice_no: string
           p_note: string
+          p_piece_work?: boolean
           p_plot_id: string
           p_project_id: string
           p_taxable_amount: number

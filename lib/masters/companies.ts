@@ -8,6 +8,8 @@ export type CompanyRow = {
   id: string;
   name: string;
   legal_name: string | null;
+  /** ED, EF, EP: the company's part of a contractor's bill number (0164). */
+  code: string | null;
   address: string | null;
   gstin: string | null;
   pan: string | null;
@@ -22,7 +24,7 @@ export type CompanyRow = {
 };
 
 const COMPANY_COLUMNS =
-  "id, name, legal_name, address, gstin, pan, msme_number, state, phone, email, is_active, created_at";
+  "id, name, legal_name, code, address, gstin, pan, msme_number, state, phone, email, is_active, created_at";
 
 export async function listCompanies(): Promise<CompanyRow[]> {
   const supabase = await createClient();

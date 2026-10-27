@@ -56,6 +56,7 @@ const vendor = [
   { key: "payment_term_days", label: "Pay in days", kind: "whole", optional: true },
   active,
   { key: "is_contractor", label: "Contractor", kind: "yesno", optional: true, start: false },
+  words("bill_code", "Bill code (four letters; blank makes one from the name)"),
 ] satisfies Field[];
 
 const item = [
@@ -88,6 +89,7 @@ const client = [
 const company = [
   name,
   words("legal_name", "Legal name"),
+  words("code", "Bill code (ED, EF…)"),
   words("address", "Address"),
   words("gstin", "GSTIN"),
   words("pan", "PAN"),

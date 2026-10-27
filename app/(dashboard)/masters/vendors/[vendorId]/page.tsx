@@ -13,10 +13,12 @@ import {
 import { hasApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { formatDate } from "@/lib/format";
+import { contractorBillReference } from "@/lib/masters/contractor-bill-number";
 import { getVendorDetail } from "@/lib/masters/vendor-detail";
 import { FileText, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ContractorBillNumberDialog } from "../_components/contractor-bill-number-dialog";
 import { VendorFormDialog } from "../_components/vendor-form-dialog";
 import { VendorPaymentDialog } from "../_components/vendor-payment-dialog";
 
@@ -29,8 +31,17 @@ export default async function VendorDetailPage({
   const [user, { vendorId }] = await Promise.all([requireUser(), params]);
   const detail = await getVendorDetail(vendorId);
   if (!detail) notFound();
-  const { vendor, updatedByName, paymentDetails, pos, poTotal, bills, billTotal, projectNames } =
-    detail;
+  const {
+    vendor,
+    updatedByName,
+    paymentDetails,
+    pos,
+    poTotal,
+    bills,
+    billTotal,
+    projectNames,
+    billCounts,
+  } = detail;
 
   const [canSeePos, canSeeBills, canEditMasters] = await Promise.all([
     hasApp(user, "/purchase-orders"),
@@ -40,6 +51,7 @@ export default async function VendorDetailPage({
   // RLS gates vendor_payment_details to these grants; the card uses the same test so "not allowed" never looks like "no details entered".
   const canSeeBank = canEditMasters || canSeePos || canSeeBills;
   const projectName = (id: string) => projectNames.get(id) ?? "—";
+  const billCode = vendor.bill_code;
 
   return (
     <div className="space-y-4">
@@ -47,7 +59,13 @@ export default async function VendorDetailPage({
         title={vendor.name}
         backHref="/masters/vendors"
         backLabel="All vendors"
-        description={[vendor.contractor_no, vendor.contact_name, vendor.mobile, vendor.gst_no]
+        description={[
+          vendor.contractor_no,
+          vendor.bill_code,
+          vendor.contact_name,
+          vendor.mobile,
+          vendor.gst_no,
+        ]
           .filter(Boolean)
           .join(" · ")}
         actions={
@@ -139,6 +157,75 @@ export default async function VendorDetailPage({
             </dl>
           ) : (
             <p className="text-muted text-sm">No bank details entered for this vendor.</p>
+          )}
+        </Card>
+      )}
+
+      {vendor.is_contractor && (
+        <Card className="space-y-3 p-4">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Bill numbers
+          </p>
+          {!billCode ? (
+            <p className="text-muted text-sm">
+              This contractor has no bill code yet. Edit the vendor and give them one.
+            </p>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Company</TableHeaderCell>
+                  <TableHeaderCell>Last bill</TableHeaderCell>
+                  <TableHeaderCell>Next bill</TableHeaderCell>
+                  <TableHeaderCell></TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {billCounts.map((count) => (
+                  <TableRow key={count.companyId}>
+                    <TableCell className="text-foreground">{count.companyName}</TableCell>
+                    <TableCell>{count.lastNo > 0 ? count.lastNo : "None yet"}</TableCell>
+                    <TableCell>
+                      {count.companyCode ? (
+                        <span className="font-mono text-xs">
+                          <span className="block">
+                            {contractorBillReference(
+                              billCode,
+                              "PW",
+                              count.companyCode,
+                              count.lastNo + 1,
+                            )}
+                          </span>
+                          <span className="text-muted block">
+                            {contractorBillReference(
+                              billCode,
+                              "NMR",
+                              count.companyCode,
+                              count.lastNo + 1,
+                            )}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted text-xs">
+                          Give this company a bill code first
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {canEditMasters && (
+                        <ContractorBillNumberDialog
+                          vendorId={vendor.id}
+                          companyId={count.companyId}
+                          companyName={count.companyName}
+                          lastNo={count.lastNo}
+                          appNumbering={count.appNumbering}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </Card>
       )}

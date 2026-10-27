@@ -1,3 +1,19 @@
+# Contractor bill numbers `[Opus planned and built 2026-10-27; the founder chose the counting and the code]`
+
+**The founder's ask** (2026-10-27): a contractor's bill numbers itself as `<four letters of the name>-<PW or NMR>-<ED, EF or EP>-<number>`, continuing from the last numbers in their contractors sheet (one tab per company), the codes kept in Masters. Settled the same day: **one count per contractor per company**, shared by PW and NMR; **one code per contractor everywhere** (the sheet's per-company codes are not kept).
+
+- [x] `[Opus]` `0164_contractor_bill_numbers.sql`: `companies.code`, `vendors.bill_code` (made from the name, permanent once on bills), `bills.work_type`, Masters' `contractor_bill_numbers` and the trigger-only definer that counts it. Reviewed independently by Opus. Trial `scripts/trials/contractor-bill-numbers.sql`. On staging.
+- [x] `[Opus]` Masters: the code on the vendor form, list and page; "Bill numbers" per company on a contractor's page; the company's bill code. A hand-made labour bill tells the database PW when it is piece-work with no daily wages. Turing's vendor and company forms carry both codes.
+- [x] `[Opus]` `scripts/import-contractor-bill-numbers.ts` run on staging: ED, EF, EP given; 151 last numbers set from exact name matches. Loose matches and unmatched names are the founder's (TODO.md).
+
+**Try it on staging:**
+
+1. Masters → Companies: Developments shows ED, Futures EF, Projects EP.
+2. Masters → Vendors → Kashinath Roy: KASH beside CON/…; Bill numbers reads Developments last 5, next KASH-PW-ED-06 (or -NMR-).
+3. Bills → Labour: send one contractor's daily wages on Saarang - Villas to a bill — it is numbered `<code>-NMR-EF-<next>`. Piece-work for the same contractor takes the following number, as PW.
+4. Back on the contractor's page the count has moved on; Edit refuses a lower number and takes a higher one.
+5. Try to change that contractor's code: refused, their bills carry it.
+
 # Saarang Collections `[Opus planned 2026-10-26; the founder said start, 2026-10-27]`
 
 **The founder's ask** (2026-10-26): bring the self-hosted "Saarang Collections" page into the toolbox — "the html has the exact design required". It turns the eight Zoho exports into the monthly Saarang collection and expense meeting summary. Settled the same day: **a separate tool, not a Client Relations tab** ("seperate tool then") — Client Relations shows each member only their own plots, and this report is every unit's money plus the expense figures.

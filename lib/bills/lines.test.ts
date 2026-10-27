@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  isPieceWorkBill,
   billLineProblem,
   billLinesProblem,
   dayRatesFromLines,
@@ -217,4 +218,11 @@ test("only what arrived is billed: a bill over it is refused before anything is 
     ),
     undefined,
   );
+});
+
+test("a bill with no work order is PW only when it is piece-work with no daily wages", () => {
+  assert.ok(isPieceWorkBill([line({ kind: "pw_qty" }), line({ kind: "pw_lump" })]));
+  assert.ok(isPieceWorkBill([line({ kind: "pw_lump" }), line({ kind: "other" })]));
+  assert.ok(!isPieceWorkBill([line({ kind: "nmr" }), line({ kind: "pw_qty" })]));
+  assert.ok(!isPieceWorkBill([line({ kind: "other" })]));
 });

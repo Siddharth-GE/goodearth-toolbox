@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertRead, readFailed } from "@/lib/supabase/read-failed";
+import { listCompanies } from "./companies";
 import type { VendorRow } from "./vendors";
 
 // Money confinement: reads only the money-free po_facts and bill_facts, never base tables or an amount column.
@@ -35,6 +36,16 @@ export type VendorPaymentDetails = {
   ifsc: string | null;
 };
 
+/** One company's count of this contractor's bills (0164); lastNo 0 when nothing was typed. */
+export type ContractorBillCount = {
+  companyId: string;
+  companyName: string;
+  companyCode: string | null;
+  lastNo: number;
+  /** The toolbox has made a bill here, so only bills move the count now. */
+  appNumbering: boolean;
+};
+
 export type VendorDetail = {
   vendor: VendorRow;
   updatedByName: string | null;
@@ -45,6 +56,8 @@ export type VendorDetail = {
   bills: VendorBillFact[];
   billTotal: number;
   projectNames: Map<string, string>;
+  /** Contractors only: every active company, and any other one a count was kept in. */
+  billCounts: ContractorBillCount[];
 };
 
 const RELATED_LIMIT = 50;
@@ -89,6 +102,8 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
   assertRead("Masters", "the projects", projectRes.error);
   assertRead("Masters", "this vendor's payment details", paymentRes.error);
 
+  const billCounts = vendor.is_contractor ? await contractorBillCounts(supabase, id) : [];
+
   let updatedByName: string | null = null;
   if (vendor.updated_by) {
     const { data: editor, error: editorError } = await supabase
@@ -109,5 +124,30 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
     bills: (billRes.data ?? []) as VendorBillFact[],
     billTotal: billRes.count ?? 0,
     projectNames: new Map((projectRes.data ?? []).map((p) => [p.id, p.name])),
+    billCounts,
   };
+}
+
+async function contractorBillCounts(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  vendorId: string,
+): Promise<ContractorBillCount[]> {
+  const [companies, countRes] = await Promise.all([
+    listCompanies(),
+    supabase
+      .from("contractor_bill_numbers")
+      .select("company_id, last_no, app_numbering")
+      .eq("vendor_id", vendorId),
+  ]);
+  assertRead("Masters", "this contractor's bill numbers", countRes.error);
+  const counts = new Map((countRes.data ?? []).map((row) => [row.company_id, row]));
+  return companies
+    .filter((company) => company.is_active || counts.has(company.id))
+    .map((company) => ({
+      companyId: company.id,
+      companyName: company.name,
+      companyCode: company.code,
+      lastNo: counts.get(company.id)?.last_no ?? 0,
+      appNumbering: counts.get(company.id)?.app_numbering ?? false,
+    }));
 }

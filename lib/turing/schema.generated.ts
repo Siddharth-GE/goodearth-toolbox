@@ -230,7 +230,8 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string",
       "updated_by": "string | null",
       "vendor_id": "string | null",
-      "vendor_seq": "number | null"
+      "vendor_seq": "number | null",
+      "work_type": "string | null"
     }
   },
   "birdwing_attendance": {
@@ -1019,6 +1020,7 @@ export const TURING_SCHEMA: Schema = {
     "kind": "table",
     "columns": {
       "address": "string | null",
+      "code": "string | null",
       "created_at": "string",
       "created_by": "string | null",
       "email": "string | null",
@@ -1063,6 +1065,18 @@ export const TURING_SCHEMA: Schema = {
       "project_id": "string",
       "reverse_reason": "string | null",
       "reverses_id": "string | null",
+      "updated_at": "string",
+      "updated_by": "string | null",
+      "vendor_id": "string"
+    }
+  },
+  "contractor_bill_numbers": {
+    "kind": "table",
+    "columns": {
+      "app_numbering": "boolean",
+      "company_id": "string",
+      "id": "string",
+      "last_no": "number",
       "updated_at": "string",
       "updated_by": "string | null",
       "vendor_id": "string"
@@ -2955,6 +2969,7 @@ export const TURING_SCHEMA: Schema = {
     "kind": "table",
     "columns": {
       "address": "string | null",
+      "bill_code": "string | null",
       "contact_designation": "string | null",
       "contact_name": "string | null",
       "contractor_no": "string | null",
