@@ -47,6 +47,7 @@ async function submittedIndents(supabase: Client) {
     plot_id: string | null;
     unit_id: string | null;
     work_item_id: string | null;
+    work_group_id: string | null;
     submitted_by: string | null;
     submitted_at: string | null;
     projects: { name: string } | null;
@@ -56,7 +57,7 @@ async function submittedIndents(supabase: Client) {
     supabase
       .from("indents")
       .select(
-        "id, reference, plot_id, unit_id, work_item_id, submitted_by, submitted_at, projects(name), plots(name), units(name)",
+        "id, reference, plot_id, unit_id, work_item_id, work_group_id, submitted_by, submitted_at, projects(name), plots(name), units(name)",
       )
       .eq("status", "submitted")
       .order("submitted_at")
@@ -120,7 +121,10 @@ export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
     ...new Set(waiting.filter((indent) => !indent.unit_id && indent.plot_id).map((i) => i.plot_id)),
   ] as string[];
 
-  const [profiles, works, plotUnits] = await Promise.all([
+  const groupIds = [
+    ...new Set(waiting.map((indent) => indent.work_group_id).filter((id) => id !== null)),
+  ] as string[];
+  const [profiles, works, plotUnits, groups] = await Promise.all([
     personIds.length
       ? supabase.from("profiles").select("id, full_name").in("id", personIds)
       : Promise.resolve({ data: [], error: null }),
@@ -130,8 +134,15 @@ export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
     plotIds.length
       ? supabase.from("units").select("id, plot_id").in("plot_id", plotIds)
       : Promise.resolve({ data: [], error: null }),
+    groupIds.length
+      ? supabase.from("work_groups").select("id, code, name").in("id", groupIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (profiles.error) fail("the names on the indents", profiles.error);
+  if (groups.error) fail("the indents' stages", groups.error);
+  const groupById = new Map(
+    (groups.data ?? []).map((row) => [row.id, `${row.code} — ${row.name}`] as const),
+  );
   if (works.error) fail("the indents' works", works.error);
   if (plotUnits.error) fail("the indents' villas", plotUnits.error);
 
@@ -163,7 +174,11 @@ export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
       reference: indent.reference ?? "—",
       project_name: indent.projects?.name ?? "—",
       villa: indent.units?.name ?? indent.plots?.name ?? null,
-      work_label: indent.work_item_id ? (workById.get(indent.work_item_id) ?? null) : null,
+      work_label: indent.work_group_id
+        ? (groupById.get(indent.work_group_id) ?? null)
+        : indent.work_item_id
+          ? (workById.get(indent.work_item_id) ?? null)
+          : null,
       submitted_by_name: indent.submitted_by ? (nameById.get(indent.submitted_by) ?? null) : null,
       submitted_at: indent.submitted_at,
       working_estimate_id: unitId ? (workingByUnit.get(unitId) ?? null) : null,
@@ -248,10 +263,11 @@ export async function getIndentApprovalsFor(
     unit_id: string | null;
     plot_id: string | null;
     work_item_id: string | null;
+    work_group_id: string | null;
   }>((from, to) =>
     supabase
       .from("indents")
-      .select("id, reference, unit_id, plot_id, work_item_id")
+      .select("id, reference, unit_id, plot_id, work_item_id, work_group_id")
       .in("id", [...new Set(lines.map((line) => line.indent_id))])
       // A cancelled indent (0143) bought nothing, so its answers settle nothing.
       .neq("status", "cancelled")
@@ -268,6 +284,27 @@ export async function getIndentApprovalsFor(
   if (error) fail("the approvers' names", error);
   const nameById = new Map((approvers ?? []).map((row) => [row.id, row.full_name]));
 
+  // A stage indent's yes covers the item on every active work of that stage (0158): the site draws it against one of them.
+  const stageIds = [
+    ...new Set(indents.map((indent) => indent.work_group_id).filter((id) => id !== null)),
+  ] as string[];
+  const stageWorks = stageIds.length
+    ? await fetchAll<{ id: string; group_id: string | null }>((from, to) =>
+        supabase
+          .from("work_items")
+          .select("id, group_id")
+          .in("group_id", stageIds)
+          .eq("is_active", true)
+          .order("id")
+          .range(from, to),
+      )
+    : [];
+  const worksOfStage = new Map<string, string[]>();
+  for (const work of stageWorks) {
+    if (work.group_id)
+      worksOfStage.set(work.group_id, [...(worksOfStage.get(work.group_id) ?? []), work.id]);
+  }
+
   const indentById = new Map(indents.map((indent) => [indent.id, indent]));
   const approvals = new Map<string, ReconciliationApproval>();
   for (const line of lines) {
@@ -276,17 +313,21 @@ export async function getIndentApprovalsFor(
     const unitId =
       indent.unit_id ?? (indent.plot_id ? (unitByPlot.get(indent.plot_id) ?? null) : null);
     if (!unitId || !villaUnits.has(unitId)) continue;
-    approvals.set(`${unitId} ${indent.work_item_id ?? ""} ${line.item_id}`, {
-      workItemId: indent.work_item_id,
-      itemId: line.item_id,
-      note: [`At indent ${indent.reference ?? ""}`.trim(), line.estimator_note]
-        .filter(Boolean)
-        .join(" — "),
-      approvedByName:
-        (line.estimator_decided_by ? nameById.get(line.estimator_decided_by) : null) ??
-        "a colleague",
-      approvedAt: line.estimator_decided_at ?? "",
-    });
+    const workIds: (string | null)[] = indent.work_group_id
+      ? (worksOfStage.get(indent.work_group_id) ?? [])
+      : [indent.work_item_id];
+    for (const workItemId of workIds)
+      approvals.set(`${unitId} ${workItemId ?? ""} ${line.item_id}`, {
+        workItemId,
+        itemId: line.item_id,
+        note: [`At indent ${indent.reference ?? ""}`.trim(), line.estimator_note]
+          .filter(Boolean)
+          .join(" — "),
+        approvedByName:
+          (line.estimator_decided_by ? nameById.get(line.estimator_decided_by) : null) ??
+          "a colleague",
+        approvedAt: line.estimator_decided_at ?? "",
+      });
   }
   return approvals;
 }

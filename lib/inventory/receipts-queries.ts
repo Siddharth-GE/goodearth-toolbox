@@ -76,7 +76,15 @@ export async function listReceivablePos({
   page = 1,
   q,
   projectId,
-}: { page?: number; q?: string; projectId?: string } = {}): Promise<ReceivablePoPage> {
+  vendorId,
+  plotId,
+}: {
+  page?: number;
+  q?: string;
+  projectId?: string;
+  vendorId?: string;
+  plotId?: string;
+} = {}): Promise<ReceivablePoPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
@@ -105,11 +113,31 @@ export async function listReceivablePos({
     })
     .eq("status", "issued");
   if (projectId) query = query.eq("project_id", projectId);
+  if (vendorId) query = query.eq("vendor_id", vendorId);
+  // One or() only: the villa's scopes and the search each become a group, joined by and().
+  const groups: string[] = [];
+  if (plotId) {
+    // A PO is scoped to a plot or to one of its units, never both (0021).
+    const { data: units, error: unitError } = await supabase
+      .from("units")
+      .select("id")
+      .eq("plot_id", plotId);
+    if (unitError) {
+      console.error("listReceivablePos unit lookup failed:", unitError);
+      throw new Error("Could not search the purchase orders.", { cause: unitError });
+    }
+    const unitIds = (units ?? []).map((row) => row.id);
+    const scopes = [`plot_id.eq.${plotId}`];
+    if (unitIds.length) scopes.push(`unit_id.in.(${unitIds.join(",")})`);
+    groups.push(scopes.join(","));
+  }
   if (q) {
     const clauses = [`reference.ilike.*${q}*`];
     if (vendorIds.length) clauses.push(`vendor_id.in.(${vendorIds.join(",")})`);
-    query = query.or(clauses.join(","));
+    groups.push(clauses.join(","));
   }
+  if (groups.length === 1) query = query.or(groups[0]);
+  if (groups.length === 2) query = query.or(`and(or(${groups[0]}),or(${groups[1]}))`);
   const { data, count, error } = await query
     .order("issued_at", { ascending: false })
     .order("id")
@@ -181,6 +209,28 @@ export async function listReceivablePos({
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
   };
+}
+
+/** The vendors with a PO still awaiting delivery, A–Z: the Receive finder offers only these. */
+export async function listReceivableVendors(): Promise<{ id: string; name: string }[]> {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+  const rows = await fetchAll<{ vendor_id: string | null }>((from, to) =>
+    supabase
+      .from("po_facts")
+      .select("vendor_id")
+      .eq("status", "issued")
+      .order("id")
+      .range(from, to),
+  );
+  const names = await labelsById(
+    supabase,
+    "vendors",
+    rows.map((row) => row.vendor_id),
+  );
+  return [...names]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function receivedProgressForPos(
@@ -535,7 +585,7 @@ async function boughtForByPoLine(
   const indentLines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
-      .select("id, indents(reference, work_items(code, name))")
+      .select("id, indents(reference, work_items(code, name), work_groups(code, name))")
       .in("id", indentLineIds)
       .order("id")
       .range(from, to),
@@ -545,10 +595,10 @@ async function boughtForByPoLine(
       const indent = line.indents as {
         reference: string;
         work_items: { code: string; name: string } | null;
+        work_groups: { code: string; name: string } | null;
       } | null;
-      const work = indent?.work_items
-        ? `${indent.work_items.name} (${indent.work_items.code})`
-        : null;
+      const named = indent?.work_items ?? indent?.work_groups;
+      const work = named ? `${named.name} (${named.code})` : null;
       return [line.id, [work, indent?.reference].filter(Boolean).join(" · ")];
     }),
   );

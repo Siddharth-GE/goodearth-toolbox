@@ -40,8 +40,16 @@ export const INDENTS = defineEntries([
       { key: "project_id", label: "Project", kind: "id", table: "projects", header: true },
       { key: "plot_id", label: "Villa", kind: "id", table: "plots", optional: true, header: true },
       {
+        key: "work_group_id",
+        label: "For the stage",
+        kind: "id",
+        table: "work_groups",
+        optional: true,
+        header: true,
+      },
+      {
         key: "work_item_id",
-        label: "For the work",
+        label: "For one work (older way)",
         kind: "id",
         table: "work_items",
         optional: true,
@@ -83,12 +91,20 @@ export const INDENTS = defineEntries([
     key: "indent_change",
     tool: "/indents",
     title: "An indent, changed",
-    description: "Changes a draft indent's work, needed-by date, note or urgent mark.",
+    description:
+      "Changes a draft indent's stage (or the one work an older indent names), needed-by date, note or urgent mark. An indent names a stage or a work, never both.",
     fields: [
       indent,
       {
+        key: "work_group_id",
+        label: "For the stage",
+        kind: "id",
+        table: "work_groups",
+        optional: true,
+      },
+      {
         key: "work_item_id",
-        label: "For the work",
+        label: "For one work (older way)",
         kind: "id",
         table: "work_items",
         optional: true,

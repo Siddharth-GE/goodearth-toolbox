@@ -185,7 +185,7 @@ export default async function BillsPage({
                     {bill.reference}
                     {bill.kind === "nmr" && (
                       <span className="text-muted ml-1.5 text-[10px] font-semibold tracking-wider uppercase">
-                        NMR
+                        No WO
                       </span>
                     )}
                   </TableCell>

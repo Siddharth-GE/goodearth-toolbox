@@ -15,6 +15,9 @@ import type { ActionState } from "@/lib/action-state";
 /** Surface the guards' own readable messages instead of a generic "try again". */
 const INVENTORY_GUARD_PHRASES = [
   "still to come",
+  "reached that villa",
+  "coming back",
+  "come back from that villa",
   "is in that store",
   "ISSUED purchase order",
   "no longer exists",
@@ -571,4 +574,46 @@ export async function deleteStockIssue(issueId: string, reason: string): Promise
   // A site request it filled is open again on the supervisor's side.
   revalidatePath("/supervisors", "layout");
   redirect("/inventory/issues");
+}
+
+export type SiteReturnInput = {
+  plotId: string;
+  storeId: string;
+  returnedOn: string | null;
+  reason: string;
+  lines: { itemId: string; quantity: number }[];
+};
+
+const RETURN_REASON_LIMIT = 500;
+
+/** Material back from a villa to a store (0159), in one go: the database refuses more than is still at the villa, and
+ * puts it back into the batches the villa drew. */
+export async function recordSiteReturn(input: SiteReturnInput): Promise<ActionState> {
+  await requireTool("/inventory");
+  if (!input.plotId) return { error: "Pick the villa it is coming back from." };
+  if (!input.storeId) return { error: "Pick the store it is going to." };
+  const reason = input.reason.trim();
+  if (!reason) return { error: "Say why it is coming back — left over, wrong item, work changed." };
+  if (reason.length > RETURN_REASON_LIMIT) {
+    return { error: `Keep the reason under ${RETURN_REASON_LIMIT} characters.` };
+  }
+  const lines = input.lines.filter((line) => Number.isFinite(line.quantity) && line.quantity > 0);
+  if (lines.length === 0) return { error: "Enter how much of at least one item is coming back." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_site_return", {
+    p_plot_id: input.plotId,
+    p_store_id: input.storeId,
+    p_returned_on: (input.returnedOn || null) as unknown as string,
+    p_reason: reason,
+    p_lines: lines.map((line) => ({ item_id: line.itemId, quantity: line.quantity })),
+  });
+  if (error) {
+    console.error("recordSiteReturn failed:", error);
+    return guardError(error, "Could not record the return. Try again.", INVENTORY_GUARD_PHRASES);
+  }
+
+  revalidatePath("/inventory", "layout");
+  revalidatePath("/supervisors", "layout");
+  return undefined;
 }

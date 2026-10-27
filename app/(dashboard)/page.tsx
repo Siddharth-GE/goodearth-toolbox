@@ -7,6 +7,7 @@ import { visibleTools } from "@/lib/tools";
 import { Suspense } from "react";
 import { OperationsPipeline } from "./_components/operations-pipeline";
 import { PeopleOverview } from "./_components/people-overview";
+import { PlateCard } from "./_components/plate-card";
 import { TeamGrid } from "./_components/team-grid";
 
 function greeting() {
@@ -35,6 +36,16 @@ export default async function DashboardHome() {
       </div>
 
       <div className="space-y-8">
+        {/* What waits on this person comes first; it reads every tool, so it streams in on its own. */}
+        <Suspense
+          fallback={
+            <div className="bg-surface flex h-[140px] items-center justify-center rounded-2xl">
+              <Spinner />
+            </div>
+          }
+        >
+          <PlateCard />
+        </Suspense>
         <TeamGrid sections={sections} />
         {/* Fetches its own counts, so it gets its own boundary rather than holding up the page. */}
         <Suspense

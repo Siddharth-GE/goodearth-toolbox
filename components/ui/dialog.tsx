@@ -21,8 +21,9 @@ export function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           // Centred card on a laptop; a bottom sheet on a phone (max-sm), so a long form keeps Cancel and Save reachable.
-          "border-border bg-surface-raised shadow-float data-[state=closed]:animate-pop-out data-[state=open]:animate-pop-in fixed top-1/2 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-3xl border p-6 focus:outline-none",
-          "max-sm:data-[state=closed]:animate-sheet-out max-sm:data-[state=open]:animate-sheet-in max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[90dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:rounded-b-none",
+          // Either way it scrolls inside itself: a centred card taller than the window would cut off its own top.
+          "border-border bg-surface-raised shadow-float data-[state=closed]:animate-pop-out data-[state=open]:animate-pop-in fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2.5rem)] w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border p-6 focus:outline-none",
+          "max-sm:data-[state=closed]:animate-sheet-out max-sm:data-[state=open]:animate-sheet-in max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[90dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none",
           className,
         )}
         {...props}

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   LABOUR_KIND_LABEL,
   labourShape,
+  labourWork,
   type LabourKind,
   type LabourShape,
 } from "@/lib/supervisors/labour";
@@ -28,7 +29,8 @@ function count(formData: FormData, field: string): number {
 
 type LabourFields = LabourShape & {
   plot_id: string;
-  work_item_id: string;
+  work_item_id: string | null;
+  custom_name: string | null;
   contractor_id: string;
   log_date: string;
   note: string | null;
@@ -49,7 +51,13 @@ async function readLabourFields(
   const workClass = workClassOf(text(formData, "work_class"));
 
   if (!plotId) return { error: "Pick the villa." };
-  if (!workItemId) return { error: "Pick the work the labour was on." };
+  const work = labourWork({
+    workItemId,
+    customName: text(formData, "custom_name"),
+    workClass: workClass ?? "",
+    kind,
+  });
+  if ("error" in work) return work;
   if (!contractorId) return { error: "Pick the contractor." };
   if (!logDate) return { error: "Pick the date." };
   if (!workClass)
@@ -59,11 +67,11 @@ async function readLabourFields(
   }
 
   let workUom: string | null = null;
-  if (kind === "pw_qty") {
+  if (kind === "pw_qty" && work.work_item_id) {
     const { data, error } = await supabase
       .from("work_unit_facts")
       .select("uom")
-      .eq("work_item_id", workItemId)
+      .eq("work_item_id", work.work_item_id)
       .maybeSingle();
     if (error) {
       console.error("readLabourFields work unit failed:", error);
@@ -87,7 +95,7 @@ async function readLabourFields(
   return {
     ...shape,
     plot_id: plotId,
-    work_item_id: workItemId,
+    ...work,
     contractor_id: contractorId,
     log_date: logDate,
     note: note || null,
@@ -141,6 +149,7 @@ export async function updateLabourLog(
     .from("labour_logs")
     .update({
       work_item_id: fields.work_item_id,
+      custom_name: fields.custom_name,
       contractor_id: fields.contractor_id,
       log_date: fields.log_date,
       kind: fields.kind,

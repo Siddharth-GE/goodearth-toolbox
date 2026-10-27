@@ -542,6 +542,29 @@ export type Database = {
           },
         ]
       }
+      bill_vendor_counters: {
+        Row: {
+          last_seq: number
+          vendor_id: string
+        }
+        Insert: {
+          last_seq?: number
+          vendor_id: string
+        }
+        Update: {
+          last_seq?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_vendor_counters_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           approved_at: string | null
@@ -576,6 +599,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           vendor_id: string | null
+          vendor_seq: number | null
         }
         Insert: {
           approved_at?: string | null
@@ -610,6 +634,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
+          vendor_seq?: number | null
         }
         Update: {
           approved_at?: string | null
@@ -644,6 +669,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
+          vendor_seq?: number | null
         }
         Relationships: [
           {
@@ -4930,10 +4956,12 @@ export type Database = {
       }
       estimator_estimate_lines: {
         Row: {
+          copied_from: string | null
           created_at: string
           created_by: string | null
           estimate_id: string
           id: string
+          label: string | null
           labour_rate: number | null
           note: string | null
           qty: number | null
@@ -4942,10 +4970,12 @@ export type Database = {
           work_item_id: string
         }
         Insert: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           estimate_id: string
           id?: string
+          label?: string | null
           labour_rate?: number | null
           note?: string | null
           qty?: number | null
@@ -4954,10 +4984,12 @@ export type Database = {
           work_item_id: string
         }
         Update: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           estimate_id?: string
           id?: string
+          label?: string | null
           labour_rate?: number | null
           note?: string | null
           qty?: number | null
@@ -6554,6 +6586,7 @@ export type Database = {
           unit_id: string | null
           updated_at: string
           updated_by: string | null
+          work_group_id: string | null
           work_item_id: string | null
         }
         Insert: {
@@ -6580,6 +6613,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
           work_item_id?: string | null
         }
         Update: {
@@ -6606,6 +6640,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_group_id?: string | null
           work_item_id?: string | null
         }
         Relationships: [
@@ -6677,6 +6712,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_work_group_id_fkey"
+            columns: ["work_group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
             referencedColumns: ["id"]
           },
           {
@@ -7394,6 +7436,7 @@ export type Database = {
           contractor_id: string
           created_at: string
           created_by: string | null
+          custom_name: string | null
           description: string | null
           helpers: number
           id: string
@@ -7408,13 +7451,14 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           work_class: string
-          work_item_id: string
+          work_item_id: string | null
         }
         Insert: {
           bill_id?: string | null
           contractor_id: string
           created_at?: string
           created_by?: string | null
+          custom_name?: string | null
           description?: string | null
           helpers?: number
           id?: string
@@ -7429,13 +7473,14 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           work_class?: string
-          work_item_id: string
+          work_item_id?: string | null
         }
         Update: {
           bill_id?: string | null
           contractor_id?: string
           created_at?: string
           created_by?: string | null
+          custom_name?: string | null
           description?: string | null
           helpers?: number
           id?: string
@@ -7450,7 +7495,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           work_class?: string
-          work_item_id?: string
+          work_item_id?: string | null
         }
         Relationships: [
           {
@@ -9070,6 +9115,65 @@ export type Database = {
           },
         ]
       }
+      site_category_owners: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          owner_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          owner_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_category_owners_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "work_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_category_owners_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_checklist_items: {
         Row: {
           checklist_id: string
@@ -9339,6 +9443,143 @@ export type Database = {
           },
         ]
       }
+      site_return_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          quantity: number
+          return_id: string
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          quantity: number
+          return_id: string
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          quantity?: number
+          return_id?: string
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_return_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "site_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_return_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+          {
+            foreignKeyName: "site_return_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          plot_id: string
+          reason: string
+          returned_on: string
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plot_id: string
+          reason: string
+          returned_on?: string
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plot_id?: string
+          reason?: string
+          returned_on?: string
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_returns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_returns_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_schedule_settings: {
         Row: {
           created_at: string
@@ -9525,6 +9766,7 @@ export type Database = {
           id: string
           link: string | null
           not_needed: boolean
+          owner_id: string | null
           pinned_start: string | null
           plot_id: string
           started_on: string | null
@@ -9548,6 +9790,7 @@ export type Database = {
           id?: string
           link?: string | null
           not_needed?: boolean
+          owner_id?: string | null
           pinned_start?: string | null
           plot_id: string
           started_on?: string | null
@@ -9571,6 +9814,7 @@ export type Database = {
           id?: string
           link?: string | null
           not_needed?: boolean
+          owner_id?: string | null
           pinned_start?: string | null
           plot_id?: string
           started_on?: string | null
@@ -9602,6 +9846,13 @@ export type Database = {
             columns: ["follows_group_id"]
             isOneToOne: false
             referencedRelation: "work_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_stages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -10058,6 +10309,7 @@ export type Database = {
           issue_line_id: string | null
           quantity: number
           receipt_line_id: string
+          return_line_id: string | null
           store_id: string
         }
         Insert: {
@@ -10068,6 +10320,7 @@ export type Database = {
           issue_line_id?: string | null
           quantity: number
           receipt_line_id: string
+          return_line_id?: string | null
           store_id: string
         }
         Update: {
@@ -10078,6 +10331,7 @@ export type Database = {
           issue_line_id?: string | null
           quantity?: number
           receipt_line_id?: string
+          return_line_id?: string | null
           store_id?: string
         }
         Relationships: [
@@ -10107,6 +10361,13 @@ export type Database = {
             columns: ["receipt_line_id"]
             isOneToOne: false
             referencedRelation: "goods_receipt_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batch_movements_return_line_id_fkey"
+            columns: ["return_line_id"]
+            isOneToOne: false
+            referencedRelation: "site_return_lines"
             referencedColumns: ["id"]
           },
           {
@@ -11088,6 +11349,7 @@ export type Database = {
           address: string | null
           contact_designation: string | null
           contact_name: string | null
+          contractor_no: string | null
           created_at: string
           email: string | null
           gst_no: string | null
@@ -11105,6 +11367,7 @@ export type Database = {
           address?: string | null
           contact_designation?: string | null
           contact_name?: string | null
+          contractor_no?: string | null
           created_at?: string
           email?: string | null
           gst_no?: string | null
@@ -11122,6 +11385,7 @@ export type Database = {
           address?: string | null
           contact_designation?: string | null
           contact_name?: string | null
+          contractor_no?: string | null
           created_at?: string
           email?: string | null
           gst_no?: string | null
@@ -12487,6 +12751,7 @@ export type Database = {
           plot_id: string | null
           unit_id: string | null
           unpriced: boolean | null
+          work_group_id: string | null
           work_item_id: string | null
         }
         Relationships: []
@@ -12917,6 +13182,16 @@ export type Database = {
           }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       pusher_current_stage: { Args: { p_project_id: string }; Returns: string }
+      record_site_return: {
+        Args: {
+          p_lines: Json
+          p_plot_id: string
+          p_reason: string
+          p_returned_on: string
+          p_store_id: string
+        }
+        Returns: string
+      }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }

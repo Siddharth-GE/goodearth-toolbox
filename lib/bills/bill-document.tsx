@@ -94,13 +94,15 @@ const columns: Column<BillLineRow>[] = [
 const KIND_LABEL: Record<BillDetail["kind"], string> = {
   po: "Material bill",
   contract: "Work-order bill",
-  nmr: "Daily wages (NMR)",
+  nmr: "Labour bill, no work order",
 };
 
 export function BillDocument({ data }: { data: BillPdfData }) {
   const { bill, lines, settlement } = data;
   const isDraft = bill.status === "recorded";
-  const party = bill.vendor_name ?? "Direct labour";
+  const party =
+    (bill.vendor_name ?? "Direct labour") +
+    (bill.vendor_contractor_no ? ` (${bill.vendor_contractor_no})` : "");
   const against =
     bill.po_reference ?? bill.contract_reference ?? (bill.kind === "nmr" ? "Muster roll" : "—");
   // An itemised bill's figures are its lines'; an older bill's are as typed.
@@ -146,6 +148,9 @@ export function BillDocument({ data }: { data: BillPdfData }) {
             { label: bill.kind === "nmr" ? "Muster roll" : "Invoice", value: bill.invoice_no },
             { label: "Invoice date", value: formatDate(bill.invoice_date) },
             { label: "Against", value: against },
+            ...(bill.vendor_seq
+              ? [{ label: "Their bill no.", value: String(bill.vendor_seq) }]
+              : []),
             {
               label: "Status",
               value: isDraft

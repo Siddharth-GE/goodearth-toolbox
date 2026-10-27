@@ -80,7 +80,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: true,
     invoker: false,
     money: false,
-    why: "The official estimate's quantity per work (0137) — '1,800 sqft of block work' — so the site sets logged piece-work against it and the schedule sizes a villa. The same four grants as estimate_takeoff_facts. The line's labour_rate must never appear here.",
+    why: "The official estimate's quantity per work (0137) — '1,800 sqft of block work' — so the site sets logged piece-work against it and the schedule sizes a villa. The same four grants as estimate_takeoff_facts. The line's labour_rate must never appear here. Since 0157 a work may have several rows, so the view adds them up: still one row per work.",
   },
   po_facts: {
     columns: [
@@ -150,7 +150,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: false,
     invoker: false,
     money: false,
-    why: "A quantity per store. Inventory carries no money, so there is none to leak.",
+    why: "A quantity per store, material back from a villa included (0159). Inventory carries no money, so there is none to leak.",
   },
   stock_by_location: {
     columns: ["location_kind", "location_id", "item_id", "quantity"],
@@ -158,7 +158,7 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     barrier: false,
     invoker: false,
     money: false,
-    why: "The same quantity, per store or per plot.",
+    why: "The same quantity, per store or per plot; a villa's total is less what went back to a store (0159).",
   },
   pusher_chain_state: {
     columns: [
@@ -381,12 +381,12 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     why: "A material bill pre-fills from its PO's lines (0106), and a /bills-only user cannot read purchase_order_lines. The second sanctioned window between POs and bills, beside po_billing_totals, for the same two tools that already see both sides' money.",
   },
   villa_cost_facts: {
-    columns: ["plot_id", "unit_id", "work_item_id", "kind", "amount", "unpriced"],
+    columns: ["plot_id", "unit_id", "work_item_id", "kind", "amount", "unpriced", "work_group_id"],
     guards: ["/bills", "/estimator", "/reporter"],
     barrier: true,
     invoker: false,
     money: true,
-    why: "Budget against actual per villa (0136, founder 2026-10-22): the official estimate, what POs and work orders committed, and what was issued, delivered and billed, before GST. Gated to the estimator and the billing team, who see these figures already, and Reporter. The one place estimate money leaves the Estimator.",
+    why: "Budget against actual per villa (0136, founder 2026-10-22): the official estimate, what POs and work orders committed, and what was issued, delivered and billed, before GST. Gated to the estimator and the billing team, who see these figures already, and Reporter. The one place estimate money leaves the Estimator. Since 0158 a purchase for a stage indent names its stage (work_group_id) where it names no work.",
   },
   work_order_line_billing_facts: {
     columns: [

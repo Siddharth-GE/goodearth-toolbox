@@ -37,6 +37,8 @@ export type GroupInfo = {
   code: string;
   name: string;
   categoryName: string;
+  /** Its work category: whose lead owns the stage unless a villa names its own owner (0158). */
+  categoryId?: string;
   /** Category order, then group order: where a stage the sequence does not name goes. */
   order: number;
 };
@@ -53,6 +55,8 @@ export type StageRecord = {
   startedOn: string | null;
   finishedOn: string | null;
   contractorId: string | null;
+  /** This villa's own owner for the stage (0158); null follows the category's lead. */
+  ownerId?: string | null;
 };
 
 export type ProgrammeStage = GroupInfo & {
@@ -321,4 +325,15 @@ export function stageProgress(
       .reduce((sum, log) => sum + (log.quantity ?? 0), 0);
     return [{ workItemId: work.id, label: work.label, logged, estimated, uom }];
   });
+}
+
+/** A stage's owner: the villa's own pick, else its category's lead. */
+export function stageOwner(
+  stage: { categoryId?: string; record: { ownerId?: string | null } | null },
+  leads: Map<string, string>,
+  names: Map<string, string>,
+): { id: string; name: string; fromLead: boolean } | null {
+  const own = stage.record?.ownerId ?? null;
+  const id = own ?? (stage.categoryId ? (leads.get(stage.categoryId) ?? null) : null);
+  return id ? { id, name: names.get(id) ?? "—", fromLead: own === null } : null;
 }

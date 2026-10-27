@@ -8,6 +8,7 @@ import {
   dayInIndia,
   dayOfStage,
   nowAndNext,
+  stageOwner,
   villaHealth,
   type Health,
   type HealthKind,
@@ -15,6 +16,7 @@ import {
 } from "./programme";
 import {
   planVilla,
+  readCategoryLeads,
   readShared,
   type EstimateRow,
   type SiteVillaRow,
@@ -59,6 +61,8 @@ export type BoardCard = {
   toConfirm: number;
   openRequests: number;
   supervisor: { id: string; name: string } | null;
+  /** Who owns the stage now under way or next (0158): such a villa is theirs on Mine too. */
+  stageOwnerIds: string[];
   /** The work category of the furthest stage begun: the board's column. */
   column: string;
 };
@@ -106,6 +110,7 @@ export async function readSiteVillas() {
     confirmations,
     requests,
     profiles,
+    leads,
   ] = await Promise.all([
     readShared(supabase),
     fetchAll((from, to) =>
@@ -124,7 +129,7 @@ export async function readSiteVillas() {
       supabase
         .from("site_stages")
         .select(
-          "id, plot_id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
+          "id, plot_id, work_group_id, status, status_changed_at, waiting_on, waiting_note, started_on, finished_on, contractor_id, owner_id, days, pinned_start, baseline_start, baseline_finish, not_needed, follows_group_id, link",
         )
         .order("id")
         .range(from, to),
@@ -199,6 +204,7 @@ export async function readSiteVillas() {
     fetchAll((from, to) =>
       supabase.from("profiles").select("id, full_name").order("id").range(from, to),
     ),
+    readCategoryLeads(supabase),
   ]);
 
   const { today, groupOfWork, groupInfos } = shared;
@@ -224,7 +230,8 @@ export async function readSiteVillas() {
   }
   const lastLabour = new Map<string, Map<string, string>>();
   for (const log of logs) {
-    const group = groupOfWork.get(log.work_item_id);
+    // A named Additional or Rework log has no work, so it starts no stage.
+    const group = log.work_item_id ? groupOfWork.get(log.work_item_id) : undefined;
     if (!group) continue;
     const forPlot = lastLabour.get(log.plot_id) ?? new Map<string, string>();
     const last = forPlot.get(group);
@@ -420,12 +427,20 @@ export async function readSiteVillas() {
       toConfirm: unconfirmed.length,
       openRequests: requestsByPlot.get(unit.plot_id) ?? 0,
       supervisor: supervisorId ? { id: supervisorId, name: names.get(supervisorId) ?? "—" } : null,
+      stageOwnerIds: [
+        ...new Set(
+          [...now, ...next].flatMap((stage) => {
+            const owner = stageOwner(stage, leads, names);
+            return owner ? [owner.id] : [];
+          }),
+        ),
+      ],
       column,
     };
     return { card, unitId: unit.id, stages, baselined: plan.baselinedAt !== null };
   });
 
-  return { user, today, villas, categories };
+  return { user, today, villas, categories, leads };
 }
 
 export type SiteVilla = Awaited<ReturnType<typeof readSiteVillas>>["villas"][number];
@@ -439,12 +454,14 @@ export async function getSiteBoard(params: {
   const { user, today, villas, categories } = await readSiteVillas();
   const all = villas.map((villa) => villa.card);
 
-  const runsAny = all.some((card) => card.supervisor?.id === user.id);
+  const isMine = (card: BoardCard) =>
+    card.supervisor?.id === user.id || card.stageOwnerIds.includes(user.id);
+  const runsAny = all.some(isMine);
   const who = params.who === "mine" || params.who === "all" ? params.who : runsAny ? "mine" : "all";
   const q = (params.q ?? "").trim().toLowerCase();
   const scoped = all.filter(
     (card) =>
-      (who === "all" || card.supervisor?.id === user.id) &&
+      (who === "all" || isMine(card)) &&
       (!params.project || card.projectId === params.project) &&
       (!q ||
         card.plotName.toLowerCase().includes(q) ||

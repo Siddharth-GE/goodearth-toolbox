@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -12,6 +13,7 @@ import {
 import { CASH_REQUEST_STATUS_LABEL, type CashRequestStatus } from "@/lib/bills/ledger";
 import { listCashRequests } from "@/lib/bills/payment-queries";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
+import { dateParam } from "@/lib/list-params";
 import { Wallet } from "lucide-react";
 import Link from "next/link";
 import { StartRequest } from "./_components/start-request";
@@ -23,8 +25,25 @@ const STATUS_VARIANT: Record<CashRequestStatus, "neutral" | "warning" | "info" |
   closed: "success",
 };
 
-export default async function CashRequestsPage() {
-  const requests = await listCashRequests();
+export default async function CashRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const raw = await searchParams;
+  const status =
+    raw.status && Object.hasOwn(CASH_REQUEST_STATUS_LABEL, raw.status)
+      ? (raw.status as CashRequestStatus)
+      : undefined;
+  const from = dateParam(raw.from);
+  const to = dateParam(raw.to);
+  const all = await listCashRequests();
+  const requests = all.filter(
+    (request) =>
+      (!status || request.status === status) &&
+      (!from || request.week_of >= from) &&
+      (!to || request.week_of <= to),
+  );
 
   return (
     <div className="space-y-4">
@@ -37,7 +56,32 @@ export default async function CashRequestsPage() {
 
       <StartRequest />
 
-      {requests.length === 0 ? (
+      {all.length > 0 && (
+        <ListToolbar
+          action="/bills/cash-requests"
+          values={{ status, from, to }}
+          dates={{ label: "Week of" }}
+          filters={[
+            {
+              param: "status",
+              label: "Status",
+              allLabel: "Every status",
+              options: Object.entries(CASH_REQUEST_STATUS_LABEL).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            },
+          ]}
+        />
+      )}
+
+      {all.length > 0 && requests.length === 0 ? (
+        <EmptyState
+          icon={Wallet}
+          title="Nothing matches"
+          description="Try another status or week."
+        />
+      ) : requests.length === 0 ? (
         <EmptyState
           icon={Wallet}
           title="No cash requests yet"

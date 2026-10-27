@@ -13,6 +13,7 @@ import {
   classifyBudgetChooser,
   type BudgetCandidate,
   type EstimatePullState as EstimateVerdict,
+  factsForGroup,
   factsForStage,
   factsForWork,
   groupEstimatePull,
@@ -364,6 +365,8 @@ export async function getEstimatePull(
   indentWorkItemId: string | null,
   allWorks: boolean,
   stageId: string | null = null,
+  /** The stage the indent was raised for (0158): its works take the place of the one work an older indent names. */
+  indentGroupId: string | null = null,
 ): Promise<EstimatePull | null> {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -415,10 +418,10 @@ export async function getEstimatePull(
   ];
   const [stageWorks, stageCategories] = await Promise.all([
     estimatedWorkIds.length
-      ? fetchAll<{ id: string; category_id: string }>((from, to) =>
+      ? fetchAll<{ id: string; category_id: string; group_id: string | null }>((from, to) =>
           supabase
             .from("work_items")
-            .select("id, category_id")
+            .select("id, category_id, group_id")
             .in("id", estimatedWorkIds)
             .order("id")
             .range(from, to),
@@ -440,14 +443,20 @@ export async function getEstimatePull(
     .map((category) => ({ id: category.id, label: workCategoryLabel(category) }));
   const stage = stageId ? (stages.find((s) => s.id === stageId) ?? null) : null;
 
+  const groupOfWork = new Map(stageWorks.map((work) => [work.id, work.group_id]));
   const workItemId = allWorks || stage ? null : indentWorkItemId;
+  const groupId = allWorks || stage ? null : indentGroupId;
   const offered = stage
     ? factsForStage(usable, categoryOfWork, stage.id)
-    : factsForWork(usable, workItemId);
+    : groupId
+      ? factsForGroup(usable, groupOfWork, groupId)
+      : factsForWork(usable, workItemId);
+  const outside = (fact: (typeof usable)[number]) =>
+    groupId
+      ? !fact.work_item_id || groupOfWork.get(fact.work_item_id) !== groupId
+      : Boolean(workItemId) && fact.work_item_id !== workItemId;
   const otherWorkItems = new Set(
-    usable
-      .filter((fact) => workItemId && fact.work_item_id !== workItemId)
-      .map((fact) => fact.item_id ?? `unlinked:${fact.material_name}`),
+    usable.filter(outside).map((fact) => fact.item_id ?? `unlinked:${fact.material_name}`),
   );
 
   const itemIds = [
@@ -515,6 +524,20 @@ export async function getEstimatePull(
     console.error("estimate pull works read failed:", worksError);
     throw new Error("Could not open the estimate.", { cause: worksError });
   }
+  const { data: indentGroup, error: groupError } = indentGroupId
+    ? await supabase
+        .from("work_groups")
+        .select("id, code, name")
+        .eq("id", indentGroupId)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (groupError) {
+    console.error("estimate pull stage read failed:", groupError);
+    throw new Error("Could not open the estimate.", { cause: groupError });
+  }
+  const groupLabel = indentGroup
+    ? { id: indentGroup.id, label: `${indentGroup.name} — ${indentGroup.code}` }
+    : null;
   const workLabel = (id: string | null) => {
     const work = id ? (works ?? []).find((row) => row.id === id) : undefined;
     return work && id ? { id, label: `${work.name} — ${work.code}` } : null;
@@ -565,8 +588,9 @@ export async function getEstimatePull(
     unit_name: unit?.name ?? "—",
     rows,
     unlinked_count: rows.filter((row) => row.state === "unlinked").length,
-    work: workLabel(workItemId),
-    indent_work: workLabel(indentWorkItemId),
+    // A stage indent reads as its stage wherever an older indent reads as its work.
+    work: groupId ? groupLabel : workLabel(workItemId),
+    indent_work: groupLabel ?? workLabel(indentWorkItemId),
     other_work_material_count: otherWorkItems.size,
     stages,
     stage,

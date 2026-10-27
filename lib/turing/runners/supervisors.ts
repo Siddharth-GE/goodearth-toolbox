@@ -60,7 +60,7 @@ async function logNow(values: Values) {
   const { data, error } = await supabase
     .from("labour_logs")
     .select(
-      "plot_id, work_item_id, contractor_id, log_date, kind, work_class, masons, helpers, others, quantity, description, note",
+      "plot_id, work_item_id, custom_name, contractor_id, log_date, kind, work_class, masons, helpers, others, quantity, description, note",
     )
     .eq("id", String(values.log_id))
     .maybeSingle();

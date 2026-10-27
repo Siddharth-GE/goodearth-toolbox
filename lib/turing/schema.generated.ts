@@ -188,6 +188,13 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "bill_vendor_counters": {
+    "kind": "table",
+    "columns": {
+      "last_seq": "number",
+      "vendor_id": "string"
+    }
+  },
   "bills": {
     "kind": "table",
     "columns": {
@@ -222,7 +229,8 @@ export const TURING_SCHEMA: Schema = {
       "unit_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null",
-      "vendor_id": "string | null"
+      "vendor_id": "string | null",
+      "vendor_seq": "number | null"
     }
   },
   "birdwing_attendance": {
@@ -1422,10 +1430,12 @@ export const TURING_SCHEMA: Schema = {
   "estimator_estimate_lines": {
     "kind": "table",
     "columns": {
+      "copied_from": "string | null",
       "created_at": "string",
       "created_by": "string | null",
       "estimate_id": "string",
       "id": "string",
+      "label": "string | null",
       "labour_rate": "number | null",
       "note": "string | null",
       "qty": "number | null",
@@ -1758,6 +1768,7 @@ export const TURING_SCHEMA: Schema = {
       "unit_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null",
+      "work_group_id": "string | null",
       "work_item_id": "string | null"
     }
   },
@@ -1916,6 +1927,7 @@ export const TURING_SCHEMA: Schema = {
       "contractor_id": "string",
       "created_at": "string",
       "created_by": "string | null",
+      "custom_name": "string | null",
       "description": "string | null",
       "helpers": "number",
       "id": "string",
@@ -1930,7 +1942,7 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string",
       "updated_by": "string | null",
       "work_class": "string",
-      "work_item_id": "string"
+      "work_item_id": "string | null"
     }
   },
   "plots": {
@@ -2364,6 +2376,18 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string"
     }
   },
+  "site_category_owners": {
+    "kind": "table",
+    "columns": {
+      "category_id": "string",
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "owner_id": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "site_checklist_items": {
     "kind": "table",
     "columns": {
@@ -2421,6 +2445,34 @@ export const TURING_SCHEMA: Schema = {
       "issue_id": "string | null",
       "note": "string | null",
       "receipt_id": "string | null"
+    }
+  },
+  "site_return_lines": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "item_id": "string",
+      "quantity": "number",
+      "return_id": "string",
+      "uom": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
+  "site_returns": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "plot_id": "string",
+      "reason": "string",
+      "returned_on": "string",
+      "store_id": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
     }
   },
   "site_schedule_settings": {
@@ -2481,6 +2533,7 @@ export const TURING_SCHEMA: Schema = {
       "id": "string",
       "link": "string | null",
       "not_needed": "boolean",
+      "owner_id": "string | null",
       "pinned_start": "string | null",
       "plot_id": "string",
       "started_on": "string | null",
@@ -2604,6 +2657,7 @@ export const TURING_SCHEMA: Schema = {
       "issue_line_id": "string | null",
       "quantity": "number",
       "receipt_line_id": "string",
+      "return_line_id": "string | null",
       "store_id": "string"
     }
   },
@@ -2809,6 +2863,7 @@ export const TURING_SCHEMA: Schema = {
       "address": "string | null",
       "contact_designation": "string | null",
       "contact_name": "string | null",
+      "contractor_no": "string | null",
       "created_at": "string",
       "email": "string | null",
       "gst_no": "string | null",
@@ -2831,6 +2886,7 @@ export const TURING_SCHEMA: Schema = {
       "plot_id": "string | null",
       "unit_id": "string | null",
       "unpriced": "boolean | null",
+      "work_group_id": "string | null",
       "work_item_id": "string | null"
     }
   },

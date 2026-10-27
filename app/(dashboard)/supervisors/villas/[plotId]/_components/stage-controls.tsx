@@ -27,6 +27,7 @@ import {
   setStageDates,
   setStageFollows,
   setStageNeeded,
+  setStageOwner,
   setStagePlan,
   setStageStatus,
   setVillaSupervisor,
@@ -57,6 +58,9 @@ export type StageControlData = {
   name: string;
   snapshot: StageSnapshot;
   contractorId: string | null;
+  /** Its owner: this villa's own pick, else the category's lead (0158). */
+  owner: { id: string; name: string; fromLead: boolean } | null;
+  leadName: string | null;
   /** Checklists this stage should be signed off with, by name, and whether each is. */
   checklists: { name: string; signedOff: boolean }[];
   /** The schedule: this villa's own days and pinned start, and the days and dates the forecast uses. */
@@ -273,16 +277,64 @@ export function StageContractorSelect({
   );
 }
 
+/** Who owns the stage on this villa: its own pick, or the work category's lead (set on Supervisors → Sequence). */
+export function StageOwnerSelect({
+  stage,
+  people,
+  id,
+}: {
+  stage: StageControlData;
+  people: { id: string; name: string }[];
+  id: string;
+}) {
+  const { pending, error, run } = useActionRunner();
+  const own = stage.owner && !stage.owner.fromLead ? stage.owner.id : "";
+  const lead = stage.leadName;
+  return (
+    <div className="space-y-1.5">
+      <Select
+        id={id}
+        value={own}
+        disabled={pending}
+        onChange={(event) =>
+          run(() =>
+            setStageOwner({
+              plotId: stage.plotId,
+              groupId: stage.groupId,
+              ownerId: event.target.value,
+            }),
+          )
+        }
+      >
+        <option value="">{lead ? `The category lead, ${lead}` : "No owner yet"}</option>
+        {/* A saved owner since switched off stays shown, so the page never claims there is none. */}
+        {own && !people.some((person) => person.id === own) && (
+          <option value={own}>{stage.owner?.name ?? "Someone switched off"}</option>
+        )}
+        {people.map((person) => (
+          <option key={person.id} value={person.id}>
+            {person.name}
+          </option>
+        ))}
+      </Select>
+      <FormMessage error={error} />
+    </div>
+  );
+}
+
 /** One stage in full: its status (Not started included), contractor and real dates. Opened from the programme. */
 export function StageSheet({
   stage,
   contractors,
+  people,
   trigger,
   waitingLine,
   otherStages,
 }: {
   stage: StageControlData;
   contractors: { id: string; name: string }[];
+  /** Everyone who may own the stage; without it the sheet shows no owner picker. */
+  people?: { id: string; name: string }[];
   trigger: ReactNode;
   waitingLine: string | null;
   /** The villa's other stages, for "on this villa it follows". */
@@ -314,6 +366,12 @@ export function StageSheet({
               id={`contractor-${stage.groupId}`}
             />
           </div>
+          {people ? (
+            <div className="space-y-1.5">
+              <Label htmlFor={`owner-${stage.groupId}`}>Owner</Label>
+              <StageOwnerSelect stage={stage} people={people} id={`owner-${stage.groupId}`} />
+            </div>
+          ) : null}
           {started ? (
             // Keyed on what the server holds, so a status tap in this sheet refills the dates.
             <StageDates

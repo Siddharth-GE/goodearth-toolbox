@@ -113,7 +113,7 @@ export function IndentDocument({ data }: { data: IndentPdfData }) {
                   : STATUS_LABEL[indent.status],
             },
             { label: "Lines", value: String(indent.line_count) },
-            { label: "Work", value: data.work_label ?? "—" },
+            { label: data.indent.work_group_id ? "Stage" : "Work", value: data.work_label ?? "—" },
             { label: "Submitted by", value: indent.submitted_by_name ?? "—" },
             { label: "Approved by", value: indent.approved_by_name ?? "—" },
             {

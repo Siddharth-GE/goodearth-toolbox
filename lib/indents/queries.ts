@@ -4,7 +4,12 @@ import { requireTool } from "@/lib/auth/access";
 import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
-import { listWorkCategories, listWorkItems, workCategoryLabel } from "@/lib/masters/works";
+import {
+  listWorkCategories,
+  listWorkGroups,
+  listWorkItems,
+  workCategoryLabel,
+} from "@/lib/masters/works";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
@@ -82,7 +87,8 @@ export type IndentListFilters = {
   page?: number;
   status?: IndentStatus;
   projectId?: string;
-  workItemId?: string;
+  /** A stage: indents raised for it (0158), and older ones raised for one of its works. */
+  workGroupId?: string;
   q?: string;
   from?: string;
   to?: string;
@@ -92,13 +98,22 @@ export async function listIndents({
   page = 1,
   status,
   projectId,
-  workItemId,
+  workGroupId,
   q,
   from,
   to,
 }: IndentListFilters = {}): Promise<IndentListPage> {
   await requireTool("/indents");
   const supabase = await createClient();
+
+  let stageFilter: string | null = null;
+  if (workGroupId) {
+    const works = (await listWorkItems()).filter((work) => work.group_id === workGroupId);
+    stageFilter = [
+      `work_group_id.eq.${workGroupId}`,
+      ...(works.length ? [`work_item_id.in.(${works.map((work) => work.id).join(",")})`] : []),
+    ].join(",");
+  }
 
   const pageSize = INDENTS_LIST_LIMIT;
   const currentPage = Math.max(1, page);
@@ -109,10 +124,13 @@ export async function listIndents({
     // Cancelled indents show only when asked for by name.
     next = status ? next.eq("status", status) : next.neq("status", "cancelled");
     if (projectId) next = next.eq("project_id", projectId);
-    if (workItemId) next = next.eq("work_item_id", workItemId);
+    // One or() only: two would not both hold.
+    const search = q ? `reference.ilike.*${q}*` : null;
+    if (stageFilter && search) next = next.or(`and(or(${stageFilter}),${search})`);
+    else if (stageFilter) next = next.or(stageFilter);
+    else if (search) next = next.or(search);
     if (from) next = next.gte("created_at", istDayStart(from));
     if (to) next = next.lt("created_at", istDayEndExclusive(to));
-    if (q) next = next.or(`reference.ilike.*${q}*`);
     return next;
   };
 
@@ -209,15 +227,15 @@ async function countLinesToBuy(
 
 export async function getIndentFilterOptions(): Promise<{
   projects: { id: string; name: string }[];
-  works: { id: string; label: string }[];
+  stages: { id: string; label: string }[];
 }> {
   await requireTool("/indents");
-  const [projects, workItems] = await Promise.all([listProjects(), listWorkItems()]);
+  const [projects, groups] = await Promise.all([listProjects(), listWorkGroups()]);
   return {
     projects: projects.map(({ id, name }) => ({ id, name })),
-    works: workItems
-      .filter((work) => work.is_active)
-      .map((work) => ({ id: work.id, label: `${work.name} — ${work.code}` })),
+    stages: groups
+      .filter((group) => group.is_active)
+      .map((group) => ({ id: group.id, label: `${group.code} ${group.name}` })),
   };
 }
 
@@ -250,16 +268,19 @@ export type IndentFormOptions = {
   plots: ScopedOption[];
   units: (ScopedOption & { plot_id: string | null })[];
   works: { id: string; code: string; name: string; category: string }[];
+  /** Stages (work groups, as Supervisors counts them): what a new indent is raised for (0158). */
+  stages: { id: string; code: string; name: string; category: string }[];
 };
 
 export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   await requireTool("/indents");
-  const [projects, plots, units, workItems, workCategories] = await Promise.all([
+  const [projects, plots, units, workItems, workCategories, workGroups] = await Promise.all([
     listProjects(),
     listPlots(),
     listUnits(),
     listWorkItems(),
     listWorkCategories(),
+    listWorkGroups(),
   ]);
   const categoryNameById = new Map(workCategories.map((c) => [c.id, workCategoryLabel(c)]));
   return {
@@ -279,6 +300,14 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
         code: work.code,
         name: work.name,
         category: categoryNameById.get(work.category_id) ?? "Other",
+      })),
+    stages: workGroups
+      .filter((group) => group.is_active)
+      .map((group) => ({
+        id: group.id,
+        code: group.code,
+        name: group.name,
+        category: categoryNameById.get(group.category_id) ?? "Other",
       })),
   };
 }

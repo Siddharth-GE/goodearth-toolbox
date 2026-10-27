@@ -1,8 +1,10 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { rateBuildUp, type MaterialDef, type MixDef } from "@/lib/estimator/calc";
 import { getRecipeBook } from "@/lib/estimator/estimate-queries";
+import { filterRateBook, RATE_BOOK_SHOWS, rateBookParams } from "@/lib/estimator/rate-book-list";
 import { countLinesByWork, listWorkStatus } from "@/lib/estimator/works-queries";
 import { formatCount } from "@/lib/format";
 import { Hammer } from "lucide-react";
@@ -13,9 +15,9 @@ import { RateBookList, type RateBookRow } from "./_components/rate-book-list";
 export default async function RateBookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { show } = await searchParams;
+  const params = rateBookParams(await searchParams);
   const [works, book, lineCounts] = await Promise.all([
     listWorkStatus(),
     getRecipeBook(),
@@ -36,16 +38,25 @@ export default async function RateBookPage({
       name: work.name,
       groupName: work.groupName,
       category: `${work.categoryCode} — ${work.categoryName}`,
+      categoryCode: work.categoryCode,
       uom: work.uom,
       labourRate: work.labourRate,
       componentCount: work.componentCount,
       rate: rateBuildUp(recipeByWork.get(work.workItemId), mixesById, materialsById)?.rate ?? null,
       lineCount: lineCounts.get(work.workItemId) ?? 0,
+      componentNames: (recipeByWork.get(work.workItemId)?.components ?? []).map((component) =>
+        component.mixId
+          ? (mixesById.get(component.mixId)?.name ?? "")
+          : (materialsById.get(component.materialId ?? "")?.name ?? ""),
+      ),
     }));
+  const categories = [...new Map(rows.map((row) => [row.categoryCode, row.category]))].sort(
+    ([a], [b]) => a.localeCompare(b),
+  );
 
   const priced = rows.filter((row) => row.rate !== null);
   const todo = rows.filter((row) => row.lineCount > 0 && row.rate === null);
-  const shown = show === "todo" ? todo : show === "priced" ? priced : rows;
+  const shown = filterRateBook(rows, params);
 
   return (
     <div className="space-y-4">
@@ -81,35 +92,56 @@ export default async function RateBookPage({
         </FigureBandCell>
       </FigureBand>
 
-      <div className="flex flex-wrap gap-2">
-        <LinkButton href="/estimator/works" variant={!show ? "primary" : "secondary"}>
-          All
-        </LinkButton>
-        <LinkButton
-          href="/estimator/works?show=todo"
-          variant={show === "todo" ? "primary" : "secondary"}
-        >
-          Used but not priced ({formatCount(todo.length)})
-        </LinkButton>
-        <LinkButton
-          href="/estimator/works?show=priced"
-          variant={show === "priced" ? "primary" : "secondary"}
-        >
-          Priced
-        </LinkButton>
-        <LinkButton href="/estimator/works/export" variant="ghost" plain className="sm:ml-auto">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <ListToolbar
+          action="/estimator/works"
+          values={params}
+          search={{ placeholder: "Work, code or material — lintel, cement" }}
+          filters={[
+            {
+              param: "category",
+              label: "Category",
+              allLabel: "All categories",
+              options: categories.map(([value, label]) => ({ value, label })),
+            },
+            {
+              param: "show",
+              label: "Show",
+              allLabel: "Every work",
+              options: Object.entries(RATE_BOOK_SHOWS).map(([value, label]) => ({
+                value,
+                label: value === "todo" ? `${label} (${formatCount(todo.length)})` : label,
+              })),
+            },
+          ]}
+        />
+        <LinkButton href="/estimator/works/export" variant="ghost" plain>
           Download works list for SketchUp
         </LinkButton>
       </div>
 
+      {shown.length > 0 && shown.length < rows.length && (
+        <p className="text-muted text-sm">
+          {formatCount(shown.length)} of {formatCount(rows.length)} works
+        </p>
+      )}
+
       {shown.length === 0 ? (
         <EmptyState
           icon={Hammer}
-          title={show === "todo" ? "Nothing waiting" : "No works yet"}
+          title={
+            rows.length === 0
+              ? "No works yet"
+              : params.show === "todo"
+                ? "Nothing waiting"
+                : "Nothing matches"
+          }
           description={
-            show === "todo"
-              ? "Every work an estimate uses has a rate."
-              : "Works come from the Masters list. Add them there first."
+            rows.length === 0
+              ? "Works come from the Masters list. Add them there first."
+              : params.show === "todo" && !params.q && !params.category
+                ? "Every work an estimate uses has a rate."
+                : "Try another search or filter."
           }
         />
       ) : (

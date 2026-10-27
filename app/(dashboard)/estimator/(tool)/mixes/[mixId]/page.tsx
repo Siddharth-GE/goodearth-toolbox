@@ -19,6 +19,7 @@ import {
   AddMixComponentForm,
   ComponentQtyField,
   DeleteMixButton,
+  DuplicateMixButton,
   MixFormDialog,
   RemoveComponentButton,
 } from "../_components/mix-forms";
@@ -54,6 +55,7 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
           <div className="flex flex-wrap items-center gap-2">
             {!mix.isActive && <Badge variant="neutral">Inactive</Badge>}
             <MixFormDialog mix={mix} uoms={uoms} groups={groups} />
+            <DuplicateMixButton mixId={mix.id} />
             <DeleteMixButton mixId={mix.id} />
           </div>
         }

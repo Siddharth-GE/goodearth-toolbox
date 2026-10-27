@@ -30,6 +30,8 @@ const CLEARED = [
   "goods_receipts",
   "grn_counters",
   "stock_batch_movements",
+  "site_return_lines",
+  "site_returns",
   "stock_issue_lines",
   "stock_issues",
   "iss_counters",

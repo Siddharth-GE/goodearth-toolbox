@@ -18,7 +18,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
   const [projectId, setProjectId] = useState("");
   // "" = general, "unit:<id>" or "plot:<id>" (plot and unit are 1:1, 0029).
   const [site, setSite] = useState("");
-  const [workItemId, setWorkItemId] = useState("");
+  const [workGroupId, setWorkGroupId] = useState("");
   const [requiredBy, setRequiredBy] = useState("");
   const [note, setNote] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
@@ -40,7 +40,8 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
         projectId,
         plotId,
         unitId,
-        workItemId: workItemId || null,
+        workItemId: null,
+        workGroupId: workGroupId || null,
         requiredBy: requiredBy || null,
         note: note || null,
         isUrgent,
@@ -91,25 +92,28 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="indent-work">Work (optional)</Label>
+          <Label htmlFor="indent-stage">Stage (optional)</Label>
           <Select
-            id="indent-work"
-            value={workItemId}
-            onChange={(event) => setWorkItemId(event.target.value)}
+            id="indent-stage"
+            value={workGroupId}
+            onChange={(event) => setWorkGroupId(event.target.value)}
           >
-            <option value="">No work</option>
-            {[...new Set(options.works.map((work) => work.category))].map((category) => (
+            <option value="">No stage</option>
+            {[...new Set(options.stages.map((stage) => stage.category))].map((category) => (
               <optgroup key={category} label={category}>
-                {options.works
-                  .filter((work) => work.category === category)
-                  .map((work) => (
-                    <option key={work.id} value={work.id}>
-                      {work.code} — {work.name}
+                {options.stages
+                  .filter((stage) => stage.category === category)
+                  .map((stage) => (
+                    <option key={stage.id} value={stage.id}>
+                      {stage.code} — {stage.name}
                     </option>
                   ))}
               </optgroup>
             ))}
           </Select>
+          <p className="text-muted text-xs">
+            The estimate pull then offers the materials of every work in this stage.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="indent-required-by">Required by</Label>

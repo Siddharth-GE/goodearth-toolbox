@@ -21,7 +21,8 @@ export type UnbilledEntry = {
   project_name: string;
   contractor_id: string;
   contractor_name: string;
-  work_item_id: string;
+  /** null for Additional work or Rework logged by name (0156): no work order line or rate book rate to offer. */
+  work_item_id: string | null;
   work_label: string;
   masons: number;
   helpers: number;
@@ -49,7 +50,7 @@ export async function listUnbilledLabour(filters: UnbilledFilters = {}): Promise
       let query = supabase
         .from("labour_logs")
         .select(
-          "id, log_date, kind, plot_id, contractor_id, work_item_id, work_class, masons, helpers, others, quantity, uom, description, note, plots(name, project_id, projects(name), units!units_plot_id_fkey(name)), vendors(name)",
+          "id, log_date, kind, plot_id, contractor_id, work_item_id, custom_name, work_class, masons, helpers, others, quantity, uom, description, note, plots(name, project_id, projects(name), units!units_plot_id_fkey(name)), vendors(name)",
         )
         .is("bill_id", null);
       if (filters.vendorId) query = query.eq("contractor_id", filters.vendorId);
@@ -84,7 +85,7 @@ export async function listUnbilledLabour(filters: UnbilledFilters = {}): Promise
         contractor_name: (log.vendors as { name: string } | null)?.name ?? "—",
         work_item_id: log.work_item_id,
         // Additional work and rework say so where the billing team reads the work (0132).
-        work_label: `${workLabel.get(log.work_item_id) ?? "A retired work"}${isWorkClass(log.work_class) && log.work_class !== "standard" ? ` · ${WORK_CLASS_LABEL[log.work_class]}` : ""}`,
+        work_label: `${log.custom_name ?? (log.work_item_id ? workLabel.get(log.work_item_id) : null) ?? "A retired work"}${isWorkClass(log.work_class) && log.work_class !== "standard" ? ` · ${WORK_CLASS_LABEL[log.work_class]}` : ""}`,
         masons: log.masons,
         helpers: log.helpers,
         others: log.others,

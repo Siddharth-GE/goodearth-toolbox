@@ -91,6 +91,69 @@ export async function updateMix(
   return undefined;
 }
 
+/** A copy under the first free "(copy)" name, with its materials, so a near variant starts from the original. */
+export async function duplicateMix(id: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const [mix, components] = await Promise.all([
+    supabase
+      .from("estimator_mixes")
+      .select("name, uom, description, group_name")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("estimator_mix_components")
+      .select("item_id, qty_per_unit")
+      .eq("mix_id", id)
+      .not("item_id", "is", null),
+  ]);
+  if (mix.error || components.error) {
+    console.error("duplicateMix read failed:", mix.error ?? components.error);
+    return { error: "Could not copy the mix. Try again." };
+  }
+  if (!mix.data) return { error: "That mix is no longer there." };
+
+  let copyId: string | null = null;
+  for (let attempt = 1; attempt <= 20 && !copyId; attempt++) {
+    const suffix = attempt === 1 ? " (copy)" : ` (copy ${attempt})`;
+    const name = `${mix.data.name.slice(0, NAME_LIMIT - suffix.length)}${suffix}`;
+    const { data, error } = await supabase
+      .from("estimator_mixes")
+      .insert({ ...mix.data, name, is_active: true, created_by: user.id, updated_by: user.id })
+      .select("id")
+      .single();
+    if (error && error.code !== "23505") {
+      console.error("duplicateMix failed:", error);
+      return { error: "Could not copy the mix. Try again." };
+    }
+    copyId = data?.id ?? null;
+  }
+  if (!copyId) return { error: "Rename the earlier copies of this mix first." };
+
+  if (components.data.length > 0) {
+    const { error } = await supabase.from("estimator_mix_components").insert(
+      components.data.map((component) => ({
+        mix_id: copyId,
+        item_id: component.item_id,
+        qty_per_unit: component.qty_per_unit,
+        created_by: user.id,
+        updated_by: user.id,
+      })),
+    );
+    if (error) {
+      console.error("duplicateMix (components) failed:", error);
+      // Brand new and named by nothing, so an empty copy is taken back rather than left to find.
+      const { error: undoError } = await supabase.from("estimator_mixes").delete().eq("id", copyId);
+      if (undoError) console.error("duplicateMix (undo) failed:", undoError);
+      return { error: "Could not copy the mix's materials, so no copy was kept. Try again." };
+    }
+  }
+
+  revalidatePath("/estimator", "layout");
+  redirect(`/estimator/mixes/${copyId}`);
+}
+
 export async function deleteMix(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();

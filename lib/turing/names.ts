@@ -165,13 +165,13 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     supabase
       .from("labour_logs")
       .select(
-        "id, log_date, plot_id, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom",
+        "id, log_date, plot_id, work_item_id, custom_name, contractor_id, kind, masons, helpers, others, quantity, uom",
       )
       .in("id", chunk),
   );
   for (const log of logs) {
     add("plots", log.plot_id);
-    add("work_items", log.work_item_id);
+    if (log.work_item_id) add("work_items", log.work_item_id);
     add("vendors", log.contractor_id);
   }
   // An indent line likewise, by its indent and item.
@@ -356,7 +356,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
   const estLines = await readIn(list("estimator_estimate_lines"), (chunk) =>
     supabase
       .from("estimator_estimate_lines")
-      .select("id, estimate_id, work_item_id, qty")
+      .select("id, estimate_id, work_item_id, label, qty")
       .in("id", chunk),
   );
   for (const one of estLines) {
@@ -838,6 +838,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     names[one.id] = [
       names[one.estimate_id],
       names[one.work_item_id],
+      one.label,
       one.qty === null ? "to measure" : formatQuantity(one.qty),
     ]
       .filter(Boolean)
@@ -972,7 +973,7 @@ export async function namesFor(ids: Map<IdTable, Set<string>>): Promise<Record<s
     names[log.id] = [
       formatDate(log.log_date),
       names[log.plot_id],
-      names[log.work_item_id],
+      log.work_item_id ? names[log.work_item_id] : log.custom_name,
       names[log.contractor_id],
       labourSummary(log),
     ]

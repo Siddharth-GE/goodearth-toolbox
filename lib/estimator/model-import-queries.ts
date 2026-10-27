@@ -94,15 +94,21 @@ export async function getWorkingEstimateForModel(unitId: string): Promise<Estima
   if (error) fail("the villa's working estimate", error);
   if (!header) return null;
 
-  const lines = await fetchAll<{ id: string; work_item_id: string; qty: number | null }>(
-    (from, to) =>
-      supabase
-        .from("estimator_estimate_lines")
-        .select("id, work_item_id, qty")
-        .eq("estimate_id", header.id)
-        .order("id")
-        .range(from, to),
+  const read = await fetchAll<{
+    id: string;
+    work_item_id: string;
+    label: string | null;
+    created_at: string;
+    qty: number | null;
+  }>((from, to) =>
+    supabase
+      .from("estimator_estimate_lines")
+      .select("id, work_item_id, label, created_at, qty")
+      .eq("estimate_id", header.id)
+      .order("id")
+      .range(from, to),
   );
+  const lines = read;
   const rows =
     lines.length === 0
       ? []
@@ -130,12 +136,22 @@ export async function getWorkingEstimateForModel(unitId: string): Promise<Estima
     estimateId: header.id,
     modelFile: header.model_file,
     modelGuid: header.model_guid,
-    lines: lines.map((line) => ({
-      lineId: line.id,
-      workItemId: line.work_item_id,
-      qty: line.qty,
-      handRows: counts.get(line.id)?.hand ?? 0,
-      modelRows: counts.get(line.id)?.model ?? 0,
-    })),
+    // The model measures the row it measured before, else a work's first unlabelled row, else its first
+    // (import_model_rows, 0157): that row comes first.
+    lines: [...lines]
+      .sort(
+        (a, b) =>
+          Number((counts.get(b.id)?.model ?? 0) > 0) - Number((counts.get(a.id)?.model ?? 0) > 0) ||
+          Number(a.label !== null) - Number(b.label !== null) ||
+          a.created_at.localeCompare(b.created_at) ||
+          a.id.localeCompare(b.id),
+      )
+      .map((line) => ({
+        lineId: line.id,
+        workItemId: line.work_item_id,
+        qty: line.qty,
+        handRows: counts.get(line.id)?.hand ?? 0,
+        modelRows: counts.get(line.id)?.model ?? 0,
+      })),
   };
 }
