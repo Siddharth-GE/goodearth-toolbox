@@ -1,15 +1,16 @@
 /**
  * Loads the founder's contractors sheet (one tab per company: DEVELOPMENTS, FUTURES, PROJECTS, each "CONTRACTOR" and
  * "FINAL BILLNO") into contractor_bill_numbers (0164): each contractor's last paper bill number per company, so the
- * toolbox's first bill takes the next. Also gives the three companies their codes ED, EF, EP where they have none.
+ * toolbox's first bill takes the next. Also gives the companies their codes (ED, EF, EP, and MEF for Maloor) where
+ * they have none.
  *
  *   npx tsx scripts/import-contractor-bill-numbers.ts --project <ref> --xlsx <path>            # dry run
  *   npx tsx scripts/import-contractor-bill-numbers.ts --project <ref> --xlsx <path> --commit
  *
- * Only the number after the last dash is read; the sheet's old codes are not kept (one code per contractor, founder
- * 2026-10-27). A name matches a contractor when its letters are the same, else when one is the start of the other and
- * no other contractor fits — a loose match is only listed unless --loose is given. A count the toolbox is already
- * keeping is never touched. A re-run writes nothing new.
+ * Only the number after the last dash is read; the sheet's old codes are not kept (one code per contractor). A name
+ * matches a contractor when its letters are the same, or when SAME_PERSON names them; a near miss is only listed, and
+ * the people Masters doesn't have are added there by hand. A count the toolbox is already keeping is never touched.
+ * A re-run writes nothing new.
  */
 import { backupTables } from "./backup-tables";
 import { readWorkbook } from "./read-xlsx";
@@ -20,6 +21,27 @@ const SHEETS = [
   { sheet: "FUTURES", code: "EF", company: /futures/i },
   { sheet: "PROJECTS", code: "EP", company: /projects/i },
 ] as const;
+
+/** Companies with no tab on the sheet that still need a code. */
+const OTHER_CODES = [{ code: "MEF", company: /maloor/i }] as const;
+
+/** The sheet's spelling → the contractor's name in Masters, checked by hand (an old bill code agrees, or one fits). */
+const SAME_PERSON: Record<string, string> = {
+  "Raju K": "Raju Kandian",
+  "Sreejayan PE": "Sreejayan",
+  Sukumaran: "Sukumaran P",
+  Balachandran: "Balachandran K R",
+  Suresh: "Suresh Earayi",
+  "Surya Kiran": "Suryakiran K",
+  Suryakiran: "Suryakiran K",
+  "Sajith Painter": "Sajith M",
+  "khaleel(Fathima Naseeba)": "Fathima Naseeba C H",
+  Sadanadhan: "Sadanandan Puthukudy",
+  "Rijseh K": "Rijesh K P",
+  "Nithin K Mathew": "Nithin mathew",
+  Pushpavalli: "K Pushpavally",
+  "Nikhil(Tile)": "Nikhil N",
+};
 
 type Contractor = { id: string; name: string };
 type Company = { id: string; name: string; code: string | null };
@@ -42,6 +64,11 @@ function matchName(
   contractors: Contractor[],
 ): { contractor: Contractor; loose: boolean } | string {
   const key = letters(name);
+  const same = Object.entries(SAME_PERSON).find(([sheetName]) => letters(sheetName) === key)?.[1];
+  if (same) {
+    const named = contractors.find((c) => c.name === same);
+    return named ? { contractor: named, loose: false } : `${same} is not a contractor in Masters`;
+  }
   const exact = contractors.filter((c) => letters(c.name) === key);
   if (exact.length === 1) return { contractor: exact[0], loose: false };
   if (exact.length > 1) return `same letters as ${exact.map((c) => c.name).join(", ")}`;
@@ -62,7 +89,6 @@ async function main() {
   if (at === -1 || !argv[at + 1])
     throw new Error("--xlsx <path to the contractors sheet> is required.");
   const workbook = readWorkbook(argv[at + 1]);
-  const takeLoose = argv.includes("--loose");
 
   const contractors = await sql<Contractor>(
     ref,
@@ -114,7 +140,7 @@ async function main() {
       }
       if (match.loose) {
         loose.push(`${sheet}: "${name}" (${lastNo}) could be ${match.contractor.name}`);
-        if (!takeLoose) continue;
+        continue;
       }
       const key = `${match.contractor.id}/${company.id}`;
       if (counted.has(key)) {
@@ -128,13 +154,15 @@ async function main() {
     }
   }
 
+  for (const { code, company: pattern } of OTHER_CODES) {
+    const company = companies.find((c) => pattern.test(c.name));
+    if (company && !company.code) codes.push({ id: company.id, code });
+  }
+
   console.log(
     `\n${writes.size} last bill numbers to set; company codes to give: ${codes.map((c) => c.code).join(", ") || "none"}.`,
   );
-  if (loose.length) {
-    const fate = takeLoose ? "set" : "not set without --loose";
-    console.log(`\nMatched loosely, ${fate}:\n  ${loose.join("\n  ")}`);
-  }
+  if (loose.length) console.log(`\nNear misses, not set:\n  ${loose.join("\n  ")}`);
   if (unmatched.length) console.log(`\nNot matched, so not set:\n  ${unmatched.join("\n  ")}`);
   if (skipped.length) console.log(`\nLeft alone:\n  ${skipped.join("\n  ")}`);
 
