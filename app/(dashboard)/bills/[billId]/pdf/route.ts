@@ -4,6 +4,7 @@ import { BillDocument } from "@/lib/bills/bill-document";
 import { getBillLines } from "@/lib/bills/line-queries";
 import { getBillSettlement } from "@/lib/bills/payment-queries";
 import { getBill, getBillVillas } from "@/lib/bills/queries";
+import { getBillSignatureBoxes } from "@/lib/bills/signature-queries";
 import { getProjectCompany } from "@/lib/masters/companies";
 import { createElement, type ReactElement } from "react";
 
@@ -14,16 +15,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bil
   const bill = await getBill(billId);
   if (!bill) return new Response("Not found", { status: 404 });
 
-  const [lines, settlement, company, villas] = await Promise.all([
+  const [lines, settlement, company, villas, signatures] = await Promise.all([
     getBillLines(billId),
     getBillSettlement(billId, bill.total_amount),
     getProjectCompany(bill.project_id),
     getBillVillas(bill),
+    getBillSignatureBoxes(bill),
   ]);
 
   const buffer = await renderToBuffer(
     createElement(BillDocument, {
-      data: { bill, lines, settlement, company, villas },
+      data: { bill, lines, settlement, company, villas, signatures },
     }) as ReactElement<DocumentProps>,
   );
 
