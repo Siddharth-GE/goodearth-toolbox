@@ -24,6 +24,7 @@ import { groupByVilla, villaLabel, villaOfLine } from "@/lib/bills/villas";
 import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
+import { getProjectCompany } from "@/lib/masters/companies";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { FileDown } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -65,6 +66,17 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       : Promise.resolve([]),
     getBillVillas(bill),
   ]);
+  // A contractor's recorded or approved bill can be folded with their others in the same company (0167).
+  const company =
+    villas &&
+    (actor.isAdmin || actor.isApprover) &&
+    (bill.status === "recorded" || bill.status === "approved")
+      ? await getProjectCompany(bill.project_id)
+      : null;
+  const combineHref =
+    company && bill.vendor_id
+      ? `/bills/combine?${new URLSearchParams({ vendor: bill.vendor_id, company: company.id, kind: bill.work_type ?? "NMR" })}`
+      : null;
   // A contractor's bill names the villa its lines are on, or how many (0166): lines can move off the header's.
   const villaGroups = villas
     ? groupByVilla(
@@ -126,6 +138,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         }
         actions={
           <>
+            {combineHref && (
+              <LinkButton href={combineHref} variant="secondary" size="sm">
+                Combine with others
+              </LinkButton>
+            )}
             <LinkButton href={`/bills/${bill.id}/pdf`} variant="secondary" size="sm" plain>
               <FileDown className="size-4" />
               Print

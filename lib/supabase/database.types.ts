@@ -13305,6 +13305,10 @@ export type Database = {
           id: string
         }[]
       }
+      combine_contractor_bills: {
+        Args: { p_bill_ids: string[] }
+        Returns: string
+      }
       create_bill: {
         Args: {
           p_gst_amount: number

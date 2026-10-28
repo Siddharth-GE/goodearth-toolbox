@@ -14,7 +14,7 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { NavTabs } from "@/components/ui/tabs";
-import { getBillFilterOptions, listBills } from "@/lib/bills/queries";
+import { getBillFilterOptions, getCurrentBillActor, listBills } from "@/lib/bills/queries";
 import type { BillStatus } from "@/lib/bills/workflow";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
@@ -54,7 +54,7 @@ export default async function BillsPage({
   const to = dateParam(raw.to);
   const tab = TABS.find((t) => t.param === statusParam) ?? TABS[0];
 
-  const [result, filterOptions] = await Promise.all([
+  const [result, filterOptions, actor] = await Promise.all([
     listBills({
       page: Number(page) || 1,
       status: tab.status,
@@ -66,6 +66,7 @@ export default async function BillsPage({
       to,
     }),
     getBillFilterOptions(),
+    getCurrentBillActor(),
   ]);
   const { bills, total, page: currentPage, pageCount, pageSize, sums } = result;
 
@@ -108,6 +109,11 @@ export default async function BillsPage({
             <LinkButton href="/bills/work-orders" variant="secondary">
               Work orders
             </LinkButton>
+            {actor.isApprover && (
+              <LinkButton href="/bills/combine" variant="secondary">
+                Combine bills
+              </LinkButton>
+            )}
             <LinkButton href="/bills/new">Record bill</LinkButton>
           </>
         }
