@@ -1,8 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormMessage } from "@/components/ui/form-message";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -16,13 +17,11 @@ import { combineProblem, keptBill } from "@/lib/bills/combine";
 import type { CombinableBill } from "@/lib/bills/queries";
 import type { BillStatus } from "@/lib/bills/workflow";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
-import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";
 import { BillStatusBadge } from "../../_components/status-badge";
 
 export function CombineBills({ bills }: { bills: CombinableBill[] }) {
   const [ticked, setTicked] = useState<Set<string>>(new Set());
-  const { pending, error, run, clearError } = useActionRunner();
 
   const open = bills.filter((bill) => !combineProblem(bill));
   const chosen = bills.filter((bill) => ticked.has(bill.id));
@@ -35,11 +34,9 @@ export function CombineBills({ bills }: { bills: CombinableBill[] }) {
     if (on) next.add(id);
     else next.delete(id);
     setTicked(next);
-    clearError();
   };
 
-  // A success lands on the kept bill; only a refusal comes back.
-  const combine = () => run(() => combineBills(chosen.map((bill) => bill.id)));
+  const summary = `Total ${formatMoney(total, { paise: true })}. The other ${formatCount(chosen.length - 1)} ${chosen.length === 2 ? "bill goes" : "bills go"} and ${chosen.length === 2 ? "its number stays" : "their numbers stay"} used. The combined bill comes back recorded, waiting for approval${approved > 0 ? ` — ${formatCount(approved)} of these ${approved === 1 ? "is" : "are"} approved now and will need approving again as one` : ""}.`;
 
   return (
     <div className="space-y-4 pb-6">
@@ -107,7 +104,7 @@ export function CombineBills({ bills }: { bills: CombinableBill[] }) {
       </Table>
 
       {chosen.length > 0 && (
-        <div className="border-border bg-surface space-y-3 rounded-2xl border p-5">
+        <Card className="space-y-3 p-5">
           <p className="text-foreground text-[15px] font-semibold tracking-tight">
             {`${formatCount(chosen.length)} ${chosen.length === 1 ? "bill" : "bills"} → one bill`}
             {kept && (
@@ -117,19 +114,25 @@ export function CombineBills({ bills }: { bills: CombinableBill[] }) {
               </span>
             )}
           </p>
-          <p className="text-muted text-sm">
-            {`Total ${formatMoney(total, { paise: true })}. The other ${formatCount(Math.max(chosen.length - 1, 0))} go and their numbers stay used. The combined bill comes back recorded, waiting for approval${approved > 0 ? ` — ${formatCount(approved)} of these ${approved === 1 ? "is" : "are"} approved now and will need approving again as one` : ""}.`}
-          </p>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            {!error && chosen.length < 2 && (
-              <p className="text-muted text-xs">Tick at least two bills.</p>
-            )}
-            <FormMessage error={error} size="xs" />
-            <Button onClick={combine} disabled={pending || chosen.length < 2}>
-              {pending ? "Combining…" : `Combine ${formatCount(chosen.length)} bills`}
-            </Button>
-          </div>
-        </div>
+          {chosen.length < 2 ? (
+            <p className="text-muted text-sm">Tick at least two bills.</p>
+          ) : (
+            <>
+              <p className="text-muted text-sm">{summary}</p>
+              <div className="flex justify-end">
+                {/* A success lands on the kept bill; only a refusal comes back. */}
+                <ConfirmDialog
+                  trigger={<Button>{`Combine ${formatCount(chosen.length)} bills`}</Button>}
+                  title={`Combine ${formatCount(chosen.length)} bills into ${kept?.reference ?? "one"}?`}
+                  description={`${summary} This can't be undone.`}
+                  confirmLabel="Combine them"
+                  pendingLabel="Combining…"
+                  onConfirm={() => combineBills(chosen.map((bill) => bill.id))}
+                />
+              </div>
+            </>
+          )}
+        </Card>
       )}
     </div>
   );
