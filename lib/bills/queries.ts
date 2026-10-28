@@ -267,6 +267,7 @@ export type BillDetail = {
   payment_ref: string | null;
   created_by: string | null;
   created_at: string;
+  approved_by: string | null;
   approved_at: string | null;
   paid_at: string | null;
   created_by_name: string | null;
@@ -369,6 +370,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     payment_ref: bill.payment_ref,
     created_by: bill.created_by,
     created_at: bill.created_at,
+    approved_by: bill.approved_by,
     approved_at: bill.approved_at,
     paid_at: bill.paid_at,
     created_by_name: nameOf(bill.created_by),

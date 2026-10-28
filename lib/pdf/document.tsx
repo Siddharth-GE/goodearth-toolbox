@@ -1,4 +1,4 @@
-import { Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
 import { pdf } from "./theme";
 
@@ -286,6 +286,9 @@ const blockStyles = StyleSheet.create({
   signatureBox: { width: "30%" },
   signatureRule: { borderTopWidth: 0.5, borderTopColor: pdf.color.ruleStrong, paddingTop: 4 },
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
+  signatureName: { fontSize: pdf.size.tiny, marginTop: 1 },
+  signatureSpace: { height: 36, justifyContent: "flex-end", marginBottom: 2 },
+  signatureImage: { maxHeight: 36, maxWidth: "100%", objectFit: "contain" },
 });
 
 export function DocumentHeading({ title, subtitle }: { title: string; subtitle: string }) {
@@ -328,14 +331,34 @@ export function NotesBlock({ notes }: { notes: { label: string; text: string | n
   );
 }
 
+/** A box that prints who signed it, and their signature when one is kept. */
+export type SignatureBox = {
+  label: string;
+  name?: string | null;
+  image?: { data: Buffer; format: "png" | "jpg" } | null;
+};
+
 /** Signature lines, kept together at the foot. A draft prints none. */
-export function Signatures({ labels }: { labels: string[] }) {
+export function Signatures({ labels }: { labels: (string | SignatureBox)[] }) {
+  const boxes = labels.map((one) => (typeof one === "string" ? { label: one } : one));
+  const signed = boxes.some((box) => box.image);
+  const width = boxes.length <= 3 ? "30%" : `${Math.floor(96 / boxes.length) - 2}%`;
   return (
-    <View style={blockStyles.signatureRow} wrap={false}>
-      {labels.map((label) => (
-        <View key={label} style={blockStyles.signatureBox}>
+    <View style={[blockStyles.signatureRow, signed ? { marginTop: 12 } : {}]} wrap={false}>
+      {boxes.map((box) => (
+        <View key={box.label} style={[blockStyles.signatureBox, { width }]}>
+          {signed && (
+            <View style={blockStyles.signatureSpace}>
+              {box.image && (
+                // react-pdf's Image is a PDF primitive, not an <img>.
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <Image src={box.image} style={blockStyles.signatureImage} />
+              )}
+            </View>
+          )}
           <View style={blockStyles.signatureRule}>
-            <Text style={blockStyles.signatureLabel}>{label}</Text>
+            <Text style={blockStyles.signatureLabel}>{box.label}</Text>
+            {box.name && <Text style={blockStyles.signatureName}>{box.name}</Text>}
           </View>
         </View>
       ))}

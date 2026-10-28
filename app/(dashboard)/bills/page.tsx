@@ -1,11 +1,11 @@
 import { PageTitle } from "@/components/ui/page-title";
-import { getWelcomeCounts } from "@/lib/bills/queries";
+import { getCurrentBillActor, getWelcomeCounts } from "@/lib/bills/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
 // Counts only: bill amounts stay behind the doors.
 export default async function BillsPage() {
-  const counts = await getWelcomeCounts();
+  const [counts, actor] = await Promise.all([getWelcomeCounts(), getCurrentBillActor()]);
 
   return (
     <div className="space-y-4">
@@ -33,6 +33,7 @@ export default async function BillsPage() {
           { label: "Payments", href: "/bills/payments" },
           { label: "Contractors", href: "/bills/contractors" },
           { label: "Work orders", href: "/bills/work-orders" },
+          ...(actor.isAdmin ? [{ label: "Signatures", href: "/bills/signatures" }] : []),
         ]}
       />
     </div>

@@ -8,6 +8,7 @@ import {
   SectionLabel,
   Signatures,
   type Column,
+  type SignatureBox,
   type DocumentMeta,
   type LetterheadCompany,
 } from "@/lib/pdf/document";
@@ -28,6 +29,8 @@ export type BillPdfData = {
   company: LetterheadCompany | null;
   /** A contractor's bill: its lines print by villa, each with its subtotal (0166). */
   villas: LineVillas | null;
+  /** Who signed it (0168); null on a draft, which prints no boxes. */
+  signatures: SignatureBox[] | null;
 };
 
 const styles = StyleSheet.create({
@@ -253,7 +256,11 @@ export function BillDocument({ data }: { data: BillPdfData }) {
           ]}
         />
 
-        {!isDraft && <Signatures labels={["Prepared by", "Approved by", `Received — ${party}`]} />}
+        {!isDraft && (
+          <Signatures
+            labels={[...(data.signatures ?? ["Prepared by", "Approved by"]), `Received — ${party}`]}
+          />
+        )}
       </DocumentPage>
     </Document>
   );
