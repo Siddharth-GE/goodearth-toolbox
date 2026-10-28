@@ -28,17 +28,18 @@ import {
 } from "@/lib/bills/labour-billing";
 import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-queries";
 import { parseNumber } from "@/lib/form-data";
-import { nextContractorBill } from "@/lib/masters/contractor-bill-number";
+import { nextContractorBill, type ContractorNumbering } from "@/lib/masters/contractor-bill-number";
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
 
 // The figure shown is the figure the bill will carry. Piece-work rate: the work order's for that work, else the rate book's; a lump sum is typed.
-const asEntry = (row: UnbilledEntry): LabourEntry => ({
+const asEntry = (row: UnbilledEntry, numbering: ContractorNumbering): LabourEntry => ({
   id: row.id,
   kind: row.kind,
   contractorId: row.contractor_id,
   projectId: row.project_id,
+  companyId: numbering.companies[row.project_id]?.id ?? null,
   workItemId: row.work_item_id,
   masons: row.masons,
   helpers: row.helpers,
@@ -71,10 +72,27 @@ export function SendToBill({
 
   const rateBook = useMemo(() => new Map(Object.entries(options.rateBook)), [options.rateBook]);
   const chosen = entries.filter((entry) => ticked.has(entry.id));
-  const chosenEntries = chosen.map(asEntry);
-  const groupProblem = chosen.length ? entriesProblem(chosenEntries) : undefined;
+  const chosenEntries = chosen.map((entry) => asEntry(entry, options.numbering));
   const first = chosen[0];
   const isDaily = first?.kind === "nmr";
+  // One company's projects go on one bill (0166); a work order is one project's, so it is offered only for one.
+  const projectNames = [...new Set(chosen.map((entry) => entry.project_name))];
+  const workOrders =
+    first && new Set(chosen.map((entry) => entry.project_id)).size === 1
+      ? options.workOrders.filter(
+          (order) =>
+            order.vendor_id === first.contractor_id && order.project_id === first.project_id,
+        )
+      : [];
+  const workOrder = isDaily ? undefined : workOrders.find((order) => order.id === workOrderId);
+  // A work order picked for one project's entries no longer fits once another project's are ticked.
+  const droppedOrder =
+    !isDaily && !workOrder
+      ? options.workOrders.find((order) => order.id === workOrderId)
+      : undefined;
+  const groupProblem = chosen.length
+    ? entriesProblem(chosenEntries, Boolean(workOrder))
+    : undefined;
   const gstPct = Number(gst);
 
   // Suggestions arrive the moment the first entry of a group is ticked.
@@ -105,15 +123,9 @@ export function SendToBill({
     if (on) suggestFor(entry, next);
   };
 
-  const workOrders = first
-    ? options.workOrders.filter(
-        (order) => order.vendor_id === first.contractor_id && order.project_id === first.project_id,
-      )
-    : [];
-  const workOrder = workOrders.find((order) => order.id === workOrderId);
   const rateFor = (entry: UnbilledEntry): string =>
     pieceRates[entry.id] ??
-    show(suggestedPieceRate(asEntry(entry), workOrder?.lines ?? [], rateBook));
+    show(suggestedPieceRate(asEntry(entry, options.numbering), workOrder?.lines ?? [], rateBook));
 
   const rates = {
     mason: parseNumber(dayRates.mason),
@@ -167,7 +179,7 @@ export function SendToBill({
       sendLabourToBill({
         logIds: chosen.map((entry) => entry.id),
         kind: isDaily ? "nmr" : "pw",
-        labourContractId: isDaily ? null : workOrderId || null,
+        labourContractId: workOrder?.id ?? null,
         billReference: reference,
         billDate,
         dayRates: isDaily ? rates : null,
@@ -267,23 +279,21 @@ export function SendToBill({
           <p className="text-foreground text-[15px] font-semibold tracking-tight">
             {`${formatCount(chosen.length)} ${chosen.length === 1 ? "entry" : "entries"} → one ${isDaily ? "daily-wages" : "piece-work"} bill`}
             {first && (
-              <span className="text-muted font-normal">{` · ${first.contractor_name} · ${first.project_name}`}</span>
+              <span className="text-muted font-normal">{` · ${first.contractor_name} · ${projectNames.join(" and ")}`}</span>
             )}
           </p>
           {nextBill && "reference" in nextBill && (
             <p className="text-foreground text-sm">
               {"This bill will be numbered "}
               <span className="font-mono font-semibold">{nextBill.reference}</span>
-              <span className="text-muted">
-                {" — from the contractor's code and the project's company."}
-              </span>
+              <span className="text-muted">{" — from the contractor's code and the company."}</span>
             </p>
           )}
 
           {!groupProblem && isDaily && (
             <div className="space-y-2">
               <p className="text-muted text-sm">
-                {`${formatQuantity(heads.masons)} mason, ${formatQuantity(heads.helpers)} helper and ${formatQuantity(heads.others)} other man-days. Day rates from their last bill are filled in where there was one.`}
+                {`${formatQuantity(heads.masons)} mason, ${formatQuantity(heads.helpers)} helper and ${formatQuantity(heads.others)} other man-days, a line per trade for each villa. Day rates from their last bill are filled in where there was one.`}
               </p>
               <div className="grid gap-3 sm:grid-cols-3">
                 {(["mason", "helper", "other"] as const).map((trade) => (
@@ -317,7 +327,7 @@ export function SendToBill({
               <Label htmlFor="work-order">Work order</Label>
               <Select
                 id="work-order"
-                value={workOrderId}
+                value={workOrder?.id ?? ""}
                 onChange={(event) => {
                   setWorkOrderId(event.target.value);
                   setPieceRates({});
@@ -330,7 +340,12 @@ export function SendToBill({
                   </option>
                 ))}
               </Select>
-              {!workOrderId && (
+              {droppedOrder && (
+                <p className="text-warning text-xs font-medium" role="alert">
+                  {`${droppedOrder.reference ?? "The work order"} is for one project, and these entries reach more than one — they go as a direct labour bill at the rate book's rates. Tick one project's entries to bill against it.`}
+                </p>
+              )}
+              {!workOrder && !droppedOrder && (
                 <p className="text-muted text-xs">
                   No work order — billed as a direct labour bill. Rates come from the rate book.
                 </p>

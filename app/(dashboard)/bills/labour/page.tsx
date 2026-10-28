@@ -44,7 +44,7 @@ export default async function LabourToBillPage({
         title="Labour to bill"
         backHref="/bills"
         backLabel="Bills"
-        description="What the supervisors logged that isn't on a bill yet. Tick a contractor's entries for one project and send them to one bill."
+        description="What the supervisors logged that isn't on a bill yet. Tick a contractor's entries for one company — any of its projects — and send them to one bill."
       />
 
       <ListToolbar

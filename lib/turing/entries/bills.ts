@@ -96,7 +96,7 @@ export const BILLS = defineEntries([
     key: "bill_nmr",
     tool: "/bills",
     title: "A daily-wages (NMR) bill",
-    description: `Records a muster roll not logged on site: for a project, or one villa of it, from a contractor (vendor_id) or paid directly (left out). One row per line: a trade's man-days, described exactly as one of "${TRADES.join('", "')}", or any other line (with its unit if it has one). GST % is 0 if left out. Labour logged on site goes through labour_to_bill instead. ${PAPER}`,
+    description: `Records a muster roll not logged on site: for a project, or one villa of it, from a contractor (vendor_id) or paid directly (left out). One row per line: a trade's man-days, described exactly as one of "${TRADES.join('", "')}", or any other line (with its unit if it has one). A contractor's bill is one bill for the whole company: give each row its own villa (line_plot_id, any villa of the project's company) and leave the header villa out. GST % is 0 if left out. Labour logged on site goes through labour_to_bill instead. ${PAPER}`,
     adds: true,
     lines: { noun: "Bill" },
     fields: [
@@ -114,6 +114,7 @@ export const BILLS = defineEntries([
       { ...invoiceDate, header: true },
       { ...note, header: true },
       { key: "description", label: "Line", kind: "text", max: 300 },
+      { key: "line_plot_id", label: "Line's villa", kind: "id", table: "plots", optional: true },
       quantity,
       { key: "uom", label: "Unit", kind: "text", optional: true, max: 40 },
       rate,
@@ -230,7 +231,7 @@ export const BILLS = defineEntries([
     tool: "/bills",
     title: "Labour logs, sent to a bill",
     description:
-      "Makes one bill from labour the supervisors logged (labour_logs not yet billed), all of one kind — daily wages, or piece-work — one contractor and one project; the logs are stamped and their quantities fixed. One row per log. Daily wages: the day rate for each trade (mason_rate, helper_rate, other_rate) and, if the muster roll differs, its total with the reason. Piece-work: each row's rate (a lump sum's: its amount), and the contractor's approved work order if billed against one (else it is a direct labour bill). bill_reference is the muster roll or bill number. GST % is 0 if left out.",
+      "Makes one bill from labour the supervisors logged (labour_logs not yet billed), all of one kind — daily wages, or piece-work — one contractor and one company (any of its projects; one project against a work order), a line per log or, for daily wages, per trade per villa; the logs are stamped and their quantities fixed. One row per log. Daily wages: the day rate for each trade (mason_rate, helper_rate, other_rate) and, if the muster roll differs, its total with the reason. Piece-work: each row's rate (a lump sum's: its amount), and the contractor's approved work order if billed against one (else it is a direct labour bill). bill_reference is the muster roll or bill number. GST % is 0 if left out.",
     adds: true,
     lines: { noun: "Bill" },
     fields: [

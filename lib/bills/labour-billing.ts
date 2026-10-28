@@ -1,5 +1,5 @@
 // Pure rules; send_labour_logs_to_bill() holds the same ones and makes the bill.
-// One kind, contractor and project per bill. Daily wages: heads × day rate per trade. Piece-work: quantity (lump sum: 1) × rate, from the approved work order first, then the rate book. GST on each, to the paisa.
+// One kind, contractor and company per bill (one project against a work order, 0166). Daily wages: heads × day rate per trade. Piece-work: quantity (lump sum: 1) × rate, from the approved work order first, then the rate book. GST on each, to the paisa.
 
 import type { DayRates } from "./lines";
 import { roundPaise } from "@/lib/line-money";
@@ -9,6 +9,8 @@ export type LabourEntry = {
   kind: "nmr" | "pw_qty" | "pw_lump";
   contractorId: string;
   projectId: string;
+  /** The project's company; null when it has none. */
+  companyId: string | null;
   /** null for a log named instead of a work (0156): daily wages or a lump sum, so no rate is looked up. */
   workItemId: string | null;
   masons: number;
@@ -17,7 +19,7 @@ export type LabourEntry = {
   quantity: number | null;
 };
 
-export function entriesProblem(entries: LabourEntry[]): string | undefined {
+export function entriesProblem(entries: LabourEntry[], workOrder = false): string | undefined {
   if (entries.length === 0) return "Tick the labour entries to bill.";
   const daily = entries.some((entry) => entry.kind === "nmr");
   const piece = entries.some((entry) => entry.kind !== "nmr");
@@ -26,7 +28,13 @@ export function entriesProblem(entries: LabourEntry[]): string | undefined {
     return "A bill is for one contractor — tick entries of one contractor.";
   }
   if (new Set(entries.map((entry) => entry.projectId)).size > 1) {
-    return "A bill is for one project — tick entries of one project.";
+    if (workOrder) {
+      return "A bill against a work order is for its one project — tick entries of that project.";
+    }
+    const companies = new Set(entries.map((entry) => entry.companyId));
+    if (companies.size > 1 || companies.has(null)) {
+      return "A bill is for one company — tick entries of one company's projects.";
+    }
   }
   return undefined;
 }

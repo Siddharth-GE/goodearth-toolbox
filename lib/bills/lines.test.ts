@@ -18,6 +18,7 @@ import {
 } from "./lines";
 import { rollUpBill } from "./math";
 import { lineMoneyOf } from "./lines";
+import { NO_VILLA } from "./villas";
 
 const line = (over: Partial<BillLineDraft> = {}): BillLineDraft => ({
   kind: "other",
@@ -34,6 +35,7 @@ const line = (over: Partial<BillLineDraft> = {}): BillLineDraft => ({
   discountAmount: null,
   otherCharges: null,
   note: null,
+  villa: NO_VILLA,
   ...over,
 });
 

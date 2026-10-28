@@ -5,6 +5,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { saveBillLines } from "@/lib/bills/line-actions";
 import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLinesProblem, type PoLineForBill, type WorkOrderLineForBill } from "@/lib/bills/lines";
+import type { LineVillas } from "@/lib/bills/villas";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import type { DocumentCharges } from "@/lib/line-money";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ const toEditor = (row: BillLineRow): EditorLine =>
       discountAmount: row.discount_amount,
       otherCharges: row.other_charges,
       note: row.note,
+      villa: row.villa,
     },
     row.id,
   );
@@ -47,6 +49,7 @@ export function BillLinesPanel({
   allowOther,
   locked,
   charges,
+  villas,
 }: {
   billId: string;
   lines: BillLineRow[];
@@ -57,6 +60,7 @@ export function BillLinesPanel({
   allowOther: boolean;
   locked: boolean;
   charges: DocumentCharges;
+  villas?: LineVillas;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<EditorLine[]>(() => lines.map(toEditor));
@@ -81,6 +85,7 @@ export function BillLinesPanel({
         allowOther={allowOther}
         lockedQuantities={locked}
         charges={charges}
+        villas={villas}
       />
       <div className="flex flex-wrap items-center justify-end gap-3">
         {!error && problem && <p className="text-muted text-xs">{problem}</p>}

@@ -16,6 +16,7 @@ import {
   type BillLineDraft,
 } from "./lines";
 import { rollUpBill } from "./math";
+import { headerVilla } from "./villas";
 import { documentChargesProblem, roundPaise, type DocumentCharges } from "@/lib/line-money";
 
 // Rules live in the database: bill_lines_guard (lines move only while the bill is recorded; a material names a line of the bill's own PO, 0111) and bill_lines_roll_up (header from lines, to the paisa).
@@ -35,6 +36,9 @@ const LINE_GUARD_PHRASES = [
   "no company yet",
   "muster roll or bill reference",
   "invoice number as printed",
+  "another company",
+  "not in that project",
+  "different villas",
 ] as const;
 
 type Client = Awaited<ReturnType<typeof createClient>>;
@@ -110,6 +114,9 @@ const row = (billId: string, userId: string, line: BillLineDraft, sortOrder: num
   discount_amount: line.discountAmount || null,
   other_charges: line.otherCharges || null,
   note: line.note?.trim() || null,
+  project_id: line.villa.projectId,
+  plot_id: line.villa.plotId,
+  unit_id: line.villa.unitId,
   updated_by: userId,
 });
 
@@ -123,7 +130,10 @@ export async function saveBillLines(billId: string, lines: BillLineSave[]): Prom
   const [{ data: bill, error: billError }, { data: existing, error: existingError }, stamped] =
     await Promise.all([
       supabase.from("bills").select("status, kind").eq("id", billId).maybeSingle(),
-      supabase.from("bill_lines").select("id, quantity, line_kind").eq("bill_id", billId),
+      supabase
+        .from("bill_lines")
+        .select("id, quantity, line_kind, project_id, plot_id, unit_id")
+        .eq("bill_id", billId),
       supabase
         .from("labour_logs")
         .select("id", { count: "exact", head: true })
@@ -149,10 +159,19 @@ export async function saveBillLines(billId: string, lines: BillLineSave[]): Prom
     const requantified = lines.some(
       (line) => line.id && before.get(line.id)?.quantity !== line.quantity,
     );
-    if (removed || added || requantified) {
+    const moved = lines.some((line) => {
+      const was = line.id ? before.get(line.id) : undefined;
+      return (
+        was &&
+        (was.project_id !== line.villa.projectId ||
+          was.plot_id !== line.villa.plotId ||
+          was.unit_id !== line.villa.unitId)
+      );
+    });
+    if (removed || added || requantified || moved) {
       return {
         error:
-          "This bill was made from labour entries — its lines and quantities come from them. Change the rates here, or delete the bill and send the entries again.",
+          "This bill was made from labour entries — its lines, villas and quantities come from them. Change the rates here, or delete the bill and send the entries again.",
       };
     }
   }
@@ -339,6 +358,50 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   if (totals.total <= 0) return { error: "The bill's total must be more than zero." };
 
   const supabase = await createClient();
+
+  // Lines that name their villas (a contractor's bill, 0166) decide the header's: their one shared villa, or none. A
+  // line with none takes the villa asked for the bill. Checked before the mint, so a refusal never spends a number.
+  let lines = input.lines;
+  let site = { plotId: input.plotId, unitId: input.unitId };
+  if (input.kind === "nmr" && input.projectId && lines.some((line) => line.villa.projectId)) {
+    const projectIds = [
+      ...new Set([input.projectId, ...lines.flatMap((line) => line.villa.projectId ?? [])]),
+    ];
+    const [vendor, projects] = await Promise.all([
+      input.vendorId
+        ? supabase.from("vendors").select("is_contractor").eq("id", input.vendorId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("projects").select("id, company_id").in("id", projectIds),
+    ]);
+    if (vendor.error || projects.error) {
+      console.error("createBillWithLines villa check failed:", vendor.error ?? projects.error);
+      return { error: "Could not check the lines' villas. Try again." };
+    }
+    if (!vendor.data?.is_contractor) {
+      return { error: "Only a contractor's labour bill can put its lines on different villas." };
+    }
+    const companyOf = new Map((projects.data ?? []).map((row) => [row.id, row.company_id]));
+    const company = companyOf.get(input.projectId);
+    if (
+      projectIds.some((id) => id !== input.projectId && (!company || companyOf.get(id) !== company))
+    ) {
+      return {
+        error: "That project is another company's — a contractor's bill is for one company.",
+      };
+    }
+    lines = lines.map((line) =>
+      line.villa.projectId
+        ? line
+        : {
+            ...line,
+            villa: { projectId: input.projectId, plotId: input.plotId, unitId: input.unitId },
+          },
+    );
+    site = headerVilla(
+      input.projectId,
+      lines.map((line) => line.villa),
+    );
+  }
   if (input.kind === "po") {
     const capProblem = await receivedCheck(supabase, null, input.lines);
     if (capProblem) return { error: capProblem };
@@ -349,8 +412,8 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
       ? await supabase.rpc("create_nmr_bill", {
           p_vendor_id: (input.vendorId || null) as unknown as string,
           p_project_id: input.projectId as string,
-          p_plot_id: (input.plotId || null) as unknown as string,
-          p_unit_id: (input.unitId || null) as unknown as string,
+          p_plot_id: (site.plotId || null) as unknown as string,
+          p_unit_id: (site.unitId || null) as unknown as string,
           p_invoice_no: input.invoiceNo.trim(),
           p_invoice_date: input.invoiceDate,
           p_taxable_amount: totals.taxable,
@@ -380,7 +443,7 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   const billId = minted.data as string;
 
   const { error } = await supabase.from("bill_lines").insert(
-    input.lines.map((line, index) => ({
+    lines.map((line, index) => ({
       ...row(billId, user.id, line, index),
       created_by: user.id,
     })),
@@ -388,9 +451,9 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   revalidatePath("/bills", "layout");
   if (error) {
     console.error("createBillWithLines lines failed:", error);
+    const said = guardError(error, "", LINE_GUARD_PHRASES)?.error;
     return {
-      error:
-        "The bill was recorded but its lines were refused — open it from the list, check the figures, or delete it and record it again.",
+      error: `The bill was recorded but its lines were refused${said ? ` (${said})` : ""} — open it from the list, check the figures, or delete it and record it again.`,
     };
   }
   redirect(`/bills/${billId}`);

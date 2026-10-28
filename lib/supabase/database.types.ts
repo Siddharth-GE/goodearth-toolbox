@@ -288,10 +288,13 @@ export type Database = {
           line_kind: string
           note: string | null
           other_charges: number | null
+          plot_id: string | null
           po_line_id: string | null
+          project_id: string | null
           quantity: number | null
           rate: number
           sort_order: number
+          unit_id: string | null
           uom: string | null
           updated_at: string
           updated_by: string | null
@@ -311,10 +314,13 @@ export type Database = {
           line_kind: string
           note?: string | null
           other_charges?: number | null
+          plot_id?: string | null
           po_line_id?: string | null
+          project_id?: string | null
           quantity?: number | null
           rate: number
           sort_order?: number
+          unit_id?: string | null
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -334,10 +340,13 @@ export type Database = {
           line_kind?: string
           note?: string | null
           other_charges?: number | null
+          plot_id?: string | null
           po_line_id?: string | null
+          project_id?: string | null
           quantity?: number | null
           rate?: number
           sort_order?: number
+          unit_id?: string | null
           uom?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -401,6 +410,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bill_lines_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bill_lines_po_line_id_fkey"
             columns: ["po_line_id"]
             isOneToOne: false
@@ -420,6 +436,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_order_lines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_lines_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "villa_cost_facts"
+            referencedColumns: ["unit_id"]
           },
           {
             foreignKeyName: "bill_lines_uom_fkey"

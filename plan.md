@@ -1,3 +1,50 @@
+# Combined contractor bills `[Opus planned 2026-10-28; the founder said go the same day; 5 not yet answered]`
+
+**The founder's ask** (2026-10-28): "we consolidate … one contractor one company multiple line items instead of million bills". Settled the same day: **by company, by contractor**; **material bills stay separate**; **contractors' bills only for now**.
+
+**What staging shows** (2026-10-28): 87 bills, every one a labour bill (55 NMR, 31 PW), no work orders yet; every bill names one villa in its header. Kashinath Roy got 22 EF bills and 2 ED bills that morning — one per villa per muster entry, P24 five times — each spending a number (KASH-NMR-EF-07 … 28). The cause: New bill's labour form takes one villa, and a line has no villa of its own, so one bill per villa was the only way to keep each villa's cost right. Send to Bill already spans villas, but refuses a second project, and its daily wages sum every villa into one line per trade, losing the villa.
+
+## The shape
+
+- **A contractor's bill is one contractor, one company, PW or NMR**: the number is unchanged (`0164`), still counted per contractor per company.
+- **Each line names its villa**: `bill_lines.project_id`, `plot_id`, `unit_id`, any project of the bill's company. **Null means the bill's own**, so every existing bill, and every material bill, reads exactly as now.
+- **The header keeps one main project**: the one picked, which decides the company and so the number. When the lines span villas, it names no villa (scope `GEN`); one villa, it names it, as today. Not dropping the header project is deliberate: payments, the contractor ledger, cash requests, advances and the lists all read it (~15 files), and a bill across two projects is rare (one contractor of 87 bills). The cost, stated: where a screen or report splits **by project** (Bills list, Payments, Contractors' project filter, "this project's advance first", Financial Management through `bill_money_facts`), a two-project bill sits under its main project. **By company everything is exact, and villa costs are exact per line.**
+- **On screen and in print, lines group by villa**, each with a subtotal; with more than one project, each villa's name carries its project's.
+- **Unchanged**: material bills, muster rolls paid directly (no contractor), work-order bills — a line villa other than the bill's own is refused on them.
+
+## Migration `0166_bill_lines_villa.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
+
+1. `bill_lines` gains `project_id`, `plot_id`, `unit_id` (FKs; not plot and unit both; indexed).
+2. `bill_lines_guard` grows: a line with a villa fills its project from the plot or unit; the project must be in the header project's company ("That project is another company's — a contractor's bill is for one company"); the plot or unit must be in that project; a line from a labour log takes the log's villa. On a bill that is not a contractor's labour bill (`kind = 'nmr'` with an `is_contractor` vendor), a villa other than the header's is refused. It reads `projects`, `plots`, `units`, `vendors` as the person saving (BUGCATCHER #19): the trial runs as the billing team.
+3. `send_labour_logs_to_bill`: entries from **several projects of one company** go on one bill ("A bill is for one company — tick entries of one company's projects"); with a work order picked, still one project. The header's project is the one with the most entries. **Daily wages put one line per trade per villa**, each line naming its villa. Piece-work lines name their log's villa.
+4. `villa_cost_facts`, re-created with identical columns: a billed line's villa is the log's, else **the line's**, else the header's, else the indent's.
+5. No backfill: null already means the bill's own. The one existing two-villa daily-wages bill stays as it is (its villas were summed away when it was made).
+
+No new view or function, so no new revokes; `bill_lines`' policies already cover the new columns.
+
+## Steps — one pull request each, vetted on staging
+
+- [x] `[Opus]` **1. The database.** Reviewed independently by Opus (three fixes, trials 7–9); on staging. `0166` as above; `scripts/trials/bill-lines-villa.sql` run as the billing team (a three-villa EF bill passes; an ED line on it is refused; a material bill's line villa is refused; Send to Bill across Saarang - Villas and Mobilisation makes one bill); `npm run db:types:staging`; independent Opus review; apply to staging.
+- [x] `[Opus built]` **2. New bill and the bill page.** `lib/bills/lines.ts`: the draft carries `projectId`, `plotId`, `unitId`; pure `groupLinesByVilla` (subtotals to the paisa) with tests. `line-actions.ts` writes them; for a contractor's labour bill the header villa is the lines' one villa, or none. `bill-form.tsx`: for a contractor, the villa moves from the header to **each line** — a villa picker per line over the company's projects, grouped by project, starting at the line above's; the header shows the company and the next number as now. `bill-lines-panel` / `bill-lines-table`: the villa column while recorded, grouped with subtotals once not. `bill-document.tsx`: grouped by villa with subtotals; the subtitle names the projects. Opened on a phone width.
+- [x] `[Opus built]` **3. Send to Bill.** `labour-billing.ts`: one company, not one project (unless a work order is picked), tested. `send-to-bill.tsx`: filter by company, tick across its projects, the summary naming the projects and "a line per trade for each villa", the next number by company; a work order picked and then outgrown by a second project's entries is said to be dropped.
+- [x] `[Opus built]` **4. Lists, Turing, docs.** The Bills list's project reads "Saarang - Villas and 1 more" for a bill reaching another project (the list has no villa column; the bill page says "4 villas"). Turing's bill runner (`lib/turing/runners/bills.ts`) and its line fields carry the villa. Bills `PLAN.md` gains rule 13 and drops this section's story; STATUS, TODO.
+- [ ] `[Opus]` **Independent review** of the full diff against this plan, SECURITY.md and BUGCATCHER.md before each merge to staging.
+
+**Optional — the founder decides:** **5. Combine recorded bills.** Tick a contractor's recorded bills of one company and one kind → one bill with all their lines, each keeping its villa; the oldest bill's number is kept and the others are deleted (their numbers stay spent, as any deleted bill's does). An approved bill is sent back first.
+
+## Not in this build
+
+- Material bills (separate by the founder's word).
+- A bill across several work orders: no work orders exist yet.
+- Splitting a two-project bill's payments between projects.
+
+## The founder's checklist on staging
+
+1. Bills → New bill → labour, Kashinath Roy, Saarang - Villas, NMR: Helpers 2 man-days on P14, Masons 1 on P24, Helpers 4 on P25 → **one** bill, KASH-NMR-EF-29 (or the next); the page and the print show P14, P24 and P25, each with its subtotal.
+2. On the same bill add a line on Saarang - Mobilisation: taken. Add one on Saarang - Infrastructure: refused, it is Developments (ED).
+3. Bills → Labour: tick one contractor's daily wages across several EF villas → one bill, a line per trade per villa.
+4. A material bill: records exactly as before, no villa per line.
+
 # Contractor bill numbers `[Opus planned and built 2026-10-27; the founder chose the counting and the code]`
 
 **The founder's ask** (2026-10-27): a contractor's bill numbers itself as `<four letters of the name>-<PW or NMR>-<ED, EF or EP>-<number>`, continuing from the last numbers in their contractors sheet (one tab per company), the codes kept in Masters. Settled the same day: **one count per contractor per company**, shared by PW and NMR; **one code per contractor everywhere** (the sheet's per-company codes are not kept).

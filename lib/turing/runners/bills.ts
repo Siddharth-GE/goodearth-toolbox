@@ -49,7 +49,10 @@ type Draft = {
   discountAmount: number | null;
   otherCharges: number | null;
   note: string | null;
+  villa: { projectId: string | null; plotId: string | null; unitId: string | null };
 };
+
+const NO_VILLA: Draft["villa"] = { projectId: null, plotId: null, unitId: null };
 
 const text = (values: Values, key: string) =>
   typeof values[key] === "string" && values[key] ? String(values[key]) : null;
@@ -63,6 +66,22 @@ const money = (row: Values) => ({
   otherCharges: numberOf(row, "other_charges"),
   note: text(row, "line_note"),
 });
+
+/** A line's own villa on a contractor's bill (0166): the plot, as its unit when it has one, in the plot's project. */
+async function villaOfPlot(plotId: string | null): Promise<Draft["villa"] | { error: string }> {
+  if (!plotId) return NO_VILLA;
+  const plot = await recordNow(
+    "plots",
+    { column: "id", id: plotId },
+    ["project_id"],
+    "That villa is gone.",
+  );
+  if ("error" in plot) return plot;
+  const projectId = String(plot.row.project_id);
+  const site = await siteOf(projectId, plotId);
+  if ("error" in site) return site;
+  return { projectId, ...site };
+}
 
 const twice = (ids: string[], what: string): Refusal =>
   new Set(ids).size < ids.length ? { error: `One ${what} is named twice; give it one row.` } : null;
@@ -107,9 +126,12 @@ type LineRow = {
   discount_amount: number | null;
   other_charges: number | null;
   note: string | null;
+  project_id: string | null;
+  plot_id: string | null;
+  unit_id: string | null;
 };
 const LINE_COLUMNS =
-  "id, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note";
+  "id, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note, project_id, plot_id, unit_id";
 
 const draftOf = (line: LineRow): Draft & { id: string } => ({
   id: line.id,
@@ -128,6 +150,7 @@ const draftOf = (line: LineRow): Draft & { id: string } => ({
   discountAmount: line.discount_amount,
   otherCharges: line.other_charges,
   note: line.note,
+  villa: { projectId: line.project_id, plotId: line.plot_id, unitId: line.unit_id },
 });
 
 export const BILL_RUNNERS: Runners<Key> = {
@@ -206,6 +229,7 @@ export const BILL_RUNNERS: Runners<Key> = {
                 : (item?.name ?? "A material"),
               uom: line.uom,
               ...money(row),
+              villa: NO_VILLA,
             };
           }),
         }),
@@ -277,6 +301,7 @@ export const BILL_RUNNERS: Runners<Key> = {
               description: one.description,
               uom: one.is_lump_sum ? null : one.uom,
               ...money(row),
+              villa: NO_VILLA,
               quantity: one.is_lump_sum ? null : numberOf(row, "quantity"),
             };
           }),
@@ -289,9 +314,16 @@ export const BILL_RUNNERS: Runners<Key> = {
       const projectId = String(header.project_id);
       const site = await siteOf(projectId, text(header, "plot_id"));
       if ("error" in site) return site;
-      const lines: Draft[] = rows.map((row) => {
+      const villas: Draft["villa"][] = [];
+      for (const row of rows) {
+        const villa = await villaOfPlot(text(row, "line_plot_id"));
+        if ("error" in villa) return villa;
+        villas.push(villa);
+      }
+      const lines: Draft[] = rows.map((row, index) => {
         const kind = lineKindOfNmr(String(row.description));
         return {
+          villa: villas[index],
           kind,
           poLineId: null,
           itemId: null,
