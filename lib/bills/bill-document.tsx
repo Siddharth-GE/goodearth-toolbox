@@ -17,6 +17,7 @@ import type { BillLineRow } from "./line-queries";
 import { billLineMoney, rollUpBill, summaryRows } from "./math";
 import type { BillSettlement } from "./payment-queries";
 import type { BillDetail } from "./queries";
+import { groupByVilla, villaLabel, villaOfLine, type LineVillas } from "./villas";
 
 // A bill not yet approved prints with the DRAFT watermark. Digits only: Helvetica has no ₹ glyph.
 
@@ -25,6 +26,8 @@ export type BillPdfData = {
   lines: BillLineRow[];
   settlement: BillSettlement;
   company: LetterheadCompany | null;
+  /** A contractor's bill: its lines print by villa, each with its subtotal (0166). */
+  villas: LineVillas | null;
 };
 
 const styles = StyleSheet.create({
@@ -43,6 +46,13 @@ const styles = StyleSheet.create({
   },
   grandLabel: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
   grandValue: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
+  villaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 3,
+  },
+  villaLabel: { fontFamily: pdf.fontBold, fontSize: pdf.size.body },
 });
 
 const moneyOf = (line: BillLineRow) =>
@@ -98,7 +108,14 @@ const KIND_LABEL: Record<BillDetail["kind"], string> = {
 };
 
 export function BillDocument({ data }: { data: BillPdfData }) {
-  const { bill, lines, settlement } = data;
+  const { bill, lines, settlement, villas } = data;
+  const groups = villas
+    ? groupByVilla(
+        lines,
+        (line) => villaOfLine(line.villa, villas.bill),
+        (line) => moneyOf(line)?.total ?? 0,
+      )
+    : [];
   const isDraft = bill.status === "recorded";
   const party =
     (bill.vendor_name ?? "Direct labour") +
@@ -138,9 +155,11 @@ export function BillDocument({ data }: { data: BillPdfData }) {
       <DocumentPage meta={meta}>
         <DocumentHeading
           title={`${bill.reference} — ${party}`}
-          subtitle={[bill.project_name, bill.scope_name ?? "General", KIND_LABEL[bill.kind]].join(
-            " · ",
-          )}
+          subtitle={[
+            bill.project_name,
+            groups.length > 1 ? `${groups.length} villas` : (bill.scope_name ?? "General"),
+            KIND_LABEL[bill.kind],
+          ].join(" · ")}
         />
 
         <MetaBlock
@@ -170,7 +189,19 @@ export function BillDocument({ data }: { data: BillPdfData }) {
           <>
             <SectionLabel>Lines</SectionLabel>
             <Text style={styles.currencyNote}>All amounts in Indian Rupees.</Text>
-            <DocumentTable columns={columns} rows={lines} />
+            {villas && groups.length > 1 ? (
+              groups.map((group) => (
+                <View key={group.key}>
+                  <View style={styles.villaRow} minPresenceAhead={40}>
+                    <Text style={styles.villaLabel}>{villaLabel(group.villa, villas)}</Text>
+                    <Text style={styles.villaLabel}>{formatAmount(group.total)}</Text>
+                  </View>
+                  <DocumentTable columns={columns} rows={group.lines} />
+                </View>
+              ))
+            ) : (
+              <DocumentTable columns={columns} rows={lines} />
+            )}
           </>
         )}
 

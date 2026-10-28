@@ -22,6 +22,7 @@ import {
 import { rollUpBill } from "@/lib/bills/math";
 import type { BillFormOptions } from "@/lib/bills/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
+import { NO_VILLA, companyVillas, hasVilla, type LineVillas } from "@/lib/bills/villas";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
@@ -161,6 +162,28 @@ export function BillForm({
   );
   const missingScopeCode = kind === "nmr" && scope !== "" && scopeCode === null;
 
+  // A contractor's labour bill is for the whole company: each line names its villa, the header none of its own (0166).
+  const contractorBill = kind === "nmr" && nmrVendorId in options.numbering.codes;
+  const lineVillas: LineVillas | undefined = useMemo(
+    () =>
+      contractorBill && projectId
+        ? {
+            ...companyVillas(
+              projectId,
+              options.projects.map((candidate) => ({
+                ...candidate,
+                company_id: options.numbering.companies[candidate.id]?.id ?? null,
+              })),
+              options.units,
+              options.plots,
+            ),
+            bill: NO_VILLA,
+          }
+        : undefined,
+    [contractorBill, projectId, options.projects, options.numbering, options.units, options.plots],
+  );
+  const companyName = projectId ? options.numbering.companies[projectId]?.name : undefined;
+
   const drafts = draftsOf(lines);
   const totals = rollUpBill(drafts.map(lineMoneyOf));
   const overBilled = anchorId !== "" && exceedsAnchor(anchorTotal, alreadyBilled, totals.total);
@@ -191,7 +214,11 @@ export function BillForm({
           ? "Choose the purchase order."
           : "Choose the work order."
         : undefined) ?? (nextBill && "problem" in nextBill ? nextBill.problem : undefined);
-  const linesProblem = billLinesProblem(drafts);
+  const linesProblem =
+    billLinesProblem(drafts) ??
+    (lineVillas && drafts.some((draft) => !hasVilla(draft.villa))
+      ? "Choose the villa on every line."
+      : undefined);
   const blocked =
     problem ??
     (!invoiceNo.trim() && !numbered
@@ -209,12 +236,12 @@ export function BillForm({
         labourContractId: kind === "contract" ? anchorId : null,
         vendorId: kind === "nmr" ? nmrVendorId || null : null,
         projectId: kind === "nmr" ? projectId : null,
-        plotId: kind === "nmr" ? plotId : null,
-        unitId: kind === "nmr" ? unitId : null,
+        plotId: kind === "nmr" && !lineVillas ? plotId : null,
+        unitId: kind === "nmr" && !lineVillas ? unitId : null,
         invoiceNo,
         invoiceDate,
         note: note || null,
-        lines: drafts,
+        lines: lineVillas ? drafts : drafts.map((draft) => ({ ...draft, villa: NO_VILLA })),
       }),
     );
 
@@ -329,6 +356,12 @@ export function BillForm({
                   onChange={(event) => {
                     setProjectId(event.target.value);
                     setScope("");
+                    setLines((current) =>
+                      current.map((line) => ({
+                        ...line,
+                        draft: { ...line.draft, villa: NO_VILLA },
+                      })),
+                    );
                   }}
                 >
                   <option value="" disabled>
@@ -342,18 +375,27 @@ export function BillForm({
                   ))}
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bill-nmr-scope">For</Label>
-                <SitePicker
-                  id="bill-nmr-scope"
-                  value={scope}
-                  onChange={(event) => setScope(event.target.value)}
-                  disabled={!projectId}
-                  options={nmrSiteOptions}
-                  generalLabel="General — whole project"
-                  showCodes
-                />
-              </div>
+              {lineVillas ? (
+                <div className="space-y-1.5">
+                  <p className="text-muted text-xs font-medium">For</p>
+                  <p className="text-foreground text-sm">
+                    {`Each line picks its villa — any of ${companyName ?? "this company"}'s projects, on one bill.`}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="bill-nmr-scope">For</Label>
+                  <SitePicker
+                    id="bill-nmr-scope"
+                    value={scope}
+                    onChange={(event) => setScope(event.target.value)}
+                    disabled={!projectId}
+                    options={nmrSiteOptions}
+                    generalLabel="General — whole project"
+                    showCodes
+                  />
+                </div>
+              )}
             </div>
             {missingProjectCode && (
               <p className="text-warning text-xs font-medium" role="alert">
@@ -445,6 +487,7 @@ export function BillForm({
             poLines={prefill.poLines}
             workLines={prefill.workLines}
             allowOther={kind !== "po"}
+            villas={lineVillas}
           />
           {overBilled && anchorTotal !== null && (
             <p className="text-warning text-xs font-medium" role="alert">

@@ -22,6 +22,14 @@ import {
   type WorkOrderLineForBill,
 } from "@/lib/bills/lines";
 import { billLineMoney, rollUpBill, summaryRows } from "@/lib/bills/math";
+import {
+  NO_VILLA,
+  groupByVilla,
+  villaFromValue,
+  villaOfLine,
+  villaValue,
+  type LineVillas,
+} from "@/lib/bills/villas";
 import type { DocumentCharges } from "@/lib/line-money";
 import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatMoney } from "@/lib/format";
@@ -86,6 +94,7 @@ const blankOther = (): BillLineDraft => ({
   discountAmount: null,
   otherCharges: null,
   note: null,
+  villa: NO_VILLA,
 });
 
 export function BillLinesEditor({
@@ -98,6 +107,7 @@ export function BillLinesEditor({
   allowOther,
   lockedQuantities = false,
   charges,
+  villas,
 }: {
   lines: EditorLine[];
   onChange: (lines: EditorLine[]) => void;
@@ -111,6 +121,8 @@ export function BillLinesEditor({
   lockedQuantities?: boolean;
   /** The bill's additional charges, so the preview matches what the header will store. */
   charges?: DocumentCharges;
+  /** A contractor's labour bill: each line picks its villa from the company's projects (0166). */
+  villas?: LineVillas;
 }) {
   const drafts = draftsOf(lines);
   const totals = rollUpBill(drafts.map(lineMoneyOf), charges);
@@ -125,6 +137,22 @@ export function BillLinesEditor({
   const onBill = new Set(
     lines.flatMap((line) => (line.draft.poLineId ? [line.draft.poLineId] : [])),
   );
+  const villaOf = (line: EditorLine) =>
+    villas ? villaValue(villaOfLine(line.draft.villa, villas.bill), villas.unitOfPlot) : "";
+  const villaLabel = (value: string) =>
+    villas?.choices.find((choice) => choice.value === value)?.label ?? "Villa not chosen";
+  const projectsOffered = villas
+    ? [...new Map(villas.choices.map((choice) => [choice.projectId, choice.projectName]))]
+    : [];
+  const byVilla = villas
+    ? groupByVilla(
+        lines.map((line, index) => ({ value: villaOf(line), draft: drafts[index] })),
+        (line) => ({ projectId: line.value, plotId: null, unitId: null }),
+        (line) => billLineMoney(lineMoneyOf(line.draft))?.total ?? 0,
+      )
+    : [];
+  const lastVilla = lines.at(-1)?.draft.villa ?? NO_VILLA;
+
   const poToAdd = (poLines ?? []).filter(
     (line) => !onBill.has(line.po_line_id) && leftToBill(line) > 0,
   );
@@ -164,6 +192,38 @@ export function BillLinesEditor({
                       aria-label="Description"
                     />
                   )}
+                  {villas &&
+                    (lockedQuantities || line.draft.labourLogId ? (
+                      <p className="text-foreground text-xs font-medium">
+                        {villaLabel(villaOf(line))}
+                      </p>
+                    ) : (
+                      <Select
+                        value={villaOf(line)}
+                        onChange={(event) =>
+                          updateDraft(line, {
+                            villa: villaFromValue(event.target.value, villas.choices),
+                          })
+                        }
+                        className="h-8 px-2 text-xs"
+                        aria-label="Villa"
+                      >
+                        <option value="" disabled>
+                          Choose the villa
+                        </option>
+                        {projectsOffered.map(([projectId, projectName]) => (
+                          <optgroup key={projectId} label={projectName}>
+                            {villas.choices
+                              .filter((choice) => choice.projectId === projectId)
+                              .map((choice) => (
+                                <option key={choice.value} value={choice.value}>
+                                  {choice.label}
+                                </option>
+                              ))}
+                          </optgroup>
+                        ))}
+                      </Select>
+                    ))}
                   <p className="text-muted text-xs">{KIND_LABEL[line.draft.kind]}</p>
                 </TableCell>
                 <TableCell className="px-3">
@@ -316,7 +376,9 @@ export function BillLinesEditor({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => onChange([...lines, toEditorLine(blankOther())])}
+                onClick={() =>
+                  onChange([...lines, toEditorLine({ ...blankOther(), villa: lastVilla })])
+                }
               >
                 <Plus className="size-4" />
                 Add a line
@@ -330,21 +392,35 @@ export function BillLinesEditor({
           </p>
         )}
 
-        <div className="border-border bg-surface w-full max-w-xs space-y-1 rounded-2xl border p-4">
-          {summaryRows(totals).map((row) => (
-            <Total key={row.label} label={row.label} value={row.amount} />
-          ))}
-          <div className="border-border flex items-center justify-between border-t pt-2">
-            <span className="text-foreground text-sm font-semibold">Total</span>
-            <span className="text-foreground text-sm font-semibold tabular-nums">
-              {formatMoney(totals.total, { paise: true })}
-            </span>
-          </div>
-          {totals.unpricedCount > 0 && (
-            <p className="text-warning text-xs font-medium">
-              {`${formatCount(totals.unpricedCount)} ${totals.unpricedCount === 1 ? "line has" : "lines have"} no rate yet.`}
-            </p>
+        <div className="flex w-full max-w-xs flex-col gap-3">
+          {byVilla.length > 1 && (
+            <div className="border-border bg-surface space-y-1 rounded-2xl border p-4">
+              <p className="text-muted text-xs font-medium">By villa</p>
+              {byVilla.map((group) => (
+                <Total
+                  key={group.key}
+                  label={villaLabel(group.villa.projectId ?? "")}
+                  value={group.total}
+                />
+              ))}
+            </div>
           )}
+          <div className="border-border bg-surface space-y-1 rounded-2xl border p-4">
+            {summaryRows(totals).map((row) => (
+              <Total key={row.label} label={row.label} value={row.amount} />
+            ))}
+            <div className="border-border flex items-center justify-between border-t pt-2">
+              <span className="text-foreground text-sm font-semibold">Total</span>
+              <span className="text-foreground text-sm font-semibold tabular-nums">
+                {formatMoney(totals.total, { paise: true })}
+              </span>
+            </div>
+            {totals.unpricedCount > 0 && (
+              <p className="text-warning text-xs font-medium">
+                {`${formatCount(totals.unpricedCount)} ${totals.unpricedCount === 1 ? "line has" : "lines have"} no rate yet.`}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

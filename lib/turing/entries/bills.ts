@@ -96,7 +96,7 @@ export const BILLS = defineEntries([
     key: "bill_nmr",
     tool: "/bills",
     title: "A daily-wages (NMR) bill",
-    description: `Records a muster roll not logged on site: for a project, or one villa of it, from a contractor (vendor_id) or paid directly (left out). One row per line: a trade's man-days, described exactly as one of "${TRADES.join('", "')}", or any other line (with its unit if it has one). GST % is 0 if left out. Labour logged on site goes through labour_to_bill instead. ${PAPER}`,
+    description: `Records a muster roll not logged on site: for a project, or one villa of it, from a contractor (vendor_id) or paid directly (left out). One row per line: a trade's man-days, described exactly as one of "${TRADES.join('", "')}", or any other line (with its unit if it has one). A contractor's bill is one bill for the whole company: give each row its own villa (line_plot_id, any villa of the project's company) and leave the header villa out. GST % is 0 if left out. Labour logged on site goes through labour_to_bill instead. ${PAPER}`,
     adds: true,
     lines: { noun: "Bill" },
     fields: [
@@ -114,6 +114,7 @@ export const BILLS = defineEntries([
       { ...invoiceDate, header: true },
       { ...note, header: true },
       { key: "description", label: "Line", kind: "text", max: 300 },
+      { key: "line_plot_id", label: "Line's villa", kind: "id", table: "plots", optional: true },
       quantity,
       { key: "uom", label: "Unit", kind: "text", optional: true, max: 40 },
       rate,

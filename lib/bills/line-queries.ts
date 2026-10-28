@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { BillLineKind, DayRates, PoLineForBill, WorkOrderLineForBill } from "./lines";
 import { dayRatesFromLines } from "./lines";
+import type { LineVilla } from "./villas";
 
 // The PO side comes only through po_line_billing_facts (money window gated to /purchase-orders or /bills); the billing team cannot read the PO tables (Bills PLAN).
 
@@ -27,6 +28,8 @@ export type BillLineRow = {
   discount_amount: number | null;
   other_charges: number | null;
   note: string | null;
+  /** The line's own villa (0166); none is the bill's. */
+  villa: LineVilla;
 };
 
 export async function getBillLines(billId: string): Promise<BillLineRow[]> {
@@ -37,7 +40,7 @@ export async function getBillLines(billId: string): Promise<BillLineRow[]> {
       supabase
         .from("bill_lines")
         .select(
-          "id, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note",
+          "id, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id, description, uom, quantity, rate, gst_pct, discount_amount, other_charges, note, project_id, plot_id, unit_id",
         )
         .eq("bill_id", billId)
         .order("sort_order")
@@ -65,6 +68,7 @@ export async function getBillLines(billId: string): Promise<BillLineRow[]> {
     discount_amount: line.discount_amount,
     other_charges: line.other_charges,
     note: line.note,
+    villa: { projectId: line.project_id, plotId: line.plot_id, unitId: line.unit_id },
   }));
 }
 

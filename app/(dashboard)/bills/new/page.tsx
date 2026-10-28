@@ -11,6 +11,7 @@ import {
   type BillLineDraft,
 } from "@/lib/bills/lines";
 import { getBillFormOptions } from "@/lib/bills/queries";
+import { NO_VILLA } from "@/lib/bills/villas";
 import { idParam } from "@/lib/list-params";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { listActiveUomNames } from "@/lib/masters/uoms";
@@ -31,6 +32,7 @@ const NMR_START: BillLineDraft = {
   discountAmount: null,
   otherCharges: null,
   note: null,
+  villa: NO_VILLA,
 };
 
 export default async function NewBillPage({

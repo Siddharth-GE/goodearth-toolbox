@@ -1,4 +1,4 @@
-# Combined contractor bills `[Opus planned 2026-10-28; waiting for the founder's approval]`
+# Combined contractor bills `[Opus planned 2026-10-28; the founder said go the same day; 5 not yet answered]`
 
 **The founder's ask** (2026-10-28): "we consolidate … one contractor one company multiple line items instead of million bills". Settled the same day: **by company, by contractor**; **material bills stay separate**; **contractors' bills only for now**.
 
@@ -8,7 +8,7 @@
 
 - **A contractor's bill is one contractor, one company, PW or NMR**: the number is unchanged (`0164`), still counted per contractor per company.
 - **Each line names its villa**: `bill_lines.project_id`, `plot_id`, `unit_id`, any project of the bill's company. **Null means the bill's own**, so every existing bill, and every material bill, reads exactly as now.
-- **The header keeps one main project**: the one picked, which decides the company and so the number. When the lines span villas, it names no villa (scope `GEN`); one villa, it names it, as today. Not dropping the header project is deliberate: payments, the contractor ledger, cash requests, advances and the lists all read it (~15 files), and a bill across two projects is rare (one contractor of 87 bills). The cost, stated: where a screen filters **by project** (Bills list, Payments, Contractors' project filter, "this project's advance first"), a two-project bill sits under its main project. **By company everything is exact, and villa costs are exact per line.**
+- **The header keeps one main project**: the one picked, which decides the company and so the number. When the lines span villas, it names no villa (scope `GEN`); one villa, it names it, as today. Not dropping the header project is deliberate: payments, the contractor ledger, cash requests, advances and the lists all read it (~15 files), and a bill across two projects is rare (one contractor of 87 bills). The cost, stated: where a screen or report splits **by project** (Bills list, Payments, Contractors' project filter, "this project's advance first", Financial Management through `bill_money_facts`), a two-project bill sits under its main project. **By company everything is exact, and villa costs are exact per line.**
 - **On screen and in print, lines group by villa**, each with a subtotal; with more than one project, under a project heading.
 - **Unchanged**: material bills, muster rolls paid directly (no contractor), work-order bills — a line villa other than the bill's own is refused on them.
 

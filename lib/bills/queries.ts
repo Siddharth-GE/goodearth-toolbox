@@ -13,6 +13,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
+import { companyVillas, type LineVillas } from "./villas";
 import type { BillKind, BillStatus } from "./workflow";
 
 // Reads masters and the money-free PO views directly under the /bills grant, never another tool's queries. Bill money lives on the bills table, whose RLS needs this grant.
@@ -206,6 +207,8 @@ export type BillDetail = {
   villa_unit_id: string | null;
   kind: BillKind;
   project_id: string;
+  plot_id: string | null;
+  unit_id: string | null;
   project_name: string;
   scope_name: string | null;
   scope_code: string;
@@ -213,6 +216,7 @@ export type BillDetail = {
   vendor_name: string | null;
   /** CON/012 for a contractor (0156). */
   vendor_contractor_no: string | null;
+  vendor_is_contractor: boolean;
   /** This bill's place in its vendor's own run of bills: their 4th is 4 (0156). */
   vendor_seq: number | null;
   po_id: string | null;
@@ -250,7 +254,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const { data: bill, error: billError } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, kind, project_id, plot_id, unit_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, vendor_seq, projects(name), plots(name), units(name), vendors(name, contractor_no), labour_contracts(description, reference)",
+      "id, reference, status, kind, project_id, plot_id, unit_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, vendor_seq, projects(name), plots(name), units(name), vendors(name, contractor_no, is_contractor), labour_contracts(description, reference)",
     )
     .eq("id", billId)
     .maybeSingle();
@@ -301,6 +305,8 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     villa_unit_id: villaUnitId,
     kind: bill.kind as BillKind,
     project_id: bill.project_id,
+    plot_id: bill.plot_id,
+    unit_id: bill.unit_id,
     project_name: (bill.projects as { name: string } | null)?.name ?? "—",
     scope_name:
       (bill.units as { name: string } | null)?.name ??
@@ -311,6 +317,8 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     vendor_name: (bill.vendors as { name: string } | null)?.name ?? null,
     vendor_contractor_no:
       (bill.vendors as { contractor_no: string | null } | null)?.contractor_no ?? null,
+    vendor_is_contractor:
+      (bill.vendors as { is_contractor: boolean } | null)?.is_contractor ?? false,
     vendor_seq: bill.vendor_seq,
     po_id: bill.po_id,
     po_reference: poFact?.reference ?? null,
@@ -619,5 +627,19 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       code,
     })),
     numbering,
+  };
+}
+
+/** A contractor's labour bill: the villas its lines may name, every project of its company (0166). Null for any
+ * other bill, whose lines stay on its own villa. */
+export async function getBillVillas(
+  bill: Pick<BillDetail, "kind" | "vendor_is_contractor" | "project_id" | "plot_id" | "unit_id">,
+): Promise<LineVillas | null> {
+  await requireTool("/bills");
+  if (bill.kind !== "nmr" || !bill.vendor_is_contractor) return null;
+  const [projects, plots, units] = await Promise.all([listProjects(), listPlots(), listUnits()]);
+  return {
+    ...companyVillas(bill.project_id, projects, units, plots),
+    bill: { projectId: bill.project_id, plotId: bill.plot_id, unitId: bill.unit_id },
   };
 }

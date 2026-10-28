@@ -3,6 +3,7 @@
 
 import type { BillLineMoney } from "./math";
 import { roundPaise } from "@/lib/line-money";
+import { NO_VILLA, type LineVilla } from "./villas";
 
 export const BILL_LINE_KINDS = ["material", "nmr", "pw_qty", "pw_lump", "other"] as const;
 export type BillLineKind = (typeof BILL_LINE_KINDS)[number];
@@ -24,6 +25,8 @@ export type BillLineDraft = {
   discountAmount: number | null;
   otherCharges: number | null;
   note: string | null;
+  /** The line's own villa on a contractor's labour bill (0166); none is the bill's. */
+  villa: LineVilla;
 };
 
 export const lineMoneyOf = (line: BillLineDraft): BillLineMoney => ({
@@ -129,6 +132,7 @@ export function linesFromPo(poLines: PoLineForBill[]): BillLineDraft[] {
         discountAmount: discount || null,
         otherCharges: line.other_charges ? roundPaise(line.other_charges * share) : null,
         note: null,
+        villa: NO_VILLA,
       };
     });
 }
@@ -177,6 +181,7 @@ export function linesFromWorkOrder(workLines: WorkOrderLineForBill[]): BillLineD
         discountAmount: null,
         otherCharges: null,
         note: null,
+        villa: NO_VILLA,
       };
     });
 }
