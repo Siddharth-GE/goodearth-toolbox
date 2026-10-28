@@ -31,8 +31,8 @@ async function readSigners(supabase: Client): Promise<BillSigners | null> {
 
 /** The boxes an approved bill prints; a draft prints none. A failed read prints a box unsigned rather than failing the PDF. */
 export async function getBillSignatureBoxes(bill: BillDetail): Promise<SignatureBox[] | null> {
-  if (bill.status === "recorded") return null;
   await requireTool("/bills");
+  if (bill.status === "recorded") return null;
   const supabase = await createClient();
 
   const boxes = signatureBoxes((await readSigners(supabase)) ?? NO_SIGNERS, bill.approved_by);
@@ -105,16 +105,19 @@ export async function getSignatureSettings(): Promise<SignatureSettings> {
     : { data: [], error: null };
   if (urlError) console.error("getSignatureSettings signed urls failed:", urlError);
   const urlOf = new Map((urls ?? []).map((one) => [one.path, one.signedUrl]));
-  const names = await profileNames(
-    supabase,
-    rows.map((row) => row.user_id),
+  // A signer since deactivated stays in the list, or the next Save would blank their box unseen.
+  const active = new Set(people.map((person) => person.id));
+  const gone = [signers.preparedBy, signers.checkedBy, signers.finalBy].filter(
+    (id): id is string => id != null && !active.has(id),
   );
+  const names = await profileNames(supabase, [...rows.map((row) => row.user_id), ...gone]);
 
   return {
     signers,
-    people: people
-      .map((person) => ({ id: person.id, name: person.full_name ?? "Unnamed" }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    people: [
+      ...people.map((person) => ({ id: person.id, name: person.full_name ?? "Unnamed" })),
+      ...[...new Set(gone)].map((id) => ({ id, name: `${names.get(id) ?? "Unnamed"} (inactive)` })),
+    ].sort((a, b) => a.name.localeCompare(b.name)),
     kept: rows
       .map((row) => ({
         userId: row.user_id,

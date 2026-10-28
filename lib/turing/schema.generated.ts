@@ -191,6 +191,26 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "bill_signatures": {
+    "kind": "table",
+    "columns": {
+      "path": "string",
+      "updated_at": "string",
+      "updated_by": "string | null",
+      "user_id": "string"
+    }
+  },
+  "bill_signers": {
+    "kind": "table",
+    "columns": {
+      "checked_by": "string | null",
+      "final_by": "string | null",
+      "id": "boolean",
+      "prepared_by": "string | null",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "bill_vendor_counters": {
     "kind": "table",
     "columns": {

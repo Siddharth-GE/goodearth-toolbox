@@ -579,6 +579,98 @@ export type Database = {
           },
         ]
       }
+      bill_signatures: {
+        Row: {
+          path: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          path: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          path?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_signatures_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_signatures_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_signers: {
+        Row: {
+          checked_by: string | null
+          final_by: string | null
+          id: boolean
+          prepared_by: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          checked_by?: string | null
+          final_by?: string | null
+          id?: boolean
+          prepared_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          checked_by?: string | null
+          final_by?: string | null
+          id?: boolean
+          prepared_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_signers_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_signers_final_by_fkey"
+            columns: ["final_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_signers_prepared_by_fkey"
+            columns: ["prepared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_signers_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bill_vendor_counters: {
         Row: {
           last_seq: number
