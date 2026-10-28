@@ -354,19 +354,54 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
     return { error: "A bill against a purchase order lists the PO's materials." };
   }
 
-  // Lines that name their villas (a contractor's bill, 0166) decide the header's: their one shared villa, or none.
-  const site =
-    input.kind === "nmr" && input.projectId && input.lines.some((line) => line.villa.projectId)
-      ? headerVilla(
-          input.projectId,
-          input.lines.map((line) => line.villa),
-        )
-      : { plotId: input.plotId, unitId: input.unitId };
-
   const totals = rollUpBill(input.lines.map(lineMoneyOf));
   if (totals.total <= 0) return { error: "The bill's total must be more than zero." };
 
   const supabase = await createClient();
+
+  // Lines that name their villas (a contractor's bill, 0166) decide the header's: their one shared villa, or none. A
+  // line with none takes the villa asked for the bill. Checked before the mint, so a refusal never spends a number.
+  let lines = input.lines;
+  let site = { plotId: input.plotId, unitId: input.unitId };
+  if (input.kind === "nmr" && input.projectId && lines.some((line) => line.villa.projectId)) {
+    const projectIds = [
+      ...new Set([input.projectId, ...lines.flatMap((line) => line.villa.projectId ?? [])]),
+    ];
+    const [vendor, projects] = await Promise.all([
+      input.vendorId
+        ? supabase.from("vendors").select("is_contractor").eq("id", input.vendorId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("projects").select("id, company_id").in("id", projectIds),
+    ]);
+    if (vendor.error || projects.error) {
+      console.error("createBillWithLines villa check failed:", vendor.error ?? projects.error);
+      return { error: "Could not check the lines' villas. Try again." };
+    }
+    if (!vendor.data?.is_contractor) {
+      return { error: "Only a contractor's labour bill can put its lines on different villas." };
+    }
+    const companyOf = new Map((projects.data ?? []).map((row) => [row.id, row.company_id]));
+    const company = companyOf.get(input.projectId);
+    if (
+      projectIds.some((id) => id !== input.projectId && (!company || companyOf.get(id) !== company))
+    ) {
+      return {
+        error: "That project is another company's — a contractor's bill is for one company.",
+      };
+    }
+    lines = lines.map((line) =>
+      line.villa.projectId
+        ? line
+        : {
+            ...line,
+            villa: { projectId: input.projectId, plotId: input.plotId, unitId: input.unitId },
+          },
+    );
+    site = headerVilla(
+      input.projectId,
+      lines.map((line) => line.villa),
+    );
+  }
   if (input.kind === "po") {
     const capProblem = await receivedCheck(supabase, null, input.lines);
     if (capProblem) return { error: capProblem };
@@ -408,7 +443,7 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   const billId = minted.data as string;
 
   const { error } = await supabase.from("bill_lines").insert(
-    input.lines.map((line, index) => ({
+    lines.map((line, index) => ({
       ...row(billId, user.id, line, index),
       created_by: user.id,
     })),
@@ -416,9 +451,9 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   revalidatePath("/bills", "layout");
   if (error) {
     console.error("createBillWithLines lines failed:", error);
+    const said = guardError(error, "", LINE_GUARD_PHRASES)?.error;
     return {
-      error:
-        "The bill was recorded but its lines were refused — open it from the list, check the figures, or delete it and record it again.",
+      error: `The bill was recorded but its lines were refused${said ? ` (${said})` : ""} — open it from the list, check the figures, or delete it and record it again.`,
     };
   }
   redirect(`/bills/${billId}`);

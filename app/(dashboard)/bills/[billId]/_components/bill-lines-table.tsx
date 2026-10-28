@@ -8,7 +8,13 @@ import {
 } from "@/components/ui/table";
 import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLineMoney } from "@/lib/bills/math";
-import { groupByVilla, villaLabel, villaOfLine, type LineVillas } from "@/lib/bills/villas";
+import {
+  groupByVilla,
+  spansProjects,
+  villaLabel,
+  villaOfLine,
+  type LineVillas,
+} from "@/lib/bills/villas";
 import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";
 import { Fragment } from "react";
 
@@ -30,9 +36,14 @@ export function BillLinesTable({ lines, villas }: { lines: BillLineRow[]; villas
         (line) => moneyOf(line)?.total ?? 0,
       )
     : [];
+  const withProject = spansProjects(groups.map((group) => group.villa));
   const sections =
     villas && groups.length > 1
-      ? groups.map((group) => ({ key: group.key, label: villaLabel(group.villa, villas), group }))
+      ? groups.map((group) => ({
+          key: group.key,
+          label: villaLabel(group.villa, villas, withProject),
+          group,
+        }))
       : [{ key: "all", label: null, group: { lines, total: 0 } }];
 
   return (

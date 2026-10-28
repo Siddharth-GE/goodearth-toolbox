@@ -139,8 +139,8 @@ export function BillLinesEditor({
   );
   const villaOf = (line: EditorLine) =>
     villas ? villaValue(villaOfLine(line.draft.villa, villas.bill), villas.unitOfPlot) : "";
-  const villaLabel = (value: string) =>
-    villas?.choices.find((choice) => choice.value === value)?.label ?? "Villa not chosen";
+  const choiceOf = (value: string) => villas?.choices.find((choice) => choice.value === value);
+  const villaLabel = (value: string) => choiceOf(value)?.label ?? "Villa not chosen";
   const projectsOffered = villas
     ? [...new Map(villas.choices.map((choice) => [choice.projectId, choice.projectName]))]
     : [];
@@ -151,6 +151,9 @@ export function BillLinesEditor({
         (line) => billLineMoney(lineMoneyOf(line.draft))?.total ?? 0,
       )
     : [];
+  const byVillaProjects = new Set(
+    byVilla.map((group) => choiceOf(group.villa.projectId ?? "")?.projectId),
+  ).size;
   const lastVilla = lines.at(-1)?.draft.villa ?? NO_VILLA;
 
   const poToAdd = (poLines ?? []).filter(
@@ -399,7 +402,11 @@ export function BillLinesEditor({
               {byVilla.map((group) => (
                 <Total
                   key={group.key}
-                  label={villaLabel(group.villa.projectId ?? "")}
+                  label={
+                    byVillaProjects > 1 && !group.key.includes("project:")
+                      ? `${villaLabel(group.villa.projectId ?? "")} · ${choiceOf(group.villa.projectId ?? "")?.projectName ?? ""}`
+                      : villaLabel(group.villa.projectId ?? "")
+                  }
                   value={group.total}
                 />
               ))}

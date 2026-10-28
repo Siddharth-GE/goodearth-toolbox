@@ -6,8 +6,10 @@ import {
   companyVillas,
   groupByVilla,
   headerVilla,
+  spansProjects,
   villaChoices,
   villaFromValue,
+  villaLabel,
   villaOfLine,
   villaValue,
 } from "./villas";
@@ -125,4 +127,15 @@ test("a bill offers its own project first, then its company's others; a project 
     [...new Set(companyVillas("baveli", all, units, plots).choices.map((c) => c.projectId))],
     ["baveli"],
   );
+});
+
+test("a villa's name carries its project only when asked, never twice for a whole project", () => {
+  const offered = { choices: villaChoices(projects, units, plots), unitOfPlot: { p14: "u14" } };
+  const p14 = { projectId: "villas", plotId: "p14", unitId: null };
+  const mob = { projectId: "mob", plotId: null, unitId: null };
+  assert.equal(villaLabel(p14, offered), "Villa 14 (V14)");
+  assert.equal(villaLabel(p14, offered, true), "Villa 14 (V14) · Saarang - Villas");
+  assert.equal(villaLabel(mob, offered, true), "Whole project — Saarang - Mobilisation");
+  assert.equal(spansProjects([p14, mob]), true);
+  assert.equal(spansProjects([p14, p14]), false);
 });

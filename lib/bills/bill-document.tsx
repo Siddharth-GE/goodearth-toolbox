@@ -17,7 +17,7 @@ import type { BillLineRow } from "./line-queries";
 import { billLineMoney, rollUpBill, summaryRows } from "./math";
 import type { BillSettlement } from "./payment-queries";
 import type { BillDetail } from "./queries";
-import { groupByVilla, villaLabel, villaOfLine, type LineVillas } from "./villas";
+import { groupByVilla, spansProjects, villaLabel, villaOfLine, type LineVillas } from "./villas";
 
 // A bill not yet approved prints with the DRAFT watermark. Digits only: Helvetica has no ₹ glyph.
 
@@ -157,7 +157,11 @@ export function BillDocument({ data }: { data: BillPdfData }) {
           title={`${bill.reference} — ${party}`}
           subtitle={[
             bill.project_name,
-            groups.length > 1 ? `${groups.length} villas` : (bill.scope_name ?? "General"),
+            groups.length > 1
+              ? `${groups.length} villas`
+              : villas && groups.length === 1
+                ? villaLabel(groups[0].villa, villas)
+                : (bill.scope_name ?? "General"),
             KIND_LABEL[bill.kind],
           ].join(" · ")}
         />
@@ -193,7 +197,13 @@ export function BillDocument({ data }: { data: BillPdfData }) {
               groups.map((group) => (
                 <View key={group.key}>
                   <View style={styles.villaRow} minPresenceAhead={40}>
-                    <Text style={styles.villaLabel}>{villaLabel(group.villa, villas)}</Text>
+                    <Text style={styles.villaLabel}>
+                      {villaLabel(
+                        group.villa,
+                        villas,
+                        spansProjects(groups.map((one) => one.villa)),
+                      )}
+                    </Text>
                     <Text style={styles.villaLabel}>{formatAmount(group.total)}</Text>
                   </View>
                   <DocumentTable columns={columns} rows={group.lines} />

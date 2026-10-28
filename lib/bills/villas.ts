@@ -149,7 +149,21 @@ export function companyVillas(
   return { choices: villaChoices(sameCompany, units, plots), unitOfPlot };
 }
 
-/** A villa's name as its picker shows it. */
-export const villaLabel = (villa: LineVilla, villas: Omit<LineVillas, "bill">): string =>
-  villas.choices.find((choice) => choice.value === villaValue(villa, villas.unitOfPlot))?.label ??
-  "Villa";
+/** A villa's name as its picker shows it; with its project's when the bill reaches more than one project. */
+export function villaLabel(
+  villa: LineVilla,
+  villas: Omit<LineVillas, "bill">,
+  withProject = false,
+): string {
+  const choice = villas.choices.find(
+    (candidate) => candidate.value === villaValue(villa, villas.unitOfPlot),
+  );
+  if (!choice) return "Villa";
+  return withProject && !choice.value.startsWith("project:")
+    ? `${choice.label} · ${choice.projectName}`
+    : choice.label;
+}
+
+/** Whether these villas lie in more than one project, so their names need the project's. */
+export const spansProjects = (villas: LineVilla[]) =>
+  new Set(villas.map((villa) => villa.projectId)).size > 1;

@@ -5,7 +5,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { saveBillLines } from "@/lib/bills/line-actions";
 import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLinesProblem, type PoLineForBill, type WorkOrderLineForBill } from "@/lib/bills/lines";
-import { hasVilla, type LineVillas } from "@/lib/bills/villas";
+import type { LineVillas } from "@/lib/bills/villas";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import type { DocumentCharges } from "@/lib/line-money";
 import { useRouter } from "next/navigation";
@@ -68,12 +68,7 @@ export function BillLinesPanel({
   const { pending: saving, error, run } = useActionRunner();
 
   const drafts = draftsOf(editing);
-  const problem = editing.length
-    ? (billLinesProblem(drafts) ??
-      (villas && !hasVilla(villas.bill) && drafts.some((draft) => !hasVilla(draft.villa))
-        ? "Choose the villa on every line."
-        : undefined))
-    : undefined;
+  const problem = editing.length ? billLinesProblem(drafts) : undefined;
 
   return (
     <div className="space-y-3">

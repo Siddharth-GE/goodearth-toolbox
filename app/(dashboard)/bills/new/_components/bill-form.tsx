@@ -423,7 +423,11 @@ export function BillForm({
               <Select
                 id="bill-nmr-vendor"
                 value={nmrVendorId}
-                onChange={(event) => setNmrVendorId(event.target.value)}
+                onChange={(event) => {
+                  setNmrVendorId(event.target.value);
+                  // A contractor's lines name their villas, so a header villa picked before is let go.
+                  if (event.target.value in options.numbering.codes) setScope("");
+                }}
               >
                 <option value="">No contractor — paid directly</option>
                 {options.vendors.map((vendor) => (

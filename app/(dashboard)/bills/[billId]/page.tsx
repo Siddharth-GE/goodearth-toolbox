@@ -20,7 +20,7 @@ import {
   getOpenAdvances,
 } from "@/lib/bills/payment-queries";
 import { getBill, getBillVillas, getCurrentBillActor } from "@/lib/bills/queries";
-import { groupByVilla, villaOfLine } from "@/lib/bills/villas";
+import { groupByVilla, villaLabel, villaOfLine } from "@/lib/bills/villas";
 import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
@@ -65,14 +65,20 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       : Promise.resolve([]),
     getBillVillas(bill),
   ]);
-  // A contractor's bill across villas names how many instead of its header's one (0166).
-  const villaCount = villas
+  // A contractor's bill names the villa its lines are on, or how many (0166): lines can move off the header's.
+  const villaGroups = villas
     ? groupByVilla(
         lines,
         (line) => villaOfLine(line.villa, villas.bill),
         () => 0,
-      ).length
-    : 1;
+      )
+    : [];
+  const placeName =
+    villaGroups.length > 1
+      ? `${villaGroups.length} villas`
+      : villas && villaGroups.length === 1
+        ? villaLabel(villaGroups[0].villa, villas)
+        : (bill.scope_name ?? "General");
   const hasMoney = events.length > 0;
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
@@ -112,11 +118,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.vendor_contractor_no ? ` (${bill.vendor_contractor_no})` : ""}
             {bill.vendor_seq ? ` · their bill ${bill.vendor_seq}` : ""}
             {` · ${bill.project_name}`}
-            {villaCount > 1
-              ? ` · ${villaCount} villas`
-              : bill.scope_name
-                ? ` · ${bill.scope_name}`
-                : " · General"}
+            {` · ${placeName}`}
             {bill.kind === "nmr" ? " · Labour, no work order" : ""}
             {bill.po_reference ? ` · ${bill.po_reference}` : ""}
             {bill.contract_reference ? ` · ${bill.contract_reference}` : ""}

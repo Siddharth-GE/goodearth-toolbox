@@ -85,6 +85,11 @@ export function SendToBill({
         )
       : [];
   const workOrder = isDaily ? undefined : workOrders.find((order) => order.id === workOrderId);
+  // A work order picked for one project's entries no longer fits once another project's are ticked.
+  const droppedOrder =
+    !isDaily && !workOrder
+      ? options.workOrders.find((order) => order.id === workOrderId)
+      : undefined;
   const groupProblem = chosen.length
     ? entriesProblem(chosenEntries, Boolean(workOrder))
     : undefined;
@@ -335,7 +340,12 @@ export function SendToBill({
                   </option>
                 ))}
               </Select>
-              {!workOrder && (
+              {droppedOrder && (
+                <p className="text-warning text-xs font-medium" role="alert">
+                  {`${droppedOrder.reference ?? "The work order"} is for one project, and these entries reach more than one — they go as a direct labour bill at the rate book's rates. Tick one project's entries to bill against it.`}
+                </p>
+              )}
+              {!workOrder && !droppedOrder && (
                 <p className="text-muted text-xs">
                   No work order — billed as a direct labour bill. Rates come from the rate book.
                 </p>
