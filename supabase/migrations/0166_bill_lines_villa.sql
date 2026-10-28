@@ -87,6 +87,11 @@ begin
     select project_id into v_villa_project from plots where id = new.plot_id;
   end if;
   if v_villa_project is not null then
+    -- A villa moved without its project named takes the villa's.
+    if tg_op = 'UPDATE' and new.project_id is not distinct from old.project_id
+       and (new.plot_id, new.unit_id) is distinct from (old.plot_id, old.unit_id) then
+      new.project_id := v_villa_project;
+    end if;
     if new.project_id is not null and new.project_id <> v_villa_project then
       raise exception 'That villa is not in that project';
     end if;
@@ -322,7 +327,9 @@ begin
         case when r.kind = 'pw_qty' then r.quantity else null end,
         (p_rates -> r.id::text ->> 'rate')::numeric,
         coalesce((p_rates -> r.id::text ->> 'gst_pct')::numeric, 0),
-        r.villa_project_id, r.plot_id,
+        -- A work-order bill keeps its lines on the order's villa; costs read the log's villa first anyway.
+        case when p_labour_contract_id is null then r.villa_project_id end,
+        case when p_labour_contract_id is null then r.plot_id end,
         auth.uid(), auth.uid()
       );
     end loop;
@@ -416,8 +423,11 @@ wo_committed as (
     join labour_contracts lc on lc.id = l.contract_id and lc.status = 'approved' and lc.is_active
 ),
 billed as (
+  -- The header's villa only for a line on the header's project: a whole-project line elsewhere is on no villa.
   select coalesce(ll.plot_id, bl.plot_id, (select u.plot_id from units u where u.id = bl.unit_id),
-                  b.plot_id, (select u.plot_id from units u where u.id = b.unit_id), iv.plot_id) as plot_id,
+                  case when bl.project_id is null or bl.project_id = b.project_id
+                       then coalesce(b.plot_id, (select u.plot_id from units u where u.id = b.unit_id)) end,
+                  iv.plot_id) as plot_id,
          coalesce(bl.work_item_id, ll.work_item_id, iv.work_item_id) as work_item_id,
          case when coalesce(bl.work_item_id, ll.work_item_id, iv.work_item_id) is null then iv.work_group_id end as work_group_id,
          case when b.kind = 'po' then 'material_billed' else 'labour_billed' end as kind,

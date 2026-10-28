@@ -30,6 +30,8 @@ declare
   v_text text;
   v_message text;
   v_before numeric;
+  v_wo uuid;
+  v_unit uuid;
 begin
   select id into v_p1 from plots where project_id = v_villas order by code limit 1;
   select id into v_p2 from plots where project_id = v_villas order by code offset 1 limit 1;
@@ -178,6 +180,47 @@ begin
   if (select coalesce(sum(amount), 0) from villa_cost_facts where plot_id = v_w2 and kind = 'labour_billed') - v_before <> 1350 then
     raise exception 'TRIAL 6 FAILED: the second Saarang West villa''s helpers are not in its cost';
   end if;
+
+  -- 7. A whole-project line on another project leaves the header's villa alone (here the bill of 5, on P1).
+  select coalesce(sum(amount), 0) into v_before from villa_cost_facts where plot_id = v_p1 and kind = 'labour_billed';
+  set local role authenticated;
+  insert into bill_lines (bill_id, sort_order, line_kind, description, quantity, rate, gst_pct, project_id)
+  values (v_bill, 9, 'other', 'Trial 0166 mobilisation', 1, 777, 0, v_mobilisation);
+  reset role;
+  if (select coalesce(sum(amount), 0) from villa_cost_facts where plot_id = v_p1 and kind = 'labour_billed') <> v_before then
+    raise exception 'TRIAL 7 FAILED: a Mobilisation line was costed to the header''s villa';
+  end if;
+
+  -- 8. A villa moved to another project's, its project left as it was, takes the villa's project.
+  set local role authenticated;
+  v_bill := create_nmr_bill(v_contractor, v_west_villas, null, null, '', current_date, 1, 0, 1, null);
+  insert into bill_lines (bill_id, sort_order, line_kind, description, quantity, rate, gst_pct, plot_id)
+  values (v_bill, 1, 'nmr', 'Helpers (man-days)', 1, 450, 0, v_w1);
+  update bill_lines set plot_id = v_wi where bill_id = v_bill;
+  if (select project_id from bill_lines where bill_id = v_bill) is distinct from v_west_infra then
+    raise exception 'TRIAL 8 FAILED: a moved villa kept its old project';
+  end if;
+  reset role;
+
+  -- 9. Send to Bill against a work order on a unit: its lines stay on the order's villa, and it still records.
+  select id into v_unit from units where plot_id = v_p2 limit 1;
+  if v_unit is null then
+    raise exception 'TRIAL SETUP: the second Saarang - Villas plot has no unit';
+  end if;
+  insert into bill_approvers (user_id) values (v_user) on conflict do nothing;
+  insert into labour_contracts (vendor_id, project_id, unit_id, description, contract_value, created_by, updated_by)
+  values (v_contractor, v_villas, v_unit, 'Trial 0166 order', 1, v_user, v_user) returning id into v_wo;
+  update labour_contracts set status = 'approved', approved_by = v_user, approved_at = now() where id = v_wo;
+  insert into labour_logs (plot_id, custom_name, contractor_id, log_date, kind, masons, helpers, others, description, work_class, created_by, updated_by)
+  values (v_p2, 'Trial 0166 g', v_contractor, current_date - 1, 'pw_lump', 0, 0, 0, 'Plaster', 'rework', v_user, v_user)
+  returning id into v_log;
+  set local role authenticated;
+  v_bill := send_labour_logs_to_bill(array[v_log], v_wo, '', current_date,
+    jsonb_build_object(v_log::text, jsonb_build_object('rate', 4000)), null, null, null);
+  if (select plot_id is not null or project_id is not null from bill_lines where bill_id = v_bill) then
+    raise exception 'TRIAL 9 FAILED: a work-order line named its own villa';
+  end if;
+  reset role;
 
   raise exception 'ALL TRIALS PASSED';
 end $trial$;
