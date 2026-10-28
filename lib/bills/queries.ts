@@ -136,7 +136,7 @@ export async function listBills({
       supabase
         .from("bills")
         .select(
-          "id, reference, status, kind, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
+          "id, reference, status, kind, project_id, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
           { count: "exact" },
         ),
     )
@@ -154,6 +154,28 @@ export async function listBills({
   if (error) {
     console.error("listBills failed:", error);
     throw new Error("Could not read the bills.", { cause: error });
+  }
+
+  // A contractor's bill whose lines reach another project of its company says so beside its main project (0166).
+  const pageIds = data.map((row) => row.id);
+  const lineProjects = pageIds.length
+    ? await fetchAll((rangeFrom, rangeTo) =>
+        supabase
+          .from("bill_lines")
+          .select("id, bill_id, project_id")
+          .in("bill_id", pageIds)
+          .not("project_id", "is", null)
+          .order("id")
+          .range(rangeFrom, rangeTo),
+      )
+    : [];
+  const otherProjects = new Map<string, Set<string>>();
+  const headerProject = new Map(data.map((row) => [row.id, row.project_id]));
+  for (const line of lineProjects) {
+    if (!line.project_id || line.project_id === headerProject.get(line.bill_id)) continue;
+    const others = otherProjects.get(line.bill_id) ?? new Set<string>();
+    others.add(line.project_id);
+    otherProjects.set(line.bill_id, others);
   }
 
   const sums = sumRows.reduce(
@@ -176,7 +198,9 @@ export async function listBills({
       invoice_date: row.invoice_date,
       total_amount: row.total_amount ?? 0,
       created_at: row.created_at,
-      project_name: (row.projects as { name: string } | null)?.name ?? "—",
+      project_name:
+        ((row.projects as { name: string } | null)?.name ?? "—") +
+        (otherProjects.get(row.id)?.size ? ` and ${otherProjects.get(row.id)?.size} more` : ""),
       vendor_name: (row.vendors as { name: string } | null)?.name ?? null,
     })),
     total,

@@ -18,6 +18,7 @@ const entry = (over: Partial<LabourEntry> = {}): LabourEntry => ({
   kind: "nmr",
   contractorId: "rajan",
   projectId: "saarang",
+  companyId: "ef",
   workItemId: "fd15",
   masons: 2,
   helpers: 3,
@@ -26,7 +27,7 @@ const entry = (over: Partial<LabourEntry> = {}): LabourEntry => ({
   ...over,
 });
 
-test("one kind, one contractor, one project per bill", () => {
+test("one kind, one contractor, one company per bill; one project against a work order", () => {
   assert.equal(entriesProblem([entry(), entry({ id: "b" })]), undefined);
   assert.match(entriesProblem([]) ?? "", /Tick/);
   assert.match(
@@ -37,7 +38,19 @@ test("one kind, one contractor, one project per bill", () => {
     entriesProblem([entry(), entry({ id: "b", contractorId: "x" })]) ?? "",
     /one contractor/,
   );
-  assert.match(entriesProblem([entry(), entry({ id: "b", projectId: "x" })]) ?? "", /one project/);
+  // Two projects of one company make one bill (0166); of two companies, or a company-less project, they don't.
+  const mobilisation = entry({ id: "b", projectId: "mobilisation" });
+  assert.equal(entriesProblem([entry(), mobilisation]), undefined);
+  assert.match(
+    entriesProblem([entry(), entry({ id: "b", projectId: "infra", companyId: "ed" })]) ?? "",
+    /one company/,
+  );
+  assert.match(
+    entriesProblem([entry(), entry({ id: "b", projectId: "baveli", companyId: null })]) ?? "",
+    /one company/,
+  );
+  assert.match(entriesProblem([entry(), mobilisation], true) ?? "", /work order.*one project/);
+  assert.equal(entriesProblem([entry(), entry({ id: "b" })], true), undefined);
   // Piece-work by quantity and lump sums are one kind for billing.
   assert.equal(
     entriesProblem([entry({ kind: "pw_qty" }), entry({ id: "b", kind: "pw_lump" })]),
