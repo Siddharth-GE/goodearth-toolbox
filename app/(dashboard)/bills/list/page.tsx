@@ -108,6 +108,9 @@ export default async function BillsPage({
             <LinkButton href="/bills/work-orders" variant="secondary">
               Work orders
             </LinkButton>
+            <LinkButton href="/bills/combine" variant="secondary">
+              Combine bills
+            </LinkButton>
             <LinkButton href="/bills/new">Record bill</LinkButton>
           </>
         }

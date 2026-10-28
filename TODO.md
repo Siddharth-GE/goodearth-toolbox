@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Waiting on the founder — combined contractor bills on staging
 
-`plan.md`, top section, has the checklist (`0166` on staging). Open: should already-recorded bills of one contractor and company be combinable into one (piece 5)?
+`plan.md`, top section, has the checklist (`0166`, `0167` on staging).
 
 Three older bill trials no longer pass on staging's data, with or without `0166`: `bills-as-billing-team.sql` (a labour log with neither work nor name), `contractor-ledger.sql` (expects CON/122; sequences move on in rolled-back runs) and `bill-line-po-check.sql` (its PO has nothing left received). Refresh them when bills are next touched.
 

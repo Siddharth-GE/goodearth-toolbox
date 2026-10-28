@@ -19,6 +19,9 @@ declare
   v_c uuid;
   v_d uuid;
   v_e uuid;
+  v_f uuid;
+  v_g uuid;
+  v_p1_before numeric;
   v_log uuid;
   v_keep uuid;
   v_before numeric;
@@ -61,6 +64,13 @@ begin
   values (v_c, 1, 'nmr', 'Helpers (man-days)', 4, 450, 0);
   v_d := send_labour_logs_to_bill(array[v_log], null, '', current_date,
     jsonb_build_object('mason', 1100, 'helper', 500, 'gst_pct', 0), null, null, null);
+  -- F on the whole of Saarang - Villas with its own reference and a note; G on P2 with a line naming the whole project.
+  v_f := create_nmr_bill(v_contractor, v_villas, null, null, 'MR 41', current_date, 1, 0, 1, 'Shed work');
+  insert into bill_lines (bill_id, sort_order, line_kind, description, quantity, rate, gst_pct)
+  values (v_f, 1, 'other', 'Trial 0167 shed', 1, 5000, 0);
+  v_g := create_nmr_bill(v_contractor, v_villas, v_p2, null, '', current_date, 1, 0, 1, null);
+  insert into bill_lines (bill_id, sort_order, line_kind, description, quantity, rate, gst_pct, project_id)
+  values (v_g, 1, 'other', 'Trial 0167 site clearing', 1, 700, 0, v_villas);
   select reference into v_ref_a from bills where id = v_a;
   select reference into v_ref_b from bills where id = v_b;
 
@@ -111,10 +121,11 @@ begin
   reset role;
   insert into bill_approvers (user_id) values (v_user);
   select coalesce(sum(amount), 0) into v_before from villa_cost_facts where plot_id = v_p2 and kind = 'labour_billed';
+  select coalesce(sum(amount), 0) into v_p1_before from villa_cost_facts where plot_id = v_p1 and kind = 'labour_billed';
 
-  -- 2. Combine all four: A keeps its number, takes every line on its villa, the entry follows, the rest are gone.
+  -- 2. Combine all six: A keeps its number, takes every line on its villa, the entry follows, the rest are gone.
   set local role authenticated;
-  v_keep := combine_contractor_bills(array[v_d, v_c, v_b, v_a]);
+  v_keep := combine_contractor_bills(array[v_d, v_c, v_b, v_a, v_f, v_g]);
   if v_keep is distinct from v_a then
     raise exception 'TRIAL 2 FAILED: the oldest bill did not keep its number';
   end if;
@@ -122,11 +133,11 @@ begin
      or (select status from bills where id = v_a) <> 'recorded' then
     raise exception 'TRIAL 2 FAILED: the kept bill changed its number or is not waiting for approval';
   end if;
-  if exists (select 1 from bills where id in (v_b, v_c, v_d)) then
+  if exists (select 1 from bills where id in (v_b, v_c, v_d, v_f, v_g)) then
     raise exception 'TRIAL 2 FAILED: a combined bill is still there';
   end if;
-  if (select count(*) from bill_lines where bill_id = v_a) <> 4
-     or (select total_amount from bills where id = v_a) <> 900 + 1100 + 1800 + 1000 then
+  if (select count(*) from bill_lines where bill_id = v_a) <> 6
+     or (select total_amount from bills where id = v_a) <> 900 + 1100 + 1800 + 1000 + 5000 + 700 then
     raise exception 'TRIAL 2 FAILED: the kept bill does not carry every line at its money';
   end if;
   if (select plot_id from bill_lines where bill_id = v_a and description like 'Masons%') is distinct from v_p2
@@ -137,10 +148,18 @@ begin
   if (select bill_id from labour_logs where id = v_log) is distinct from v_a then
     raise exception 'TRIAL 2 FAILED: the labour entry did not follow its line';
   end if;
-  if (select note from bills where id = v_a) not like '%Combined with %' || v_ref_b || '%' then
-    raise exception 'TRIAL 2 FAILED: the note does not name the bills taken in';
+  if (select note from bills where id = v_a) not like '%Combined with %' || v_ref_b || '%'
+     or (select note from bills where id = v_a) not like '%their MR 41%'
+     or (select note from bills where id = v_a) not like '%: Shed work%' then
+    raise exception 'TRIAL 2 FAILED: the note does not name the bills taken in, their references and notes: %',
+      (select note from bills where id = v_a);
   end if;
   reset role;
+  -- The whole-project lines of F and G are on no villa, not on A's P1.
+  if (select coalesce(sum(amount), 0) from villa_cost_facts where plot_id = v_p1 and kind = 'labour_billed')
+     <> v_p1_before then
+    raise exception 'TRIAL 2 FAILED: a whole-project line was costed to the kept bill''s villa';
+  end if;
   if (select coalesce(sum(amount), 0) from villa_cost_facts where plot_id = v_p2 and kind = 'labour_billed')
      <> v_before then
     raise exception 'TRIAL 2 FAILED: P2''s cost moved when its bills were combined';

@@ -5,7 +5,10 @@
 -- combine_contractor_bills(p_bill_ids) is a bill approver's or an admin's, as a send-back is. A bill may be recorded,
 -- or approved with no money on it (it is sent back on the way). Refused, naming the bill: any payment or recovery on
 -- record, a place on a cash request, additional charges, a total set by hand, or no lines. The kept bill comes out
--- recorded, waiting for approval, its note naming the bills it took in.
+-- recorded, waiting for approval, its note naming the bills it took in, with their own references and notes.
+--
+-- villa_cost_facts: a line falls back to its bill's villa only when it names none of its own. A line naming a whole
+-- project is on no villa, even on its header's project (0166 put it on the header's villa).
 --
 -- Re-runnable.
 
@@ -20,6 +23,7 @@ declare
   v_keep uuid;
   v_others uuid[];
   v_refs text;
+  v_notes text;
   v_sort int;
   r record;
 begin
@@ -79,7 +83,12 @@ begin
       v_keep := r.id;
     else
       v_others := v_others || r.id;
-      v_refs := concat_ws(', ', v_refs, r.reference);
+      v_refs := concat_ws(', ', v_refs, r.reference
+        || case when nullif(trim(r.invoice_no), '') is distinct from r.reference
+                then ' (their ' || r.invoice_no || ', ' || to_char(r.invoice_date, 'DD Mon') || ')' else '' end);
+      if nullif(trim(r.note), '') is not null then
+        v_notes := concat_ws(E'\n', v_notes, r.reference || ': ' || trim(r.note));
+      end if;
     end if;
   end loop;
 
@@ -90,7 +99,8 @@ begin
          updated_by = auth.uid()
    where id = any(v_ids) and status = 'approved';
 
-  -- A line with no villa of its own was on its bill's; on the kept bill it names that villa.
+  -- A line with no villa of its own was on its bill's; on the kept bill it names that villa, or that bill's whole
+  -- project when its bill named no villa (never the kept bill's villa: villa_cost_facts below).
   select coalesce(max(sort_order), 0) into v_sort from bill_lines where bill_id = v_keep;
   insert into bill_lines (
     bill_id, sort_order, line_kind, po_line_id, item_id, labour_log_id, labour_contract_line_id, work_item_id,
@@ -116,13 +126,131 @@ begin
   delete from bills where id = any(v_others);
 
   update bills
-     set note = concat_ws(E'\n', note, 'Combined with ' || v_refs || '.'), updated_by = auth.uid()
+     set note = concat_ws(E'\n', note, 'Combined with ' || v_refs || '.', v_notes), updated_by = auth.uid()
    where id = v_keep;
   return v_keep;
 end $$;
 
 revoke all on function combine_contractor_bills(uuid[]) from public, anon;
 grant execute on function combine_contractor_bills(uuid[]) to authenticated;
+
+-- villa_cost_facts, as 0166 left it, but for whole-project lines -------------------------------------------------
+create or replace view villa_cost_facts with (security_barrier = true) as
+with villa as (
+  select p.id as plot_id, u.id as unit_id from plots p left join units u on u.plot_id = p.id
+),
+official as (
+  select e.id, e.unit_id from estimator_estimates e
+   where e.status = 'submitted' and not e.is_template and e.unit_id is not null
+),
+estimated as (
+  select v.plot_id, v.unit_id, c.work_item_id, null::uuid as work_group_id, 'estimated_labour'::text as kind,
+         c.labour_cost as amount, c.labour_cost is null as unpriced
+    from estimator_estimate_line_costs c
+    join official o on o.id = c.estimate_id
+    join villa v on v.unit_id = o.unit_id
+  union all
+  select v.plot_id, v.unit_id, c.work_item_id, null::uuid, 'estimated_material', c.material_cost, c.material_cost is null
+    from estimator_estimate_line_costs c
+    join official o on o.id = c.estimate_id
+    join villa v on v.unit_id = o.unit_id
+),
+indent_villa as (
+  select il.id as indent_line_id, i.work_item_id, i.work_group_id,
+         coalesce(i.plot_id, (select u.plot_id from units u where u.id = i.unit_id)) as plot_id
+    from indent_lines il join indents i on i.id = il.indent_id
+),
+po_committed as (
+  select iv.plot_id, iv.work_item_id, iv.work_group_id, 'po_committed'::text as kind,
+         l.quantity * l.rate - coalesce(l.quantity * l.rate * l.discount_pct / 100, 0) - coalesce(l.discount_amount, 0) as amount,
+         l.rate is null as unpriced
+    from purchase_order_lines l
+    join purchase_orders po on po.id = l.po_id and po.status in ('issued', 'deletion_requested', 'completed')
+    join indent_villa iv on iv.indent_line_id = l.indent_line_id
+),
+issued_line as (
+  select si.plot_id, si.work_item_id, sil.quantity,
+         -- An issue's movements leave the store, so they are negative: the villa received their opposite.
+         sum(-m.quantity * r.rate) as valued,
+         coalesce(sum(-m.quantity) filter (where r.rate is not null), 0) as valued_quantity
+    from stock_issue_lines sil
+    join stock_issues si on si.id = sil.issue_id and si.plot_id is not null
+    left join stock_batch_movements m on m.issue_line_id = sil.id
+    left join goods_receipt_line_rates r on r.receipt_line_id = m.receipt_line_id
+   group by sil.id, si.plot_id, si.work_item_id, sil.quantity
+),
+material_spent as (
+  select plot_id, work_item_id, 'material_issued'::text as kind,
+         coalesce(valued, 0) as amount, valued_quantity < quantity as unpriced
+    from issued_line
+  union all
+  -- A delivery to a house names its unit, not its plot: the villa is the unit's plot.
+  select coalesce(u.plot_id, gr.plot_id), gr.work_item_id, 'material_delivered',
+         grl.quantity * r.rate, r.rate is null
+    from goods_receipt_lines grl
+    join goods_receipts gr on gr.id = grl.receipt_id and gr.to_site
+    left join units u on u.id = gr.unit_id
+    left join goods_receipt_line_rates r on r.receipt_line_id = grl.id
+  union all
+  -- A return takes its value, at the batches it went back into, off the villa's material (0159). It names no work.
+  select r.plot_id, null::uuid, 'material_issued',
+         -coalesce(rv.valued, 0), coalesce(rv.valued_quantity, 0) < rl.quantity
+    from site_return_lines rl
+    join site_returns r on r.id = rl.return_id
+    left join lateral (
+      select sum(m.quantity * gr.rate) as valued,
+             sum(m.quantity) filter (where gr.rate is not null) as valued_quantity
+        from stock_batch_movements m
+        left join goods_receipt_line_rates gr on gr.receipt_line_id = m.receipt_line_id
+       where m.return_line_id = rl.id
+    ) rv on true
+),
+wo_committed as (
+  select coalesce(lc.plot_id, (select u.plot_id from units u where u.id = lc.unit_id)) as plot_id,
+         l.work_item_id, 'wo_committed'::text as kind,
+         coalesce(l.quantity, 1) * l.rate as amount, false as unpriced
+    from labour_contract_lines l
+    join labour_contracts lc on lc.id = l.contract_id and lc.status = 'approved' and lc.is_active
+),
+billed as (
+  -- The header's villa only for a line naming none of its own: one naming a whole project is on no villa.
+  select coalesce(ll.plot_id, bl.plot_id, (select u.plot_id from units u where u.id = bl.unit_id),
+                  case when bl.project_id is null
+                       then coalesce(b.plot_id, (select u.plot_id from units u where u.id = b.unit_id)) end,
+                  iv.plot_id) as plot_id,
+         coalesce(bl.work_item_id, ll.work_item_id, iv.work_item_id) as work_item_id,
+         case when coalesce(bl.work_item_id, ll.work_item_id, iv.work_item_id) is null then iv.work_group_id end as work_group_id,
+         case when b.kind = 'po' then 'material_billed' else 'labour_billed' end as kind,
+         coalesce(bl.quantity, 1) * bl.rate - coalesce(bl.discount_amount, 0) as amount,
+         false as unpriced
+    from bill_lines bl
+    join bills b on b.id = bl.bill_id
+    left join labour_logs ll on ll.id = bl.labour_log_id
+    left join purchase_order_lines pl on pl.id = bl.po_line_id
+    left join indent_villa iv on iv.indent_line_id = pl.indent_line_id
+),
+everything as (
+  select plot_id, work_item_id, work_group_id, kind, amount, unpriced from estimated
+  union all select plot_id, work_item_id, work_group_id, kind, amount, unpriced from po_committed
+  union all select plot_id, work_item_id, null::uuid, kind, amount, unpriced from material_spent
+  union all select plot_id, work_item_id, null::uuid, kind, amount, unpriced from wo_committed
+  union all select plot_id, work_item_id, work_group_id, kind, amount, unpriced from billed
+)
+select e.plot_id,
+       v.unit_id,
+       e.work_item_id,
+       e.kind,
+       round(sum(coalesce(e.amount, 0)), 2) as amount,
+       bool_or(e.unpriced or e.amount is null) as unpriced,
+       e.work_group_id
+  from everything e
+  join villa v on v.plot_id = e.plot_id
+ where has_app('/estimator') or has_app('/bills') or has_app('/reporter')
+ group by e.plot_id, v.unit_id, e.work_item_id, e.kind, e.work_group_id;
+
+revoke insert, update, delete, truncate on villa_cost_facts from anon, authenticated;
+revoke all on villa_cost_facts from anon;
+grant select on villa_cost_facts to authenticated;
 
 -- Checks ---------------------------------------------------------------------------------------------------
 do $$
@@ -132,5 +260,9 @@ begin
   end if;
   if has_function_privilege('anon', 'combine_contractor_bills(uuid[])', 'execute') then
     raise exception '0167: anon can combine bills';
+  end if;
+  if position('has_app(''/estimator''' in pg_get_viewdef('villa_cost_facts'::regclass)) = 0
+     or has_table_privilege('authenticated', 'villa_cost_facts', 'insert') then
+    raise exception '0167: villa_cost_facts must keep its gate and stay read-only';
   end if;
 end $$;
