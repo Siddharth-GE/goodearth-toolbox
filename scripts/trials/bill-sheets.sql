@@ -26,6 +26,8 @@ declare
   v_item uuid;
   v_entry uuid;
   v_back uuid;
+  v_advance uuid;
+  v_recovery uuid;
   v_result jsonb;
   v_message text;
 begin
@@ -199,6 +201,18 @@ begin
     raise exception 'TRIAL 6 FAILED: overpaying gave "%"', v_message;
   end if;
 
+  -- 6b. 300 of an advance is set against the sheet (B, the one still pending), and taken back whole.
+  insert into contractor_advances (vendor_id, project_id, amount, payment_ref, created_by, updated_by)
+  values (v_contractor, v_villas, 1000, 'ADV-0170', v_user, v_user) returning id into v_advance;
+  v_recovery := recover_on_bill_sheet(v_s1, v_advance, 300, current_date, null);
+  if (select sum(amount) from advance_recoveries where bill_id = v_b and sheet_entry_id = v_recovery) <> 300 then
+    raise exception 'TRIAL 6b FAILED: the recovery did not land on B';
+  end if;
+  perform reverse_bill_sheet_money('recovery', v_recovery, 'Wrong advance');
+  if (select sum(amount) from advance_recoveries where bill_id = v_b) <> 0 then
+    raise exception 'TRIAL 6b FAILED: the recovery was not taken back';
+  end if;
+
   -- 7. While money is out the sheet is neither sent back nor undone; reversed whole, it can be sent back, never undone.
   v_message := null;
   begin
@@ -245,6 +259,28 @@ begin
   end;
   if v_message is null then
     raise exception 'TRIAL 9 FAILED: a sheet was written directly';
+  end if;
+  v_message := null;
+  begin
+    insert into bills (project_id, scope_code, vendor_id, kind, bill_no, reference, invoice_no, invoice_date,
+                       taxable_amount, gst_amount, total_amount, sheet_id, created_by, updated_by)
+    values (v_villas, 'GEN', v_contractor, 'nmr', 9701, 'BILL/TRIAL/9701', 'T', current_date, 1, 0, 1, v_s1,
+            v_user, v_user);
+  exception when raise_exception then v_message := sqlerrm;
+  end;
+  if coalesce(v_message, '') not like 'A bill goes on a sheet only by consolidating' then
+    raise exception 'TRIAL 9 FAILED: a bill inserted onto a sheet gave "%"', v_message;
+  end if;
+  v_message := null;
+  begin
+    insert into bills (project_id, scope_code, vendor_id, kind, bill_no, reference, invoice_no, invoice_date,
+                       taxable_amount, gst_amount, total_amount, status, approved_by, approved_at, created_by, updated_by)
+    values (v_villas, 'GEN', v_contractor, 'nmr', 9702, 'BILL/TRIAL/9702', 'T', current_date, 1, 0, 1, 'approved',
+            v_user, now(), v_user, v_user);
+  exception when raise_exception then v_message := sqlerrm;
+  end;
+  if coalesce(v_message, '') not like 'A new bill is recorded%' then
+    raise exception 'TRIAL 9 FAILED: a bill inserted as approved gave "%"', v_message;
   end if;
 
   raise exception 'ALL TRIALS PASSED';

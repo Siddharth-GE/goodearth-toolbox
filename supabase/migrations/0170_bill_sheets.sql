@@ -22,6 +22,8 @@ create table if not exists bill_sheets (
   vendor_id uuid not null references vendors (id),
   company_id uuid not null references companies (id),
   work_type text not null check (work_type in ('PW', 'NMR')),
+  -- A test project's bills (0142) never share a sheet with real ones, so its red button never reaches a real sheet.
+  is_test boolean not null default false,
   status text not null default 'recorded' check (status in ('recorded', 'approved', 'undone')),
   approved_by uuid references profiles (id),
   approved_at timestamptz,
@@ -77,7 +79,8 @@ alter table cash_request_items drop constraint if exists cash_request_items_shap
 alter table cash_request_items add constraint cash_request_items_shape check (
   (item_kind = 'bill' and bill_id is not null and sheet_id is null)
   or (item_kind = 'advance' and bill_id is null and sheet_id is null and vendor_id is not null and project_id is not null)
-  or (item_kind = 'sheet' and sheet_id is not null and bill_id is null)
+  or (item_kind = 'sheet' and sheet_id is not null and bill_id is null and vendor_id is null and project_id is null
+      and labour_contract_id is null)
 );
 alter table cash_request_items drop constraint if exists cash_request_items_one_sheet_per_request;
 alter table cash_request_items add constraint cash_request_items_one_sheet_per_request unique (cash_request_id, sheet_id);
@@ -123,6 +126,17 @@ begin
   if coalesce(current_setting('toolbox.bill_sheet', true), '') = 'on' then
     return new;
   end if;
+  if tg_op = 'INSERT' then
+    if new.sheet_id is not null then
+      raise exception 'A bill goes on a sheet only by consolidating';
+    end if;
+    -- bills_guard (0147) watches updates only, so an insert from the app starts where a bill starts.
+    if current_user = 'authenticated' and (new.status <> 'recorded' or new.approved_by is not null
+       or new.approved_at is not null or new.paid_by is not null or new.paid_at is not null) then
+      raise exception 'A new bill is recorded, waiting for approval';
+    end if;
+    return new;
+  end if;
   if new.sheet_id is distinct from old.sheet_id then
     raise exception 'A bill goes on or off a sheet only by consolidating, taking it off or undoing the sheet';
   end if;
@@ -137,7 +151,7 @@ end $$;
 revoke all on function bills_sheet_guard() from public, anon, authenticated;
 
 drop trigger if exists bills_sheet_guard on bills;
-create trigger bills_sheet_guard before update or delete on bills
+create trigger bills_sheet_guard before insert or update or delete on bills
   for each row execute function bills_sheet_guard();
 
 -- After the reversal guard (by name), so a reversal's bill is already the original's.
@@ -162,10 +176,13 @@ begin
   if new.sheet_id is distinct from v_bill.sheet_id or new.sheet_entry_id is null then
     raise exception 'Money through a sheet names that sheet';
   end if;
-  if tg_table_name = 'bill_payments' and new.cash_request_item_id is not null and not exists (
-    select 1 from cash_request_items where id = new.cash_request_item_id and sheet_id = v_bill.sheet_id
-  ) then
-    raise exception 'That cash request line is not for %', v_bill.sheet_reference;
+  -- Nested: advance_recoveries has no cash_request_item_id, and plpgsql reads every field an expression names.
+  if tg_table_name = 'bill_payments' then
+    if new.cash_request_item_id is not null and not exists (
+      select 1 from cash_request_items where id = new.cash_request_item_id and sheet_id = v_bill.sheet_id
+    ) then
+      raise exception 'That cash request line is not for %', v_bill.sheet_reference;
+    end if;
   end if;
   return new;
 end $$;
@@ -246,7 +263,7 @@ begin
 
   for r in
     select b.id, b.reference, b.status, b.kind, b.work_type, b.vendor_id, b.sheet_id, b.invoice_date,
-           v.is_contractor, v.bill_code, p.company_id, c.code as company_code,
+           v.is_contractor, v.bill_code, p.company_id, p.is_test, c.code as company_code,
            (select s.reference from bill_sheets s where s.id = b.sheet_id) as sheet_reference
       from bills b
       left join vendors v on v.id = b.vendor_id
@@ -273,8 +290,11 @@ begin
       continue;
     end if;
 
+    -- One consolidation at a time per contractor and company, or two could each make a new sheet.
+    perform pg_advisory_xact_lock(hashtextextended('bill_sheet:' || r.vendor_id || ':' || r.company_id, 0));
     select id, reference into v_sheet, v_ref from bill_sheets
      where vendor_id = r.vendor_id and company_id = r.company_id and work_type = r.work_type and status = 'recorded'
+       and is_test = r.is_test
      order by created_at desc, id
      limit 1
        for update;
@@ -283,8 +303,8 @@ begin
       on conflict (vendor_id, company_id) do update set last_no = bill_sheet_counters.last_no + 1
       returning last_no into v_no;
       v_ref := r.bill_code || '-' || r.work_type || '-' || r.company_code || '-C' || lpad(v_no::text, 2, '0');
-      insert into bill_sheets (reference, sheet_no, vendor_id, company_id, work_type, created_by, updated_by)
-      values (v_ref, v_no, r.vendor_id, r.company_id, r.work_type, auth.uid(), auth.uid())
+      insert into bill_sheets (reference, sheet_no, vendor_id, company_id, work_type, is_test, created_by, updated_by)
+      values (v_ref, v_no, r.vendor_id, r.company_id, r.work_type, r.is_test, auth.uid(), auth.uid())
       returning id into v_sheet;
     end if;
 
@@ -437,7 +457,8 @@ begin
   if not has_app('/bills') then
     raise exception 'Only the Bills tool can take a bill off a sheet';
   end if;
-  select id, reference, sheet_id into v_bill from bills where id = p_bill_id for update;
+  -- The sheet is locked before the bill, in the order approve, send back and undo take them.
+  select id, reference, sheet_id into v_bill from bills where id = p_bill_id;
   if not found then
     raise exception 'That bill no longer exists';
   end if;
@@ -445,8 +466,16 @@ begin
     raise exception '% is not on a sheet', v_bill.reference;
   end if;
   select * into v_sheet from bill_sheets where id = v_bill.sheet_id for update;
+  perform 1 from bills where id = p_bill_id and sheet_id = v_sheet.id for update;
+  if not found then
+    raise exception '% has just moved — refresh and try again', v_bill.reference;
+  end if;
   if v_sheet.status <> 'recorded' then
-    raise exception '% is approved — send it back before taking a bill off', v_sheet.reference;
+    raise exception '% is %, so a bill comes off only once it is sent back', v_sheet.reference,
+      case v_sheet.status when 'approved' then 'approved' else 'undone' end;
+  end if;
+  if exists (select 1 from cash_request_items where sheet_id = v_sheet.id) then
+    raise exception '% has been on a cash request, so its bills stay on it', v_sheet.reference;
   end if;
   if exists (select 1 from bill_payments where bill_id = p_bill_id)
      or exists (select 1 from advance_recoveries where bill_id = p_bill_id) then
@@ -536,8 +565,8 @@ create or replace function pay_bill_sheet(
   p_amount numeric,
   p_paid_on date,
   p_reference text,
-  p_note text,
-  p_cash_request_item_id uuid
+  p_note text default null,
+  p_cash_request_item_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -603,7 +632,7 @@ create or replace function recover_on_bill_sheet(
   p_advance_id uuid,
   p_amount numeric,
   p_recovered_on date,
-  p_note text
+  p_note text default null
 )
 returns uuid
 language plpgsql
