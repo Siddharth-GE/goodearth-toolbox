@@ -39,10 +39,13 @@ declare global {
       geqsTakeoff?: () => void;
       geqsImported?: (json: string) => void;
       geqsWorksList?: (csv: string) => void;
+      /** Goodearth QS 0.10 on: the whole setup (sketchup-setup.ts), answered on geqsSetupSaved. */
+      geqsSetup?: (json: string) => void;
     };
     geqsReceive?: (json: string) => void;
     geqsFailed?: (message: string) => void;
     geqsWorksListSaved?: (count: number) => void;
+    geqsSetupSaved?: (json: string) => void;
   }
 }
 
@@ -53,9 +56,23 @@ type Received = { text: string; from: "sketchup" | "file"; fileName?: string };
 const noSubscription = () => () => {};
 /** Inside SketchUp's window the bridge exists from the first paint; on the server and in any browser it never does. */
 const bridgePresent = () => typeof window.sketchup?.geqsTakeoff === "function";
+/** An older plugin has no geqsSetup and takes the works list alone. */
+const setupBridgePresent = () => typeof window.sketchup?.geqsSetup === "function";
+
+/** What SketchUp says it took from the setup; anything unreadable is just "done". */
+function setupSavedNote(text: string): string {
+  try {
+    const saved = JSON.parse(text) as { works?: unknown; mixes?: unknown; items?: unknown };
+    const count = (value: unknown) => (typeof value === "number" ? formatCount(value) : "the");
+    return `SketchUp now follows the toolbox: ${count(saved.works)} works, ${count(saved.mixes)} mixes and ${count(saved.items)} materials with their rates. Measuring the model again…`;
+  } catch {
+    return "SketchUp now follows the toolbox. Measuring the model again…";
+  }
+}
 
 export function FromModel({ villas }: { villas: VillaOption[] }) {
   const inSketchUp = useSyncExternalStore(noSubscription, bridgePresent, () => false);
+  const takesSetup = useSyncExternalStore(noSubscription, setupBridgePresent, () => false);
   const [asking, setAsking] = useState(false);
   const [bridgeError, setBridgeError] = useState<string>();
   const [worksListNote, setWorksListNote] = useState<{ error?: string; done?: string }>();
@@ -118,6 +135,7 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
     receive: (next: Received) => void;
     failed: (message: string) => void;
     listSaved: (count: number) => void;
+    setupSaved: (text: string) => void;
   } | null>(null);
   useEffect(() => {
     bridge.current = {
@@ -132,6 +150,10 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
         });
         askSketchUp();
       },
+      setupSaved: (text) => {
+        setWorksListNote({ done: setupSavedNote(text) });
+        askSketchUp();
+      },
     };
   });
 
@@ -141,8 +163,10 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
       bridge.current?.receive({ text: String(text), from: "sketchup" });
     window.geqsFailed = (message) => bridge.current?.failed(String(message ?? ""));
     window.geqsWorksListSaved = (count) => bridge.current?.listSaved(Number(count) || 0);
+    window.geqsSetupSaved = (text) => bridge.current?.setupSaved(String(text ?? ""));
     window.sketchup?.geqsTakeoff?.();
     return () => {
+      delete window.geqsSetupSaved;
       delete window.geqsReceive;
       delete window.geqsFailed;
       delete window.geqsWorksListSaved;
@@ -178,23 +202,24 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
     });
   };
 
-  const sendWorksList = () => {
+  /** The setup when the plugin takes it, else the works list alone. A signed-out read answers with the login page, not the file, so the type is checked. */
+  const sendToSketchUp = () => {
     setWorksListNote(undefined);
+    const [path, type, what] = takesSetup
+      ? ["/estimator/works/sketchup-setup", "application/json", "the setup"]
+      : ["/estimator/works/export", "text/csv", "the works list"];
     startSendingList(async () => {
       try {
-        const response = await fetch("/estimator/works/export", { cache: "no-store" });
-        const type = response.headers.get("content-type") ?? "";
-        if (!response.ok || !type.includes("text/csv")) {
-          setWorksListNote({
-            error: "Could not read the works list — reload the page and try again.",
-          });
+        const response = await fetch(path, { cache: "no-store" });
+        if (!response.ok || !(response.headers.get("content-type") ?? "").includes(type)) {
+          setWorksListNote({ error: `Could not read ${what} — reload the page and try again.` });
           return;
         }
-        window.sketchup?.geqsWorksList?.(await response.text());
+        const text = await response.text();
+        if (takesSetup) window.sketchup?.geqsSetup?.(text);
+        else window.sketchup?.geqsWorksList?.(text);
       } catch {
-        setWorksListNote({
-          error: "Could not read the works list — check the connection and try again.",
-        });
+        setWorksListNote({ error: `Could not read ${what} — check the connection and try again.` });
       }
     });
   };
@@ -363,12 +388,13 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
       <Card className="space-y-3 p-5">
         <div>
           <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
-            The works list
+            Setting up SketchUp
           </p>
           <p className="text-muted mt-1 text-sm">
-            SketchUp tags by the rate book&apos;s work codes, units and how each is measured. When
-            the rate book changes, give SketchUp the new list — a work whose unit no longer matches
-            is refused until it has.
+            SketchUp tags by the rate book&apos;s work codes, units and how each is measured, paints
+            with the Mixes tab&apos;s names, and prices its own Estimate with the toolbox&apos;s
+            rates. When any of these change, give SketchUp the new setup — a work whose unit no
+            longer matches is refused until it has.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -377,19 +403,32 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
               type="button"
               variant="secondary"
               disabled={sendingList}
-              onClick={sendWorksList}
+              onClick={sendToSketchUp}
             >
-              {sendingList ? "Sending…" : "Send the works list to SketchUp"}
+              {sendingList
+                ? "Sending…"
+                : takesSetup
+                  ? "Send the setup to SketchUp"
+                  : "Send the works list to SketchUp"}
             </Button>
           ) : (
             <>
-              <LinkButton href="/estimator/works/export" variant="secondary" plain>
-                Download works list for SketchUp
+              <LinkButton href="/estimator/works/sketchup-setup" variant="secondary" plain>
+                Download setup for SketchUp
               </LinkButton>
               <span className="text-muted text-xs">
-                then in SketchUp: Goodearth QS → Choose works list…
+                then in SketchUp: Goodearth QS → Load toolbox setup…
               </span>
+              <LinkButton href="/estimator/works/export" variant="ghost" plain>
+                Works list only (older plugin)
+              </LinkButton>
             </>
+          )}
+          {inSketchUp && !takesSetup && (
+            <span className="text-muted text-xs">
+              This plugin takes the works list only. Install Goodearth QS 0.10 for the mixes and
+              rates too.
+            </span>
           )}
         </div>
         <FormMessage error={worksListNote?.error} success={worksListNote?.done} />

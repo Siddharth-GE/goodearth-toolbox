@@ -51,9 +51,12 @@ const TOUCHED = [
 /** Today's categories the new sheet spells differently: same row, new code. */
 const CATEGORY_RECODES: Record<string, string> = { CARP: "CAR" };
 
-/** How a SketchUp model measures works whose unit alone would mislead (0118, re-keyed to the new codes). */
-const BASE_AND_SIDES = ["FD.03.04"];
-const MEASURED_BY_HAND = ["FD.03.05", "FD.04.04", "FD.04.11", "FD.04.12", "FD.04.13", "FD.04.14"];
+/** How a SketchUp model measures works whose unit alone would mislead (0118, 0172, 0173). Packages are measured as the built-up area. */
+const BY_VOLUME = ["FD.03.04", "FD.03.05"];
+const MEASURED_BY_HAND = ["FD.04.04", "FD.04.11", "FD.04.12", "FD.04.13", "FD.04.14", "SS.03.02"];
+
+/** The workbook says "each" but its rate is per sqft of paint (0172). */
+const UNIT_FIXES: Record<string, string> = { "F.03.02A": "sqft" };
 
 const lit = (value: string | number | boolean | null): string =>
   value === null ? "null" : typeof value === "string" ? literal(value) : String(value);
@@ -143,7 +146,9 @@ async function main() {
     maintenance: sheet("Maintenance - Works"),
   });
   const bridge = villaBridge(sheet("Villas - Work"), estate);
-  const liveWorks = estate.works.filter((w) => !w.left_out);
+  const liveWorks = estate.works
+    .filter((w) => !w.left_out)
+    .map((w) => (UNIT_FIXES[w.code] && w.uom ? { ...w, uom: UNIT_FIXES[w.code] } : w));
 
   console.log(`Database : ${ref}`);
   console.log(`Workbook : ${xlsxPath}`);
@@ -627,11 +632,13 @@ async function main() {
   }
   const packageCodes = liveWorks.filter((w) => w.is_package).map((w) => w.code);
   statements.push(
-    `update estimator_work_info i set model_measure = 'base_and_sides'
-     from work_items w where w.id = i.work_item_id and w.code = any(${textArray(BASE_AND_SIDES)}) and i.model_measure is null;`,
+    `update estimator_work_info i set model_measure = 'volume'
+     from work_items w where w.id = i.work_item_id and w.code = any(${textArray(BY_VOLUME)}) and i.model_measure is null;`,
+    `update estimator_work_info i set model_measure = 'bua'
+     from work_items w where w.id = i.work_item_id and w.code = any(${textArray(packageCodes)}) and i.model_measure is null;`,
     `update estimator_work_info i set model_measure = 'manual'
      from work_items w where w.id = i.work_item_id and i.model_measure is null
-       and w.code = any(${textArray([...MEASURED_BY_HAND, ...packageCodes])});`,
+       and w.code = any(${textArray(MEASURED_BY_HAND)});`,
   );
 
   // The report: what each of today's works becomes, then what is new, in the sheet's order.

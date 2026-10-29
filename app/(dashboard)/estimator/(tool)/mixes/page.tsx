@@ -47,7 +47,12 @@ export default async function MixesPage({
             updates.
           </p>
         </div>
-        <MixFormDialog uoms={uoms} groups={groups} />
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href="/estimator/works/sketchup-setup" variant="ghost" plain>
+            Download setup for SketchUp
+          </LinkButton>
+          <MixFormDialog uoms={uoms} groups={groups} />
+        </div>
       </div>
 
       {mixes.length === 0 ? (

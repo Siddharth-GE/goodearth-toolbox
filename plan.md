@@ -1,4 +1,4 @@
-# From the model, everything — Goodearth QS 0.9 into the toolbox `[Opus planned 2026-10-29; waiting for the founder's go-ahead]`
+# From the model, everything — Goodearth QS 0.9 into the toolbox `[Opus planned 2026-10-29; the founder said go the same day]`
 
 **The founder's ask** (2026-10-29): "for the qs estimator i've built the latest plugin update, now i need toolbox to be updated as well for the same, where everything goes in … i need a download works or mixes or whatever button that can be uploaded to the plugin to set stuff up as we go forward." Plot 04 (`Documents\3Dqs_Sandbox\plot 04`) is the test: its model, its takeoff file, and the plugin's own estimate of it to compare against.
 
@@ -16,8 +16,8 @@ It adopts the sandbox session's draft ("everything can go to the toolbox in 1 cl
 - Today the toolbox reads only `lines` and `not_measured` from the file. The plugin also sends `mixes`, `steel` and `derived` (worked-out lines, allowances, settings, the BUA), and the toolbox ignores all of them.
 - **Sent today, Plot 04 is almost all refused.** The plugin's `works.csv` is the 6 Oct list, while staging's works were recoded on 22 Oct. Of the 62 works Plot 04 sends, about 25 match by name; the rest need the list below.
 - Material codes (CVL/07, CAR/42, HW/21…) are the same on both sides. The plugin's 11 starter mixes differ in name from the toolbox's 51.
-- Some rate-book units don't fit how the work is measured. FD.03.04 (Footing, base + 4 sides) is in cum. FD.03.05 and FD.04.13 are in cum and each, but are measured as shuttering. SS.03.02 (anti-termite) is in _each_, and F.03.02A (final coat) is in _each_.
-- `0170` and `0171` are taken, so this build's migrations are `0172` and `0173`.
+- The rate book prices the footing and the column to plinth **per cum of concrete** (FD.03.04 ₹6,000, FD.03.05 ₹16,000), not per sqft of shuttering as the plugin's old list did. So the model measures them by volume (`0173`; `0172` had wrongly moved them to sqft and was put back the same day). F.03.02A (final coat, ₹3.50) was in _each_ but is priced per sqft.
+- `0170` and `0171` are taken, so this build's migrations are `0172`–`0174`.
 
 ## The old codes, the new ones (for the founder to confirm)
 
@@ -28,17 +28,18 @@ Matched by meaning (one line each, so the founder can correct any):
 | Old                                  | New                                          | Note                                                                          |
 | ------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------------- |
 | FD.7A rubble masonry                 | FD.02.05                                     | cum                                                                           |
-| FD.15 / FD.16 / FD.31                | FD.03.04 / FD.03.05 / FD.04.13               | measured as shuttering: **units to sqft** in the rate book                    |
+| FD.15 / FD.16                        | FD.03.04 / FD.03.05                          | cum, **by volume** (the rate book prices the concrete)                        |
+| FD.31 plinth beam and DPC            | FD.04.06 the beam (cum); FD.04.13 by hand    | FD.04.13 is _each_ with no rate                                               |
 | FD.4 + FD.12 excavation              | FD.02.02 / FD.03.01 (Hours)                  | the plugin's JCB hours become these lines, split by volume, not an other cost |
 | FD.8 dust filling                    | FD.02.09                                     | cum: becomes a line                                                           |
 | FD.17 backfill, SS.4a levelling      | FD.03.06, SS.03.01                           | lumpsum: one each when the model has any                                      |
-| SS.4b anti-termite                   | SS.03.02                                     | **unit to sqft** (now _each_)                                                 |
+| SS.4b anti-termite                   | SS.03.02                                     | _each_, ₹450, by hand: an allowance until the founder says what one is        |
 | SS.2–SS.8                            | SS.01.00–SS.07.00                            | package per sqft of BUA                                                       |
 | SS.9 / SS.10 / SS.11                 | SS.10.00 / SS.08.00 / SS.09.00               | package per sqft of BUA                                                       |
 | MEP.2–MEP.11                         | MEP.02.00–MEP.11.00                          | package per sqft of BUA                                                       |
 | F.1.2 + F.1.3 polishing (by coat)    | F.01.03 frames, F.01.02 columns and shutters | the new list splits by element, not coat                                      |
 | F.1.23–F.1.25 putty, sanding, primer | F.03.01                                      | one work now                                                                  |
-| F.1.26 / F.1.27 emulsion             | F.03.02 / F.03.02A                           | **F.03.02A unit to sqft** (now _each_)                                        |
+| F.1.26 / F.1.27 emulsion             | F.03.02 / F.03.02A                           | F.03.02A moved to sqft (`0172`)                                               |
 | F.1.29 / 30 / 31 frames              | CAR.01.01 / 02 / 03                          | pali                                                                          |
 | F.1.32, F.1.35 window shutter        | CAR.01.04, CAR.01.07                         |                                                                               |
 | F.1.36, F.1.37 single door           | CAR.01.08, CAR.01.09                         |                                                                               |
@@ -52,7 +53,7 @@ Matched by meaning (one line each, so the founder can correct any):
 | F.2.15 / 16 / 17 exterior paint      | F.04.11 / 12 / 13                            |                                                                               |
 | PF.20j gutters                       | PF.03.20                                     | rmt                                                                           |
 
-## Piece 1 — the setup download, and the plugin on the toolbox's codes (`0172`, small)
+## Piece 1 — the setup download, and the plugin on the toolbox's codes (`0172`, `0173`, small)
 
 - **Estimator → Rate book and Mixes: Download setup for SketchUp.** It gives one file, `goodearth-qs-setup` v1 (JSON), holding:
   - every active work: code, name, unit, how the model measures it, category, group and labour rate;
@@ -61,12 +62,8 @@ Matched by meaning (one line each, so the founder can correct any):
   - the rate book's per-unit recipes.
     It is a route under `(tool)`, so `requireTool("/estimator")`, and money-bearing. Today's works-list CSV stays for older plugins.
 - **From the model: Send the setup to SketchUp**, over the bridge (`geqsSetup`). The same file, without the download.
-- **`0172_model_measure_sides_bua.sql`:**
-  - `model_measure` gains `sides` and `bua`;
-  - the package works (SS.xx.00, MEP.xx.00) are set to `bua`, and FD.03.05 and FD.04.13 to `sides`, wherever they are blank or `manual`;
-  - the five unit fixes above, only where no estimate line uses the work (decision 7 still holds), named in the migration's own check.
-    No policy or view changes, no money.
-- **Plugin 0.10** `[Opus]`, in the sandbox:
+- **`0172_model_measure_sides_bua.sql`:** `model_measure` gains `sides` and `bua`; the package works (SS.xx.00, MEP.xx.00) are set to `bua`; F.03.02A to sqft. It also moved four works to sqft, which **`0173_model_measure_units_back.sql`** put back: FD.03.04 and FD.03.05 in cum by volume, FD.04.13 and SS.03.02 in each by hand. Units change only where no estimate line uses the work (decision 7). No policy, view or money. `scripts/import-masters-workbook.ts` keeps the same measures and the F.03.02A unit on a re-run.
+- **Plugin 0.10**, in the sandbox, from **`goodearth-qs/TOOLBOX-ADJUSTMENTS.md`** (the setup file's contract, the code table, mix renames, Estimate from the setup, tests). A real setup from staging is `goodearth-qs/examples/goodearth-qs-setup-staging-2026-10-29.json` (it holds rates):
   - **Load toolbox setup…**, plus the bridge's answer: the works list, the mixes (made or renamed as `Mix - …`, the known list, the Materials panel folder) and the rates, kept beside SketchUp's settings;
   - the built-in rules (worked-out items, the JCB hours, the recipes' work hooks) read their codes from one table on the new codes;
   - **Estimate** prices from the loaded setup, with Masters.xlsx only as the fallback;
@@ -74,7 +71,7 @@ Matched by meaning (one line each, so the founder can correct any):
   - every material the settings stand in for gets a work code: stair → CAR.02.03, sunken-slab PCC → PF.03.18, grills → F.03.05, ridge tiles → PF.03.09, gutters → PF.03.20.
   - Plot 04's model is re-tagged and repainted to the new codes and names by script, and the four test files are re-run.
 
-## Piece 2 — everything imports (`0173`, money: independent Opus review before `db:apply`)
+## Piece 2 — everything imports (`0174`, money: independent Opus review before `db:apply`)
 
 The sandbox draft's rules, as they stand, except where noted:
 
@@ -102,11 +99,12 @@ Send `Plot 04 - QS model.skp` (0.10) to a test villa on staging. Then compare th
 
 ## Steps — one branch per piece, each vetted on staging before the next
 
-- [ ] Founder: go-ahead, and the code list above confirmed or corrected.
-- [ ] `[Opus]` Piece 1: `0172` with its check, dry run, independent read, applied to staging. Then the download route, the bridge button and the tests.
-- [ ] `[Opus]` Piece 1: plugin 0.10 (its four test files pass), Plot 04 re-tagged, the new `.rbz` in `Goodearth QS for the team`.
+- [x] Founder: go-ahead (2026-10-29), the code list as written; 0172's four unit moves put back by `0173` at the founder's word.
+- [x] `[Opus]` Piece 1: `0172` and `0173` dry run and applied to staging. The download route (`/estimator/works/sketchup-setup`, `lib/estimator/sketchup-setup.ts` and its tests), the buttons on the Rate book and the Mixes tab, and _Send the setup to SketchUp_ on From the model (the works list for an older plugin).
+- [x] `[Opus]` Piece 1: the plugin's half written as `goodearth-qs/TOOLBOX-ADJUSTMENTS.md`, with a real setup beside it.
+- [ ] Plugin 0.10 built from `TOOLBOX-ADJUSTMENTS.md` (its tests pass), Plot 04 re-tagged, the new `.rbz` in `Goodearth QS for the team`.
 - [ ] `[Opus]` Piece 1: independent review, then the pull request to `staging`. Founder: checklist 1.
-- [ ] `[Opus]` Piece 2: `0173` and its trial, dry run as the single-grant person, independent Opus review, applied to staging, `db:types:staging`.
+- [ ] `[Opus]` Piece 2: `0174` and its trial, dry run as the single-grant person, independent Opus review, applied to staging, `db:types:staging`.
 - [ ] `[Sonnet]` Piece 2: `calc.ts`, `model-takeoff.ts` and their tests, the import and estimate queries and actions.
 - [ ] `[Sonnet]` Piece 2: the estimate page, the From the model preview, the seed script (dry run).
 - [ ] `[Opus]` Piece 2: vet, open every changed page as the probe, the checks, independent review, pull request. Founder: checklist 2.
@@ -116,14 +114,14 @@ Send `Plot 04 - QS model.skp` (0.10) to a test villa on staging. Then compare th
 
 **1. Setup:**
 
-1. Estimator → Rate book → **Download setup for SketchUp**.
+1. Estimator → Rate book → **Download setup for SketchUp**: a `.json` file downloads. Mixes has the same button. Estimator → From a SketchUp model has it too, with _Works list only (older plugin)_ beside it.
 2. SketchUp (0.10) → Goodearth QS → **Load toolbox setup…** → that file. It says how many works, mixes and items it took.
 3. Open Plot 04 → **Estimate**: it now says _Rates: the toolbox, 29 Oct_.
 4. Send to the toolbox → the preview: FD.03.04, CAR.01.02… and nothing _not in the toolbox's works_.
 
 **2. Everything:**
 
-1. Send Plot 04 → Import. FD.03.04 shows _made of M20 Concrete and Steel 10 mm_. F.01.03 says _Worked out: 5 door and 24 window frames…_. FD.02.02 is in hours. Other costs list fill soil, setting out, hardware and MEP materials.
+1. Send Plot 04 → Import. FD.03.04 shows _made of M25 Concrete and Steel 10 mm_. F.01.03 says _Worked out: 5 door and 24 window frames…_. FD.02.02 is in hours. Other costs list fill soil, setting out, hardware and MEP materials.
 2. Labour, materials and other costs each equal the plugin's Estimate within rupees.
 3. Change a beam's bars, send again → its steel changes and nothing doubles. Type an other cost, send again → it stays.
 4. Make official → the total includes the other costs. Indents offer M20's materials and the steel, never the other costs.

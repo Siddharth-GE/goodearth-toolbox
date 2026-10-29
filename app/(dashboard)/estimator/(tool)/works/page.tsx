@@ -115,8 +115,8 @@ export default async function RateBookPage({
             },
           ]}
         />
-        <LinkButton href="/estimator/works/export" variant="ghost" plain>
-          Download works list for SketchUp
+        <LinkButton href="/estimator/works/sketchup-setup" variant="ghost" plain>
+          Download setup for SketchUp
         </LinkButton>
       </div>
 

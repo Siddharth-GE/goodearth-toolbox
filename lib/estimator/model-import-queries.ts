@@ -6,6 +6,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { isModelMeasure, type EstimateForModel, type WorkForModel } from "./model-takeoff";
 import { fail, GRANT } from "./shared";
+import type { SetupSource } from "./sketchup-setup";
 
 /** Reads for importing a SketchUp takeoff (0118) and for the works list SketchUp tags by. */
 
@@ -64,6 +65,110 @@ export async function listWorksForModel(): Promise<WorkForModelRow[]> {
         groupName: group?.name ?? null,
       };
     });
+}
+
+const ITEM_CHUNK = 100;
+
+/** Everything the SketchUp setup carries (sketchup-setup.ts): the works with their rates and recipes, the mixes with their make-ups, and the items those use. */
+export async function getSketchupSetupSource(): Promise<SetupSource> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const [works, info, workComponents, mixes, mixComponents] = await Promise.all([
+    listWorksForModel(),
+    fetchAll<{ work_item_id: string; labour_rate: number | null }>((from, to) =>
+      supabase
+        .from("estimator_work_info")
+        .select("work_item_id, labour_rate")
+        .order("work_item_id")
+        .range(from, to),
+    ),
+    fetchAll<{
+      work_item_id: string;
+      item_id: string | null;
+      mix_id: string | null;
+      qty_per_unit: number;
+    }>((from, to) =>
+      supabase
+        .from("estimator_work_components")
+        .select("work_item_id, item_id, mix_id, qty_per_unit")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{
+      id: string;
+      name: string;
+      uom: string;
+      group_name: string | null;
+      is_active: boolean;
+    }>((from, to) =>
+      supabase
+        .from("estimator_mixes")
+        .select("id, name, uom, group_name, is_active")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ mix_id: string; item_id: string | null; qty_per_unit: number }>((from, to) =>
+      supabase
+        .from("estimator_mix_components")
+        .select("mix_id, item_id, qty_per_unit")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  // In chunks: a few hundred ids in one `in` filter make a URL past what the gateway takes.
+  const itemIds = [
+    ...new Set(
+      [...workComponents, ...mixComponents].flatMap((row) => (row.item_id ? [row.item_id] : [])),
+    ),
+  ];
+  const items: SetupSource["items"] = new Map();
+  for (let at = 0; at < itemIds.length; at += ITEM_CHUNK) {
+    const { data, error } = await supabase
+      .from("items")
+      .select("id, code, name, default_uom, indicative_price")
+      .in("id", itemIds.slice(at, at + ITEM_CHUNK));
+    if (error) fail("the materials", error);
+    for (const row of data ?? []) {
+      items.set(row.id, {
+        code: row.code,
+        name: row.name,
+        uom: row.default_uom,
+        price: row.indicative_price,
+      });
+    }
+  }
+
+  const workParts: SetupSource["workComponents"] = new Map();
+  for (const row of workComponents) {
+    if (!row.item_id && !row.mix_id) continue;
+    const list = workParts.get(row.work_item_id) ?? [];
+    list.push({ itemId: row.item_id, mixId: row.mix_id, qtyPerUnit: row.qty_per_unit });
+    workParts.set(row.work_item_id, list);
+  }
+  const mixParts: SetupSource["mixComponents"] = new Map();
+  for (const row of mixComponents) {
+    if (!row.item_id) continue;
+    const list = mixParts.get(row.mix_id) ?? [];
+    list.push({ itemId: row.item_id, qtyPerUnit: row.qty_per_unit });
+    mixParts.set(row.mix_id, list);
+  }
+
+  return {
+    works,
+    labourRates: new Map(info.map((row) => [row.work_item_id, row.labour_rate])),
+    workComponents: workParts,
+    mixes: mixes.map((mix) => ({
+      id: mix.id,
+      name: mix.name,
+      uom: mix.uom,
+      groupName: mix.group_name,
+      isActive: mix.is_active,
+    })),
+    mixComponents: mixParts,
+    items,
+  };
 }
 
 export async function getVillaForModel(
