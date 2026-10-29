@@ -2,6 +2,10 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## SketchUp: everything from the model
+
+`plan.md`, top section. Piece 1 (Download setup for SketchUp, `0172`–`0173`) is on staging; the founder tries checklist 1 once the plugin's 0.10 is built from `goodearth-qs/TOOLBOX-ADJUSTMENTS.md` (in the 3Dqs sandbox). Next: piece 2 (`0174`: the model's mixes, steel, worked-out lines and other costs), then piece 3 (Plot 04 compared).
+
 ## Waiting on the founder — Kaadal Billing on staging
 
 `plan.md`, top section, has the checklist (`0169` on staging, the sheet's records imported, the tool in Interiors Operations). Grant `/kaadal-billing` to whoever keeps the ledger. For production: apply `0169`, then run `scripts/import-kaadal-billing.ts` with the data file in `../kaadal-billing-data/` (or carry staging's rows if the team has worked in it by then).

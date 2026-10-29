@@ -7,6 +7,8 @@ export const MODEL_MEASURES = [
   "volume",
   "area",
   "base_and_sides",
+  "sides",
+  "bua",
   "length",
   "count",
   "manual",

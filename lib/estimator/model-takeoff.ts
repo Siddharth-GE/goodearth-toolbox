@@ -24,6 +24,8 @@ export const MODEL_MEASURES = [
   "volume",
   "area",
   "base_and_sides",
+  "sides",
+  "bua",
   "length",
   "count",
   "manual",
@@ -34,6 +36,8 @@ export const MODEL_MEASURE_LABELS: Record<ModelMeasure, string> = {
   volume: "Volume of the solid",
   area: "Area — a wall's face, a slab's plan, painted faces",
   base_and_sides: "Base and sides — a footing's shuttering",
+  sides: "Sides — every face but top and bottom: a beam's or column's shuttering",
+  bua: "Built-up area — the sheet painted over each floor (package works)",
   length: "Length — the longest side",
   count: "Count — one per tagged object",
   manual: "By hand, on the estimate",
@@ -43,6 +47,8 @@ export const MODEL_MEASURE_SHORT: Record<ModelMeasure, string> = {
   volume: "volume",
   area: "area",
   base_and_sides: "base and sides",
+  sides: "sides",
+  bua: "built-up area",
   length: "length",
   count: "count",
   manual: "hand",
@@ -448,10 +454,11 @@ export function planImport(
       there && there.modelRows === 0 && there.handRows === 0 && there.qty !== null
         ? there.qty
         : null;
+    // Goodearth QS 0.7–0.9 sends a built-up-area work as an area.
+    const sameMeasure =
+      line.measuredAs === effective || (effective === "bua" && line.measuredAs === "area");
     entry.measuredDifferently =
-      line.measuredAs && line.measuredAs !== effective
-        ? { model: line.measuredAs, rateBook: effective }
-        : null;
+      line.measuredAs && !sameMeasure ? { model: line.measuredAs, rateBook: effective } : null;
 
     measured.add(work.workItemId);
     payload.push({
