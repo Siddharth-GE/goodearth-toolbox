@@ -18,6 +18,10 @@ const MAX_LINES = 2_000;
 const MAX_ROWS = 50_000;
 const MAX_REF = 200;
 const MAX_ISSUES = 500;
+const MAX_MATERIALS = 2_000;
+const MAX_WORKED_OUT = 500;
+const MAX_OTHER_COSTS = 100;
+const MAX_SETTINGS = 100;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const MODEL_MEASURES = [
@@ -111,6 +115,28 @@ export type TakeoffNotMeasured = {
 
 export type TakeoffIssue = { level: string; title: string; detail: string };
 
+/** What a work is made of as the model measured it, in the mix's own unit. uom null: the model didn't say (the
+ * settings' materials), so the toolbox's mix decides. */
+export type TakeoffMaterial = {
+  workCode: string;
+  mix: string;
+  uom: string | null;
+  qty: number;
+  from: "model" | "steel" | "settings";
+};
+
+/** An allowance the rate book has no work for, at the plugin's rate (the founder, 2026-10-29). */
+export type TakeoffOtherCost = {
+  code: string | null;
+  name: string;
+  unit: string | null;
+  qty: number | null;
+  rate: number | null;
+  note: string | null;
+};
+
+export type ModelSettings = Record<string, string | number | boolean | null>;
+
 export type Takeoff = {
   model: {
     file: string | null;
@@ -123,6 +149,10 @@ export type Takeoff = {
   lines: TakeoffLine[];
   notMeasured: TakeoffNotMeasured[];
   issues: TakeoffIssue[];
+  materials: TakeoffMaterial[];
+  otherCosts: TakeoffOtherCost[];
+  settings: ModelSettings | null;
+  buaSqft: number | null;
   rowCount: number;
   errorCount: number;
   warningCount: number;
@@ -145,6 +175,112 @@ const numberOrNull = (value: unknown): number | null =>
 const box = (value: unknown): number | null =>
   value === null || value === undefined ? null : typeof value === "number" ? value : Number.NaN;
 const lowerFirst = (message: string) => message.charAt(0).toLowerCase() + message.slice(1);
+const positive = (value: unknown): number | null => {
+  const number = numberOrNull(value);
+  return number !== null && number > 0 ? number : null;
+};
+const notNegative = (value: unknown): number | null => {
+  const number = numberOrNull(value);
+  return number !== null && number >= 0 ? number : null;
+};
+const DIAMETER = /^\d{1,2}$/;
+
+/** Steel arrives as mixes (the founder, 2026-10-29): bar diameter d is `Steel d mm`; 0 is kg per cum, not split. */
+export function steelMixName(diameter: string): string {
+  return diameter === "0" ? "Steel (kg per cum)" : `Steel ${diameter} mm`;
+}
+
+/** Worked-out lines (derived.lines): one row each, merged into the drawn line of the same code. */
+function addWorkedOut(lines: TakeoffLine[], raw: unknown[]): void {
+  const byCode = new Map(lines.map((line) => [line.workCode, line]));
+  for (const entry of raw.filter(isObject)) {
+    const workCode = text(entry.code, 40);
+    const qty = positive(entry.qty);
+    if (!workCode || qty === null) continue;
+    const basis = text(entry.basis, 1_900);
+    const row: TakeoffRow = {
+      description: `${entry.from === "settings" ? "From the settings" : "Worked out"}${basis ? `: ${basis}` : ""}`,
+      nos: 1,
+      length: qty,
+      breadth: null,
+      depth: null,
+      modelRefs: [],
+    };
+    const line = byCode.get(workCode);
+    if (line) {
+      line.rows.push(row);
+      line.modelQty = line.modelQty === null ? null : line.modelQty + qty;
+      continue;
+    }
+    const added: TakeoffLine = {
+      position: lines.length + 1,
+      workCode,
+      workName: "",
+      uom: text(entry.uom, 40).toLowerCase(),
+      measuredAs: "",
+      modelQty: qty,
+      rows: [row],
+      problem: null,
+    };
+    lines.push(added);
+    byCode.set(workCode, added);
+  }
+}
+
+function readMaterials(doc: Record<string, unknown>, derived: Record<string, unknown>): TakeoffMaterial[] {
+  const list = (value: unknown) => (Array.isArray(value) ? value.filter(isObject) : []);
+  const materials: TakeoffMaterial[] = [];
+  const push = (workCode: unknown, mix: unknown, uom: unknown, qty: unknown, from: TakeoffMaterial["from"]) => {
+    const code = text(workCode, 40);
+    const name = text(mix, 120);
+    const amount = positive(qty);
+    if (code && name && amount !== null) {
+      materials.push({ workCode: code, mix: name, uom: text(uom, 40) || null, qty: amount, from });
+    }
+  };
+  for (const entry of list(doc.mixes)) push(entry.work_code, entry.mix, entry.uom, entry.qty, "model");
+  for (const entry of list(doc.steel)) {
+    const byDia = isObject(entry.by_dia) ? entry.by_dia : {};
+    for (const [diameter, kg] of Object.entries(byDia)) {
+      if (DIAMETER.test(diameter)) push(entry.work_code, steelMixName(diameter), "kg", kg, "steel");
+    }
+  }
+  for (const entry of list(derived.mixes)) push(entry.work_code, entry.name, entry.uom, entry.qty, "settings");
+  for (const entry of list(derived.steel)) {
+    const diameter = String(entry.dia ?? "");
+    if (DIAMETER.test(diameter)) push(entry.work_code, steelMixName(diameter), "kg", entry.kg, "settings");
+  }
+  for (const entry of list(derived.extras)) push(entry.work_code, entry.name, entry.uom, entry.qty, "settings");
+  return materials;
+}
+
+function readOtherCosts(raw: unknown[]): TakeoffOtherCost[] {
+  return raw
+    .filter(isObject)
+    .map((entry) => ({
+      code: textOrNull(entry.code, 40),
+      name: text(entry.name, 200),
+      unit: textOrNull(entry.unit, 40),
+      qty: notNegative(entry.qty),
+      rate: notNegative(entry.rate),
+      note: textOrNull(entry.note, 500),
+    }))
+    .filter((cost) => cost.name);
+}
+
+function readSettings(raw: unknown): ModelSettings | null {
+  if (!isObject(raw)) return null;
+  const settings: ModelSettings = {};
+  for (const [key, value] of Object.entries(raw).slice(0, MAX_SETTINGS)) {
+    if (!key || key.length > 60) continue;
+    if (value === null || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+      settings[key] = value;
+    } else if (typeof value === "string") {
+      settings[key] = value.slice(0, 200);
+    }
+  }
+  return Object.keys(settings).length > 0 ? settings : null;
+}
 
 function readRow(raw: unknown, number: number): { row?: TakeoffRow; problem?: string } {
   if (!isObject(raw)) return { problem: `row ${number} can't be read.` };
@@ -241,6 +377,20 @@ export function parseTakeoff(input: unknown): ParsedTakeoff {
     };
   });
 
+  const derived = isObject(doc.derived) ? doc.derived : {};
+  const workedOut = Array.isArray(derived.lines) ? derived.lines : [];
+  const allowances = Array.isArray(derived.allowances) ? derived.allowances : [];
+  const counted = [doc.mixes, doc.steel, derived.mixes, derived.steel, derived.extras].map((value) =>
+    Array.isArray(value) ? value.length : 0,
+  );
+  if (counted.some((count) => count > MAX_MATERIALS)) {
+    return { problem: "The takeoff lists more materials than any villa has." };
+  }
+  if (workedOut.length > MAX_WORKED_OUT || allowances.length > MAX_OTHER_COSTS) {
+    return { problem: "The takeoff lists more worked-out items than any villa has." };
+  }
+  addWorkedOut(lines, workedOut);
+
   const notMeasured: TakeoffNotMeasured[] = (
     Array.isArray(doc.not_measured) ? doc.not_measured : []
   )
@@ -281,6 +431,10 @@ export function parseTakeoff(input: unknown): ParsedTakeoff {
       lines,
       notMeasured,
       issues,
+      materials: readMaterials(doc, derived),
+      otherCosts: readOtherCosts(allowances),
+      settings: readSettings(derived.settings),
+      buaSqft: positive(derived.bua_sqft),
       rowCount: lines.reduce((sum, line) => sum + line.rows.length, 0),
       errorCount:
         numberOrNull(summary.errors) ?? issues.filter((issue) => issue.level === "error").length,
@@ -299,6 +453,8 @@ export type WorkForModel = {
   uom: string | null;
   modelMeasure: ModelMeasure | null;
 };
+
+export type MixForModel = { name: string; uom: string };
 
 export type EstimateForModel = {
   estimateId: string;
@@ -353,20 +509,139 @@ export type ImportRowPayload = {
 /** import_model_rows()'s p_lines. */
 export type ImportLinePayload = { work_item_id: string; rows: ImportRowPayload[] };
 
+/** import_model_takeoff()'s p_materials and p_other_costs (0174). */
+export type ImportMaterialPayload = {
+  work_item_id: string;
+  mix_name: string;
+  mix_uom: string;
+  qty: number;
+};
+export type ImportOtherCostPayload = {
+  code: string | null;
+  name: string;
+  unit: string | null;
+  qty: number | null;
+  rate: number | null;
+  note: string | null;
+};
+
+/** One work's material as the import will take it: a toolbox mix, a new one made under From SketchUp, or refused. */
+export type PlanMaterial = {
+  key: string;
+  code: string;
+  mix: string;
+  uom: string | null;
+  qty: number;
+  from: TakeoffMaterial["from"];
+  kind: "ok" | "new_mix" | "refused";
+  why: string | null;
+};
+
+export const MODEL_MIX_GROUP = "From SketchUp";
+
 export type ImportPlan = {
   entries: PlanEntry[];
   removals: PlanRemoval[];
+  materials: PlanMaterial[];
+  /** The mixes the import will make, empty, under From SketchUp. */
+  newMixes: { name: string; uom: string }[];
+  otherCosts: TakeoffOtherCost[];
   differentModel: { file: string | null } | null;
-  counts: { add: number; replace: number; refused: number; toMeasure: number; removed: number };
+  counts: {
+    add: number;
+    replace: number;
+    refused: number;
+    toMeasure: number;
+    removed: number;
+    materials: number;
+    refusedMaterials: number;
+    otherCosts: number;
+  };
   payload: ImportLinePayload[];
+  materialsPayload: ImportMaterialPayload[];
+  otherCostsPayload: ImportOtherCostPayload[];
   canImport: boolean;
 };
+
+/** The model's materials, work by work: matched to the Mixes tab by name (any case), the unit equal. A name the
+ * toolbox lacks becomes a new mix (the founder, 2026-10-29); a work not on the estimate after the import is refused. */
+export function planMaterials(
+  materials: TakeoffMaterial[],
+  works: WorkForModel[],
+  mixes: MixForModel[],
+  onEstimateAfter: Set<string>,
+  units: string[],
+): { plan: PlanMaterial[]; payload: ImportMaterialPayload[]; newMixes: { name: string; uom: string }[] } {
+  const byCode = new Map(works.map((work) => [work.code, work]));
+  const mixByName = new Map(mixes.map((mix) => [mix.name.trim().toLowerCase(), mix]));
+  const unitByLower = new Map(units.map((unit) => [unit.trim().toLowerCase(), unit]));
+  const merged = new Map<string, PlanMaterial & { workItemId: string | null }>();
+  const newMixes = new Map<string, { name: string; uom: string }>();
+
+  for (const material of materials) {
+    const work = byCode.get(material.workCode);
+    const nameKey = material.mix.toLowerCase();
+    const known = mixByName.get(nameKey);
+    const planned = newMixes.get(nameKey);
+    // A new mix takes the toolbox's own spelling of its unit (uoms), as 0174 does.
+    const uom =
+      known?.uom ??
+      planned?.uom ??
+      (material.uom ? (unitByLower.get(material.uom.toLowerCase()) ?? null) : null);
+    let why: string | null = null;
+    if (!work) {
+      why = `${material.workCode} is not in the toolbox's works.`;
+    } else if (!onEstimateAfter.has(work.workItemId)) {
+      why = `${material.workCode} is not on the estimate — the model didn't measure it, or it was refused.`;
+    } else if (!uom && material.uom) {
+      why = `${material.mix} is in "${material.uom}", a unit the toolbox doesn't have — add it in Masters, or fix the unit in SketchUp.`;
+    } else if (!uom) {
+      why = `${material.mix} is not in the toolbox's mixes, and the model didn't say its unit — add it on the Mixes tab.`;
+    } else if (material.uom && material.uom.toLowerCase() !== uom.trim().toLowerCase()) {
+      why = `The toolbox's ${known?.name ?? material.mix} is in ${uom}; the model sent ${material.uom}. Nothing converts.`;
+    }
+    if (!why && !known && !planned && uom) newMixes.set(nameKey, { name: material.mix, uom });
+
+    const key = `${material.workCode}|${nameKey}|${why ? "refused" : "ok"}`;
+    const entry = merged.get(key) ?? {
+      key,
+      code: material.workCode,
+      mix: known?.name ?? planned?.name ?? material.mix,
+      uom,
+      qty: 0,
+      from: material.from,
+      kind: why ? "refused" : known ? "ok" : "new_mix",
+      why,
+      workItemId: work?.workItemId ?? null,
+    };
+    entry.qty += material.qty;
+    merged.set(key, entry);
+  }
+
+  const plan = [...merged.values()].sort(
+    (a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.mix.localeCompare(b.mix),
+  );
+  return {
+    plan: plan.map(({ workItemId: _workItemId, ...entry }) => entry),
+    payload: plan
+      .filter((entry) => entry.kind !== "refused" && entry.workItemId && entry.uom)
+      .map((entry) => ({
+        work_item_id: entry.workItemId as string,
+        mix_name: entry.mix,
+        mix_uom: entry.uom as string,
+        qty: entry.qty,
+      })),
+    newMixes: [...newMixes.values()],
+  };
+}
 
 /** What importing would do, work by work: the preview the person reads, and exactly what the import writes. */
 export function planImport(
   takeoff: Takeoff,
   works: WorkForModel[],
   estimate: EstimateForModel | null,
+  mixes: MixForModel[] = [],
+  units: string[] = [],
 ): ImportPlan {
   const byCode = new Map(works.map((work) => [work.code, work]));
   const byId = new Map(works.map((work) => [work.workItemId, work]));
@@ -520,6 +795,12 @@ export function planImport(
     })
     .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
 
+  const onEstimateAfter = new Set([
+    ...payload.map((line) => line.work_item_id),
+    ...(estimate?.lines ?? []).map((line) => line.workItemId),
+  ]);
+  const materials = planMaterials(takeoff.materials, works, mixes, onEstimateAfter, units);
+
   const count = (kind: PlanKind) => entries.filter((entry) => entry.kind === kind).length;
   const counts = {
     add: count("add"),
@@ -527,17 +808,26 @@ export function planImport(
     refused: count("refused"),
     toMeasure: count("to_measure"),
     removed: removals.length,
+    materials: materials.payload.length,
+    refusedMaterials: materials.plan.filter((entry) => entry.kind === "refused").length,
+    otherCosts: takeoff.otherCosts.length,
   };
 
   return {
     entries,
     removals,
+    materials: materials.plan,
+    newMixes: materials.newMixes,
+    otherCosts: takeoff.otherCosts,
     differentModel:
       estimate?.modelGuid && takeoff.model.guid && estimate.modelGuid !== takeoff.model.guid
         ? { file: estimate.modelFile }
         : null,
     counts,
     payload,
-    canImport: counts.add + counts.replace + counts.toMeasure + counts.removed > 0,
+    materialsPayload: materials.payload,
+    otherCostsPayload: takeoff.otherCosts.map((cost) => ({ ...cost })),
+    canImport:
+      counts.add + counts.replace + counts.toMeasure + counts.removed + counts.otherCosts > 0,
   };
 }

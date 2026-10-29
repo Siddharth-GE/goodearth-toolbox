@@ -26,7 +26,7 @@ create table if not exists estimator_estimate_line_model_materials (
   id uuid primary key default gen_random_uuid(),
   line_id uuid not null references estimator_estimate_lines (id) on delete cascade,
   mix_id uuid not null references estimator_mixes (id),
-  qty numeric not null check (qty > 0),
+  qty numeric not null check (qty > 0 and qty <> 'NaN'),
   created_by uuid references profiles (id),
   updated_by uuid references profiles (id),
   created_at timestamptz not null default now(),
@@ -44,8 +44,8 @@ create table if not exists estimator_estimate_other_costs (
   code text check (code is null or length(trim(code)) between 1 and 40),
   name text not null check (length(trim(name)) between 1 and 200),
   unit text check (unit is null or length(trim(unit)) between 1 and 40),
-  qty numeric check (qty is null or qty >= 0),
-  rate numeric check (rate is null or rate >= 0),
+  qty numeric check (qty is null or (qty >= 0 and qty <> 'NaN')),
+  rate numeric check (rate is null or (rate >= 0 and rate <> 'NaN')),
   note text check (note is null or length(note) <= 500),
   position integer not null default 0,
   created_by uuid references profiles (id),
@@ -56,8 +56,9 @@ create table if not exists estimator_estimate_other_costs (
 create index if not exists estimator_estimate_other_costs_estimate
   on estimator_estimate_other_costs (estimate_id, position);
 
--- Both change only while their estimate is a draft (0087's shape). A parent already gone is a cascade from a delete its
--- own guard allowed (a draft's line, delete_draft_estimate), so it passes.
+-- Both change only while their estimate is a draft (0087's shape), and never move to another row or estimate. A parent
+-- already gone inside a cascade (trigger depth above 1) is a delete its own guard allowed, so it passes; a direct
+-- delete that cannot see its parent does not.
 create or replace function estimator_model_materials_draft_only()
 returns trigger
 language plpgsql
@@ -78,7 +79,10 @@ begin
   where l.id = v_line
   for share of e;
 
-  if tg_op = 'DELETE' and v_status is null then
+  if tg_op = 'UPDATE' and new.line_id <> old.line_id then
+    raise exception 'A material stays on its own row';
+  end if;
+  if tg_op = 'DELETE' and v_status is null and pg_trigger_depth() > 1 then
     return old;
   end if;
   if v_status is distinct from 'draft' then
@@ -115,15 +119,15 @@ begin
   where id = v_estimate
   for share;
 
-  if tg_op = 'DELETE' and v_status is null then
+  if tg_op = 'UPDATE' and new.estimate_id <> old.estimate_id then
+    raise exception 'An other cost stays on its own estimate';
+  end if;
+  if tg_op = 'DELETE' and v_status is null and pg_trigger_depth() > 1 then
     return old;
   end if;
   if v_status is distinct from 'draft' then
     raise exception 'This estimate is % — its other costs can only change while it is a draft. Revise it instead.',
       coalesce(v_status, 'missing');
-  end if;
-  if tg_op = 'UPDATE' and new.estimate_id <> old.estimate_id then
-    raise exception 'An other cost stays on its own estimate';
   end if;
   if tg_op = 'DELETE' then
     return old;
@@ -180,6 +184,9 @@ begin
   end loop;
 end $$;
 
+revoke execute on function estimator_model_materials_draft_only() from public, anon, authenticated;
+revoke execute on function estimator_other_costs_draft_only() from public, anon, authenticated;
+
 -- 4 ------------------------------------------------------------------------------------------------------
 -- p_materials: [{work_item_id, mix_name, mix_uom, qty}], already planned by the app (model-takeoff.ts); p_other_costs:
 -- [{code, name, unit, qty, rate, note}]; p_model also carries settings and bua_sqft.
@@ -192,27 +199,57 @@ set search_path to 'public'
 as $$
 declare
   v_touched uuid[];
+  v_prior uuid[];
+  v_unit text;
 begin
   if jsonb_typeof(p_materials) is distinct from 'array' or jsonb_typeof(p_other_costs) is distinct from 'array' then
     raise exception 'The takeoff''s materials or other costs are missing';
   end if;
+  if exists (
+    select 1 from jsonb_to_recordset(p_materials) as m(mix_name text)
+    where length(btrim(coalesce(m.mix_name, ''))) not between 1 and 120
+  ) or (select count(distinct lower(btrim(m.mix_name))) from jsonb_to_recordset(p_materials) as m(mix_name text)) > 2000
+  then
+    raise exception 'The takeoff names a mix with no name, one longer than 120 letters, or more mixes than any villa has';
+  end if;
+
+  -- The rows the model measured, or gave materials to, before this send: a work it sends no rows for this time keeps
+  -- its materials on the same row (import_model_rows' choice).
+  select coalesce(array_agg(distinct l.id), '{}') into v_prior
+  from estimator_estimate_lines l
+  where l.estimate_id = p_estimate
+    and (exists (select 1 from estimator_estimate_line_measurements h where h.line_id = l.id and h.from_model)
+         or exists (select 1 from estimator_estimate_line_model_materials mm where mm.line_id = l.id));
 
   -- Locks the estimate, refuses anything but the villa's working one, and lays the model's rows.
   v_touched := import_model_rows(p_estimate, p_lines, p_model);
 
+  -- A new mix takes the toolbox's own spelling of its unit; a unit the toolbox doesn't know is refused by name.
+  select btrim(m.mix_uom) into v_unit
+  from jsonb_to_recordset(p_materials) as m(mix_name text, mix_uom text)
+  where not exists (select 1 from estimator_mixes x where lower(x.name) = lower(btrim(m.mix_name)))
+    and not exists (select 1 from uoms u where lower(u.name) = lower(btrim(m.mix_uom)))
+  limit 1;
+  if found then
+    raise exception 'SketchUp sent a mix in "%", a unit the toolbox doesn''t have — add it in Masters, or fix the unit in SketchUp',
+      coalesce(v_unit, 'no unit');
+  end if;
+
   -- A mix the toolbox lacks is made, empty, under From SketchUp; one it has is never changed.
   insert into estimator_mixes (name, uom, group_name, description, created_by, updated_by)
   select distinct on (lower(btrim(m.mix_name)))
-         btrim(m.mix_name), btrim(m.mix_uom), 'From SketchUp',
+         btrim(m.mix_name), u.name, 'From SketchUp',
          'Made by a SketchUp import — add what one unit of it uses.', auth.uid(), auth.uid()
   from jsonb_to_recordset(p_materials) as m(mix_name text, mix_uom text)
-  where btrim(coalesce(m.mix_name, '')) <> '' and btrim(coalesce(m.mix_uom, '')) <> ''
+  join uoms u on lower(u.name) = lower(btrim(m.mix_uom))
+  where not exists (select 1 from estimator_mixes x where lower(x.name) = lower(btrim(m.mix_name)))
+  order by lower(btrim(m.mix_name)), u.name
   on conflict ((lower(name))) do nothing;
 
   if exists (
     select 1
     from jsonb_to_recordset(p_materials) as m(work_item_id uuid, mix_name text, mix_uom text, qty numeric)
-    where m.qty is null or m.qty <= 0
+    where m.qty is null or m.qty <= 0 or m.qty = 'NaN'
        or not exists (
          select 1 from estimator_mixes x
          where lower(x.name) = lower(btrim(m.mix_name)) and lower(btrim(x.uom)) = lower(btrim(m.mix_uom))
@@ -226,7 +263,7 @@ begin
   end if;
 
   -- The model's materials from the last import go. The new ones land on the row the model's rows went to, else the
-  -- work's first unlabelled row, else its first (import_model_rows' choice).
+  -- row that held them before, else the work's first unlabelled row, else its first.
   delete from estimator_estimate_line_model_materials mm
   using estimator_estimate_lines l
   where l.id = mm.line_id and l.estimate_id = p_estimate;
@@ -240,6 +277,7 @@ begin
      where f.estimate_id = p_estimate and f.work_item_id = m.work_item_id
      order by exists (select 1 from estimator_estimate_line_measurements h
                       where h.line_id = f.id and h.from_model) desc,
+              (f.id = any(v_prior)) desc,
               (f.label is not null), f.created_at, f.id
      limit 1
   ) r on true

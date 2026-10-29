@@ -21,7 +21,12 @@ import {
   type WorkRecipe,
 } from "./calc";
 import { joinInWords } from "../format";
-import type { EstimateDetail, EstimateVariations, RecipeBook } from "./estimate-queries";
+import type {
+  EstimateDetail,
+  EstimateVariations,
+  OtherCostRow,
+  RecipeBook,
+} from "./estimate-queries";
 import type { MixRow } from "./mixes-queries";
 import type { MaterialItemRow } from "./shared";
 import type { WorkStatusRow } from "./works-queries";
@@ -41,6 +46,8 @@ export type LineRateView = {
   workName: string;
   workUom: string | null;
   own: boolean;
+  /** Made of what the SketchUp model measured (0174), in place of the rate book's list. */
+  fromModel: boolean;
   labour: { villa: number | null; rateBook: number | null; inUse: number | null };
   components: RateComponentView[];
   prices: RatePriceView[];
@@ -74,8 +81,40 @@ export type TakeoffRow = {
 
 type Totals = ReturnType<typeof computeEstimateTotals>;
 
+/** One other cost's amount: unknown, never zero, while its quantity or rate is blank. */
+export function otherCostAmount(row: Pick<OtherCostRow, "qty" | "rate">): number | null {
+  return row.qty === null || row.rate === null ? null : row.qty * row.rate;
+}
+
+/** The other costs added up (0174): what is priced, and how many are not. Nothing listed is 0; nothing priced is null. */
+export function otherCostsTotal(rows: Pick<OtherCostRow, "qty" | "rate">[]): {
+  amount: number | null;
+  unpriced: number;
+} {
+  const amounts = rows.map(otherCostAmount);
+  const priced = amounts.filter((amount): amount is number => amount !== null);
+  return {
+    amount: rows.length > 0 && priced.length === 0 ? null : priced.reduce((sum, a) => sum + a, 0),
+    unpriced: amounts.length - priced.length,
+  };
+}
+
+/** Labour, materials and other costs together: a floor while anything is unpriced. */
+export function grandTotal(
+  totals: Totals,
+  other: ReturnType<typeof otherCostsTotal>,
+): { amount: number | null; isComplete: boolean } {
+  return {
+    amount:
+      totals.grand === null && other.amount === null
+        ? null
+        : (totals.grand ?? 0) + (other.amount ?? 0),
+    isComplete: totals.isComplete && other.unpriced === 0,
+  };
+}
+
 /** The warning under the total, or none when everything is priced. */
-export function missingParts(totals: Totals): string[] {
+export function missingParts(totals: Totals, unpricedOther = 0): string[] {
   const parts = [
     totals.toMeasureCount > 0 &&
       `${totals.toMeasureCount} ${totals.toMeasureCount === 1 ? "work is" : "works are"} still to measure`,
@@ -85,6 +124,8 @@ export function missingParts(totals: Totals): string[] {
       `${totals.missingLabourCount} ${totals.missingLabourCount === 1 ? "work has" : "works have"} no labour rate`,
     totals.missingMaterialRateCount > 0 &&
       `${totals.missingMaterialRateCount} ${totals.missingMaterialRateCount === 1 ? "work uses a material" : "works use materials"} with no rate`,
+    unpricedOther > 0 &&
+      `${unpricedOther} other ${unpricedOther === 1 ? "cost has" : "costs have"} no quantity or rate`,
   ];
   return parts.filter((part): part is string => Boolean(part));
 }
@@ -166,6 +207,7 @@ export function buildEstimateView(input: {
   takeoffRows.sort((a, b) => a.name.localeCompare(b.name));
 
   const totals = computeEstimateTotals(lineCosts);
+  const other = otherCostsTotal(estimate.otherCosts);
   const categoryByWork = new Map(
     works.map((work) => [work.workItemId, { code: work.categoryCode, name: work.categoryName }]),
   );
@@ -204,6 +246,8 @@ export function buildEstimateView(input: {
   const rateViewFor = (line: EstimateDetail["lines"][number], uom: string | null): LineRateView => {
     const standard = book.recipes.find((recipe) => recipe.workItemId === line.workItemId);
     const own = variations.byLine.get(line.id);
+    // A row's list that isn't its own is the model's, folded in by getEstimateVariations.
+    const model = own ? undefined : variations.componentsByLine.get(line.id);
     const buildUp = rateBuildUp(recipesByLine.get(line.id), mixesById, materialsById);
     return {
       lineId: line.id,
@@ -211,6 +255,7 @@ export function buildEstimateView(input: {
       workName: line.label ? `${line.name} — ${line.label}` : line.name,
       workUom: uom,
       own: own !== undefined,
+      fromModel: model !== undefined,
       labour: {
         villa: line.labourRate,
         rateBook: standard?.labourRate ?? null,
@@ -220,7 +265,7 @@ export function buildEstimateView(input: {
         ? own.map((row) =>
             componentView({ materialId: row.itemId, mixId: row.mixId, qtyPerUnit: row.qtyPerUnit }),
           )
-        : (standard?.components ?? []).map(componentView),
+        : (model ?? standard?.components ?? []).map(componentView),
       prices: (buildUp?.materials ?? []).map((row) => {
         const def = materialsById.get(row.materialId);
         return {
@@ -242,7 +287,9 @@ export function buildEstimateView(input: {
     villaName: estimate.unitName ?? "this villa",
     olderDraft: isDraft && !estimate.isWorking,
     totals,
-    missing: missingParts(totals),
+    other,
+    grand: grandTotal(totals, other),
+    missing: missingParts(totals, other.unpriced),
     boq: groupLineCosts(lineCosts, categoryByWork, categoryOrder),
     lineById: new Map(estimate.lines.map((line) => [line.id, line])),
     /** How many rows each work has: a frozen work with several keeps its materials per work, not per row. */

@@ -91,6 +91,32 @@ test("expandRecipe survives an empty or missing mix", () => {
   assert.deepEqual(expandRecipe(recipe, mixes), [{ materialId: "sand", qtyPerWorkUnit: 1 }]);
 });
 
+test("a line made of an empty or missing mix has unknown materials, never zero", () => {
+  for (const mixId of ["empty", "deleted-mix"]) {
+    const recipe: WorkRecipe = {
+      workItemId: "w1",
+      uom: "cum",
+      labourRate: 100,
+      components: [mix(mixId, 3), direct("sand", 1)],
+    };
+    const cost = computeLine({ workItemId: "w1", qty: 2 }, recipe, mixes, materials);
+    assert.equal(cost.labourCost, 200);
+    assert.equal(cost.materialCost, null);
+    assert.equal(cost.totalCost, null);
+    assert.equal(rateBuildUp(recipe, mixes, materials)?.rate, null);
+  }
+});
+
+test("the model's materials as a row's own list price per unit (0174)", () => {
+  // 0.486 cum of footing made of 0.486 cum of M20 and 21.9 kg of steel: the fold divides by the row's quantity.
+  const standard: WorkRecipe = { workItemId: "w1", uom: "cum", labourRate: 6000, components: [] };
+  const own = new Map([["row1", [mix("m20", 0.486 / 0.486)]]]);
+  const recipes = lineRecipes([standard], [{ id: "row1", workItemId: "w1" }], own, new Map());
+  const cost = computeLine({ workItemId: "w1", qty: 0.486 }, recipes.get("row1"), mixes, materials);
+  assert.equal(cost.labourCost, 6000 * 0.486);
+  assert.ok(Math.abs((cost.materialCost ?? 0) - 0.486 * (8 * 400 + 0.45 * 2000 + 0.9 * 1500)) < 1e-9);
+});
+
 test("computeLine prices labour and materials together", () => {
   const recipe: WorkRecipe = {
     workItemId: "w1",

@@ -92,6 +92,13 @@ export function expandRecipe(
   return [...totals].map(([materialId, qtyPerWorkUnit]) => ({ materialId, qtyPerWorkUnit }));
 }
 
+/** A mix the recipe names that is gone or has nothing in it yet (a mix a SketchUp import made, 0174): its materials are unknown, never ₹0. */
+export function hasEmptyMix(recipe: WorkRecipe, mixesById: Map<string, MixDef>): boolean {
+  return recipe.components.some(
+    (component) => component.mixId !== null && !mixesById.get(component.mixId)?.components.length,
+  );
+}
+
 export type LineCost = {
   workItemId: string;
   /** The estimate row it prices, where the caller knows it. */
@@ -148,7 +155,7 @@ export function computeLine(
   const qty = line.qty;
   const labourCost = recipe.labourRate === null ? null : recipe.labourRate * qty;
 
-  let materialCost: number | null = 0;
+  let materialCost: number | null = hasEmptyMix(recipe, mixesById) ? null : 0;
   const missingRateMaterialIds: string[] = [];
   for (const need of needs) {
     const material = materialsById.get(need.materialId);
@@ -203,7 +210,10 @@ export function rateBuildUp(
       cost: price === null ? null : price * need.qtyPerWorkUnit,
     };
   });
-  const known = recipe.labourRate !== null && materials.every((row) => row.cost !== null);
+  const known =
+    recipe.labourRate !== null &&
+    !hasEmptyMix(recipe, mixesById) &&
+    materials.every((row) => row.cost !== null);
   return {
     labourRate: recipe.labourRate,
     materials,

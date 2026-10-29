@@ -159,15 +159,16 @@ export async function deleteMix(id: string): Promise<ActionState> {
   const supabase = await createClient();
 
   // Checked before its composition goes: the FK refuses the mix only after that delete, which would leave every work using it priced at nothing.
-  const [works, lines] = await Promise.all([
+  const [works, lines, model] = await Promise.all([
     supabase.from("estimator_work_components").select("id").eq("mix_id", id).limit(1),
     supabase.from("estimator_estimate_line_components").select("id").eq("mix_id", id).limit(1),
+    supabase.from("estimator_estimate_line_model_materials").select("id").eq("mix_id", id).limit(1),
   ]);
-  if (works.error || lines.error) {
-    console.error("deleteMix (in use) read failed:", works.error ?? lines.error);
+  if (works.error || lines.error || model.error) {
+    console.error("deleteMix (in use) read failed:", works.error ?? lines.error ?? model.error);
     return { error: "Could not delete the mix. Try again." };
   }
-  if (works.data.length > 0 || lines.data.length > 0) {
+  if (works.data.length > 0 || lines.data.length > 0 || model.data.length > 0) {
     return { error: "This mix is in use, so it can't be deleted. Switch it off instead." };
   }
 

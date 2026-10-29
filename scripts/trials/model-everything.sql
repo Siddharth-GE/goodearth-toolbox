@@ -51,15 +51,15 @@ begin
   v_materials := jsonb_build_array(
     jsonb_build_object('work_item_id', v_work, 'mix_name', v_mix_name, 'mix_uom', v_mix_uom, 'qty', 1.5),
     jsonb_build_object('work_item_id', v_work, 'mix_name', ' ' || upper(v_mix_name), 'mix_uom', v_mix_uom, 'qty', 0.5),
-    jsonb_build_object('work_item_id', v_work, 'mix_name', 'Trial SketchUp mix', 'mix_uom', 'kg', 'qty', 40));
+    jsonb_build_object('work_item_id', v_work, 'mix_name', 'Trial SketchUp mix', 'mix_uom', ' KG ', 'qty', 40));
   v_costs := jsonb_build_array(
     jsonb_build_object('code', 'MEP', 'name', 'MEP materials', 'unit', 'sqft BUA', 'qty', 100, 'rate', 200, 'note', 'Allowance'),
     jsonb_build_object('code', '', 'name', 'Door hardware', 'unit', 'nos', 'qty', 5, 'rate', 3500, 'note', null));
   v_model := jsonb_build_object('file', 'Trial.skp', 'bua_sqft', 100,
     'settings', jsonb_build_object('toilets', 3));
 
-  -- 1. One import lays the rows, makes the missing mix under From SketchUp, adds a mix named twice once, and keeps the
-  --    other costs and settings.
+  -- 1. One import lays the rows, makes the missing mix under From SketchUp in the toolbox's spelling of its unit, adds a
+  --    mix named twice once, and keeps the other costs and settings.
   perform import_model_takeoff(v_working, v_lines, v_model, v_materials, v_costs);
   select id into v_line from estimator_estimate_lines where estimate_id = v_working and work_item_id = v_work;
   if not exists (select 1 from estimator_mixes where name = 'Trial SketchUp mix' and uom = 'kg'
@@ -102,6 +102,28 @@ begin
   end;
   if v_text not like 'The rate book or the estimate changed%' then
     raise exception 'TRIAL 3 FAILED: a unit that differs gave %', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 3b. A new mix in a unit the toolbox doesn't have is refused by name; so is a name past 120 letters.
+  v_text := null;
+  begin
+    perform import_model_takeoff(v_working, v_lines, v_model,
+      jsonb_build_array(jsonb_build_object('work_item_id', v_work, 'mix_name', 'Trial odd unit',
+                                           'mix_uom', 'furlong', 'qty', 1)), '[]'::jsonb);
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text not like 'SketchUp sent a mix in "furlong"%' then
+    raise exception 'TRIAL 3b FAILED: an unknown unit gave %', coalesce(v_text, 'no refusal');
+  end if;
+  v_text := null;
+  begin
+    perform import_model_takeoff(v_working, v_lines, v_model,
+      jsonb_build_array(jsonb_build_object('work_item_id', v_work, 'mix_name', repeat('x', 121),
+                                           'mix_uom', 'kg', 'qty', 1)), '[]'::jsonb);
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text not like 'The takeoff names a mix%' then
+    raise exception 'TRIAL 3b FAILED: a long name gave %', coalesce(v_text, 'no refusal');
   end if;
 
   -- 4. Made official: the materials, other costs and settings are copied, and the copy is frozen.
@@ -150,6 +172,28 @@ begin
   end;
   if v_text not like 'A submitted estimate can no longer be edited%' then
     raise exception 'TRIAL 4 FAILED: the official''s switch moved (%)', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 4b. A material never moves off the official onto a draft row.
+  v_text := null;
+  begin
+    update estimator_estimate_line_model_materials mm set line_id = v_line
+      from estimator_estimate_lines l
+     where l.id = mm.line_id and l.estimate_id = v_official;
+  exception when others then v_text := sqlerrm;
+  end;
+  if v_text is distinct from 'A material stays on its own row' then
+    raise exception 'TRIAL 4b FAILED: an official''s material moved (%)', coalesce(v_text, 'no refusal');
+  end if;
+
+  -- 5a. A draft row taken off goes with its materials.
+  perform import_model_takeoff(v_working, v_lines, v_model, v_materials, v_costs);
+  perform 1 from estimator_estimate_line_model_materials where line_id = v_line;
+  if not found then raise exception 'TRIAL 5a SETUP: the draft row has no materials'; end if;
+  delete from estimator_estimate_line_measurements where line_id = v_line;
+  delete from estimator_estimate_lines where id = v_line;
+  if exists (select 1 from estimator_estimate_line_model_materials where line_id = v_line) then
+    raise exception 'TRIAL 5a FAILED: the row''s materials stayed';
   end if;
 
   -- 5. A draft goes whole, its materials and other costs with it.
