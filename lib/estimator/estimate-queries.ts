@@ -159,6 +159,14 @@ export type EstimateVariations = {
   /** item id → this villa's price (0088). Absent = Masters'. */
   rateByMaterialId: Map<string, number>;
   extraMaterials: MaterialDef[];
+  /** Row id → what the SketchUp model says it is made of, in each mix's own unit (0174). */
+  modelByLine: Map<string, { mixId: string; qty: number; addsToRecipe: boolean }[]>;
+  /** Row id → the model's extras per unit, on top of whichever list stands (0175). */
+  addsByLine: Map<string, WorkRecipe["components"]>;
+  /** Row id → the quantity the per-unit figures above were worked out from. */
+  qtyByLine: Map<string, number | null>;
+  /** Materials from: the model (true) or the Rate book (0174). */
+  useModelMaterials: boolean;
 };
 
 const NO_VARIATIONS: EstimateVariations = {
@@ -167,20 +175,30 @@ const NO_VARIATIONS: EstimateVariations = {
   labourRateByLine: new Map(),
   rateByMaterialId: new Map(),
   extraMaterials: [],
+  modelByLine: new Map(),
+  addsByLine: new Map(),
+  qtyByLine: new Map(),
+  useModelMaterials: true,
 };
 
 export async function getEstimateVariations(estimateId: string): Promise<EstimateVariations> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [lines, itemRates] = await Promise.all([
-    fetchAll<{ id: string; work_item_id: string; labour_rate: number | null }>((from, to) =>
-      supabase
-        .from("estimator_estimate_lines")
-        .select("id, work_item_id, labour_rate")
-        .eq("estimate_id", estimateId)
-        .order("id")
-        .range(from, to),
+  const [header, lines, itemRates] = await Promise.all([
+    supabase
+      .from("estimator_estimates")
+      .select("use_model_materials")
+      .eq("id", estimateId)
+      .maybeSingle(),
+    fetchAll<{ id: string; work_item_id: string; labour_rate: number | null; qty: number | null }>(
+      (from, to) =>
+        supabase
+          .from("estimator_estimate_lines")
+          .select("id, work_item_id, labour_rate, qty")
+          .eq("estimate_id", estimateId)
+          .order("id")
+          .range(from, to),
     ),
     fetchAll<{ item_id: string | null; rate: number }>((from, to) =>
       supabase
@@ -191,6 +209,9 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
         .range(from, to),
     ),
   ]);
+
+  if (header.error) fail("the estimate", header.error);
+  const useModelMaterials = header.data?.use_model_materials ?? true;
 
   // Prices are per (estimate, material), so they stand without a recipe variation.
   const rateByMaterialId = new Map<string, number>();
@@ -203,26 +224,35 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
   }
 
   if (lines.length === 0) {
-    return { ...NO_VARIATIONS, rateByMaterialId };
+    return { ...NO_VARIATIONS, rateByMaterialId, useModelMaterials };
   }
 
-  const components = await fetchAll<{
-    id: string;
-    line_id: string;
-    item_id: string | null;
-    mix_id: string | null;
-    qty_per_unit: number;
-  }>((from, to) =>
-    supabase
-      .from("estimator_estimate_line_components")
-      .select("id, line_id, item_id, mix_id, qty_per_unit")
-      .in(
-        "line_id",
-        lines.map((line) => line.id),
-      )
-      .order("id")
-      .range(from, to),
-  );
+  const lineIds = lines.map((line) => line.id);
+  const [components, modelRows] = await Promise.all([
+    fetchAll<{
+      id: string;
+      line_id: string;
+      item_id: string | null;
+      mix_id: string | null;
+      qty_per_unit: number;
+    }>((from, to) =>
+      supabase
+        .from("estimator_estimate_line_components")
+        .select("id, line_id, item_id, mix_id, qty_per_unit")
+        .in("line_id", lineIds)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ line_id: string; mix_id: string; qty: number; adds_to_recipe: boolean }>(
+      (from, to) =>
+        supabase
+          .from("estimator_estimate_line_model_materials")
+          .select("line_id, mix_id, qty, adds_to_recipe")
+          .in("line_id", lineIds)
+          .order("id")
+          .range(from, to),
+    ),
+  ]);
 
   const itemDefs = await itemDefsByIds(supabase, [
     ...new Set(components.flatMap((row) => (row.item_id ? [row.item_id] : []))),
@@ -253,12 +283,42 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     );
   }
 
+  const modelByLine = new Map<string, { mixId: string; qty: number; addsToRecipe: boolean }[]>();
+  for (const row of modelRows) {
+    const bucket = modelByLine.get(row.line_id) ?? [];
+    bucket.push({ mixId: row.mix_id, qty: Number(row.qty), addsToRecipe: row.adds_to_recipe });
+    modelByLine.set(row.line_id, bucket);
+  }
+  const addsByLine = new Map<string, WorkRecipe["components"]>();
+  // The model's quantities become the row's list per unit, so every sum downstream follows: its mixes and steel in
+  // place of the rate book's list, its extras on top of whichever list stands. A villa's own list still wins, and a
+  // row not yet measured has no per-unit figure (it stays unknown, never zero).
+  if (useModelMaterials) {
+    for (const line of lines) {
+      const model = modelByLine.get(line.id);
+      const qty = line.qty === null ? null : Number(line.qty);
+      if (!model || qty === null || qty <= 0) continue;
+      const perUnit = (rows: typeof model) =>
+        rows.map((row) => ({ materialId: null, mixId: row.mixId, qtyPerUnit: row.qty / qty }));
+      const replacing = model.filter((row) => !row.addsToRecipe);
+      const adding = model.filter((row) => row.addsToRecipe);
+      if (replacing.length > 0 && !byLine.has(line.id)) {
+        componentsByLine.set(line.id, perUnit(replacing));
+      }
+      if (adding.length > 0) addsByLine.set(line.id, perUnit(adding));
+    }
+  }
+
   return {
     byLine,
     componentsByLine,
     labourRateByLine,
     rateByMaterialId,
     extraMaterials: [...itemDefs.values()],
+    modelByLine,
+    addsByLine,
+    qtyByLine: new Map(lines.map((line) => [line.id, line.qty === null ? null : Number(line.qty)])),
+    useModelMaterials,
   };
 }
 
@@ -405,8 +465,26 @@ export async function listVillas(): Promise<VillaEstimates[]> {
           .range(from, to),
       )
     : [];
+  // An official's other costs (0174) count in its total, as on its page; an unpriced one leaves the total unknown.
+  const others = officialIds.length
+    ? await fetchAll<{ estimate_id: string; qty: number | null; rate: number | null }>((from, to) =>
+        supabase
+          .from("estimator_estimate_other_costs")
+          .select("estimate_id, qty, rate")
+          .in("estimate_id", officialIds)
+          .order("id")
+          .range(from, to),
+      )
+    : [];
   const totals = new Map<string, number | null>();
-  for (const row of costs) {
+  for (const row of [
+    ...costs,
+    ...others.map((other) => ({
+      estimate_id: other.estimate_id,
+      total_cost:
+        other.qty === null || other.rate === null ? null : Number(other.qty) * Number(other.rate),
+    })),
+  ]) {
     const sofar = totals.has(row.estimate_id) ? totals.get(row.estimate_id)! : 0;
     totals.set(
       row.estimate_id,
@@ -475,6 +553,19 @@ export type EstimateLineRow = {
   labourRate: number | null;
 };
 
+/** An allowance the rate book has no work for (0174): from the model (replaced on each import) or typed. */
+export type OtherCostRow = {
+  id: string;
+  fromModel: boolean;
+  code: string | null;
+  name: string;
+  unit: string | null;
+  qty: number | null;
+  rate: number | null;
+  note: string | null;
+  position: number;
+};
+
 export type EstimateDetail = {
   id: string;
   name: string;
@@ -500,6 +591,12 @@ export type EstimateDetail = {
   villaWorkingId: string | null;
   villaOfficial: { id: string; reference: string | null } | null;
   model: { file: string | null; importedAt: string; importedByName: string | null } | null;
+  /** Materials from: the model (true) or the Rate book (0174). */
+  useModelMaterials: boolean;
+  /** The project settings and built-up area the model last sent (0174). */
+  modelSettings: Record<string, string | number | boolean | null> | null;
+  modelBuaSqft: number | null;
+  otherCosts: OtherCostRow[];
   /** The 0077 snapshot, present once past draft. The screen renders it: costs frozen at submit. */
   frozen: {
     lineCosts: FrozenLineRow[];
@@ -514,7 +611,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
     .select(
-      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at, cancelled_at, cancelled_by, cancel_reason, model_file, model_imported_at, model_imported_by",
+      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at, cancelled_at, cancelled_by, cancel_reason, model_file, model_imported_at, model_imported_by, use_model_materials, model_settings, model_bua_sqft",
     )
     .eq("id", estimateId)
     .maybeSingle();
@@ -559,84 +656,102 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  const [submitter, importer, siblings, frozenCosts, frozenTakeoff, canceller, drawing] =
-    await Promise.all([
-      estimate.submitted_by
-        ? supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", estimate.submitted_by)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      estimate.model_imported_by
-        ? supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", estimate.model_imported_by)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      estimate.unit_id
-        ? supabase
-            .from("estimator_estimates")
-            .select("id, is_working, status, reference")
-            .eq("unit_id", estimate.unit_id)
-            .or("is_working.eq.true,status.eq.submitted")
-        : Promise.resolve({ data: [], error: null }),
-      estimate.status !== "draft"
-        ? fetchAll<{
-            line_id: string;
-            work_item_id: string;
-            qty: number;
-            uom: string | null;
-            labour_cost: number | null;
-            material_cost: number | null;
-            total_cost: number | null;
-          }>((from, to) =>
-            supabase
-              .from("estimator_estimate_line_costs")
-              .select("line_id, work_item_id, qty, uom, labour_cost, material_cost, total_cost")
-              .eq("estimate_id", estimateId)
-              .order("id")
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-      estimate.status !== "draft"
-        ? fetchAll<{
-            work_item_id: string;
-            material_id: string | null;
-            item_id: string | null;
-            material_name: string;
-            uom: string;
-            quantity: number;
-            rate: number | null;
-          }>((from, to) =>
-            supabase
-              .from("estimator_estimate_takeoff")
-              .select("work_item_id, material_id, item_id, material_name, uom, quantity, rate")
-              .eq("estimate_id", estimateId)
-              .order("id")
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-      estimate.cancelled_by
-        ? supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", estimate.cancelled_by)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      estimate.status === "submitted"
-        ? fetchAll<{ indents: { reference: string | null } | null }>((from, to) =>
-            supabase
-              .from("indent_lines")
-              .select("id, indents!indent_lines_indent_id_fkey!inner(reference, status)")
-              .eq("estimate_id", estimateId)
-              .neq("indents.status", "cancelled")
-              .order("id")
-              .range(from, to),
-          )
-        : Promise.resolve([]),
-    ]);
+  const [
+    submitter,
+    importer,
+    siblings,
+    frozenCosts,
+    frozenTakeoff,
+    canceller,
+    drawing,
+    otherCosts,
+  ] = await Promise.all([
+    estimate.submitted_by
+      ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    estimate.model_imported_by
+      ? supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", estimate.model_imported_by)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    estimate.unit_id
+      ? supabase
+          .from("estimator_estimates")
+          .select("id, is_working, status, reference")
+          .eq("unit_id", estimate.unit_id)
+          .or("is_working.eq.true,status.eq.submitted")
+      : Promise.resolve({ data: [], error: null }),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          line_id: string;
+          work_item_id: string;
+          qty: number;
+          uom: string | null;
+          labour_cost: number | null;
+          material_cost: number | null;
+          total_cost: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_line_costs")
+            .select("line_id, work_item_id, qty, uom, labour_cost, material_cost, total_cost")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          work_item_id: string;
+          material_id: string | null;
+          item_id: string | null;
+          material_name: string;
+          uom: string;
+          quantity: number;
+          rate: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_takeoff")
+            .select("work_item_id, material_id, item_id, material_name, uom, quantity, rate")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    estimate.cancelled_by
+      ? supabase.from("profiles").select("full_name").eq("id", estimate.cancelled_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    estimate.status === "submitted"
+      ? fetchAll<{ indents: { reference: string | null } | null }>((from, to) =>
+          supabase
+            .from("indent_lines")
+            .select("id, indents!indent_lines_indent_id_fkey!inner(reference, status)")
+            .eq("estimate_id", estimateId)
+            .neq("indents.status", "cancelled")
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    fetchAll<{
+      id: string;
+      from_model: boolean;
+      code: string | null;
+      name: string;
+      unit: string | null;
+      qty: number | null;
+      rate: number | null;
+      note: string | null;
+      position: number;
+    }>((from, to) =>
+      supabase
+        .from("estimator_estimate_other_costs")
+        .select("id, from_model, code, name, unit, qty, rate, note, position")
+        .eq("estimate_id", estimateId)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
   if (siblings.error) fail("the villa's other estimates", siblings.error);
   if (canceller.error) fail("who withdrew the estimate", canceller.error);
   if (importer.error) fail("who imported the model", importer.error);
@@ -682,6 +797,33 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           importedByName: importer.data?.full_name ?? null,
         }
       : null,
+    useModelMaterials: estimate.use_model_materials,
+    modelSettings:
+      estimate.model_settings &&
+      typeof estimate.model_settings === "object" &&
+      !Array.isArray(estimate.model_settings)
+        ? (estimate.model_settings as Record<string, string | number | boolean | null>)
+        : null,
+    modelBuaSqft: estimate.model_bua_sqft === null ? null : Number(estimate.model_bua_sqft),
+    // The model's rows first in the order it sent them, then the typed ones in the order they were added.
+    otherCosts: otherCosts
+      .map((row) => ({
+        id: row.id,
+        fromModel: row.from_model,
+        code: row.code,
+        name: row.name,
+        unit: row.unit,
+        qty: row.qty === null ? null : Number(row.qty),
+        rate: row.rate === null ? null : Number(row.rate),
+        note: row.note,
+        position: row.position,
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.fromModel) - Number(a.fromModel) ||
+          a.position - b.position ||
+          a.id.localeCompare(b.id),
+      ),
     frozen:
       estimate.status === "draft"
         ? null

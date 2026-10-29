@@ -907,6 +907,18 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
   if (!lines.data || lines.data.length === 0) {
     return { error: "Add at least one work before making this estimate official." };
   }
+  // The model's per-unit figures were worked out from the quantities read with the variations: a change since then
+  // would freeze model × new ÷ old.
+  if (
+    lines.data.some(
+      (line) =>
+        !variations.qtyByLine.has(line.id) ||
+        variations.qtyByLine.get(line.id) !== (line.qty === null ? null : Number(line.qty)),
+    ) ||
+    lines.data.length !== variations.qtyByLine.size
+  ) {
+    return { error: "The estimate changed while it was being made official — try again." };
+  }
   if (lines.data.some((line) => line.qty === null)) {
     const count = lines.data.filter((line) => line.qty === null).length;
     return {
@@ -928,6 +940,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     lines.data.map((line) => ({ id: line.id, workItemId: line.work_item_id })),
     variations.componentsByLine,
     variations.labourRateByLine,
+    variations.addsByLine,
   );
 
   const lineInputs = lines.data.map((line) => ({
@@ -1036,6 +1049,166 @@ export async function approveReconciliation(input: {
     }
     console.error("approveReconciliation failed:", error);
     return { error: "Could not record the approval. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/** Materials from: the model or the Rate book (0174). The final QS switches to the Rate book; the model's list stays, unused. */
+export async function setUseModelMaterials(
+  estimateId: string,
+  useModel: boolean,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!estimateId) return { error: "Which estimate?" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("estimator_estimates")
+    .update({ use_model_materials: useModel, updated_by: user.id })
+    .eq("id", estimateId)
+    .select("id");
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("setUseModelMaterials failed:", error);
+    return { error: "Could not change where the materials come from. Try again." };
+  }
+  if (!data || data.length === 0) return { error: "That estimate is gone — reload the page." };
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+const OTHER_COST_CODE_LIMIT = 40;
+const OTHER_COST_NAME_LIMIT = 200;
+const OTHER_COST_UNIT_LIMIT = 40;
+const OTHER_COST_NOTE_LIMIT = 500;
+
+function readOtherCost(formData: FormData):
+  | { error: string }
+  | {
+      code: string | null;
+      name: string;
+      unit: string | null;
+      qty: number | null;
+      rate: number | null;
+      note: string | null;
+    } {
+  const code = text(formData, "code");
+  const name = text(formData, "name");
+  const unit = text(formData, "unit");
+  const note = text(formData, "note");
+  const qty = parseNumber(formData.get("qty"));
+  const rate = parseNumber(formData.get("rate"));
+  if (!name) return { error: "Say what the cost is for." };
+  if (name.length > OTHER_COST_NAME_LIMIT) return { error: "Keep the name shorter." };
+  if (code.length > OTHER_COST_CODE_LIMIT || unit.length > OTHER_COST_UNIT_LIMIT) {
+    return { error: "Keep the code and unit short." };
+  }
+  if (note.length > OTHER_COST_NOTE_LIMIT) return { error: "That note is too long." };
+  if (qty !== null && (!Number.isFinite(qty) || qty < 0)) {
+    return { error: "The quantity must be a number, or left blank." };
+  }
+  if (rate !== null && (!Number.isFinite(rate) || rate < 0)) {
+    return { error: "The rate must be a number in rupees, or left blank." };
+  }
+  return { code: code || null, name, unit: unit || null, qty, rate, note: note || null };
+}
+
+/** A cost typed on the estimate (0174): it stays when the model is sent again. */
+export async function addOtherCost(
+  estimateId: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!estimateId) return { error: "Which estimate?" };
+  const fields = readOtherCost(formData);
+  if ("error" in fields) return fields;
+
+  const supabase = await createClient();
+  const { data: last, error: readError } = await supabase
+    .from("estimator_estimate_other_costs")
+    .select("position")
+    .eq("estimate_id", estimateId)
+    .eq("from_model", false)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readError) {
+    console.error("addOtherCost (read) failed:", readError);
+    return { error: "Could not add the cost. Try again." };
+  }
+  const { error } = await supabase.from("estimator_estimate_other_costs").insert({
+    estimate_id: estimateId,
+    from_model: false,
+    ...fields,
+    position: (last?.position ?? 0) + 1,
+    created_by: user.id,
+    updated_by: user.id,
+  });
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("addOtherCost failed:", error);
+    return { error: "Could not add the cost. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/** Only a typed cost changes here; the model's come from SketchUp and are replaced on each import. */
+export async function updateOtherCost(
+  id: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!id) return { error: "Which cost?" };
+  const fields = readOtherCost(formData);
+  if ("error" in fields) return fields;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("estimator_estimate_other_costs")
+    .update({ ...fields, updated_by: user.id })
+    .eq("id", id)
+    .eq("from_model", false)
+    .select("id");
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("updateOtherCost failed:", error);
+    return { error: "Could not save the cost. Try again." };
+  }
+  if (!data || data.length === 0) {
+    return {
+      error: "That cost came from the model, or is gone — change it in SketchUp, or reload.",
+    };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function deleteOtherCost(id: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  if (!id) return { error: "Which cost?" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("estimator_estimate_other_costs")
+    .delete()
+    .eq("id", id)
+    .eq("from_model", false)
+    .select("id");
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("deleteOtherCost failed:", error);
+    return { error: "Could not remove the cost. Try again." };
+  }
+  if (!data || data.length === 0) {
+    return { error: "That cost came from the model, or is gone — reload the page." };
   }
 
   revalidatePath("/estimator", "layout");

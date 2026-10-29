@@ -36,6 +36,8 @@ export function lineRecipes(
   lines: { id: string; workItemId: string }[],
   componentsByLine: Map<string, WorkRecipe["components"]>,
   labourRateByLine: Map<string, number>,
+  /** Added on top of whichever list stands: the model's extras (0175). */
+  addsByLine: Map<string, WorkRecipe["components"]> = new Map(),
 ): Map<string, WorkRecipe> {
   const byWork = new Map(recipes.map((recipe) => [recipe.workItemId, recipe]));
   const byLine = new Map<string, WorkRecipe>();
@@ -45,7 +47,10 @@ export function lineRecipes(
     const labourRate = labourRateByLine.get(line.id);
     byLine.set(line.id, {
       ...standard,
-      components: componentsByLine.get(line.id) ?? standard.components,
+      components: [
+        ...(componentsByLine.get(line.id) ?? standard.components),
+        ...(addsByLine.get(line.id) ?? []),
+      ],
       // A villa rate of 0 is real (labour included in a contract), so do not fall back on falsy.
       labourRate: labourRate === undefined ? standard.labourRate : labourRate,
     });
@@ -90,6 +95,13 @@ export function expandRecipe(
   }
 
   return [...totals].map(([materialId, qtyPerWorkUnit]) => ({ materialId, qtyPerWorkUnit }));
+}
+
+/** A mix the recipe names that is gone or has nothing in it yet (a mix a SketchUp import made, 0174): its materials are unknown, never ₹0. */
+export function hasEmptyMix(recipe: WorkRecipe, mixesById: Map<string, MixDef>): boolean {
+  return recipe.components.some(
+    (component) => component.mixId !== null && !mixesById.get(component.mixId)?.components.length,
+  );
 }
 
 export type LineCost = {
@@ -148,7 +160,7 @@ export function computeLine(
   const qty = line.qty;
   const labourCost = recipe.labourRate === null ? null : recipe.labourRate * qty;
 
-  let materialCost: number | null = 0;
+  let materialCost: number | null = hasEmptyMix(recipe, mixesById) ? null : 0;
   const missingRateMaterialIds: string[] = [];
   for (const need of needs) {
     const material = materialsById.get(need.materialId);
@@ -203,7 +215,10 @@ export function rateBuildUp(
       cost: price === null ? null : price * need.qtyPerWorkUnit,
     };
   });
-  const known = recipe.labourRate !== null && materials.every((row) => row.cost !== null);
+  const known =
+    recipe.labourRate !== null &&
+    !hasEmptyMix(recipe, mixesById) &&
+    materials.every((row) => row.cost !== null);
   return {
     labourRate: recipe.labourRate,
     materials,

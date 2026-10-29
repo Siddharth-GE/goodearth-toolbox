@@ -28,7 +28,7 @@ import {
   type PlanEntry,
   type PlanRemoval,
 } from "@/lib/estimator/model-takeoff";
-import { formatCount, formatQuantity } from "@/lib/format";
+import { formatCount, formatMoney, formatQuantity } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 
 /** Bridge with Goodearth QS for SketchUp: it opens this page in an HtmlDialog and injects window.sketchup; it answers through the window functions below.
@@ -527,6 +527,9 @@ function PreviewCard({
         </TableBody>
       </Table>
 
+      {plan.materials.length > 0 && <MaterialsPreview preview={preview} />}
+      {plan.otherCosts.length > 0 && <OtherCostsPreview preview={preview} />}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" disabled={importing || !plan.canImport} onClick={onImport}>
           {importing ? "Importing…" : `Import into ${villa.name}`}
@@ -536,6 +539,115 @@ function PreviewCard({
         )}
       </div>
     </Card>
+  );
+}
+
+/** What each work is made of, as the model measured it: a toolbox mix, a new one, or refused. */
+function MaterialsPreview({ preview }: { preview: ModelImportPreview }) {
+  const { plan } = preview;
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+          What the works are made of
+        </p>
+        <p className="text-muted text-sm">
+          {formatCount(plan.counts.materials)} from the model while the estimate takes its materials
+          from it: its mixes and steel in place of the rate book&apos;s list, its extras (ridge
+          tiles, grills, stair teak) on top.
+          {plan.counts.refusedMaterials > 0 && (
+            <span className="text-danger">
+              {" "}
+              {formatCount(plan.counts.refusedMaterials)} refused — the rest still imports.
+            </span>
+          )}
+        </p>
+        {plan.newMixes.length > 0 && (
+          <p className="text-warning text-sm">
+            New in the Mixes tab, under From SketchUp, with nothing in them yet:{" "}
+            {plan.newMixes.map((mix) => `${mix.name} (${mix.uom})`).join(", ")}. Fill each in on the
+            Mixes tab — until then its materials are not priced.
+          </p>
+        )}
+      </div>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Work</TableHeaderCell>
+            <TableHeaderCell>Made of</TableHeaderCell>
+            <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {plan.materials.map((material) => (
+            <TableRow key={material.key}>
+              <TableCell className="font-mono text-xs">{material.code}</TableCell>
+              <TableCell className="text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-foreground">{material.mix}</span>
+                  {material.kind === "new_mix" && <Badge variant="warning">New mix</Badge>}
+                  {material.kind === "refused" && <Badge variant="danger">Refused</Badge>}
+                  {material.from === "settings" && (
+                    <span className="text-muted text-xs">from the settings</span>
+                  )}
+                </div>
+                {material.why && <p className="text-danger text-xs">{material.why}</p>}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                {formatQuantity(material.qty)} {material.uom ?? ""}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/** The allowances, at the plugin's rates: they replace the model's last ones; typed costs stay. */
+function OtherCostsPreview({ preview }: { preview: ModelImportPreview }) {
+  const { plan } = preview;
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+          Other costs
+        </p>
+        <p className="text-muted text-sm">
+          What the rate book has no work for, at SketchUp&apos;s project-setting rates. They replace
+          the model&apos;s last ones; costs typed on the estimate stay.
+        </p>
+      </div>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Cost</TableHeaderCell>
+            <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
+            <TableHeaderCell className="text-right">Rate</TableHeaderCell>
+            <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {plan.otherCosts.map((cost, index) => (
+            <TableRow key={`${index}-${cost.name}`}>
+              <TableCell className="text-sm">
+                <span className="text-foreground">{cost.name}</span>
+                {cost.note && <span className="text-muted block text-xs">{cost.note}</span>}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                {cost.qty === null ? "—" : `${formatQuantity(cost.qty)} ${cost.unit ?? ""}`}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm">
+                {formatMoney(cost.rate)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm">
+                {formatMoney(cost.qty === null || cost.rate === null ? null : cost.qty * cost.rate)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

@@ -6,8 +6,10 @@ import { revalidatePath } from "next/cache";
 import {
   getVillaForModel,
   getWorkingEstimateForModel,
+  listMixesForModel,
   listWorksForModel,
 } from "./model-import-queries";
+import { listUomNames } from "./shared";
 import { parseTakeoff, planImport, type ImportPlan, type Takeoff } from "./model-takeoff";
 import { GRANT } from "./shared";
 import { syncLineQty } from "./sheet-sync";
@@ -18,7 +20,7 @@ import { syncLineQty } from "./sheet-sync";
 export type ModelImportPreview = {
   villa: { unitId: string; name: string };
   startsEstimate: boolean;
-  plan: Omit<ImportPlan, "payload">;
+  plan: Omit<ImportPlan, "payload" | "materialsPayload" | "otherCostsPayload">;
 };
 
 export type ModelImportResult = {
@@ -37,6 +39,8 @@ type Inputs =
       takeoff: Takeoff;
       villa: { unitId: string; name: string };
       works: Awaited<ReturnType<typeof listWorksForModel>>;
+      mixes: Awaited<ReturnType<typeof listMixesForModel>>;
+      units: string[];
       working: Awaited<ReturnType<typeof getWorkingEstimateForModel>>;
     };
 
@@ -46,13 +50,15 @@ async function readInputs(text: unknown, unitId: unknown): Promise<Inputs> {
   if (parsed.problem !== undefined) return { error: parsed.problem };
 
   try {
-    const [villa, works, working] = await Promise.all([
+    const [villa, works, mixes, units, working] = await Promise.all([
       getVillaForModel(unitId),
       listWorksForModel(),
+      listMixesForModel(),
+      listUomNames(),
       getWorkingEstimateForModel(unitId),
     ]);
     if (!villa) return { error: "That villa no longer exists — pick another." };
-    return { takeoff: parsed.takeoff, villa, works, working };
+    return { takeoff: parsed.takeoff, villa, works, mixes, units, working };
   } catch (error) {
     console.error("model import (read) failed:", error);
     return { error: "Could not read the rate book or the villa's estimate. Try again." };
@@ -67,7 +73,7 @@ export async function previewModelImport(
   const inputs = await readInputs(text, unitId);
   if ("error" in inputs) return { error: inputs.error };
 
-  const plan = planImport(inputs.takeoff, inputs.works, inputs.working);
+  const plan = planImport(inputs.takeoff, inputs.works, inputs.working, inputs.mixes, inputs.units);
   return {
     preview: {
       villa: inputs.villa,
@@ -75,6 +81,9 @@ export async function previewModelImport(
       plan: {
         entries: plan.entries,
         removals: plan.removals,
+        materials: plan.materials,
+        newMixes: plan.newMixes,
+        otherCosts: plan.otherCosts,
         differentModel: plan.differentModel,
         counts: plan.counts,
         canImport: plan.canImport,
@@ -90,13 +99,13 @@ export async function importModelTakeoff(
   const user = await requireTool(GRANT);
   const inputs = await readInputs(text, unitId);
   if ("error" in inputs) return { error: inputs.error };
-  const { takeoff, villa, works } = inputs;
+  const { takeoff, villa, works, mixes, units } = inputs;
   const supabase = await createClient();
 
   // A villa with no working estimate gets a blank one first (0098); in a race, the second import finds the first's.
   let working = inputs.working;
   if (!working) {
-    if (!planImport(takeoff, works, null).canImport) {
+    if (!planImport(takeoff, works, null, mixes, units).canImport) {
       return { error: "Nothing in this takeoff can be imported — see why beside each work." };
     }
     const { error } = await supabase.rpc("start_villa_estimate", {
@@ -120,15 +129,22 @@ export async function importModelTakeoff(
     if (!working) return { error: "Could not start the villa's estimate. Try again." };
   }
 
-  const plan = planImport(takeoff, works, working);
+  const plan = planImport(takeoff, works, working, mixes, units);
   if (!plan.canImport) {
     return { error: "Nothing in this takeoff can be imported — see why beside each work." };
   }
 
-  const { data: touched, error } = await supabase.rpc("import_model_rows", {
+  const { data: touched, error } = await supabase.rpc("import_model_takeoff", {
     p_estimate: working.estimateId,
     p_lines: plan.payload,
-    p_model: { file: takeoff.model.file, guid: takeoff.model.guid },
+    p_model: {
+      file: takeoff.model.file,
+      guid: takeoff.model.guid,
+      settings: takeoff.settings,
+      bua_sqft: takeoff.buaSqft,
+    },
+    p_materials: plan.materialsPayload,
+    p_other_costs: plan.otherCostsPayload,
   });
   if (error) {
     if (error.code === "P0001") return { error: error.message };

@@ -73,42 +73,64 @@ Matched by meaning (one line each, so the founder can correct any):
 
 ## Piece 2 — everything imports (`0174`, money: independent Opus review before `db:apply`)
 
-The sandbox draft's rules, as they stand, except where noted:
+**The founder, 2026-10-29, on starting pieces 2 and 3:** "the toolbox is the source of truth, the plugin is the servant". Then, on how the model's materials meet the rate book: "once I start the final QS the mixes, materials, all of that must come from the toolbox; until then, when it's uploaded it should take all the values and let new mixes get added to the toolbox, unless deleted later, with some name that talks of the plugin". The allowances come in at the plugin's rates. The mixes the toolbox lacks are added once from the plugin's make-ups.
 
-- **Worked-out lines import like drawn ones:** one model row each, `Worked out: <basis>` or `From the settings: <basis>`. They match on code, the unit must agree, and a refused one is refused alone.
-- **Model materials:** each work's mixes, steel (by bar size → `Steel <d> mm`; `0` → `Steel (kg per cum)`) and extras (Stair teak, Window grills, Ridge tiles, Gutters), all matched to the Mixes tab by name, case-insensitive, unit equal, each refused alone. While a line has any model material, the rate book's recipe and the villa's own list are not used for it. Labour is unchanged. On a work that is on the estimate twice (`0157`), the materials go on the line the model's rows go to.
-- **Other costs:** a block on the estimate below the lines (code, name, unit, qty, rate, amount, note). It holds the allowances the rate book has no work for: fill soil, setting out, hardware, MEP materials per sqft and the site allowance. The JCB hours are no longer here; they're lines now. Rows come from the model (read-only, replaced on every import) or are typed (kept). They count in the total, are frozen by Make official, and are never in the takeoff or Indents.
-- **The estimate shows the BUA and the project settings** it came from.
-- **Database:**
-  - `estimator_estimate_line_model_materials` (line, `source` mix|steel|extra, mix, qty > 0, refs);
-  - `estimator_estimate_other_costs` and its frozen snapshot;
-  - `estimator_estimates.model_settings`, `model_bua_sqft`;
-  - `import_model_rows`, `estimator_copy_estimate_contents` and `make_estimate_official` re-created;
-  - `villa_cost_facts` re-created with other costs as their own budget line.
-    RLS on, the four `/estimator` policies and the draft-only trigger in `0087`'s shape, execute revoked from `public, anon`. It ends by asserting all of this. The trial `scripts/trials/estimator-model-everything.sql` runs as the single-grant person. `SECURITY.md` gains the tables.
-- **Code:**
-  - `calc.ts` (`expandModelMaterials`, other costs in the total and never in the takeoff) and its tests;
-  - `model-takeoff.ts` (reads `mixes`, `steel`, `derived` within caps: 2,000 mixes, 2,000 steel, 500 worked-out lines, 100 allowances, 100 settings) and its tests;
-  - the import query and action; the estimate's queries and actions (typed other costs);
-  - the estimate page (_made of_, Other costs, a From the model card) and the From the model preview;
-  - the seed script `scripts/seed-sketchup-mixes.ts`. It adds the mixes the toolbox lacks and the five steel mixes from the plugin's `recipes.csv`, under toolbox naming, dry run first and `--commit` on staging only.
+So:
+
+- **Worked-out lines import like drawn ones** (`derived.lines`): one model row each, `Worked out: <basis>` or `From the settings: <basis>` (Nos 1 × Length qty, the plugin's own net-row shape). A code the model also drew gets the row added to its line. They match on code, the unit must agree, and a refused one is refused alone.
+- **The model's materials** (`mixes`, `steel`, `derived.mixes`, `derived.steel`, `derived.extras`) are stored per line, in the mix's own unit:
+  - a mix by name, case-insensitive, unit equal (a unit that differs is refused alone);
+  - steel `by_dia` _d_ → the mix `Steel d mm`, `0` → `Steel (kg per cum)`;
+  - extras by name (`Stair teak`, `Window grills`, `Ridge tiles`, `Gutters`);
+  - **a name the toolbox lacks becomes a new mix** in the group **From SketchUp**, in the unit the model sent, with no make-up yet (its materials are unpriced until someone fills it in on the Mixes tab). It stays a toolbox mix until someone deletes it.
+  - On a work that is on the estimate twice (`0157`), they go on the row the model's rows go to. A material whose work is not on the estimate after the import is refused alone.
+- **Materials from: the model / the Rate book** — one switch per estimate (`use_model_materials`, on by default). On: a line with model materials is made of those, in place of the rate book's recipe; a line without any keeps the recipe. Off (the final QS): every line is made of the rate book's recipe, and the model's materials are kept but not counted. Either way, a villa's own list (`0087`) wins over both. calc.ts needs no change: the model's quantities become the line's per-unit list (quantity ÷ the line's quantity) inside `getEstimateVariations`, so the takeoff, Make official, Indents and the rate build-up all follow.
+- **Other costs** (`derived.allowances`, at the plugin's rates): a block on the estimate below the lines (code, name, unit, qty, rate, amount, note). Rows from the model are replaced on every import; rows typed on the estimate stay. They count in the total, are copied into the official estimate (and so frozen with it), and are never in the takeoff or Indents.
+- **The estimate shows the BUA and the project settings** the model sent (`model_bua_sqft`, `model_settings`).
+- **Database (`0174_model_everything.sql`):**
+  - `estimator_estimates`: `use_model_materials` (default true), `model_settings` jsonb, `model_bua_sqft`;
+  - `estimator_estimate_line_model_materials` (line, mix, qty > 0), cascading with its line, under its own draft-only trigger (a row never moves; a delete that can't see its parent passes only inside a cascade);
+  - `estimator_estimate_other_costs` (estimate, `from_model`, code, name, unit, qty, rate, note, position), cascading with its estimate, draft-only by its own trigger;
+  - `import_model_takeoff(p_estimate, p_lines, p_model, p_materials, p_other_costs)` (the settings and BUA ride in `p_model`): runs `import_model_rows` unchanged, makes the missing mixes, replaces the model's materials and other costs, records the settings and BUA — one transaction. The old three-argument function stays for the app between apply and deploy;
+  - `estimator_copy_estimate_contents` re-created: a full copy carries the materials, the other costs and the three columns.
+  - RLS on, the four `/estimator` policies on each table, execute revoked from `public, anon`, asserted at the end. The trial `scripts/trials/model-everything.sql` runs as the single-grant person.
+- **Settled at the 0174 review:** a new mix takes the toolbox's spelling of its unit, and a unit the toolbox lacks is refused for that material alone. A switched-off mix of the same name is reused, and still counts. A full copy from another villa carries its model materials, settings and BUA, as `0157` already carries its model rows. Deleting a mix the model uses is refused, like one a recipe uses.
+- **Not in this build:** other costs in Budget against actual (`villa_cost_facts`) — the official estimate's total includes them, the budget page does not yet (TODO).
+- **Code:** `model-takeoff.ts` reads the new parts (caps: 2,000 mixes, 2,000 steel, 500 worked-out lines, 100 allowances, 100 settings) and plans them, with tests; the import action and query; `getEstimateVariations` folds the model's materials in; the estimate page (the switch, _made of … (from the model)_, Other costs with typed rows, the settings card); the From the model preview (materials and other costs, new mixes named); `scripts/seed-sketchup-mixes.ts` (dry run, then `--commit` on staging): the plugin's `recipes.csv` mixes and steel that the toolbox lacks, with their make-ups, in **From SketchUp**, and its work recipes only for works the rate book has no recipe for.
 
 ## Piece 3 — Plot 04 end to end
 
-Send `Plot 04 - QS model.skp` (0.10) to a test villa on staging. Then compare the toolbox's estimate with the plugin's Estimate button on the same setup, quantity by quantity and rupee by rupee, and write the differences into this section. The target is equal within rupees.
+Import `Plot 04 - QS model takeoff.json` (0.10, 29 Oct) into a test villa on staging. Then compare the toolbox's estimate with the plugin's `Plot 04 - QS model estimate.csv` (₹72.3 L: labour ₹26.3 L, materials ₹29.3 L, allowances ₹16.7 L), quantity by quantity and rupee by rupee, and write the differences into this section. The target is equal within rupees, or each difference named.
+
+**Compared on 2026-10-29** (Opus): the takeoff from 21:16 run through the toolbox's own reader, planner and pricing (`parseTakeoff`, `planImport`, the fold, `computeLine`, `computeTakeoff`) against staging's rate book after `0174`, `0175` and the mix seed, read-only. Nothing refused: 85 works, 1 to measure (F.04.08 jali), 51 materials, 7 other costs, no new mixes.
+
+|             | Plugin        | Toolbox       | Difference          |
+| ----------- | ------------- | ------------- | ------------------- |
+| Labour      | ₹26,28,681.74 | ₹26,28,681.78 | 4 paise of rounding |
+| Materials   | ₹29,31,873.62 | ₹22,64,104.25 | ₹6,67,769 — below   |
+| Other costs | ₹16,72,094.50 | ₹16,72,094.50 | none                |
+| Total       | ₹72,32,649.87 | ₹65,64,880.53 |                     |
+
+The materials' difference, all of it:
+
+- **₹6,67,914: the plugin's own recipes for 18 works the rate book has none for** (roof steel PF.03.01 ₹2.86 L, floor and wall tiles F.02.02/F.02.03/CAR.02.05 ₹2.24 L, putty and paints, PU polish, grout, waterproofing). The plugin says so in its own notes. `scripts/seed-sketchup-mixes.ts --works` adds them to the rate book (dry run: CAR.02.05, CAR.02.08, F.01.02, F.01.03, F.02.02, F.02.03, F.02.14, F.03.01, F.03.02, F.03.02A, F.03.05, F.04.05, F.04.10–F.04.13, PF.03.01, PF.03.15), but that changes those works for every villa, so it waits for the founder.
+- **−₹149.40: HW/19B Tower Bolt 6"** — the plugin prices it ₹120, the toolbox's Masters ₹194.70. The toolbox's price stands.
+- **₹4.62: rounding** of 8 mm steel's quantity in the plugin's sheet.
+
+Found on the way and fixed by `0175`: the model's extras (ridge tiles, grills, stair teak) add to a work's recipe, as the plugin does; `0174` let them replace it, which dropped PF.03.09's Mangalore tiles (₹1.64 L).
 
 ## Steps — one branch per piece, each vetted on staging before the next
 
 - [x] Founder: go-ahead (2026-10-29), the code list as written; 0172's four unit moves put back by `0173` at the founder's word.
-- [x] `[Opus]` Piece 1: `0172` and `0173` dry run and applied to staging. The download route (`/estimator/works/sketchup-setup`, `lib/estimator/sketchup-setup.ts` and its tests), the buttons on the Rate book and the Mixes tab, and _Send the setup to SketchUp_ on From the model (the works list for an older plugin).
+- [x] `[Opus]` Piece 1: `0172` and `0173` dry run and applied to staging. The download route, the buttons, _Send the setup to SketchUp_.
 - [x] `[Opus]` Piece 1: the plugin's half written as `goodearth-qs/TOOLBOX-ADJUSTMENTS.md`, with a real setup beside it.
-- [ ] Plugin 0.10 built from `TOOLBOX-ADJUSTMENTS.md` (its tests pass), Plot 04 re-tagged, the new `.rbz` in `Goodearth QS for the team`.
-- [ ] `[Opus]` Piece 1: independent review, then the pull request to `staging`. Founder: checklist 1.
-- [ ] `[Opus]` Piece 2: `0174` and its trial, dry run as the single-grant person, independent Opus review, applied to staging, `db:types:staging`.
-- [ ] `[Sonnet]` Piece 2: `calc.ts`, `model-takeoff.ts` and their tests, the import and estimate queries and actions.
-- [ ] `[Sonnet]` Piece 2: the estimate page, the From the model preview, the seed script (dry run).
-- [ ] `[Opus]` Piece 2: vet, open every changed page as the probe, the checks, independent review, pull request. Founder: checklist 2.
-- [ ] `[Opus]` Piece 3: Plot 04 compared, written up here.
+- [x] Plugin 0.10 built from `TOOLBOX-ADJUSTMENTS.md` (the founder's plugin session; Plot 04 sent from it on 29 Oct).
+- [x] `[Opus]` Piece 1: independent review, merged to `staging` (#198).
+- [x] `[Opus]` Piece 2: `0174` and its trial, dry run as the single-grant person, independent Opus review (fixes made), applied to staging, `db:types:staging`. `0175` the same way.
+- [x] `[Opus]` Piece 2: `model-takeoff.ts`, the import, the variations fold, their tests.
+- [x] `[Opus]` Piece 2: the estimate page, the From the model preview, the seed script (mixes committed on staging; `--works` waits for the founder).
+- [ ] `[Opus]` Piece 2: vet, open every changed page, the checks, independent review, pull request. Founder: checklist 2.
+- [x] `[Opus]` Piece 3: Plot 04 compared, written up here; `0175` from it.
 
 ## The founder's checklists on staging
 
@@ -121,17 +143,19 @@ Send `Plot 04 - QS model.skp` (0.10) to a test villa on staging. Then compare th
 
 **2. Everything:**
 
-1. Send Plot 04 → Import. FD.03.04 shows _made of M25 Concrete and Steel 10 mm_. F.01.03 says _Worked out: 5 door and 24 window frames…_. FD.02.02 is in hours. Other costs list fill soil, setting out, hardware and MEP materials.
-2. Labour, materials and other costs each equal the plugin's Estimate within rupees.
-3. Change a beam's bars, send again → its steel changes and nothing doubles. Type an other cost, send again → it stays.
-4. Make official → the total includes the other costs. Indents offer M20's materials and the steel, never the other costs.
-5. As the probe: every step works.
+1. Send Plot 04 → the preview lists the materials and other costs, and names any new mix. Import. FD.03.04 shows _made of M20 Concrete and Steel 10 mm (from the model)_. F.01.03 says _Worked out: Frames…_. FD.02.02 is in hours. Other costs list fill soil, hardware, MEP materials and the site allowance.
+2. Labour, materials and other costs each equal the plugin's Estimate within rupees, or the difference is named in piece 3.
+3. Switch **Materials from** to _the Rate book_ → FD.03.04 is made of M25 Concrete, the steel is gone; switch back.
+4. Send again → nothing doubles. Type an other cost, send again → it stays.
+5. Make official → the total includes the other costs. Indents offer M20's materials and the steel, never the other costs.
+6. Mixes tab → the group **From SketchUp** holds the plugin's mixes.
 
 ## Not in this build
 
 - Earthwork priced per cum (it's in hours now, as the rate book has it).
 - FD.22 and FD.29/30/32's measure (still open).
 - Converting units, and renaming a mix in models already painted with the old name.
+- Other costs in Budget against actual.
 
 ---
 

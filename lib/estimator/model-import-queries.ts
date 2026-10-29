@@ -4,7 +4,12 @@ import { requireTool } from "@/lib/auth/access";
 import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
-import { isModelMeasure, type EstimateForModel, type WorkForModel } from "./model-takeoff";
+import {
+  isModelMeasure,
+  type EstimateForModel,
+  type MixForModel,
+  type WorkForModel,
+} from "./model-takeoff";
 import { fail, GRANT } from "./shared";
 import type { SetupSource } from "./sketchup-setup";
 
@@ -65,6 +70,15 @@ export async function listWorksForModel(): Promise<WorkForModelRow[]> {
         groupName: group?.name ?? null,
       };
     });
+}
+
+/** Every mix, switched off or not: the import matches the model's materials to these by name. */
+export async function listMixesForModel(): Promise<MixForModel[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  return fetchAll<MixForModel>((from, to) =>
+    supabase.from("estimator_mixes").select("name, uom").order("id").range(from, to),
+  );
 }
 
 const ITEM_CHUNK = 100;

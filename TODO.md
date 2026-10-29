@@ -4,7 +4,10 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## SketchUp: everything from the model
 
-`plan.md`, top section. Piece 1 (Download setup for SketchUp, `0172`–`0173`) is on staging; the founder tries checklist 1 once the plugin's 0.10 is built from `goodearth-qs/TOOLBOX-ADJUSTMENTS.md` (in the 3Dqs sandbox). Next: piece 2 (`0174`: the model's mixes, steel, worked-out lines and other costs), then piece 3 (Plot 04 compared).
+`plan.md`, top section. Piece 1 (Download setup for SketchUp, `0172`–`0173`) is on staging (#198), and the plugin's 0.10 is built. Piece 2 (`0174`: the model's mixes, steel, worked-out lines and other costs) is being built on `feature/model-everything-2`, then piece 3 (Plot 04 compared). Follow-ups from piece 2:
+
+- Make official's freshness check covers only line quantities: an import or a _Materials from_ switch landing mid-press can freeze costs that disagree with the copied model materials. Pass the working estimate's `updated_at` and refuse on a change (0174 review). The same review found 0077, 0087, 0088 and 0096's draft-only guards check only the new row on an update.
+- Other costs in Budget against actual (`villa_cost_facts`).
 
 ## Waiting on the founder — Kaadal Billing on staging
 
