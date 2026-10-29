@@ -630,7 +630,8 @@ async function main() {
        on conflict (work_item_id) do update set uom = excluded.uom, labour_rate = excluded.labour_rate;`,
     );
   }
-  const packageCodes = liveWorks.filter((w) => w.is_package).map((w) => w.code);
+  // A package is measured as the built-up area only in sqft, as 0172 sets it.
+  const packageCodes = liveWorks.filter((w) => w.is_package && w.uom === "sqft").map((w) => w.code);
   statements.push(
     `update estimator_work_info i set model_measure = 'volume'
      from work_items w where w.id = i.work_item_id and w.code = any(${textArray(BY_VOLUME)}) and i.model_measure is null;`,

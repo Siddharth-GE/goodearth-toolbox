@@ -1,6 +1,6 @@
-/** The setup Goodearth QS for SketchUp loads from the toolbox (plan.md, From the model, everything): the works it tags by, the mixes it paints,
- * and the rates and make-ups its Estimate button prices with, so the plugin follows the rate book instead of a workbook of its own.
- * It carries money, so only /estimator downloads it. The contract with the plugin is `goodearth-qs/TOOLBOX-ADJUSTMENTS.md` in the sandbox. */
+/** The setup Goodearth QS for SketchUp loads (estimator/PLAN.md decision 12): the works it tags by, the mixes it paints, and the rates and
+ * make-ups its Estimate button prices with, so the plugin follows the rate book. It carries money, so only /estimator downloads it.
+ * Standard rates only: a villa's own labour rates and materials stay in the toolbox. This file is the contract; the plugin reads it as is. */
 
 export const SETUP_FORMAT = "goodearth-qs-setup";
 export const SETUP_VERSION = 1;
