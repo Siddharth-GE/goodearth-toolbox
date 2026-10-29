@@ -29,8 +29,10 @@ async function readSigners(supabase: Client): Promise<BillSigners | null> {
   };
 }
 
-/** The boxes an approved bill prints; a draft prints none. A failed read prints a box unsigned rather than failing the PDF. */
-export async function getBillSignatureBoxes(bill: BillDetail): Promise<SignatureBox[] | null> {
+/** The boxes an approved bill or sheet prints; a draft prints none. A failed read prints a box unsigned rather than failing the PDF. */
+export async function getBillSignatureBoxes(
+  bill: Pick<BillDetail, "status" | "approved_by">,
+): Promise<SignatureBox[] | null> {
   await requireTool("/bills");
   if (bill.status === "recorded") return null;
   const supabase = await createClient();

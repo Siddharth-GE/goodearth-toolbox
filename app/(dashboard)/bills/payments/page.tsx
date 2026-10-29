@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { MONEY_KIND_LABEL, moneyReversal, type MoneyKind } from "@/lib/bills/ledger";
 import { reverseBillMoney } from "@/lib/bills/payment-actions";
+import { reverseSheetMoney } from "@/lib/bills/sheet-actions";
 import { listPaymentsLedger } from "@/lib/bills/payment-queries";
 import { getCurrentBillActor } from "@/lib/bills/queries";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
@@ -121,7 +122,7 @@ export default async function PaymentsPage({
               <TableHeaderCell>On</TableHeaderCell>
               <TableHeaderCell>What</TableHeaderCell>
               <TableHeaderCell>To</TableHeaderCell>
-              <TableHeaderCell>Bill</TableHeaderCell>
+              <TableHeaderCell>Bill or sheet</TableHeaderCell>
               <TableHeaderCell>Reference</TableHeaderCell>
               <TableHeaderCell className="text-right">Amount</TableHeaderCell>
               <TableHeaderCell />
@@ -143,7 +144,14 @@ export default async function PaymentsPage({
                   <div className="text-muted text-xs">{row.project_name}</div>
                 </TableCell>
                 <TableCell className="font-mono text-xs">
-                  {row.bill_id ? (
+                  {row.sheet_id ? (
+                    <Link
+                      href={`/bills/sheets/${row.sheet_id}`}
+                      className="text-accent hover:underline"
+                    >
+                      {row.bill_reference}
+                    </Link>
+                  ) : row.bill_id ? (
                     <Link href={`/bills/${row.bill_id}`} className="text-accent hover:underline">
                       {row.bill_reference}
                     </Link>
@@ -161,8 +169,16 @@ export default async function PaymentsPage({
                     verb="Reverse"
                     reasonPlaceholder="Paid twice by mistake"
                     removal={moneyReversal(row, actor)}
-                    cancelNote={REVERSE_NOTE[row.kind]}
-                    onCancel={reverseBillMoney.bind(null, row.kind, row.id)}
+                    cancelNote={
+                      row.sheet_entry_id
+                        ? "The same amount is entered the other way on every bill of the sheet, with your reason, so the sheet has it pending again. Both entries stay on record. This can't be undone."
+                        : REVERSE_NOTE[row.kind]
+                    }
+                    onCancel={
+                      row.sheet_entry_id && row.kind !== "advance"
+                        ? reverseSheetMoney.bind(null, row.kind, row.sheet_entry_id)
+                        : reverseBillMoney.bind(null, row.kind, row.id)
+                    }
                   />
                 </TableCell>
               </TableRow>

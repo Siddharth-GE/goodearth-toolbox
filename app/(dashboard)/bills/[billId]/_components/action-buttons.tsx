@@ -28,6 +28,7 @@ export function ActionButtons({
   createdBy,
   totalAmount,
   hasMoney,
+  approveOnSheet = false,
 }: {
   billId: string;
   status: BillStatus;
@@ -36,6 +37,8 @@ export function ActionButtons({
   totalAmount: number;
   /** Paid and reversed (0147): its money rows stay, so it is corrected, never deleted. */
   hasMoney: boolean;
+  /** A contractor's labour bill is approved on its sheet (0170), never alone. */
+  approveOnSheet?: boolean;
 }) {
   const { pending, error, run: runAction, clearError } = useActionRunner();
   const [sendingBack, setSendingBack] = useState(false);
@@ -105,12 +108,16 @@ export function ActionButtons({
     );
   }
 
-  const approvable = canApprove(status, actor, totalAmount);
+  const approvable = !approveOnSheet && canApprove(status, actor, totalAmount);
   const deletable = canDeleteBill(status, actor, createdBy);
   // A named approver who is simply over their ceiling gets told so,
   // rather than watching the button quietly vanish.
   const overLimit =
-    status === "recorded" && !approvable && (actor.isAdmin || actor.isApprover) && !actor.isAdmin;
+    !approveOnSheet &&
+    status === "recorded" &&
+    !approvable &&
+    (actor.isAdmin || actor.isApprover) &&
+    !actor.isAdmin;
   if (!approvable && !deletable && !overLimit) return null;
 
   return (

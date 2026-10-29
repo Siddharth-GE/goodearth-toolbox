@@ -6,9 +6,9 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 `plan.md`, top section, has the checklist (`0169` on staging, the sheet's records imported, the tool in Interiors Operations). Grant `/kaadal-billing` to whoever keeps the ledger. For production: apply `0169`, then run `scripts/import-kaadal-billing.ts` with the data file in `../kaadal-billing-data/` (or carry staging's rows if the team has worked in it by then).
 
-## Waiting on the founder — combined contractor bills on staging
+## Waiting on the founder — consolidated bills (sheets) on staging
 
-`plan.md`, top section, has the checklist (`0166`, `0167` on staging).
+`plan.md`, top section (`0170` on staging; it replaces Combine, `0167`). `scripts/trials/payment-reversals.sql` no longer passes on staging's data either (its project has no company since `0164`).
 
 Three older bill trials no longer pass on staging's data, with or without `0166`: `bills-as-billing-team.sql` (a labour log with neither work nor name), `contractor-ledger.sql` (expects CON/122; sequences move on in rolled-back runs) and `bill-line-po-check.sql` (its PO has nothing left received). Refresh them when bills are next touched.
 

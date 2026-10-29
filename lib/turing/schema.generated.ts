@@ -16,6 +16,8 @@ export const TURING_SCHEMA: Schema = {
       "recovered_on": "string",
       "reverse_reason": "string | null",
       "reverses_id": "string | null",
+      "sheet_entry_id": "string | null",
+      "sheet_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null"
     }
@@ -187,8 +189,54 @@ export const TURING_SCHEMA: Schema = {
       "payment_ref": "string",
       "reverse_reason": "string | null",
       "reverses_id": "string | null",
+      "sheet_entry_id": "string | null",
+      "sheet_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null"
+    }
+  },
+  "bill_sheet_bills": {
+    "kind": "table",
+    "columns": {
+      "added_at": "string",
+      "added_by": "string | null",
+      "bill_id": "string | null",
+      "bill_reference": "string",
+      "id": "string",
+      "removed_at": "string | null",
+      "removed_by": "string | null",
+      "sheet_id": "string",
+      "updated_at": "string"
+    }
+  },
+  "bill_sheet_counters": {
+    "kind": "table",
+    "columns": {
+      "company_id": "string",
+      "last_no": "number",
+      "vendor_id": "string"
+    }
+  },
+  "bill_sheets": {
+    "kind": "table",
+    "columns": {
+      "approved_at": "string | null",
+      "approved_by": "string | null",
+      "company_id": "string",
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "is_test": "boolean",
+      "reference": "string",
+      "sent_back_note": "string | null",
+      "sheet_no": "number",
+      "status": "string",
+      "undone_at": "string | null",
+      "undone_by": "string | null",
+      "updated_at": "string",
+      "updated_by": "string | null",
+      "vendor_id": "string",
+      "work_type": "string"
     }
   },
   "bill_signatures": {
@@ -245,6 +293,7 @@ export const TURING_SCHEMA: Schema = {
       "reference": "string",
       "rejection_note": "string | null",
       "scope_code": "string",
+      "sheet_id": "string | null",
       "status": "string",
       "taxable_amount": "number",
       "total_amount": "number",
@@ -858,6 +907,7 @@ export const TURING_SCHEMA: Schema = {
       "project_id": "string | null",
       "released_amount": "number | null",
       "requested_amount": "number",
+      "sheet_id": "string | null",
       "updated_at": "string",
       "updated_by": "string | null",
       "vendor_id": "string | null"

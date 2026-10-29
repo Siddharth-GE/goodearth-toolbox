@@ -34,6 +34,8 @@ import {
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
 import type { CashRequestDetail, CashRequestItem, PayableBill } from "@/lib/bills/payment-queries";
+import { addSheetsToCashRequest, paySheet } from "@/lib/bills/sheet-actions";
+import type { PayableSheet } from "@/lib/bills/sheet-queries";
 import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
@@ -133,13 +135,18 @@ function LineRow({
   const [payOpen, setPayOpen] = useState(false);
   const leftToPay = lineLeftToPay(item);
   const payable =
-    item.kind === "bill" ? Math.min(leftToPay, item.bill_pending ?? leftToPay) : leftToPay;
+    item.kind === "advance" ? leftToPay : Math.min(leftToPay, item.bill_pending ?? leftToPay);
 
   return (
     <>
       <TableRow className="align-top">
         <TableCell>
-          {item.kind === "bill" ? (
+          {item.kind === "sheet" ? (
+            <>
+              <span className="text-foreground font-mono font-medium">{item.sheet_reference}</span>
+              <div className="text-muted text-xs">{`${item.vendor_name} · ${item.project_name}`}</div>
+            </>
+          ) : item.kind === "bill" ? (
             <>
               <span className="text-foreground font-mono font-medium">{item.bill_reference}</span>
               <div className="text-muted text-xs">{`${item.vendor_name} · ${item.project_name}`}</div>
@@ -155,7 +162,7 @@ function LineRow({
           {item.note && <div className="text-muted text-xs">{item.note}</div>}
         </TableCell>
         <TableCell className="text-right font-mono text-xs whitespace-nowrap">
-          {item.kind === "bill" ? (
+          {item.kind !== "advance" ? (
             <>
               {formatMoney(item.bill_total)}
               <div className="text-muted">{`${formatMoney(item.bill_pending)} pending`}</div>
@@ -221,7 +228,7 @@ function LineRow({
             )}
             {paying && payable > 0 && !payOpen && (
               <Button size="sm" onClick={() => setPayOpen(true)}>
-                {item.kind === "bill" ? "Pay" : "Give the advance"}
+                {item.kind === "advance" ? "Give the advance" : "Pay"}
               </Button>
             )}
             {paying && payable <= 0 && <span className="text-muted text-xs">Done</span>}
@@ -257,7 +264,7 @@ function PayForm({
   const problem = paymentProblem({
     amount: value,
     reference,
-    pending: item.kind === "bill" ? (item.bill_pending ?? 0) : cap,
+    pending: item.kind === "advance" ? cap : (item.bill_pending ?? 0),
     cap,
   });
 
@@ -304,24 +311,32 @@ function PayForm({
         onClick={() =>
           run(
             () =>
-              item.kind === "bill" && item.bill_id
-                ? recordBillPayment(item.bill_id, {
+              item.kind === "sheet" && item.sheet_id
+                ? paySheet(item.sheet_id, {
                     amount: value,
                     paidOn,
                     reference,
                     note: null,
                     cashRequestItemId: item.id,
                   })
-                : recordAdvance({
-                    vendorId: item.vendor_id ?? "",
-                    projectId: item.project_id ?? "",
-                    labourContractId: item.labour_contract_id,
-                    amount: value,
-                    paidOn,
-                    reference,
-                    note: item.note,
-                    cashRequestItemId: item.id,
-                  }),
+                : item.kind === "bill" && item.bill_id
+                  ? recordBillPayment(item.bill_id, {
+                      amount: value,
+                      paidOn,
+                      reference,
+                      note: null,
+                      cashRequestItemId: item.id,
+                    })
+                  : recordAdvance({
+                      vendorId: item.vendor_id ?? "",
+                      projectId: item.project_id ?? "",
+                      labourContractId: item.labour_contract_id,
+                      amount: value,
+                      paidOn,
+                      reference,
+                      note: item.note,
+                      cashRequestItemId: item.id,
+                    }),
             onDone,
           )
         }
@@ -330,6 +345,111 @@ function PayForm({
       </Button>
       {!error && problem && <p className="text-muted text-xs">{problem}</p>}
       <FormMessage error={error} size="xs" />
+    </div>
+  );
+}
+
+/** A contractor's labour is asked for by sheet, never by bill: the cash team sees the C number only. */
+export function AddSheets({ requestId, sheets }: { requestId: string; sheets: PayableSheet[] }) {
+  const { run, error, pending } = useRun();
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const entries = Object.entries(picked);
+
+  if (sheets.length === 0) {
+    return (
+      <p className="text-muted text-sm">
+        Every approved sheet with something pending is already on this request — or there are none.
+        A contractor&apos;s labour bills come here once they are consolidated and the sheet is
+        approved.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell className="w-10"></TableHeaderCell>
+            <TableHeaderCell>Sheet</TableHeaderCell>
+            <TableHeaderCell className="text-right">Total</TableHeaderCell>
+            <TableHeaderCell className="text-right">Pending</TableHeaderCell>
+            <TableHeaderCell className="w-40 text-right">Ask for</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {sheets.map((sheet) => {
+            const on = picked[sheet.id] != null;
+            return (
+              <TableRow key={sheet.id}>
+                <TableCell>
+                  <Checkbox
+                    checked={on}
+                    onChange={(event) =>
+                      setPicked((current) => {
+                        const next = { ...current };
+                        if (event.target.checked) next[sheet.id] = String(sheet.pending);
+                        else delete next[sheet.id];
+                        return next;
+                      })
+                    }
+                    aria-label={`Add ${sheet.reference}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono font-medium">{sheet.reference}</span>
+                  <div className="text-muted text-xs">{`${sheet.vendor_name} · ${sheet.company_name}`}</div>
+                </TableCell>
+                <TableCell className="text-right font-mono">{formatMoney(sheet.total)}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatMoney(sheet.pending)}
+                  {sheet.advance_out > 0 && (
+                    <div className="text-warning text-xs font-medium">
+                      {`${formatMoney(sheet.advance_out)} advance out — net ${formatMoney(
+                        Math.max(0, sheet.pending - sheet.advance_out),
+                      )}`}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {on && (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={picked[sheet.id]}
+                      onChange={(event) =>
+                        setPicked((current) => ({ ...current, [sheet.id]: event.target.value }))
+                      }
+                      className="h-9 text-right"
+                      aria-label={`Ask for, ${sheet.reference}`}
+                    />
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <FormMessage error={error} size="xs" />
+        <Button
+          size="sm"
+          disabled={pending || entries.length === 0}
+          onClick={() =>
+            run(
+              () =>
+                addSheetsToCashRequest(
+                  requestId,
+                  entries.map(([sheetId, amount]) => ({ sheetId, amount: amountOf(amount) })),
+                ),
+              () => setPicked({}),
+            )
+          }
+        >
+          {entries.length === 0 ? "Tick sheets to add" : `Add ${entries.length} to the request`}
+        </Button>
+      </div>
     </div>
   );
 }

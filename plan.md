@@ -1,3 +1,56 @@
+# Consolidated bills — sheets `[Opus planned 2026-10-29; the founder said "now build" the same day]`
+
+**The founder's ask** (2026-10-29): combining is not meant to merge bills — "it's more to consolidate": the bills stay, and one **sheet** with its own number lists each bill as one line. Settled the same day:
+
+- **The sheet is approved and paid**: one approval approves every bill on it, the approver's limit on the sheet's total; one payment is spread over its bills, oldest first. Ledgers and villa costs stay per bill.
+- **Numbered `THIN-PW-EF-C01`**: the contractor's style with a C, counted per contractor per company (PW and NMR share it, as bills do).
+- **Even one bill makes a sheet.** **Sheets are what go on the cash request** — a contractor's labour bill reaches one only on its sheet; material, work-order and direct muster-roll bills go on as now.
+- **The cash team sees only the C number**: cash requests, Payments, the contractor's statement. Bill numbers stay for billing (the Bills list, a bill's page, the sheet's own page and print).
+- **Bulk actions in the Bills list**: tick (or select all), then **Consolidate** (sorts them into sheets per contractor, company and PW/NMR by itself, and says what it left out and why) and **Print** (one PDF, each ticked bill or sheet from a new page). A **Sheet** filter: not consolidated / on a sheet / all.
+- **Undo**: while nothing is paid and it is on no cash request, a sheet is undone and its bills stand alone; one bill comes off a sheet still waiting for approval. The sheet stays on record, marked undone, with the bills it had.
+- **Combine goes**: its screen and function. Bills already combined stay as they are.
+
+## The shape
+
+- `bill_sheets`: reference, vendor, company, work type, status `recorded → approved`, or `undone`; who approved, the send-back note. **Paid is what the money says** (every bill paid), never stored.
+- `bill_sheet_bills`: which bill was on which sheet, when it was put on and taken off, and by whom — the record that outlives an undo. `bills.sheet_id` is the current one, kept by the same functions.
+- A bill on a sheet is approved, sent back and paid **only through its sheet** (a transaction-local flag only the sheet functions raise), and is not deleted while on one. Editing its lines while the sheet waits for approval is allowed.
+- New consolidations join the contractor's sheet still **waiting for approval** in that company and kind, if there is one; else a new sheet.
+- An approved bill with no money is sent back on the way (by a bill approver or an admin; anyone else gets it left out, named). Left out, named: money on record (even reversed), on a cash request, already on a sheet, not a contractor's labour bill.
+- Money from a sheet: `bill_payments` and `advance_recoveries` carry `sheet_id` and `sheet_entry_id` (the one payment or recovery it was part of); a sheet's payment is reversed whole.
+- Cash request: `item_kind = 'sheet'` with `sheet_id`; payments against it carry the item, so its paid sums as now.
+
+## Migration `0170_bill_sheets.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
+
+Tables `bill_sheets`, `bill_sheet_bills`, `bill_sheet_counters` (RLS, one SELECT per table `/bills` or `/reporter` with the second-factor floor, no write policy: every write is a definer that checks `/bills` first); `bills.sheet_id`; `bill_payments`/`advance_recoveries.sheet_id`, `sheet_entry_id`; `cash_request_items.sheet_id` and the `sheet` kind. Functions `consolidate_bills`, `approve_bill_sheet`, `send_back_bill_sheet`, `remove_bill_from_sheet`, `undo_bill_sheet` (definers), `pay_bill_sheet`, `recover_on_bill_sheet`, `reverse_bill_sheet_money` (invokers, so RLS and the money guards hold as the person). Guards: `bills_sheet_guard` (status, sheet, delete), `bill_money_sheet_guard`, `cash_request_items_sheet_guard`. Drops `combine_contractor_bills`. Trial `scripts/trials/bill-sheets.sql` as the billing team.
+
+## Steps — one branch `feature/consolidate-bills`, vetted on staging
+
+- [x] `[Opus]` **1. The database.** `0170` and its trial; independent Opus review (two rounds: recovering on a sheet, a bill inserted onto a sheet or as approved, test bills, a sheet once on a cash request — all fixed and trialled); applied to staging; `npm run db:types:staging`.
+- [x] `[Opus]` **2. The Bills list.** Tick boxes and select all, the bulk bar (Consolidate, Print), the Sheet filter, "On C01" beside a bill. `/bills/print` makes one PDF of ticked bills and sheets. Rules in `lib/bills/sheets.ts` (pure, tested).
+- [x] `[Opus]` **3. Consolidated.** `/bills/sheets` (the list) and `/bills/sheets/[id]` (its bills as lines, approve, send back, undo, take a bill off, pay, recover from an advance, reverse) and its print. A bill's page names its sheet, and its own approve and pay give way to the sheet's. The welcome links Consolidated.
+- [x] `[Opus]` **4. Cash and the rest.** Cash requests add sheets (the contractor's labour bills no longer offered loose), a sheet's line shows its C number and pays the sheet; Payments and the contractor's statement show the C number for sheet money. Combine's screen, rules and links go. Bills `PLAN.md` rule 14, STATUS, TODO.
+- [ ] `[Opus]` **Independent review** of the full diff against this plan, SECURITY.md and BUGCATCHER.md before the merge to staging.
+
+## Not in this build
+
+- Material and work-order bills on sheets.
+- Hiding bill numbers from the cash team by permission (they share the Bills grant).
+- Turing proposing consolidations.
+
+## The founder's checklist on staging
+
+1. **Bills → All bills**, Sheet filter **Not consolidated**: tick two or three of one contractor's labour bills (one company), press **Consolidate**. The box names the sheet (like THIN-PW-EF-C01) and anything left out with why.
+2. Tick a single bill of another contractor → Consolidate: it gets its own one-line sheet.
+3. Open the sheet (**Bills → Consolidated**): each bill is a line with its villa, date and amount. **Take one off**, then put it back from its own page (**Put on a sheet**).
+4. **Approve** the sheet: every bill on it shows Approved. A bill's own page says "On THIN-…" and has no Approve or Pay of its own.
+5. **Print**, and **Print with its bills**: one PDF, the sheet then each bill on its own page. In All bills, tick a few bills → **Print**.
+6. **Cash requests**: start one, **Add contractors' sheets** — the sheet shows by its C number only; a contractor's loose bill is not offered. Submit, release, **Pay** the sheet line with a UTR.
+7. **Payments**: that payment is one row, named by the C number. The contractor's statement (Contractors → the name) shows it the same way.
+8. On another approved sheet with nothing paid: **Undo** — its bills stand alone again; the sheet stays under Consolidated → Undone, listing the bills it had.
+
+---
+
 # Kaadal Billing `[Opus planned and building 2026-10-29; the founder: "make a plan and execute"]`
 
 **The founder's ask** (2026-10-29): "in interior operations there needs to be a billing, exactly like this, keep the data as well" — the Kaadal Billing page (Kritham Creations' vendor orders for the Kaadal interiors plots), with its records from `Kaadal_Vendor_Payments_2026-10-28.xlsx`.
@@ -35,6 +88,8 @@
 7. Export to Excel: three sheets, as the page's export.
 
 # Combined contractor bills `[Opus planned 2026-10-28; the founder said go the same day; 5 not yet answered]`
+
+**Step 5 (Combine) was replaced by Consolidated bills, the top section (2026-10-29): its screen and function are gone, so skip check 5 below.**
 
 **The founder's ask** (2026-10-28): "we consolidate … one contractor one company multiple line items instead of million bills". Settled the same day: **by company, by contractor**; **material bills stay separate**; **contractors' bills only for now**.
 

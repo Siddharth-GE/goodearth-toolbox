@@ -21,12 +21,14 @@ import {
 } from "@/lib/bills/payment-queries";
 import { getBill, getBillVillas, getCurrentBillActor } from "@/lib/bills/queries";
 import { groupByVilla, villaLabel, villaOfLine } from "@/lib/bills/villas";
+import { sheetHasBeenRequested } from "@/lib/bills/sheet-queries";
+import { isContractorLabourBill } from "@/lib/bills/sheets";
 import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
-import { getProjectCompany } from "@/lib/masters/companies";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { FileDown } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BillStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
@@ -35,6 +37,7 @@ import { BillLinesTable } from "./_components/bill-lines-table";
 import { DetailsFields, TotalOverride } from "./_components/details-fields";
 import { HeaderFields } from "./_components/header-fields";
 import { SettlementPanel } from "./_components/settlement-panel";
+import { PutOnSheet, TakeOffSheet } from "./_components/sheet-buttons";
 import {
   Table,
   TableBody,
@@ -66,17 +69,12 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       : Promise.resolve([]),
     getBillVillas(bill),
   ]);
-  // A contractor's recorded or approved bill can be folded with their others in the same company (0167).
-  const company =
-    villas &&
-    (actor.isAdmin || actor.isApprover) &&
-    (bill.status === "recorded" || bill.status === "approved")
-      ? await getProjectCompany(bill.project_id)
-      : null;
-  const combineHref =
-    company && bill.vendor_id
-      ? `/bills/combine?${new URLSearchParams({ vendor: bill.vendor_id, company: company.id, kind: bill.work_type ?? "NMR" })}`
-      : null;
+  // A contractor's labour bill is approved and paid on its sheet (0170); a loose one is offered a sheet.
+  const onSheet = bill.sheet_id !== null;
+  const loose =
+    !onSheet &&
+    isContractorLabourBill({ kind: bill.kind, vendorIsContractor: bill.vendor_is_contractor }) &&
+    (bill.status === "recorded" || bill.status === "approved");
   // A contractor's bill names the villa its lines are on, or how many (0166): lines can move off the header's.
   const villaGroups = villas
     ? groupByVilla(
@@ -92,6 +90,12 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         ? villaLabel(villaGroups[0].villa, villas)
         : (bill.scope_name ?? "General");
   const hasMoney = events.length > 0;
+  // As remove_bill_from_sheet: a sheet still waiting, never on a cash request, and no money ever on this bill.
+  const canTakeOff =
+    onSheet &&
+    bill.sheet_status === "recorded" &&
+    !hasMoney &&
+    !(await sheetHasBeenRequested(bill.sheet_id ?? ""));
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
         listActiveGstRates(),
@@ -138,11 +142,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         }
         actions={
           <>
-            {combineHref && (
-              <LinkButton href={combineHref} variant="secondary" size="sm">
-                Combine with others
-              </LinkButton>
-            )}
+            {loose && !hasMoney && <PutOnSheet billId={bill.id} />}
             <LinkButton href={`/bills/${bill.id}/pdf`} variant="secondary" size="sm" plain>
               <FileDown className="size-4" />
               Print
@@ -157,17 +157,36 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               </LinkButton>
             )}
             <BillStatusBadge status={bill.status} />
-            <ActionButtons
-              billId={bill.id}
-              status={bill.status}
-              actor={actor}
-              createdBy={bill.created_by}
-              totalAmount={bill.total_amount}
-              hasMoney={hasMoney}
-            />
+            {!onSheet && (
+              <ActionButtons
+                billId={bill.id}
+                status={bill.status}
+                actor={actor}
+                createdBy={bill.created_by}
+                totalAmount={bill.total_amount}
+                hasMoney={hasMoney}
+                approveOnSheet={loose}
+              />
+            )}
           </>
         }
       />
+
+      {onSheet && (
+        <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            {"On "}
+            <Link
+              href={`/bills/sheets/${bill.sheet_id}`}
+              className="text-accent font-mono font-medium hover:underline"
+            >
+              {bill.sheet_reference}
+            </Link>
+            {" — it is approved, put on the cash request and paid there."}
+          </p>
+          {canTakeOff && <TakeOffSheet billId={bill.id} />}
+        </div>
+      )}
 
       {editable && bill.rejection_note && (
         <div className="border-warning/40 bg-warning/5 rounded-xl border px-4 py-3">
@@ -180,7 +199,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         </div>
       )}
 
-      {editable && !bill.rejection_note && (
+      {editable && !bill.rejection_note && !onSheet && (
         <div className="border-border bg-surface rounded-xl border px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-foreground text-sm">
@@ -189,9 +208,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             <Attribution name={bill.created_by_name} label="Recorded by" />
           </div>
           <p className="text-muted mt-1 text-xs">
-            {actor.isAdmin || actor.isApprover
-              ? "Yours to decide — approve it, or delete it if it was recorded wrongly."
-              : "Waiting for a named bill approver or an admin."}
+            {loose
+              ? "A contractor's labour bill is approved and paid on a sheet — press Put on a sheet."
+              : actor.isAdmin || actor.isApprover
+                ? "Yours to decide — approve it, or delete it if it was recorded wrongly."
+                : "Waiting for a named bill approver or an admin."}
           </p>
         </div>
       )}
@@ -306,21 +327,23 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                       {formatMoney(event.amount, { paise: true })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DeleteOrCancel
-                        noun={MONEY_KIND_LABEL[event.kind].noun}
-                        verb="Reverse"
-                        reasonPlaceholder="Paid twice by mistake"
-                        removal={moneyReversal(event, actor)}
-                        cancelNote="The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone."
-                        onCancel={reverseBillMoney.bind(null, event.kind, event.id)}
-                      />
+                      {!onSheet && (
+                        <DeleteOrCancel
+                          noun={MONEY_KIND_LABEL[event.kind].noun}
+                          verb="Reverse"
+                          reasonPlaceholder="Paid twice by mistake"
+                          removal={moneyReversal(event, actor)}
+                          cancelNote="The same amount is entered the other way with your reason, so the bill has it pending again. Both entries stay on record. This can't be undone."
+                          onCancel={reverseBillMoney.bind(null, event.kind, event.id)}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-          {canTakePayment(bill.status) && settlement.pending > 0 && (
+          {canTakePayment(bill.status) && settlement.pending > 0 && !onSheet && (
             <SettlementPanel billId={bill.id} pending={settlement.pending} advances={advances} />
           )}
         </div>

@@ -51,4 +51,6 @@ export type Filterable<T> = {
   lt(column: string, value: string): T;
   lte(column: string, value: string): T;
   or(filters: string): T;
+  is(column: string, value: null): T;
+  not(column: string, operator: string, value: null): T;
 };
