@@ -552,8 +552,9 @@ function MaterialsPreview({ preview }: { preview: ModelImportPreview }) {
           What the works are made of
         </p>
         <p className="text-muted text-sm">
-          {formatCount(plan.counts.materials)} from the model, in place of the rate book&apos;s list
-          while the estimate takes its materials from the model.
+          {formatCount(plan.counts.materials)} from the model while the estimate takes its materials
+          from it: its mixes and steel in place of the rate book&apos;s list, its extras (ridge
+          tiles, grills, stair teak) on top.
           {plan.counts.refusedMaterials > 0 && (
             <span className="text-danger">
               {" "}

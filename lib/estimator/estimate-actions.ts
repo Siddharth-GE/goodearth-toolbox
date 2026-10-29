@@ -912,7 +912,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
   if (
     lines.data.some(
       (line) =>
-        variations.qtyByLine.has(line.id) &&
+        !variations.qtyByLine.has(line.id) ||
         variations.qtyByLine.get(line.id) !== (line.qty === null ? null : Number(line.qty)),
     ) ||
     lines.data.length !== variations.qtyByLine.size

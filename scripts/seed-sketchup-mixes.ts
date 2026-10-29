@@ -87,6 +87,8 @@ if (bindingWire) {
   }
 }
 
+if (mixParts.length === 0) throw new Error("recipes.csv lists no mixes, steel or extras.");
+
 const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const values = (parts: Part[]) =>
   parts

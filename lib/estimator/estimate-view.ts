@@ -89,12 +89,14 @@ export function otherCostAmount(row: Pick<OtherCostRow, "qty" | "rate">): number
 /** The other costs added up (0174): what is priced, and how many are not. Nothing listed is 0; nothing priced is null. */
 export function otherCostsTotal(rows: Pick<OtherCostRow, "qty" | "rate">[]): {
   amount: number | null;
+  priced: number;
   unpriced: number;
 } {
   const amounts = rows.map(otherCostAmount);
   const priced = amounts.filter((amount): amount is number => amount !== null);
   return {
     amount: rows.length > 0 && priced.length === 0 ? null : priced.reduce((sum, a) => sum + a, 0),
+    priced: priced.length,
     unpriced: amounts.length - priced.length,
   };
 }
@@ -105,8 +107,9 @@ export function grandTotal(
   other: ReturnType<typeof otherCostsTotal>,
 ): { amount: number | null; isComplete: boolean } {
   return {
+    // Nothing priced anywhere is unknown, never ₹0 — an estimate with no other costs included.
     amount:
-      totals.grand === null && other.amount === null
+      totals.grand === null && other.priced === 0
         ? null
         : (totals.grand ?? 0) + (other.amount ?? 0),
     isComplete: totals.isComplete && other.unpriced === 0,

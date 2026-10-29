@@ -49,7 +49,9 @@ export function EstimateFromModel({
             {settings.map(([key, value]) => (
               <div key={key} className="flex justify-between gap-3">
                 <dt className="text-muted">{key.replaceAll("_", " ")}</dt>
-                <dd className="text-foreground tabular-nums">{String(value ?? "—")}</dd>
+                <dd className="text-foreground min-w-0 text-right break-words tabular-nums">
+                  {String(value ?? "—")}
+                </dd>
               </div>
             ))}
           </dl>

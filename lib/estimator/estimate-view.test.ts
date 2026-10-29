@@ -253,10 +253,10 @@ test("other costs add to the total; one with no rate is unknown, never zero (017
     note: null,
     position: 0,
   });
-  assert.deepEqual(otherCostsTotal([]), { amount: 0, unpriced: 0 });
-  assert.deepEqual(otherCostsTotal([cost("a", 2, null)]), { amount: null, unpriced: 1 });
+  assert.deepEqual(otherCostsTotal([]), { amount: 0, priced: 0, unpriced: 0 });
+  assert.deepEqual(otherCostsTotal([cost("a", 2, null)]), { amount: null, priced: 0, unpriced: 1 });
   const v = view({ otherCosts: [cost("mep", 100, 200), cost("site", 1, null)] });
-  assert.deepEqual(v.other, { amount: 20000, unpriced: 1 });
+  assert.deepEqual(v.other, { amount: 20000, priced: 1, unpriced: 1 });
   assert.equal(v.grand.amount, (v.totals.grand ?? 0) + 20000);
   assert.equal(v.grand.isComplete, false);
   assert.ok(v.missing.some((part) => part === "1 other cost has no quantity or rate"));
@@ -277,4 +277,24 @@ test("a row made of the model's materials says so, and lists them (0174)", () =>
     rate.components.map((row) => [row.ref, row.qtyPerUnit]),
     [["material:cement", 0.5]],
   );
+});
+
+test("an estimate with nothing priced and no other costs totals unknown, never ₹0", () => {
+  const v = view({
+    lines: [
+      {
+        id: "l1",
+        workItemId: "plaster",
+        code: "PL.1",
+        name: "Plastering",
+        label: null,
+        categoryCode: "PL",
+        qty: null,
+        note: null,
+        labourRate: null,
+      },
+    ],
+  });
+  assert.equal(v.totals.grand, null);
+  assert.equal(v.grand.amount, null);
 });

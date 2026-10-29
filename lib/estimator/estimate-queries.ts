@@ -465,8 +465,26 @@ export async function listVillas(): Promise<VillaEstimates[]> {
           .range(from, to),
       )
     : [];
+  // An official's other costs (0174) count in its total, as on its page; an unpriced one leaves the total unknown.
+  const others = officialIds.length
+    ? await fetchAll<{ estimate_id: string; qty: number | null; rate: number | null }>((from, to) =>
+        supabase
+          .from("estimator_estimate_other_costs")
+          .select("estimate_id, qty, rate")
+          .in("estimate_id", officialIds)
+          .order("id")
+          .range(from, to),
+      )
+    : [];
   const totals = new Map<string, number | null>();
-  for (const row of costs) {
+  for (const row of [
+    ...costs,
+    ...others.map((other) => ({
+      estimate_id: other.estimate_id,
+      total_cost:
+        other.qty === null || other.rate === null ? null : Number(other.qty) * Number(other.rate),
+    })),
+  ]) {
     const sofar = totals.has(row.estimate_id) ? totals.get(row.estimate_id)! : 0;
     totals.set(
       row.estimate_id,
