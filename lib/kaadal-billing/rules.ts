@@ -134,9 +134,8 @@ export function allocToSave(order: Order, draft: PaymentDraft): Amounts {
   return {};
 }
 
-/** What is left to pay on each plot, with this payment's own earlier marks given back when editing it. */
+/** What is left to pay on each plot, with the payment being edited left out entirely (its share or its marks). */
 export function leftOnPlots(order: Order, pays: Payment[], editingId: string | null): Amounts {
-  // Left out entirely, so a payment shared by value gives back its share as well as a marked one.
   const all = shares(order, editingId ? pays.filter((p) => p.id !== editingId) : pays);
   return Object.fromEntries(order.plots.map((p) => [p, r2(all[p]?.balance ?? 0)]));
 }
