@@ -128,10 +128,10 @@ test("the model's extras add to whichever list stands (0175)", () => {
   };
   const lines = [{ id: "row1", workItemId: "w1" }];
   const adds = new Map([["row1", [direct("sand", 0.5)]]]);
-  assert.deepEqual(lineRecipes([standard], lines, new Map(), new Map(), adds).get("row1")?.components, [
-    direct("cement", 1),
-    direct("sand", 0.5),
-  ]);
+  assert.deepEqual(
+    lineRecipes([standard], lines, new Map(), new Map(), adds).get("row1")?.components,
+    [direct("cement", 1), direct("sand", 0.5)],
+  );
   const own = new Map([["row1", [direct("jelly", 2)]]]);
   assert.deepEqual(lineRecipes([standard], lines, own, new Map(), adds).get("row1")?.components, [
     direct("jelly", 2),

@@ -133,8 +133,8 @@ export function LineRateDialog({
 
           {view.fromModel ? (
             <ul className="divide-border divide-y">
-              {view.components.map((row) => (
-                <li key={row.ref} className="text-foreground py-2 text-sm">
+              {view.components.map((row, index) => (
+                <li key={`${row.ref}:${index}`} className="text-foreground py-2 text-sm">
                   {row.name}
                   <span className="text-muted block text-xs">
                     {formatQuantity(row.qtyPerUnit)} {row.uom} per {unit}

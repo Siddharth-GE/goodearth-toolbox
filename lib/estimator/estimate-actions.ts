@@ -907,6 +907,18 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
   if (!lines.data || lines.data.length === 0) {
     return { error: "Add at least one work before making this estimate official." };
   }
+  // The model's per-unit figures were worked out from the quantities read with the variations: a change since then
+  // would freeze model × new ÷ old.
+  if (
+    lines.data.some(
+      (line) =>
+        variations.qtyByLine.has(line.id) &&
+        variations.qtyByLine.get(line.id) !== (line.qty === null ? null : Number(line.qty)),
+    ) ||
+    lines.data.length !== variations.qtyByLine.size
+  ) {
+    return { error: "The estimate changed while it was being made official — try again." };
+  }
   if (lines.data.some((line) => line.qty === null)) {
     const count = lines.data.filter((line) => line.qty === null).length;
     return {
@@ -1052,15 +1064,17 @@ export async function setUseModelMaterials(
   if (!estimateId) return { error: "Which estimate?" };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("estimator_estimates")
     .update({ use_model_materials: useModel, updated_by: user.id })
-    .eq("id", estimateId);
+    .eq("id", estimateId)
+    .select("id");
   if (error) {
     if (error.code === "P0001") return { error: error.message };
     console.error("setUseModelMaterials failed:", error);
     return { error: "Could not change where the materials come from. Try again." };
   }
+  if (!data || data.length === 0) return { error: "That estimate is gone — reload the page." };
 
   revalidatePath("/estimator", "layout");
   return undefined;

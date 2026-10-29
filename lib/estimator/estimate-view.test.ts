@@ -47,6 +47,7 @@ const noVariations: EstimateVariations = {
   extraMaterials: [],
   modelByLine: new Map(),
   addsByLine: new Map(),
+  qtyByLine: new Map(),
   useModelMaterials: true,
 };
 

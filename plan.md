@@ -93,7 +93,7 @@ So:
   - `estimator_estimate_other_costs` (estimate, `from_model`, code, name, unit, qty, rate, note, position), cascading with its estimate, draft-only by its own trigger;
   - `import_model_takeoff(p_estimate, p_lines, p_model, p_materials, p_other_costs)` (the settings and BUA ride in `p_model`): runs `import_model_rows` unchanged, makes the missing mixes, replaces the model's materials and other costs, records the settings and BUA — one transaction. The old three-argument function stays for the app between apply and deploy;
   - `estimator_copy_estimate_contents` re-created: a full copy carries the materials, the other costs and the three columns.
-  - RLS on, the four `/estimator` policies on each table, execute revoked from `public, anon`, asserted at the end. The trial `scripts/trials/model-everything.sql` runs as the single-grant person. `SECURITY.md` gains the tables.
+  - RLS on, the four `/estimator` policies on each table, execute revoked from `public, anon`, asserted at the end. The trial `scripts/trials/model-everything.sql` runs as the single-grant person.
 - **Settled at the 0174 review:** a new mix takes the toolbox's spelling of its unit, and a unit the toolbox lacks is refused for that material alone. A switched-off mix of the same name is reused, and still counts. A full copy from another villa carries its model materials, settings and BUA, as `0157` already carries its model rows. Deleting a mix the model uses is refused, like one a recipe uses.
 - **Not in this build:** other costs in Budget against actual (`villa_cost_facts`) — the official estimate's total includes them, the budget page does not yet (TODO).
 - **Code:** `model-takeoff.ts` reads the new parts (caps: 2,000 mixes, 2,000 steel, 500 worked-out lines, 100 allowances, 100 settings) and plans them, with tests; the import action and query; `getEstimateVariations` folds the model's materials in; the estimate page (the switch, _made of … (from the model)_, Other costs with typed rows, the settings card); the From the model preview (materials and other costs, new mixes named); `scripts/seed-sketchup-mixes.ts` (dry run, then `--commit` on staging): the plugin's `recipes.csv` mixes and steel that the toolbox lacks, with their make-ups, in **From SketchUp**, and its work recipes only for works the rate book has no recipe for.
@@ -126,9 +126,9 @@ Found on the way and fixed by `0175`: the model's extras (ridge tiles, grills, s
 - [x] `[Opus]` Piece 1: the plugin's half written as `goodearth-qs/TOOLBOX-ADJUSTMENTS.md`, with a real setup beside it.
 - [x] Plugin 0.10 built from `TOOLBOX-ADJUSTMENTS.md` (the founder's plugin session; Plot 04 sent from it on 29 Oct).
 - [x] `[Opus]` Piece 1: independent review, merged to `staging` (#198).
-- [ ] `[Opus]` Piece 2: `0174` and its trial, dry run as the single-grant person, independent Opus review, applied to staging, `db:types:staging`.
-- [ ] `[Opus]` Piece 2: `model-takeoff.ts`, the import, the variations fold, their tests.
-- [ ] `[Opus]` Piece 2: the estimate page, the From the model preview, the seed script (dry run, then staging).
+- [x] `[Opus]` Piece 2: `0174` and its trial, dry run as the single-grant person, independent Opus review (fixes made), applied to staging, `db:types:staging`. `0175` the same way.
+- [x] `[Opus]` Piece 2: `model-takeoff.ts`, the import, the variations fold, their tests.
+- [x] `[Opus]` Piece 2: the estimate page, the From the model preview, the seed script (mixes committed on staging; `--works` waits for the founder).
 - [ ] `[Opus]` Piece 2: vet, open every changed page, the checks, independent review, pull request. Founder: checklist 2.
 - [x] `[Opus]` Piece 3: Plot 04 compared, written up here; `0175` from it.
 

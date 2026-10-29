@@ -163,6 +163,8 @@ export type EstimateVariations = {
   modelByLine: Map<string, { mixId: string; qty: number; addsToRecipe: boolean }[]>;
   /** Row id → the model's extras per unit, on top of whichever list stands (0175). */
   addsByLine: Map<string, WorkRecipe["components"]>;
+  /** Row id → the quantity the per-unit figures above were worked out from. */
+  qtyByLine: Map<string, number | null>;
   /** Materials from: the model (true) or the Rate book (0174). */
   useModelMaterials: boolean;
 };
@@ -175,6 +177,7 @@ const NO_VARIATIONS: EstimateVariations = {
   extraMaterials: [],
   modelByLine: new Map(),
   addsByLine: new Map(),
+  qtyByLine: new Map(),
   useModelMaterials: true,
 };
 
@@ -240,13 +243,14 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
         .order("id")
         .range(from, to),
     ),
-    fetchAll<{ line_id: string; mix_id: string; qty: number; adds_to_recipe: boolean }>((from, to) =>
-      supabase
-        .from("estimator_estimate_line_model_materials")
-        .select("line_id, mix_id, qty, adds_to_recipe")
-        .in("line_id", lineIds)
-        .order("id")
-        .range(from, to),
+    fetchAll<{ line_id: string; mix_id: string; qty: number; adds_to_recipe: boolean }>(
+      (from, to) =>
+        supabase
+          .from("estimator_estimate_line_model_materials")
+          .select("line_id, mix_id, qty, adds_to_recipe")
+          .in("line_id", lineIds)
+          .order("id")
+          .range(from, to),
     ),
   ]);
 
@@ -293,12 +297,14 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     for (const line of lines) {
       const model = modelByLine.get(line.id);
       const qty = line.qty === null ? null : Number(line.qty);
-      if (!model || byLine.has(line.id) || qty === null || qty <= 0) continue;
+      if (!model || qty === null || qty <= 0) continue;
       const perUnit = (rows: typeof model) =>
         rows.map((row) => ({ materialId: null, mixId: row.mixId, qtyPerUnit: row.qty / qty }));
       const replacing = model.filter((row) => !row.addsToRecipe);
       const adding = model.filter((row) => row.addsToRecipe);
-      if (replacing.length > 0) componentsByLine.set(line.id, perUnit(replacing));
+      if (replacing.length > 0 && !byLine.has(line.id)) {
+        componentsByLine.set(line.id, perUnit(replacing));
+      }
       if (adding.length > 0) addsByLine.set(line.id, perUnit(adding));
     }
   }
@@ -311,6 +317,7 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     extraMaterials: [...itemDefs.values()],
     modelByLine,
     addsByLine,
+    qtyByLine: new Map(lines.map((line) => [line.id, line.qty === null ? null : Number(line.qty)])),
     useModelMaterials,
   };
 }

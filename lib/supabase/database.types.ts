@@ -5410,6 +5410,7 @@ export type Database = {
       }
       estimator_estimate_line_model_materials: {
         Row: {
+          adds_to_recipe: boolean
           created_at: string
           created_by: string | null
           id: string
@@ -5420,6 +5421,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          adds_to_recipe?: boolean
           created_at?: string
           created_by?: string | null
           id?: string
@@ -5430,6 +5432,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          adds_to_recipe?: boolean
           created_at?: string
           created_by?: string | null
           id?: string

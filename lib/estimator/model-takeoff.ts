@@ -646,7 +646,16 @@ export function planMaterials(
       a.code.localeCompare(b.code, undefined, { numeric: true }) || a.mix.localeCompare(b.mix),
   );
   return {
-    plan: plan.map(({ workItemId: _workItemId, ...entry }) => entry),
+    plan: plan.map((entry) => ({
+      key: entry.key,
+      code: entry.code,
+      mix: entry.mix,
+      uom: entry.uom,
+      qty: entry.qty,
+      from: entry.from,
+      kind: entry.kind,
+      why: entry.why,
+    })),
     payload: plan
       .filter((entry) => entry.kind !== "refused" && entry.workItemId && entry.uom)
       .map((entry) => ({

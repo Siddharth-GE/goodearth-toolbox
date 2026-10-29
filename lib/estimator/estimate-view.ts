@@ -249,8 +249,7 @@ export function buildEstimateView(input: {
     const own = variations.byLine.get(line.id);
     // Not the villa's own: the list in use, the model's folded in by getEstimateVariations.
     const fromModel =
-      !own &&
-      (variations.componentsByLine.has(line.id) || variations.addsByLine.has(line.id));
+      !own && (variations.componentsByLine.has(line.id) || variations.addsByLine.has(line.id));
     const inUse = recipesByLine.get(line.id)?.components;
     const buildUp = rateBuildUp(recipesByLine.get(line.id), mixesById, materialsById);
     return {

@@ -1519,6 +1519,7 @@ export const TURING_SCHEMA: Schema = {
   "estimator_estimate_line_model_materials": {
     "kind": "table",
     "columns": {
+      "adds_to_recipe": "boolean",
       "created_at": "string",
       "created_by": "string | null",
       "id": "string",

@@ -23,7 +23,7 @@ export function EstimateFromModel({
           </p>
           <p className="text-muted text-sm">
             {estimate.useModelMaterials
-              ? "Works the model gave materials to are made of those — its concrete, masonry and steel — in place of the rate book's list. Switch to the Rate book for the final QS."
+              ? "Works the model gave materials to are made of those — its concrete, masonry and steel — in place of the rate book's list; its extras (ridge tiles, grills, stair teak) add to whichever list stands. Switch to the Rate book for the final QS."
               : "Every work is made of the rate book's list. The model's materials are kept but not counted."}
           </p>
         </div>
