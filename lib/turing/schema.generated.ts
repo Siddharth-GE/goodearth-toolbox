@@ -1915,6 +1915,57 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "kaadal_billing_orders": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "deduction": "number",
+      "deduction_note": "string",
+      "deduction_plot": "string | null",
+      "gross": "number",
+      "id": "string",
+      "item": "string",
+      "notes": "string",
+      "ordered_on": "string | null",
+      "pay_note": "string",
+      "plots": "string[]",
+      "split": "Json",
+      "updated_at": "string",
+      "updated_by": "string | null",
+      "vendor_id": "string"
+    }
+  },
+  "kaadal_billing_payments": {
+    "kind": "table",
+    "columns": {
+      "alloc": "Json",
+      "amount": "number",
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "kind": "string",
+      "notes": "string",
+      "order_id": "string",
+      "paid_by": "string",
+      "paid_on": "string | null",
+      "reference": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
+  "kaadal_billing_vendors": {
+    "kind": "table",
+    "columns": {
+      "bank": "string",
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "name": "string",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "labour_contract_lines": {
     "kind": "table",
     "columns": {

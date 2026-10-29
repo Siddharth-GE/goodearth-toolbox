@@ -7403,6 +7403,200 @@ export type Database = {
           },
         ]
       }
+      kaadal_billing_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deduction: number
+          deduction_note: string
+          deduction_plot: string | null
+          gross: number
+          id: string
+          item: string
+          notes: string
+          ordered_on: string | null
+          pay_note: string
+          plots: string[]
+          split: Json
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deduction?: number
+          deduction_note?: string
+          deduction_plot?: string | null
+          gross: number
+          id?: string
+          item?: string
+          notes?: string
+          ordered_on?: string | null
+          pay_note?: string
+          plots: string[]
+          split?: Json
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deduction?: number
+          deduction_note?: string
+          deduction_plot?: string | null
+          gross?: number
+          id?: string
+          item?: string
+          notes?: string
+          ordered_on?: string | null
+          pay_note?: string
+          plots?: string[]
+          split?: Json
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kaadal_billing_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kaadal_billing_orders_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kaadal_billing_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "kaadal_billing_vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kaadal_billing_payments: {
+        Row: {
+          alloc: Json
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          notes: string
+          order_id: string
+          paid_by: string
+          paid_on: string | null
+          reference: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alloc?: Json
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          notes?: string
+          order_id: string
+          paid_by?: string
+          paid_on?: string | null
+          reference?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alloc?: Json
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          notes?: string
+          order_id?: string
+          paid_by?: string
+          paid_on?: string | null
+          reference?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kaadal_billing_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kaadal_billing_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "kaadal_billing_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kaadal_billing_payments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kaadal_billing_vendors: {
+        Row: {
+          bank: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bank?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bank?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kaadal_billing_vendors_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kaadal_billing_vendors_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       labour_contract_lines: {
         Row: {
           contract_id: string

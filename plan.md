@@ -1,3 +1,39 @@
+# Kaadal Billing `[Opus planned and building 2026-10-29; the founder: "make a plan and execute"]`
+
+**The founder's ask** (2026-10-29): "in interior operations there needs to be a billing, exactly like this, keep the data as well" — the Kaadal Billing page (Kritham Creations' vendor orders for the Kaadal interiors plots), with its records from `Kaadal_Vendor_Payments_2026-10-28.xlsx`.
+
+## The shape
+
+- **A new tool, `/kaadal-billing`**, placed in the **Interiors Operations** team. Its own grant, its own three tables, read by no other tool and no view. Not scoped: whoever holds it sees and edits the whole ledger, as on the page.
+- **The page's flow, the toolbox's materials** (as on the Saarang tracker): the same five tabs — Orders, Payments, Plots, Vendors, Checks — the totals band, the plot filter, search, "show fully paid", New order, Record payment, Excel export. The page's side drawer becomes a page of its own (an order, a vendor, a plot), because the toolbox has no drawer and an order needs a form, a list and its details at once.
+- **The page's rules, kept exactly**: an order's net is its value less its deduction; a multi-plot order is split by the plot values from the quote, else evenly; a deduction sits on its plot or is shared by value; a payment is shared by plot value, put on one plot, or split by amounts that must add up to the paisa; warnings (more than the balance, more than a plot's share, the same amount on the same day) ask "Save anyway". The checks tab runs the page's checks. All of it pure in `lib/kaadal-billing/` and tested.
+- **Vendors are the tool's own, with their bank details**, not Masters' vendors: these are furniture and décor shops paid from one ledger, the page adds them inline, and their bank details then stay inside this grant. Plots are the page's labels (`Plot 45-46`, `Site`), not Masters plots. Both settled in the tool's `PLAN.md`.
+- **Edits and deletes as on the page** (with Undo), unlike Bills' payments: this is a ledger replacing a sheet, and `audit_row` records every change and delete with who made it.
+- **The data**: 13 vendors, 24 orders, 29 payments, imported to staging by `scripts/import-kaadal-billing.ts` from a JSON file kept **outside the repo** (the repo is public; the file holds bank account numbers), at `../kaadal-billing-data/`.
+
+## Migration `0169_kaadal_billing.sql` `[Opus drafts; an independent Opus read reviews before db:apply]`
+
+`kaadal_billing_vendors`, `kaadal_billing_orders`, `kaadal_billing_payments`; both `_app_known` CHECKs gain `/kaadal-billing`; RLS on, one policy per verb on the grant, audit and stamp triggers, revokes; an order deleted takes its payments (cascade inside the tool, not the line chain). Asserts at the end. No views; one invoker trigger function, execute revoked.
+
+## Steps
+
+- [ ] `[Opus]` **1. Database.** 0169, a trial as a single-grant person (`scripts/trials/kaadal-billing.sql`), independent review, apply to staging, types.
+- [ ] `[Opus]` **2. Rules.** `lib/kaadal-billing/ledger.ts` (figures, plot shares, checks) and `rules.ts` (validation), tested; `queries.ts`, `actions.ts`.
+- [ ] `[Opus]` **3. Screens.** Welcome, the five tabs, order / new order / vendor / plot pages, Excel download; registry, icon, loading screens.
+- [ ] `[Opus]` **4. Data.** The import script, dry run, then `--commit` on staging; the tool placed in Interiors Operations.
+- [ ] `[Opus]` **5. Docs.** The tool's `PLAN.md`, STATUS (tool + contract row), SECURITY (money confined), TODO (production).
+- [ ] `[Opus]` **Independent review** of the full diff, then merge to staging.
+
+## The founder's checklist on staging
+
+1. Interiors Operations → Kaadal Billing → Orders: the totals read ₹50.8 L order value, ₹33.6 L paid, ₹17.2 L to pay (the page's figures); Not paid yet / Part paid / Fully paid as on the page.
+2. Tap the 14 chip: only Plot 14's orders and their shares; Whispering Homes shows "Share of a 3-plot order".
+3. Open Noku (Plot 24, ₹5.6 L) → Record payment: "Full balance" fills the balance; save; Undo takes it back.
+4. Open Whispering Homes → Split amounts by plot: amounts that don't add up are refused in words; "Split by what's left on each plot" fills them.
+5. New order → + Add a new vendor, two plots, plot values that don't match the order value: refused; fix; with an advance; it opens on its own page.
+6. Payments, Plots (open Plot 11), Vendors (Copy bank details), Checks (the payment with no date is listed) — each as on the page.
+7. Export to Excel: three sheets, as the page's export.
+
 # Combined contractor bills `[Opus planned 2026-10-28; the founder said go the same day; 5 not yet answered]`
 
 **The founder's ask** (2026-10-28): "we consolidate … one contractor one company multiple line items instead of million bills". Settled the same day: **by company, by contractor**; **material bills stay separate**; **contractors' bills only for now**.
