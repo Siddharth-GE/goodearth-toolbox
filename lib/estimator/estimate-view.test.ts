@@ -2,12 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { EstimateDetail, EstimateVariations, RecipeBook } from "./estimate-queries";
-import {
-  buildEstimateView,
-  missingParts,
-  officialRemoval,
-  otherCostsTotal,
-} from "./estimate-view";
+import { buildEstimateView, missingParts, officialRemoval, otherCostsTotal } from "./estimate-view";
 import type { WorkStatusRow } from "./works-queries";
 
 const book: RecipeBook = {
@@ -51,6 +46,7 @@ const noVariations: EstimateVariations = {
   rateByMaterialId: new Map(),
   extraMaterials: [],
   modelByLine: new Map(),
+  addsByLine: new Map(),
   useModelMaterials: true,
 };
 
@@ -266,12 +262,18 @@ test("other costs add to the total; one with no rate is unknown, never zero (017
 });
 
 test("a row made of the model's materials says so, and lists them (0174)", () => {
-  const v = view({}, {
-    ...noVariations,
-    componentsByLine: new Map([["l1", [{ materialId: "cement", mixId: null, qtyPerUnit: 0.5 }]]]),
-  });
+  const v = view(
+    {},
+    {
+      ...noVariations,
+      componentsByLine: new Map([["l1", [{ materialId: "cement", mixId: null, qtyPerUnit: 0.5 }]]]),
+    },
+  );
   const rate = v.rateViewFor(v.lineById.get("l1")!, "sqft");
   assert.equal(rate.fromModel, true);
   assert.equal(rate.own, false);
-  assert.deepEqual(rate.components.map((row) => [row.ref, row.qtyPerUnit]), [["material:cement", 0.5]]);
+  assert.deepEqual(
+    rate.components.map((row) => [row.ref, row.qtyPerUnit]),
+    [["material:cement", 0.5]],
+  );
 });

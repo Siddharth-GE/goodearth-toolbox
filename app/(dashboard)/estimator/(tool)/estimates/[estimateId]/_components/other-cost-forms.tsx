@@ -55,13 +55,7 @@ export function MaterialsFromChoice({
 }
 
 /** Add or change a typed cost. The model's own rows never come here. */
-export function OtherCostDialog({
-  estimateId,
-  cost,
-}: {
-  estimateId: string;
-  cost?: OtherCostRow;
-}) {
+export function OtherCostDialog({ estimateId, cost }: { estimateId: string; cost?: OtherCostRow }) {
   const [open, setOpen] = useState(false);
   const { pending, error, run } = useActionRunner();
   const id = useId();
@@ -135,12 +129,7 @@ export function OtherCostDialog({
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor={`${id}-code`}>Code (optional)</Label>
-              <Input
-                id={`${id}-code`}
-                name="code"
-                maxLength={40}
-                defaultValue={cost?.code ?? ""}
-              />
+              <Input id={`${id}-code`} name="code" maxLength={40} defaultValue={cost?.code ?? ""} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor={`${id}-note`}>Note (optional)</Label>

@@ -80,6 +80,16 @@ begin
     raise exception 'TRIAL 1 FAILED: the settings, BUA or switch did not land';
   end if;
 
+  -- 1b. One mix arriving both ways on a row (0175) is two rows: one replaces the recipe, one adds to it.
+  perform import_model_takeoff(v_working, v_lines, v_model,
+    v_materials || jsonb_build_array(jsonb_build_object('work_item_id', v_work, 'mix_name', v_mix_name,
+                                     'mix_uom', v_mix_uom, 'qty', 3, 'adds_to_recipe', true)), v_costs);
+  if (select count(*) from estimator_estimate_line_model_materials where line_id = v_line and mix_id = v_mix) <> 2
+     or (select qty from estimator_estimate_line_model_materials
+          where line_id = v_line and mix_id = v_mix and adds_to_recipe) is distinct from 3.0 then
+    raise exception 'TRIAL 1b FAILED: a mix both ways did not land as two rows';
+  end if;
+
   -- 2. Sent again with one other cost and a typed one beside it: nothing doubles and the typed one stays.
   insert into estimator_estimate_other_costs (estimate_id, name, qty, rate, position, created_by, updated_by)
   values (v_working, 'Typed by hand', 1, 500, 100, v_user, v_user) returning id into v_typed;

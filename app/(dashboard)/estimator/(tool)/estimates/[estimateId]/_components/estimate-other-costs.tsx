@@ -82,7 +82,9 @@ export function EstimateOtherCosts({
                       formatMoney(cost.rate)
                     )}
                   </TableCell>
-                  <TableCell className="text-foreground text-right">{formatMoney(amount)}</TableCell>
+                  <TableCell className="text-foreground text-right">
+                    {formatMoney(amount)}
+                  </TableCell>
                   {isDraft && (
                     <TableCell className="text-right whitespace-nowrap">
                       {!cost.fromModel && (

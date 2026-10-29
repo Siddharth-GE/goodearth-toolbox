@@ -11,7 +11,8 @@ export function EstimateTotal({
   estimate: EstimateDetail;
   view: EstimateView;
 }) {
-  const { isDraft, totals } = view;
+  const { isDraft, totals, other, grand } = view;
+  const empty = estimate.lines.length === 0 && estimate.otherCosts.length === 0;
   const missingBits = view.missing;
   const part = (label: string, value: number | null) =>
     `${label} ${value === null ? "not priced yet" : formatMoney(value)}`;
@@ -19,21 +20,25 @@ export function EstimateTotal({
     <Card className="space-y-2 p-5">
       <Figure
         label={
-          estimate.lines.length === 0
+          empty
             ? "Total"
             : !isDraft
               ? `Total, frozen ${formatDate(estimate.submittedAt)}`
-              : totals.isComplete
+              : grand.isComplete
                 ? "Total at today's rates"
                 : "Total so far"
         }
-        value={estimate.lines.length === 0 ? formatMoney(null) : formatMoney(totals.grand)}
+        value={empty ? formatMoney(null) : formatMoney(grand.amount)}
         hint={
-          estimate.lines.length === 0
+          empty
             ? "nothing on it yet"
-            : `${part("Labour", totals.labour)} · ${part("Materials", totals.material)}`
+            : [
+                part("Labour", totals.labour),
+                part("Materials", totals.material),
+                ...(estimate.otherCosts.length > 0 ? [part("Other costs", other.amount)] : []),
+              ].join(" · ")
         }
-        tone={estimate.lines.length > 0 && !totals.isComplete ? "warn" : undefined}
+        tone={!empty && !grand.isComplete ? "warn" : undefined}
         size="hero"
       />
       {missingBits.length > 0 && (

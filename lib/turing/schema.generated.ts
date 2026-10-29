@@ -1516,6 +1516,19 @@ export const TURING_SCHEMA: Schema = {
       "updated_by": "string | null"
     }
   },
+  "estimator_estimate_line_model_materials": {
+    "kind": "table",
+    "columns": {
+      "created_at": "string",
+      "created_by": "string | null",
+      "id": "string",
+      "line_id": "string",
+      "mix_id": "string",
+      "qty": "number",
+      "updated_at": "string",
+      "updated_by": "string | null"
+    }
+  },
   "estimator_estimate_lines": {
     "kind": "table",
     "columns": {
@@ -1531,6 +1544,25 @@ export const TURING_SCHEMA: Schema = {
       "updated_at": "string",
       "updated_by": "string | null",
       "work_item_id": "string"
+    }
+  },
+  "estimator_estimate_other_costs": {
+    "kind": "table",
+    "columns": {
+      "code": "string | null",
+      "created_at": "string",
+      "created_by": "string | null",
+      "estimate_id": "string",
+      "from_model": "boolean",
+      "id": "string",
+      "name": "string",
+      "note": "string | null",
+      "position": "number",
+      "qty": "number | null",
+      "rate": "number | null",
+      "unit": "string | null",
+      "updated_at": "string",
+      "updated_by": "string | null"
     }
   },
   "estimator_estimate_takeoff": {
@@ -1563,10 +1595,12 @@ export const TURING_SCHEMA: Schema = {
       "id": "string",
       "is_template": "boolean",
       "is_working": "boolean",
+      "model_bua_sqft": "number | null",
       "model_file": "string | null",
       "model_guid": "string | null",
       "model_imported_at": "string | null",
       "model_imported_by": "string | null",
+      "model_settings": "Json | null",
       "name": "string",
       "note": "string | null",
       "project_id": "string",
@@ -1578,7 +1612,8 @@ export const TURING_SCHEMA: Schema = {
       "superseded_at": "string | null",
       "unit_id": "string | null",
       "updated_at": "string",
-      "updated_by": "string | null"
+      "updated_by": "string | null",
+      "use_model_materials": "boolean"
     }
   },
   "estimator_materials": {

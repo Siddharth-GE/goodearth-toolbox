@@ -148,7 +148,7 @@ test("the villa the model remembers is only a suggestion, and only a real id", (
 });
 
 test("a first import adds every work, and the hand-measured one goes on to measure", () => {
-  const plan = planImport(read(file()), WORKS, null);
+  const plan = planImport(read(file()), WORKS, null, [], []);
   assert.deepEqual(
     plan.entries.map((entry) => [entry.code, entry.kind]),
     [
@@ -198,6 +198,8 @@ test("an unknown code, a switched-off work and a work with no rate-book unit are
     read(file()),
     [work("FD.9", null), work("PF.8", "sqft", { isActive: false })],
     null,
+    [],
+    [],
   );
   const why = Object.fromEntries(plan.entries.map((entry) => [entry.code, entry.why]));
   assert.match(String(why["FD.14"]), /FD\.14 is not in the toolbox's works/);
@@ -211,6 +213,8 @@ test("a unit that disagrees with the rate book refuses that work and the rest im
     read(file()),
     [...WORKS.filter((w) => w.code !== "FD.9"), work("FD.9", "sqm")],
     null,
+    [],
+    [],
   );
   const masonry = plan.entries.find((entry) => entry.code === "FD.9");
   assert.equal(masonry?.kind, "refused");
@@ -222,7 +226,8 @@ test("a unit that disagrees with the rate book refuses that work and the rest im
 test("a row a person could not have typed refuses its work: a box at zero, an empty row, a long description", () => {
   const withRows = (rows: unknown[]) =>
     file({ lines: [{ work_code: "FD.9", uom: "cum", measured_as: "volume", rows }] });
-  const why = (rows: unknown[]) => planImport(read(withRows(rows)), WORKS, null).entries[0].why;
+  const why = (rows: unknown[]) =>
+    planImport(read(withRows(rows)), WORKS, null, [], []).entries[0].why;
 
   assert.match(
     String(why([{ nos: 1, length: 0, model_refs: [] }])),
@@ -255,7 +260,7 @@ test("a code listed twice is refused both times — which one is meant is unknow
       { work_code: "FD.9", uom: "cum", rows: [{ nos: 2 }] },
     ],
   });
-  const plan = planImport(read(twice), WORKS, null);
+  const plan = planImport(read(twice), WORKS, null, [], []);
   assert.deepEqual(
     plan.entries.filter((entry) => entry.code === "FD.9").map((entry) => entry.kind),
     ["refused", "refused"],
@@ -281,6 +286,8 @@ test("sending again replaces the model's rows, keeps hand rows, and says so", ()
       { lineId: "l-9", workItemId: "w-FD.9", qty: 2.818, handRows: 1, modelRows: 2 },
       { lineId: "l-14", workItemId: "w-FD.14", qty: 0.392, handRows: 0, modelRows: 1 },
     ]),
+    [],
+    [],
   );
   const masonry = plan.entries.find((entry) => entry.code === "FD.9");
   assert.equal(masonry?.kind, "replace");
@@ -300,6 +307,8 @@ test("a work the model stops measuring loses its model rows: to measure again, o
       { lineId: "l-6", workItemId: "w-FD.6", qty: 3, handRows: 2, modelRows: 1 },
       { lineId: "l-x", workItemId: "w-FD.9", qty: 5, handRows: 3, modelRows: 0 },
     ]),
+    [],
+    [],
   );
   assert.deepEqual(
     plan.removals.map((removal) => [removal.code, removal.modelRows, removal.backToMeasure]),
@@ -319,6 +328,8 @@ test("a typed quantity the model's rows replace is named; a work already measure
       { lineId: "l-14", workItemId: "w-FD.14", qty: 12, handRows: 0, modelRows: 0 },
       { lineId: "l-8", workItemId: "w-PF.8", qty: 40, handRows: 2, modelRows: 0 },
     ]),
+    [],
+    [],
   );
   const footing = plan.entries.find((entry) => entry.code === "FD.14");
   assert.equal(footing?.kind, "add");
@@ -333,17 +344,22 @@ test("a hand-measured work already on the estimate is left as it is", () => {
     read(file()),
     WORKS,
     estimate([{ lineId: "l-ss", workItemId: "w-SS.3", qty: 1200, handRows: 0, modelRows: 0 }]),
+    [],
+    [],
   );
   assert.equal(plan.entries.find((entry) => entry.code === "SS.3")?.kind, "already_on");
   assert.equal(plan.counts.toMeasure, 0);
 });
 
 test("a different model on the same villa is warned; the same one is not", () => {
-  assert.deepEqual(planImport(read(file()), WORKS, estimate([], "another-guid")).differentModel, {
-    file: "Sample villa.skp",
-  });
-  assert.equal(planImport(read(file()), WORKS, estimate([], GUID)).differentModel, null);
-  assert.equal(planImport(read(file()), WORKS, estimate([], null)).differentModel, null);
+  assert.deepEqual(
+    planImport(read(file()), WORKS, estimate([], "another-guid"), [], []).differentModel,
+    {
+      file: "Sample villa.skp",
+    },
+  );
+  assert.equal(planImport(read(file()), WORKS, estimate([], GUID), [], []).differentModel, null);
+  assert.equal(planImport(read(file()), WORKS, estimate([], null), [], []).differentModel, null);
 });
 
 test("the toolbox sums the rows itself and shows a model total that disagrees", () => {
@@ -358,7 +374,7 @@ test("the toolbox sums the rows itself and shows a model total that disagrees", 
       },
     ],
   });
-  const entry = planImport(read(off), WORKS, null).entries[0];
+  const entry = planImport(read(off), WORKS, null, [], []).entries[0];
   assert.equal(entry.qty, 1.8); // 4 × 3 × 0.15, without the floating-point dust
   assert.equal(entry.modelQtyDiffers, 9);
 });
@@ -370,13 +386,13 @@ test("a work the model measured differently from the rate book imports with a wa
     ],
     not_measured: [],
   });
-  const entry = planImport(read(stale), WORKS, null).entries[0];
+  const entry = planImport(read(stale), WORKS, null, [], []).entries[0];
   assert.equal(entry.kind, "add");
   assert.deepEqual(entry.measuredDifferently, { model: "area", rateBook: "manual" });
 });
 
 test("nothing to do means nothing to import", () => {
-  const plan = planImport(read(file({ lines: [], not_measured: [] })), WORKS, null);
+  const plan = planImport(read(file({ lines: [], not_measured: [] })), WORKS, null, [], []);
   assert.equal(plan.canImport, false);
 });
 
@@ -389,15 +405,32 @@ test("a blank 'how it is measured' follows the unit, as SketchUp reads it", () =
   assert.equal(measureFromUnit(null), "manual");
 });
 
+const UNITS = ["kg", "cum", "nos", "cft"];
+
 /** 0.10's extra parts (0174): the model's mixes and steel, and what it worked out. */
 const everything = () =>
   file({
     mixes: [
-      { work_code: "FD.14", mix: "M20 Concrete", uom: "cum", measured_as: "volume", qty: 0.392, rows: [] },
+      {
+        work_code: "FD.14",
+        mix: "M20 Concrete",
+        uom: "cum",
+        measured_as: "volume",
+        qty: 0.392,
+        rows: [],
+      },
       { work_code: "FD.14", mix: "m20 concrete", uom: "cum", qty: 0.1, rows: [] },
       { work_code: "FD.9", mix: "Laterite basement masonry", uom: "nos", qty: 1.8, rows: [] },
     ],
-    steel: [{ work_code: "FD.14", element: "Footing", uom: "kg", kg: 30, by_dia: { "10": 20, "0": 10, x: 5 } }],
+    steel: [
+      {
+        work_code: "FD.14",
+        element: "Footing",
+        uom: "kg",
+        kg: 30,
+        by_dia: { "10": 20, "0": 10, x: 5 },
+      },
+    ],
     derived: {
       lines: [
         { code: "FD.14", qty: 0.2, uom: "cum", basis: "Pits", from: "model" },
@@ -408,7 +441,15 @@ const everything = () =>
       steel: [{ work_code: "CAR.02.03", dia: 8, kg: 30 }],
       extras: [{ work_code: "CAR.02.03", name: "Stair teak", qty: 18 }],
       allowances: [
-        { code: "MEP", name: "MEP materials", unit: "sqft BUA", qty: 2335.63, rate: 200, amount: 467126, note: "Allowance" },
+        {
+          code: "MEP",
+          name: "MEP materials",
+          unit: "sqft BUA",
+          qty: 2335.63,
+          rate: 200,
+          amount: 467126,
+          note: "Allowance",
+        },
         { code: "", name: "Door hardware", unit: "nos", qty: 5, rate: -1, note: "" },
         { code: "", name: "", qty: 1 },
       ],
@@ -447,11 +488,18 @@ test("the model's materials, steel as mixes, other costs and settings are read",
       ["FD.14", "Steel 10 mm", "kg", 20, "steel"],
       ["CAR.02.03", "M20 Concrete", null, 1.2, "settings"],
       ["CAR.02.03", "Steel 8 mm", "kg", 30, "settings"],
-      ["CAR.02.03", "Stair teak", null, 18, "settings"],
+      ["CAR.02.03", "Stair teak", null, 18, "extra"],
     ],
   );
   assert.deepEqual(takeoff.otherCosts, [
-    { code: "MEP", name: "MEP materials", unit: "sqft BUA", qty: 2335.63, rate: 200, note: "Allowance" },
+    {
+      code: "MEP",
+      name: "MEP materials",
+      unit: "sqft BUA",
+      qty: 2335.63,
+      rate: 200,
+      note: "Allowance",
+    },
     { code: null, name: "Door hardware", unit: "nos", qty: 5, rate: null, note: null },
   ]);
   assert.deepEqual(takeoff.settings, { toilets: 3, ceiling_tiles: "yes" });
@@ -461,8 +509,16 @@ test("the model's materials, steel as mixes, other costs and settings are read",
 });
 
 test("a takeoff with more materials than any villa has is refused whole", () => {
-  const many = Array.from({ length: 2_001 }, () => ({ work_code: "FD.14", mix: "M20", uom: "cum", qty: 1 }));
-  assert.match(String(parseTakeoff(JSON.stringify(file({ mixes: many }))).problem), /more materials/);
+  const many = Array.from({ length: 2_001 }, () => ({
+    work_code: "FD.14",
+    mix: "M20",
+    uom: "cum",
+    qty: 1,
+  }));
+  assert.match(
+    String(parseTakeoff(JSON.stringify(file({ mixes: many }))).problem),
+    /more materials/,
+  );
 });
 
 test("materials match the Mixes tab by name, add up, make what's missing, and refuse a unit that differs", () => {
@@ -471,14 +527,17 @@ test("materials match the Mixes tab by name, add up, make what's missing, and re
     { name: "M20 Concrete", uom: "cum" },
     { name: "Laterite basement masonry", uom: "cum" },
   ];
-  const plan = planImport(read(everything()), works, null, mixes);
+  const plan = planImport(read(everything()), works, null, mixes, UNITS);
   const row = (code: string, mix: string) =>
     plan.materials.find((entry) => entry.code === code && entry.mix === mix);
 
   assert.equal(row("FD.14", "M20 Concrete")?.kind, "ok");
   assert.ok(Math.abs((row("FD.14", "M20 Concrete")?.qty ?? 0) - 0.492) < 1e-9);
   assert.equal(row("FD.9", "Laterite basement masonry")?.kind, "refused");
-  assert.match(String(row("FD.9", "Laterite basement masonry")?.why), /is in cum; the model sent nos/);
+  assert.match(
+    String(row("FD.9", "Laterite basement masonry")?.why),
+    /is in cum; the model sent nos/,
+  );
   assert.equal(row("CAR.02.03", "M20 Concrete")?.uom, "cum");
   assert.equal(row("CAR.02.03", "Steel 8 mm")?.kind, "new_mix");
   assert.equal(row("CAR.02.03", "Stair teak")?.kind, "refused");
@@ -489,17 +548,51 @@ test("materials match the Mixes tab by name, add up, make what's missing, and re
     { name: "Steel 8 mm", uom: "kg" },
   ]);
   assert.deepEqual(
-    plan.materialsPayload.find((entry) => entry.mix_name === "M20 Concrete" && entry.work_item_id === "w-FD.14"),
-    { work_item_id: "w-FD.14", mix_name: "M20 Concrete", mix_uom: "cum", qty: 0.492 },
+    plan.materialsPayload.find(
+      (entry) => entry.mix_name === "M20 Concrete" && entry.work_item_id === "w-FD.14",
+    ),
+    {
+      work_item_id: "w-FD.14",
+      mix_name: "M20 Concrete",
+      mix_uom: "cum",
+      qty: 0.492,
+      adds_to_recipe: false,
+    },
   );
   assert.equal(plan.counts.otherCosts, 2);
   assert.equal(plan.otherCostsPayload.length, 2);
 });
 
 test("a material whose work is not on the estimate after the import is refused alone", () => {
-  const plan = planImport(read(everything()), WORKS, null, [{ name: "M20 Concrete", uom: "cum" }]);
+  const plan = planImport(
+    read(everything()),
+    WORKS,
+    null,
+    [{ name: "M20 Concrete", uom: "cum" }],
+    UNITS,
+  );
   const stair = plan.materials.filter((entry) => entry.code === "CAR.02.03");
   assert.ok(stair.length > 0 && stair.every((entry) => entry.kind === "refused"));
   assert.match(String(stair[0].why), /not in the toolbox's works/);
   assert.ok(plan.materialsPayload.every((entry) => entry.work_item_id !== "w-CAR.02.03"));
+});
+
+test("a new mix takes the toolbox's spelling of its unit; a unit it lacks is refused alone", () => {
+  const takeoff = read(
+    file({
+      mixes: [
+        { work_code: "FD.14", mix: "Steel 16 mm", uom: "KG", qty: 3 },
+        { work_code: "FD.14", mix: "Odd", uom: "furlong", qty: 1 },
+      ],
+    }),
+  );
+  const plan = planImport(takeoff, WORKS, null, [], UNITS);
+  assert.deepEqual(plan.newMixes, [{ name: "Steel 16 mm", uom: "kg" }]);
+  const odd = plan.materials.find((entry) => entry.mix === "Odd");
+  assert.equal(odd?.kind, "refused");
+  assert.match(String(odd?.why), /"furlong", a unit the toolbox doesn't have/);
+  assert.deepEqual(
+    plan.materialsPayload.map((entry) => entry.mix_uom),
+    ["kg"],
+  );
 });

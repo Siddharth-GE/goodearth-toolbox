@@ -154,6 +154,7 @@ export function buildEstimateView(input: {
     estimate.lines.map((line) => ({ id: line.id, workItemId: line.workItemId })),
     variations.componentsByLine,
     variations.labourRateByLine,
+    variations.addsByLine,
   );
 
   const lineInputs = estimate.lines.map((line) => ({
@@ -246,8 +247,11 @@ export function buildEstimateView(input: {
   const rateViewFor = (line: EstimateDetail["lines"][number], uom: string | null): LineRateView => {
     const standard = book.recipes.find((recipe) => recipe.workItemId === line.workItemId);
     const own = variations.byLine.get(line.id);
-    // A row's list that isn't its own is the model's, folded in by getEstimateVariations.
-    const model = own ? undefined : variations.componentsByLine.get(line.id);
+    // Not the villa's own: the list in use, the model's folded in by getEstimateVariations.
+    const fromModel =
+      !own &&
+      (variations.componentsByLine.has(line.id) || variations.addsByLine.has(line.id));
+    const inUse = recipesByLine.get(line.id)?.components;
     const buildUp = rateBuildUp(recipesByLine.get(line.id), mixesById, materialsById);
     return {
       lineId: line.id,
@@ -255,7 +259,7 @@ export function buildEstimateView(input: {
       workName: line.label ? `${line.name} — ${line.label}` : line.name,
       workUom: uom,
       own: own !== undefined,
-      fromModel: model !== undefined,
+      fromModel,
       labour: {
         villa: line.labourRate,
         rateBook: standard?.labourRate ?? null,
@@ -265,7 +269,7 @@ export function buildEstimateView(input: {
         ? own.map((row) =>
             componentView({ materialId: row.itemId, mixId: row.mixId, qtyPerUnit: row.qtyPerUnit }),
           )
-        : (model ?? standard?.components ?? []).map(componentView),
+        : ((fromModel ? inUse : undefined) ?? standard?.components ?? []).map(componentView),
       prices: (buildUp?.materials ?? []).map((row) => {
         const def = materialsById.get(row.materialId);
         return {

@@ -26,7 +26,7 @@ create table if not exists estimator_estimate_line_model_materials (
   id uuid primary key default gen_random_uuid(),
   line_id uuid not null references estimator_estimate_lines (id) on delete cascade,
   mix_id uuid not null references estimator_mixes (id),
-  qty numeric not null check (qty > 0 and qty <> 'NaN'),
+  qty numeric not null check (qty > 0 and qty < 'Infinity'),
   created_by uuid references profiles (id),
   updated_by uuid references profiles (id),
   created_at timestamptz not null default now(),
@@ -44,8 +44,8 @@ create table if not exists estimator_estimate_other_costs (
   code text check (code is null or length(trim(code)) between 1 and 40),
   name text not null check (length(trim(name)) between 1 and 200),
   unit text check (unit is null or length(trim(unit)) between 1 and 40),
-  qty numeric check (qty is null or (qty >= 0 and qty <> 'NaN')),
-  rate numeric check (rate is null or (rate >= 0 and rate <> 'NaN')),
+  qty numeric check (qty is null or (qty >= 0 and qty < 'Infinity')),
+  rate numeric check (rate is null or (rate >= 0 and rate < 'Infinity')),
   note text check (note is null or length(note) <= 500),
   position integer not null default 0,
   created_by uuid references profiles (id),
@@ -213,6 +213,9 @@ begin
     raise exception 'The takeoff names a mix with no name, one longer than 120 letters, or more mixes than any villa has';
   end if;
 
+  -- Locked before the first read; import_model_rows locks it again, harmlessly.
+  perform 1 from estimator_estimates where id = p_estimate for update;
+
   -- The rows the model measured, or gave materials to, before this send: a work it sends no rows for this time keeps
   -- its materials on the same row (import_model_rows' choice).
   select coalesce(array_agg(distinct l.id), '{}') into v_prior
@@ -249,7 +252,7 @@ begin
   if exists (
     select 1
     from jsonb_to_recordset(p_materials) as m(work_item_id uuid, mix_name text, mix_uom text, qty numeric)
-    where m.qty is null or m.qty <= 0 or m.qty = 'NaN'
+    where m.qty is null or m.qty <= 0 or m.qty >= 'Infinity'
        or not exists (
          select 1 from estimator_mixes x
          where lower(x.name) = lower(btrim(m.mix_name)) and lower(btrim(x.uom)) = lower(btrim(m.mix_uom))

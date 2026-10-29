@@ -14,8 +14,10 @@ import { listMixes } from "@/lib/estimator/mixes-queries";
 import { listMaterialItems, listUomNames } from "@/lib/estimator/shared";
 import { listWorkStatus } from "@/lib/estimator/works-queries";
 import { notFound } from "next/navigation";
+import { EstimateFromModel } from "./_components/estimate-from-model";
 import { EstimateHeader } from "./_components/estimate-header";
 import { EstimateMaterials } from "./_components/estimate-materials";
+import { EstimateOtherCosts } from "./_components/estimate-other-costs";
 import { EstimateReachedSite } from "./_components/estimate-reached-site";
 import { EstimateTotal } from "./_components/estimate-total";
 import { EstimateWorks } from "./_components/estimate-works";
@@ -80,6 +82,7 @@ export default async function EstimatePage({
     <div className="space-y-4">
       <EstimateHeader estimate={estimate} view={view} />
       <EstimateTotal estimate={estimate} view={view} />
+      <EstimateFromModel estimate={estimate} isDraft={view.isDraft} />
       <EstimateWorks
         estimate={estimate}
         view={view}
@@ -88,6 +91,7 @@ export default async function EstimatePage({
         canEditMasters={canEditMasters}
         uoms={uoms}
       />
+      <EstimateOtherCosts estimate={estimate} view={view} />
       {view.takeoffRows.length > 0 && (
         <EstimateMaterials estimate={estimate} view={view} variations={variations} />
       )}

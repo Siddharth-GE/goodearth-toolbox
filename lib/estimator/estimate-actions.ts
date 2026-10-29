@@ -928,6 +928,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     lines.data.map((line) => ({ id: line.id, workItemId: line.work_item_id })),
     variations.componentsByLine,
     variations.labourRateByLine,
+    variations.addsByLine,
   );
 
   const lineInputs = lines.data.map((line) => ({
@@ -1070,9 +1071,16 @@ const OTHER_COST_NAME_LIMIT = 200;
 const OTHER_COST_UNIT_LIMIT = 40;
 const OTHER_COST_NOTE_LIMIT = 500;
 
-function readOtherCost(
-  formData: FormData,
-): { error: string } | { code: string | null; name: string; unit: string | null; qty: number | null; rate: number | null; note: string | null } {
+function readOtherCost(formData: FormData):
+  | { error: string }
+  | {
+      code: string | null;
+      name: string;
+      unit: string | null;
+      qty: number | null;
+      rate: number | null;
+      note: string | null;
+    } {
   const code = text(formData, "code");
   const name = text(formData, "name");
   const unit = text(formData, "unit");
@@ -1160,7 +1168,9 @@ export async function updateOtherCost(
     return { error: "Could not save the cost. Try again." };
   }
   if (!data || data.length === 0) {
-    return { error: "That cost came from the model, or is gone — change it in SketchUp, or reload." };
+    return {
+      error: "That cost came from the model, or is gone — change it in SketchUp, or reload.",
+    };
   }
 
   revalidatePath("/estimator", "layout");

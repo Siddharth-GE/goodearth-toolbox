@@ -124,18 +124,33 @@ export function LineRateDialog({
                   ↺ Back to the rate book
                 </Button>
               </span>
+            ) : view.fromModel ? (
+              <Badge variant="info">From the SketchUp model</Badge>
             ) : (
               <Badge variant="neutral">From the rate book</Badge>
             )}
           </div>
 
-          <AddComponentForm
-            options={options}
-            unit={unit}
-            pending={pending}
-            onAdd={(ref, qty) => change({ op: "add", ref, qty })}
-          />
-          {view.components.length === 0 ? (
+          {view.fromModel ? (
+            <ul className="divide-border divide-y">
+              {view.components.map((row) => (
+                <li key={row.ref} className="text-foreground py-2 text-sm">
+                  {row.name}
+                  <span className="text-muted block text-xs">
+                    {formatQuantity(row.qtyPerUnit)} {row.uom} per {unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <AddComponentForm
+              options={options}
+              unit={unit}
+              pending={pending}
+              onAdd={(ref, qty) => change({ op: "add", ref, qty })}
+            />
+          )}
+          {view.fromModel ? null : view.components.length === 0 ? (
             <p className="text-muted text-sm">
               Labour only — nothing listed yet. Add a mix such as W3, or a material, above.
             </p>
@@ -154,9 +169,11 @@ export function LineRateDialog({
             </ul>
           )}
           <p className="text-muted text-xs">
-            {view.own
-              ? "This villa's list stands on its own — later changes to the rate book don't reach it. Removing every material puts it back on the rate book's."
-              : "Changing anything here gives this villa its own list, starting from the rate book's. Other villas, and the rate book, stay as they are."}
+            {view.fromModel
+              ? "The model's quantities for this work, shared over its quantity. They change when the model is sent again. To give this villa its own list, switch Materials from to the Rate book first."
+              : view.own
+                ? "This villa's list stands on its own — later changes to the rate book don't reach it. Removing every material puts it back on the rate book's."
+                : "Changing anything here gives this villa its own list, starting from the rate book's. Other villas, and the rate book, stay as they are."}
           </p>
         </div>
 

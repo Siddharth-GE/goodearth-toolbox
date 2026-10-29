@@ -102,6 +102,23 @@ So:
 
 Import `Plot 04 - QS model takeoff.json` (0.10, 29 Oct) into a test villa on staging. Then compare the toolbox's estimate with the plugin's `Plot 04 - QS model estimate.csv` (₹72.3 L: labour ₹26.3 L, materials ₹29.3 L, allowances ₹16.7 L), quantity by quantity and rupee by rupee, and write the differences into this section. The target is equal within rupees, or each difference named.
 
+**Compared on 2026-10-29** (Opus): the takeoff from 21:16 run through the toolbox's own reader, planner and pricing (`parseTakeoff`, `planImport`, the fold, `computeLine`, `computeTakeoff`) against staging's rate book after `0174`, `0175` and the mix seed, read-only. Nothing refused: 85 works, 1 to measure (F.04.08 jali), 51 materials, 7 other costs, no new mixes.
+
+|             | Plugin        | Toolbox       | Difference          |
+| ----------- | ------------- | ------------- | ------------------- |
+| Labour      | ₹26,28,681.74 | ₹26,28,681.78 | 4 paise of rounding |
+| Materials   | ₹29,31,873.62 | ₹22,64,104.25 | ₹6,67,769 — below   |
+| Other costs | ₹16,72,094.50 | ₹16,72,094.50 | none                |
+| Total       | ₹72,32,649.87 | ₹65,64,880.53 |                     |
+
+The materials' difference, all of it:
+
+- **₹6,67,914: the plugin's own recipes for 18 works the rate book has none for** (roof steel PF.03.01 ₹2.86 L, floor and wall tiles F.02.02/F.02.03/CAR.02.05 ₹2.24 L, putty and paints, PU polish, grout, waterproofing). The plugin says so in its own notes. `scripts/seed-sketchup-mixes.ts --works` adds them to the rate book (dry run: CAR.02.05, CAR.02.08, F.01.02, F.01.03, F.02.02, F.02.03, F.02.14, F.03.01, F.03.02, F.03.02A, F.03.05, F.04.05, F.04.10–F.04.13, PF.03.01, PF.03.15), but that changes those works for every villa, so it waits for the founder.
+- **−₹149.40: HW/19B Tower Bolt 6"** — the plugin prices it ₹120, the toolbox's Masters ₹194.70. The toolbox's price stands.
+- **₹4.62: rounding** of 8 mm steel's quantity in the plugin's sheet.
+
+Found on the way and fixed by `0175`: the model's extras (ridge tiles, grills, stair teak) add to a work's recipe, as the plugin does; `0174` let them replace it, which dropped PF.03.09's Mangalore tiles (₹1.64 L).
+
 ## Steps — one branch per piece, each vetted on staging before the next
 
 - [x] Founder: go-ahead (2026-10-29), the code list as written; 0172's four unit moves put back by `0173` at the founder's word.
@@ -113,7 +130,7 @@ Import `Plot 04 - QS model takeoff.json` (0.10, 29 Oct) into a test villa on sta
 - [ ] `[Opus]` Piece 2: `model-takeoff.ts`, the import, the variations fold, their tests.
 - [ ] `[Opus]` Piece 2: the estimate page, the From the model preview, the seed script (dry run, then staging).
 - [ ] `[Opus]` Piece 2: vet, open every changed page, the checks, independent review, pull request. Founder: checklist 2.
-- [ ] `[Opus]` Piece 3: Plot 04 compared, written up here.
+- [x] `[Opus]` Piece 3: Plot 04 compared, written up here; `0175` from it.
 
 ## The founder's checklists on staging
 

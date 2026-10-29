@@ -36,6 +36,8 @@ export function lineRecipes(
   lines: { id: string; workItemId: string }[],
   componentsByLine: Map<string, WorkRecipe["components"]>,
   labourRateByLine: Map<string, number>,
+  /** Added on top of whichever list stands: the model's extras (0175). */
+  addsByLine: Map<string, WorkRecipe["components"]> = new Map(),
 ): Map<string, WorkRecipe> {
   const byWork = new Map(recipes.map((recipe) => [recipe.workItemId, recipe]));
   const byLine = new Map<string, WorkRecipe>();
@@ -45,7 +47,10 @@ export function lineRecipes(
     const labourRate = labourRateByLine.get(line.id);
     byLine.set(line.id, {
       ...standard,
-      components: componentsByLine.get(line.id) ?? standard.components,
+      components: [
+        ...(componentsByLine.get(line.id) ?? standard.components),
+        ...(addsByLine.get(line.id) ?? []),
+      ],
       // A villa rate of 0 is real (labour included in a contract), so do not fall back on falsy.
       labourRate: labourRate === undefined ? standard.labourRate : labourRate,
     });

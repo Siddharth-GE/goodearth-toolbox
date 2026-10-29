@@ -122,7 +122,7 @@ export type TakeoffMaterial = {
   mix: string;
   uom: string | null;
   qty: number;
-  from: "model" | "steel" | "settings";
+  from: "model" | "steel" | "settings" | "extra";
 };
 
 /** An allowance the rate book has no work for, at the plugin's rate (the founder, 2026-10-29). */
@@ -227,10 +227,19 @@ function addWorkedOut(lines: TakeoffLine[], raw: unknown[]): void {
   }
 }
 
-function readMaterials(doc: Record<string, unknown>, derived: Record<string, unknown>): TakeoffMaterial[] {
+function readMaterials(
+  doc: Record<string, unknown>,
+  derived: Record<string, unknown>,
+): TakeoffMaterial[] {
   const list = (value: unknown) => (Array.isArray(value) ? value.filter(isObject) : []);
   const materials: TakeoffMaterial[] = [];
-  const push = (workCode: unknown, mix: unknown, uom: unknown, qty: unknown, from: TakeoffMaterial["from"]) => {
+  const push = (
+    workCode: unknown,
+    mix: unknown,
+    uom: unknown,
+    qty: unknown,
+    from: TakeoffMaterial["from"],
+  ) => {
     const code = text(workCode, 40);
     const name = text(mix, 120);
     const amount = positive(qty);
@@ -238,19 +247,23 @@ function readMaterials(doc: Record<string, unknown>, derived: Record<string, unk
       materials.push({ workCode: code, mix: name, uom: text(uom, 40) || null, qty: amount, from });
     }
   };
-  for (const entry of list(doc.mixes)) push(entry.work_code, entry.mix, entry.uom, entry.qty, "model");
+  for (const entry of list(doc.mixes))
+    push(entry.work_code, entry.mix, entry.uom, entry.qty, "model");
   for (const entry of list(doc.steel)) {
     const byDia = isObject(entry.by_dia) ? entry.by_dia : {};
     for (const [diameter, kg] of Object.entries(byDia)) {
       if (DIAMETER.test(diameter)) push(entry.work_code, steelMixName(diameter), "kg", kg, "steel");
     }
   }
-  for (const entry of list(derived.mixes)) push(entry.work_code, entry.name, entry.uom, entry.qty, "settings");
+  for (const entry of list(derived.mixes))
+    push(entry.work_code, entry.name, entry.uom, entry.qty, "settings");
   for (const entry of list(derived.steel)) {
     const diameter = String(entry.dia ?? "");
-    if (DIAMETER.test(diameter)) push(entry.work_code, steelMixName(diameter), "kg", entry.kg, "settings");
+    if (DIAMETER.test(diameter))
+      push(entry.work_code, steelMixName(diameter), "kg", entry.kg, "settings");
   }
-  for (const entry of list(derived.extras)) push(entry.work_code, entry.name, entry.uom, entry.qty, "settings");
+  for (const entry of list(derived.extras))
+    push(entry.work_code, entry.name, entry.uom, entry.qty, "extra");
   return materials;
 }
 
@@ -273,7 +286,11 @@ function readSettings(raw: unknown): ModelSettings | null {
   const settings: ModelSettings = {};
   for (const [key, value] of Object.entries(raw).slice(0, MAX_SETTINGS)) {
     if (!key || key.length > 60) continue;
-    if (value === null || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+    if (
+      value === null ||
+      typeof value === "boolean" ||
+      (typeof value === "number" && Number.isFinite(value))
+    ) {
       settings[key] = value;
     } else if (typeof value === "string") {
       settings[key] = value.slice(0, 200);
@@ -380,8 +397,8 @@ export function parseTakeoff(input: unknown): ParsedTakeoff {
   const derived = isObject(doc.derived) ? doc.derived : {};
   const workedOut = Array.isArray(derived.lines) ? derived.lines : [];
   const allowances = Array.isArray(derived.allowances) ? derived.allowances : [];
-  const counted = [doc.mixes, doc.steel, derived.mixes, derived.steel, derived.extras].map((value) =>
-    Array.isArray(value) ? value.length : 0,
+  const counted = [doc.mixes, doc.steel, derived.mixes, derived.steel, derived.extras].map(
+    (value) => (Array.isArray(value) ? value.length : 0),
   );
   if (counted.some((count) => count > MAX_MATERIALS)) {
     return { problem: "The takeoff lists more materials than any villa has." };
@@ -515,6 +532,8 @@ export type ImportMaterialPayload = {
   mix_name: string;
   mix_uom: string;
   qty: number;
+  /** An extra (ridge tiles, grills, stair teak) adds to the work's recipe; a mix or steel replaces it (0175). */
+  adds_to_recipe: boolean;
 };
 export type ImportOtherCostPayload = {
   code: string | null;
@@ -571,7 +590,11 @@ export function planMaterials(
   mixes: MixForModel[],
   onEstimateAfter: Set<string>,
   units: string[],
-): { plan: PlanMaterial[]; payload: ImportMaterialPayload[]; newMixes: { name: string; uom: string }[] } {
+): {
+  plan: PlanMaterial[];
+  payload: ImportMaterialPayload[];
+  newMixes: { name: string; uom: string }[];
+} {
   const byCode = new Map(works.map((work) => [work.code, work]));
   const mixByName = new Map(mixes.map((mix) => [mix.name.trim().toLowerCase(), mix]));
   const unitByLower = new Map(units.map((unit) => [unit.trim().toLowerCase(), unit]));
@@ -602,7 +625,7 @@ export function planMaterials(
     }
     if (!why && !known && !planned && uom) newMixes.set(nameKey, { name: material.mix, uom });
 
-    const key = `${material.workCode}|${nameKey}|${why ? "refused" : "ok"}`;
+    const key = `${material.workCode}|${nameKey}|${material.from === "extra"}|${why ? "refused" : "ok"}`;
     const entry = merged.get(key) ?? {
       key,
       code: material.workCode,
@@ -619,7 +642,8 @@ export function planMaterials(
   }
 
   const plan = [...merged.values()].sort(
-    (a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.mix.localeCompare(b.mix),
+    (a, b) =>
+      a.code.localeCompare(b.code, undefined, { numeric: true }) || a.mix.localeCompare(b.mix),
   );
   return {
     plan: plan.map(({ workItemId: _workItemId, ...entry }) => entry),
@@ -630,6 +654,7 @@ export function planMaterials(
         mix_name: entry.mix,
         mix_uom: entry.uom as string,
         qty: entry.qty,
+        adds_to_recipe: entry.from === "extra",
       })),
     newMixes: [...newMixes.values()],
   };
@@ -640,8 +665,8 @@ export function planImport(
   takeoff: Takeoff,
   works: WorkForModel[],
   estimate: EstimateForModel | null,
-  mixes: MixForModel[] = [],
-  units: string[] = [],
+  mixes: MixForModel[],
+  units: string[],
 ): ImportPlan {
   const byCode = new Map(works.map((work) => [work.code, work]));
   const byId = new Map(works.map((work) => [work.workItemId, work]));

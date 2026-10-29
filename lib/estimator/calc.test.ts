@@ -114,7 +114,29 @@ test("the model's materials as a row's own list price per unit (0174)", () => {
   const recipes = lineRecipes([standard], [{ id: "row1", workItemId: "w1" }], own, new Map());
   const cost = computeLine({ workItemId: "w1", qty: 0.486 }, recipes.get("row1"), mixes, materials);
   assert.equal(cost.labourCost, 6000 * 0.486);
-  assert.ok(Math.abs((cost.materialCost ?? 0) - 0.486 * (8 * 400 + 0.45 * 2000 + 0.9 * 1500)) < 1e-9);
+  assert.ok(
+    Math.abs((cost.materialCost ?? 0) - 0.486 * (8 * 400 + 0.45 * 2000 + 0.9 * 1500)) < 1e-9,
+  );
+});
+
+test("the model's extras add to whichever list stands (0175)", () => {
+  const standard: WorkRecipe = {
+    workItemId: "w1",
+    uom: "sqft",
+    labourRate: 10,
+    components: [direct("cement", 1)],
+  };
+  const lines = [{ id: "row1", workItemId: "w1" }];
+  const adds = new Map([["row1", [direct("sand", 0.5)]]]);
+  assert.deepEqual(lineRecipes([standard], lines, new Map(), new Map(), adds).get("row1")?.components, [
+    direct("cement", 1),
+    direct("sand", 0.5),
+  ]);
+  const own = new Map([["row1", [direct("jelly", 2)]]]);
+  assert.deepEqual(lineRecipes([standard], lines, own, new Map(), adds).get("row1")?.components, [
+    direct("jelly", 2),
+    direct("sand", 0.5),
+  ]);
 });
 
 test("computeLine prices labour and materials together", () => {
