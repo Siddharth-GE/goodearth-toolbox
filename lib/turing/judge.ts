@@ -33,7 +33,8 @@ export async function judge(
         thinking: { type: "disabled" },
         output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
       },
-      { signal, timeout: 15_000, maxRetries: 1 },
+      // A slow judge holds up the whole answer; giving up costs only a Sonnet turn.
+      { signal, timeout: 6_000, maxRetries: 0 },
     );
     const text = response.content.find((block) => block.type === "text")?.text ?? "";
     const level = response.stop_reason === "refusal" ? null : levelFrom(text);
