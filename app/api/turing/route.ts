@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     conversationId?: unknown;
     text?: unknown;
     fileIds?: unknown;
+    deeper?: unknown;
   } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   const rawIds: unknown[] = Array.isArray(body?.fileIds) ? body.fileIds : [];
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
         ? { id: conversation.container_id, expiresAt: conversation.container_expires_at }
         : null,
     userContent: content,
+    deeper: body?.deeper === true,
     signal: request.signal,
   });
 

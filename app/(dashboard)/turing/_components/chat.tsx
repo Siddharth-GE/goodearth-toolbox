@@ -12,7 +12,7 @@ import type { ShownProposal, Turn } from "@/lib/turing/display";
 import { ACCEPTED_EXTENSIONS, fileKind, MAX_FILE_BYTES, NOT_TAKEN } from "@/lib/turing/file-kinds";
 import { shrinkDocumentForUpload } from "@/lib/uploads/shrink-in-browser";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Paperclip, Send, Sparkles, Square, X } from "lucide-react";
+import { Brain, LayoutDashboard, Paperclip, Send, Sparkles, Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent } from "react";
 import { MarkdownView } from "./markdown-view";
@@ -91,6 +91,7 @@ export function Chat({
   const [live, setLive] = useState<Live | null>(null);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [deeper, setDeeper] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const abort = useRef<AbortController | null>(null);
@@ -157,6 +158,7 @@ export function Chat({
     ]);
     setText("");
     setAttachments([]);
+    setDeeper(false);
     setLive({ text: "", pages: [], proposals: [], status: "Thinking…", error: null });
     follow(true);
 
@@ -167,7 +169,12 @@ export function Chat({
       const response = await fetch("/api/turing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, text: asked, fileIds: sent.map((file) => file.id) }),
+        body: JSON.stringify({
+          conversationId,
+          text: asked,
+          fileIds: sent.map((file) => file.id),
+          deeper,
+        }),
         signal: controller.signal,
       });
       if (!response.ok || !response.body) {
@@ -397,6 +404,15 @@ export function Chat({
               className="mb-0.5"
             >
               <Paperclip className="size-4" />
+            </IconButton>
+            <IconButton
+              aria-label="Think harder on the next answer"
+              title="Think harder: the next answer uses the strongest model"
+              aria-pressed={deeper}
+              onClick={() => setDeeper((on) => !on)}
+              className={cn("mb-0.5", deeper && "bg-accent/10 text-accent hover:text-accent")}
+            >
+              <Brain className="size-4" />
             </IconButton>
             <input
               ref={fileInput}

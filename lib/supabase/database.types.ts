@@ -11690,8 +11690,10 @@ export type Database = {
           created_at: string
           id: number
           input_tokens: number | null
+          model: string | null
           output_tokens: number | null
           role: string
+          route: string | null
         }
         Insert: {
           cache_read_tokens?: number | null
@@ -11701,8 +11703,10 @@ export type Database = {
           created_at?: string
           id?: never
           input_tokens?: number | null
+          model?: string | null
           output_tokens?: number | null
           role: string
+          route?: string | null
         }
         Update: {
           cache_read_tokens?: number | null
@@ -11712,8 +11716,10 @@ export type Database = {
           created_at?: string
           id?: never
           input_tokens?: number | null
+          model?: string | null
           output_tokens?: number | null
           role?: string
+          route?: string | null
         }
         Relationships: [
           {
