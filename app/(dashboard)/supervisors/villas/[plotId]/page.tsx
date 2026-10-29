@@ -1,6 +1,6 @@
 import { WORK_CLASS_LABEL } from "@/lib/masters/work-classes";
 import { Badge } from "@/components/ui/badge";
-import { LinkButton } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { SectionHead } from "@/components/ui/section-head";
@@ -26,7 +26,7 @@ import {
   type IssueRequestRow,
   type VillaDetail,
 } from "@/lib/supervisors/queries";
-import { ChevronLeft, ExternalLink, FileText } from "lucide-react";
+import { ChevronLeft, ExternalLink, FileText, HardHat } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   listChecklistTemplates,
@@ -178,23 +178,7 @@ export default async function VillaPage({
         {tab === "work" && villa ? (
           <>
             <section className="space-y-2">
-              <SectionHead
-                title="Now"
-                count={programme.now.length}
-                hint="Working or waiting"
-                aside={
-                  <LabourLogDialog
-                    plotId={plotId}
-                    works={works}
-                    contractors={contractors}
-                    trigger={
-                      <button type="button" className="text-accent text-sm font-medium">
-                        Log other labour
-                      </button>
-                    }
-                  />
-                }
-              />
+              <SectionHead title="Now" count={programme.now.length} hint="Working or waiting" />
               {programme.now.length === 0 ? (
                 <Card className="p-5">
                   <p className="text-muted text-sm">
@@ -217,6 +201,17 @@ export default async function VillaPage({
                   />
                 ))
               )}
+              <LabourLogDialog
+                plotId={plotId}
+                works={works}
+                contractors={contractors}
+                trigger={
+                  <Button variant="secondary" size="lg" className="w-full">
+                    <HardHat className="size-5" aria-hidden />
+                    Log other labour
+                  </Button>
+                }
+              />
             </section>
 
             {programme.next.length > 0 && (
