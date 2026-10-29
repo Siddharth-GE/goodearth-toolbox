@@ -17,17 +17,17 @@
 
 ## Steps
 
-- [ ] `[Opus]` **1. Database.** 0169, a trial as a single-grant person (`scripts/trials/kaadal-billing.sql`), independent review, apply to staging, types.
-- [ ] `[Opus]` **2. Rules.** `lib/kaadal-billing/ledger.ts` (figures, plot shares, checks) and `rules.ts` (validation), tested; `queries.ts`, `actions.ts`.
-- [ ] `[Opus]` **3. Screens.** Welcome, the five tabs, order / new order / vendor / plot pages, Excel download; registry, icon, loading screens.
-- [ ] `[Opus]` **4. Data.** The import script, dry run, then `--commit` on staging; the tool placed in Interiors Operations.
-- [ ] `[Opus]` **5. Docs.** The tool's `PLAN.md`, STATUS (tool + contract row), SECURITY (money confined), TODO (production).
+- [x] `[Opus]` **1. Database.** 0169, a trial as a single-grant person (`scripts/trials/kaadal-billing.sql`), independent review (approved with fixes; the plot sums moved into the database; re-reviewed and approved), applied to staging, types.
+- [x] `[Opus]` **2. Rules.** `lib/kaadal-billing/ledger.ts` (figures, plot shares, checks) and `rules.ts` (validation), tested; `queries.ts`, `actions.ts`.
+- [x] `[Opus]` **3. Screens.** Welcome, the five tabs, order / new order / vendor / plot pages, Excel download; registry, icon, loading screens.
+- [x] `[Opus]` **4. Data.** The import script, dry run, then `--commit` on staging; the tool placed in Interiors Operations.
+- [x] `[Opus]` **5. Docs.** The tool's `PLAN.md`, STATUS (tool + contract row), SECURITY (money confined), TODO (production).
 - [ ] `[Opus]` **Independent review** of the full diff, then merge to staging.
 
 ## The founder's checklist on staging
 
-1. Interiors Operations → Kaadal Billing → Orders: the totals read ₹50.8 L order value, ₹33.6 L paid, ₹17.2 L to pay (the page's figures); Not paid yet / Part paid / Fully paid as on the page.
-2. Tap the 14 chip: only Plot 14's orders and their shares; Whispering Homes shows "Share of a 3-plot order".
+1. Interiors Operations → Kaadal Billing → Orders: the totals read ₹39.9 L order value, ₹25.0 L paid, ₹14.8 L to pay, 14 orders open (the page's figures); Not paid yet / Part paid / Fully paid as on the page.
+2. Tap the 14 chip: ₹7.5 L value, ₹33,399 to pay, 2 open; Show fully paid orders: Whispering Homes says "Share of a 3-plot order".
 3. Open Noku (Plot 24, ₹5.6 L) → Record payment: "Full balance" fills the balance; save; Undo takes it back.
 4. Open Whispering Homes → Split amounts by plot: amounts that don't add up are refused in words; "Split by what's left on each plot" fills them.
 5. New order → + Add a new vendor, two plots, plot values that don't match the order value: refused; fix; with an advance; it opens on its own page.
