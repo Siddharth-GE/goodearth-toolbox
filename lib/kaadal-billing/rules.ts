@@ -136,13 +136,9 @@ export function allocToSave(order: Order, draft: PaymentDraft): Amounts {
 
 /** What is left to pay on each plot, with this payment's own earlier marks given back when editing it. */
 export function leftOnPlots(order: Order, pays: Payment[], editingId: string | null): Amounts {
-  const all = shares(order, pays);
-  const earlier = editingId
-    ? (allocOf(pays.find((p) => p.id === editingId) ?? { alloc: {} }) ?? {})
-    : {};
-  return Object.fromEntries(
-    order.plots.map((p) => [p, r2((all[p]?.balance ?? 0) + (earlier[p] ?? 0))]),
-  );
+  // Left out entirely, so a payment shared by value gives back its share as well as a marked one.
+  const all = shares(order, editingId ? pays.filter((p) => p.id !== editingId) : pays);
+  return Object.fromEntries(order.plots.map((p) => [p, r2(all[p]?.balance ?? 0)]));
 }
 
 /** Errors block the save; warnings ask "Save anyway". */
@@ -453,7 +449,8 @@ export function togglePlot(
   if (plots.length > 1 && hadSplit && removing) {
     split = Object.fromEntries(Object.entries(order.split).filter(([k]) => plots.includes(k)));
     const sum = Object.values(split).reduce((a, b) => a + b, 0);
-    if (Math.abs(sum - order.gross) > 0.5) split = {};
+    // 0169's guard wants the plot values to the paisa.
+    if (Math.abs(sum - order.gross) > 0.009) split = {};
   }
   return {
     plots,

@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure } from "@/components/ui/figure";
 import { HealthPill } from "@/components/ui/health-pill";
-import { formatCrore } from "@/lib/format";
+import { formatCrore, formatPercent } from "@/lib/format";
 import { plotState, plotTotals, shortPlot, totals } from "@/lib/kaadal-billing/ledger";
 import { getLedger } from "@/lib/kaadal-billing/queries";
 import Link from "next/link";
@@ -55,7 +55,7 @@ export default async function PlotsPage() {
                     {t.vendors} vendor{t.vendors === 1 ? "" : "s"} · {t.rows.length} order
                     {t.rows.length === 1 ? "" : "s"}
                   </span>
-                  <span>{pct.toFixed(0)}% paid</span>
+                  <span>{formatPercent(Math.round(pct))} paid</span>
                 </div>
               </Card>
             );

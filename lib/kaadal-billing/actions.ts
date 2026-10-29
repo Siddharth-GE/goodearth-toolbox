@@ -48,13 +48,23 @@ export type Result =
 
 const refresh = () => revalidatePath("/kaadal-billing", "layout");
 
-function failed(error: { message: string; code?: string }, fallback: string): Result {
-  if (error.code === "23505") return { error: "That vendor is already on the list." };
-  if (error.code === "23503")
-    return { error: "That vendor still has orders, so it can't be deleted." };
+/** `duplicate` and `inUse` word a 23505 and a 23503 for the save at hand; without them the fallback speaks. */
+function failed(
+  error: { message: string; code?: string },
+  fallback: string,
+  words: { duplicate?: string; inUse?: string } = {},
+): Result {
+  if (error.code === "23505" && words.duplicate) return { error: words.duplicate };
+  if (error.code === "23503" && words.inUse) return { error: words.inUse };
   console.error(`kaadal-billing: ${fallback}`, error);
   return { error: dbErrorMessage(error, fallback) };
 }
+
+const VENDOR_WORDS = {
+  duplicate: "That vendor is already on the list.",
+  inUse: "That vendor still has orders, so it can't be deleted.",
+};
+const ALREADY_BACK = { duplicate: "It's already back." };
 
 async function context(orderId: string) {
   const ledger = await getLedger();
@@ -135,7 +145,35 @@ export async function restorePayment(payment: Payment): Promise<Result> {
   if (checkAmount(String(payment.amount))) return { error: "That payment can't be put back." };
   const supabase = await createClient();
   const { error } = await supabase.from("kaadal_billing_payments").insert(paymentRow(payment));
-  if (error) return failed(error, "Couldn't put the payment back.");
+  if (error) return failed(error, "Couldn't put the payment back.", ALREADY_BACK);
+  refresh();
+  return undefined;
+}
+
+/**
+ * Undo of an edit: the payment as it was, by id. Not re-validated — what it was is what the person had (an imported
+ * payment with no date, say); 0169's guards still hold.
+ */
+export async function revertPayment(payment: Payment): Promise<Result> {
+  await requireTool(GRANT);
+  const row = {
+    amount: r2(payment.amount),
+    paid_on: payment.paidOn,
+    paid_by: payment.paidBy,
+    kind: payment.kind,
+    alloc: payment.alloc,
+    reference: payment.reference,
+    notes: payment.notes,
+  };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("kaadal_billing_payments")
+    .update(row)
+    .eq("id", payment.id)
+    .eq("order_id", payment.orderId)
+    .select("id");
+  if (error) return failed(error, "Couldn't put the payment back as it was.");
+  if (!data?.length) return { error: "That payment is no longer there." };
   refresh();
   return undefined;
 }
@@ -174,7 +212,7 @@ export async function createOrder(draft: NewOrderDraft): Promise<Result> {
       .insert({ name: draft.newVendor.trim(), bank: draft.bank.trim() })
       .select("id")
       .single();
-    if (error) return failed(error, "Couldn't add the vendor. Try again.");
+    if (error) return failed(error, "Couldn't add the vendor. Try again.", VENDOR_WORDS);
     vendorId = data.id;
     madeVendor = true;
   }
@@ -269,7 +307,7 @@ export async function updateOrderField(
 
   const patch = orderPatch(field, value);
   let note: string | undefined;
-  if (field === "gross" && order.plots.length > 1 && Object.keys(order.split).length) {
+  if (field === "gross" && Object.keys(order.split).length) {
     patch.split = scaleSplit(order, parseAmount(value));
     note = "Order value changed. Plot values were scaled to match.";
   }
@@ -363,7 +401,7 @@ export async function restoreOrder(order: Order, payments: Payment[]): Promise<R
     ordered_on: order.orderedOn,
     created_at: order.createdAt,
   });
-  if (error) return failed(error, "Couldn't put the order back.");
+  if (error) return failed(error, "Couldn't put the order back.", ALREADY_BACK);
   const own = payments.filter((p) => p.orderId === order.id);
   if (own.length) {
     const { error: payError } = await supabase
@@ -406,7 +444,7 @@ export async function updateVendor(
     .update(field === "name" ? { name: next } : { bank: next })
     .eq("id", vendorId)
     .select("id");
-  if (error) return failed(error, "Couldn't save the vendor. Try again.");
+  if (error) return failed(error, "Couldn't save the vendor. Try again.", VENDOR_WORDS);
   if (!data?.length) return { error: "That vendor is no longer there." };
   refresh();
   return undefined;
@@ -421,7 +459,7 @@ export async function deleteVendor(vendorId: string): Promise<Result> {
     .delete()
     .eq("id", vendorId)
     .select("id");
-  if (error) return failed(error, "Couldn't delete the vendor. Try again.");
+  if (error) return failed(error, "Couldn't delete the vendor. Try again.", VENDOR_WORDS);
   if (!data?.length) return { error: "That vendor is no longer there." };
   refresh();
   return undefined;
@@ -435,7 +473,10 @@ export async function restoreVendor(vendor: Vendor): Promise<Result> {
   const { error: saveError } = await supabase
     .from("kaadal_billing_vendors")
     .insert({ id: vendor.id, name: vendor.name, bank: vendor.bank });
-  if (saveError) return failed(saveError, "Couldn't put the vendor back.");
+  if (saveError)
+    return failed(saveError, "Couldn't put the vendor back.", {
+      duplicate: "A vendor of that name is already back on the list.",
+    });
   refresh();
   return undefined;
 }

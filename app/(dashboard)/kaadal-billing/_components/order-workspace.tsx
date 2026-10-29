@@ -219,9 +219,13 @@ export function OrderWorkspace({
           confirmLabel={`Delete order and ${pays.length} payment${pays.length === 1 ? "" : "s"}`}
           pendingLabel="Deleting…"
           onConfirm={async () => {
-            const result = await deleteOrder(order.id);
-            if (result?.error) return result;
+            // Leave first: the delete refreshes this page, which would otherwise flash "not found".
             router.push("/kaadal-billing/orders");
+            const result = await deleteOrder(order.id);
+            if (result?.error) {
+              show(result.error);
+              return undefined;
+            }
             show(`Deleted ${vendor.name} order`, async () => {
               const back = await restoreOrder(order, pays);
               if (back?.error) show(back.error);

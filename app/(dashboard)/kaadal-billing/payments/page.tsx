@@ -10,7 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatShortDate } from "@/lib/format";
+import { formatMoney, formatMonthMark, formatShortDate } from "@/lib/format";
 import {
   allocLabel,
   allocOf,
@@ -25,9 +25,6 @@ import { getLedger } from "@/lib/kaadal-billing/queries";
 import Link from "next/link";
 import { PlotScope, TotalsBand, withParams } from "../_components/parts";
 import { scopeOf } from "../_components/scope";
-
-const monthName = (key: string) =>
-  new Date(`${key}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
 export default async function PaymentsPage({
   searchParams,
@@ -107,7 +104,7 @@ export default async function PaymentsPage({
           return (
             <section key={key} className="space-y-2">
               <SectionHead
-                title={key === "none" ? "No date entered" : monthName(key)}
+                title={key === "none" ? "No date entered" : formatMonthMark(`${key}-01`)}
                 count={list.length}
                 hint={`${formatMoney(sum)}${plot !== "All" ? ` for ${plot}` : ""}`}
               />

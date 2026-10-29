@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { useUndoBar } from "@/components/ui/undo-bar";
-import { deletePayment, restorePayment, savePayment } from "@/lib/kaadal-billing/actions";
+import {
+  deletePayment,
+  restorePayment,
+  revertPayment,
+  savePayment,
+} from "@/lib/kaadal-billing/actions";
 import {
   figures,
   KINDS,
@@ -23,7 +28,6 @@ import {
   allocSum,
   autoSplit,
   checkAmount,
-  draftFrom,
   leftOnPlots,
   newPaymentDraft,
   parseAmount,
@@ -113,7 +117,7 @@ export function PaymentForm({
       if (before) {
         show("Payment updated", () =>
           start(async () => {
-            const back = await savePayment(order.id, draftFrom(before), true);
+            const back = await revertPayment(before);
             if (back?.error) show(back.error);
           }),
         );

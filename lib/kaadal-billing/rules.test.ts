@@ -8,6 +8,7 @@ import {
   checkAmount,
   checkDate,
   draftFrom,
+  leftOnPlots,
   newPaymentDraft,
   parseAmount,
   plotName,
@@ -152,6 +153,20 @@ describe("a payment", () => {
     assert.equal(big.warnings.length, 2);
     assert.match(big.warnings[0], /₹100.00 more than what's left/);
     assert.match(big.warnings[1], /Plot 14 only has ₹320.00 left/);
+  });
+
+  it("gives an edited payment shared by value back its share on every plot", () => {
+    const small = { ...order, gross: 300, split: { "Plot 11": 100, "Plot 14": 200 } };
+    const pays = [pay({ id: "p1", amount: 150 })];
+    assert.deepEqual(leftOnPlots(small, pays, null), { "Plot 11": 50, "Plot 14": 100 });
+    assert.deepEqual(leftOnPlots(small, pays, "p1"), { "Plot 11": 100, "Plot 14": 200 });
+    const { warnings } = validatePayment(
+      small,
+      pays,
+      { ...draftFrom(pays[0]), amount: "100", mode: "one", plot: "Plot 11" },
+      TODAY,
+    );
+    assert.deepEqual(warnings, []);
   });
 
   it("gives an edited payment back its own amount before warning", () => {

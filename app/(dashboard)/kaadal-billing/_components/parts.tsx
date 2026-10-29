@@ -4,7 +4,7 @@ import { chipClassName } from "@/components/ui/choice-chips";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { Heading } from "@/components/ui/heading";
 import { Pill } from "@/components/ui/pill";
-import { formatCrore, formatMoney, formatShortDate } from "@/lib/format";
+import { formatCrore, formatMoney, formatPercent, formatShortDate } from "@/lib/format";
 import {
   rupees,
   shortPlot,
@@ -102,7 +102,7 @@ export function TotalsBand({ totals, scope }: { totals: Totals; scope: string })
         />
       </FigureBandCell>
       <FigureBandCell className="space-y-2">
-        <Figure size="lg" label="Paid so far" value={`${pct.toFixed(1)}%`} />
+        <Figure size="lg" label="Paid so far" value={formatPercent(pct)} />
         <PaidBar kaadal={totals.byKaadal} client={totals.byClient} total={totals.net} />
       </FigureBandCell>
     </FigureBand>

@@ -16,10 +16,16 @@ import { formatMoney } from "@/lib/format";
 import { plotState, plotTotals, rupees, shortPlot } from "@/lib/kaadal-billing/ledger";
 import { getLedger } from "@/lib/kaadal-billing/queries";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { DetailHead } from "../../_components/parts";
 
 export default async function PlotPage({ params }: { params: Promise<{ plot: string }> }) {
-  const plot = decodeURIComponent((await params).plot);
+  let plot: string;
+  try {
+    plot = decodeURIComponent((await params).plot);
+  } catch {
+    notFound();
+  }
   const ledger = await getLedger();
   const t = plotTotals(ledger).find((x) => x.plot === plot);
   const back = { href: "/kaadal-billing/plots", label: "Plots" };

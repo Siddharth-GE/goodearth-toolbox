@@ -81,12 +81,13 @@ export function VendorForm({ vendor, canDelete }: { vendor: Vendor; canDelete: b
               disabled={pending}
               onClick={() =>
                 start(async () => {
+                  // Leave first: the delete refreshes this page, which would otherwise flash "not found".
+                  router.push("/kaadal-billing/vendors");
                   const result = await deleteVendor(vendor.id);
                   if (result?.error) {
-                    setError(result.error);
+                    show(result.error);
                     return;
                   }
-                  router.push("/kaadal-billing/vendors");
                   show("Vendor deleted", () =>
                     start(async () => {
                       const back = await restoreVendor(vendor);

@@ -103,13 +103,13 @@ export function OrderDetails({
   const diff = r2(order.gross - splitSum);
 
   return (
-    // Keyed by the last change, so a refresh after a save shows the stored values.
-    <Section title="Order details" key={order.updatedAt}>
+    <Section title="Order details">
       <div className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="order-vendor">Vendor</Label>
           <Select
             id="order-vendor"
+            key={order.vendorId}
             defaultValue={order.vendorId}
             onChange={(e) => save("vendorId", e.target.value)}
           >
@@ -167,6 +167,7 @@ export function OrderDetails({
               id="order-item"
               maxLength={80}
               placeholder="e.g. Sofa, kitchen appliances"
+              key={order.item}
               defaultValue={order.item}
               onBlur={onBlur("item")}
             />
@@ -178,6 +179,7 @@ export function OrderDetails({
               id="order-date"
               type="date"
               max={today}
+              key={order.orderedOn ?? ""}
               defaultValue={order.orderedOn ?? ""}
               onBlur={onBlur("orderedOn")}
             />
@@ -189,6 +191,7 @@ export function OrderDetails({
           <Label htmlFor="order-gross">Order value before deductions</Label>
           <MoneyInput
             id="order-gross"
+            key={String(order.gross)}
             defaultValue={String(order.gross)}
             aria-invalid={Boolean(errors.gross) || undefined}
             onBlur={onBlur("gross")}
@@ -280,6 +283,7 @@ export function OrderDetails({
             <MoneyInput
               id="order-deduction"
               placeholder="0"
+              key={order.deduction ? String(order.deduction) : ""}
               defaultValue={order.deduction ? String(order.deduction) : ""}
               aria-invalid={Boolean(errors.deduction) || undefined}
               onBlur={onBlur("deduction")}
@@ -291,6 +295,7 @@ export function OrderDetails({
               <Label htmlFor="order-deduction-plot">Deduction applies to</Label>
               <Select
                 id="order-deduction-plot"
+                key={order.deductionPlot ?? ""}
                 defaultValue={order.deductionPlot ?? ""}
                 onChange={(e) => save("deductionPlot", e.target.value)}
               >
@@ -311,6 +316,7 @@ export function OrderDetails({
             id="order-deduction-note"
             maxLength={80}
             placeholder="e.g. 9 wall lights cancelled"
+            key={order.deductionNote}
             defaultValue={order.deductionNote}
             onBlur={onBlur("deductionNote")}
           />
@@ -322,6 +328,7 @@ export function OrderDetails({
             id="order-pay-note"
             maxLength={80}
             placeholder="e.g. Through QR – UPI (leave blank for bank transfer)"
+            key={order.payNote}
             defaultValue={order.payNote}
             onBlur={onBlur("payNote")}
           />
@@ -333,6 +340,7 @@ export function OrderDetails({
             id="order-notes"
             rows={3}
             maxLength={2000}
+            key={order.notes}
             defaultValue={order.notes}
             onBlur={onBlur("notes")}
           />
