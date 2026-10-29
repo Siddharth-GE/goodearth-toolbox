@@ -5,10 +5,20 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
-import { anthropicClient, MODEL, SYSTEM_PROMPT, TURING_TOOLS } from "./claude";
+import { anthropicClient, SYSTEM_PROMPT, TURING_TOOLS } from "./claude";
 import { claudeFailure, CUT_OFF, NO_KEY, REFUSED, TOO_MANY_STEPS } from "./errors";
 import { CONTEXT_PREFIX, shownProposals, type SaveResult, type ShownProposal } from "./display";
+import { judge } from "./judge";
 import { replayable } from "./replay";
+import {
+  fallsBackOnServer,
+  JUDGE_MODEL,
+  judgeInput,
+  lastQuestion,
+  MODEL_FOR,
+  RESCUE_MODEL,
+  type Route,
+} from "./routing";
 import { runTool } from "./tools";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
@@ -78,14 +88,15 @@ function statusFor(name: string, input: unknown): string {
   }
 }
 
-async function loadHistory(
-  conversationId: string,
-): Promise<{ stored: { role: string; content: unknown }[]; history: MessageParam[] }> {
+async function loadHistory(conversationId: string): Promise<{
+  stored: { role: string; content: unknown; route: string | null }[];
+  history: MessageParam[];
+}> {
   const supabase = await createClient();
   const rows = await fetchAll((from, to) =>
     supabase
       .from("turing_messages")
-      .select("id, role, content")
+      .select("id, role, content, route")
       .eq("conversation_id", conversationId)
       .order("id")
       .range(from, to),
@@ -154,11 +165,20 @@ async function savesToReport(
   };
 }
 
+type Usage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+};
+
+/** On a question, `model` and `usage` are the judge's; on an answer, the Claude that wrote it. */
 async function saveMessage(
   conversationId: string,
   message: MessageParam,
-  usage?: Message["usage"],
+  meta: { usage?: Usage; model?: string; route?: Route } = {},
 ): Promise<void> {
+  const { usage } = meta;
   const supabase = await createClient();
   const { error } = await supabase.from("turing_messages").insert({
     conversation_id: conversationId,
@@ -168,6 +188,8 @@ async function saveMessage(
     output_tokens: usage?.output_tokens ?? null,
     cache_read_tokens: usage?.cache_read_input_tokens ?? null,
     cache_write_tokens: usage?.cache_creation_input_tokens ?? null,
+    model: meta.model ?? null,
+    route: meta.route ?? null,
   });
   if (error) {
     console.error("turing: message save failed:", error);
@@ -189,11 +211,14 @@ export async function* converse({
   conversationId,
   container,
   userContent,
+  deeper,
   signal,
 }: {
   conversationId: string;
   container: { id: string; expiresAt: string } | null;
   userContent: ContentParam[];
+  /** The admin pressed Think harder: the strongest model, no judge. */
+  deeper: boolean;
   signal: AbortSignal;
 }): AsyncGenerator<TuringEvent> {
   const client = anthropicClient();
@@ -203,12 +228,24 @@ export async function* converse({
   }
 
   const { stored, history } = await loadHistory(conversationId);
+  const judged = deeper
+    ? null
+    : await judge(client, judgeInput(userContent, lastQuestion(stored)), signal);
+  if (signal.aborted) return;
+  // A judge that could not answer sends the turn to the standard model, with no judge on record.
+  const route: Route = deeper ? "asked" : (judged?.level ?? "standard");
+  let model = MODEL_FOR[route];
+
   const report = await savesToReport(conversationId, stored);
   const ask: MessageParam = {
     role: "user",
     content: report ? [{ type: "text", text: report.line }, ...userContent] : userContent,
   };
-  await saveMessage(conversationId, ask);
+  await saveMessage(
+    conversationId,
+    ask,
+    judged ? { route, model: JUDGE_MODEL, usage: judged.usage } : { route },
+  );
   history.push(ask);
   if (report) {
     const supabase = await createClient();
@@ -228,7 +265,7 @@ export async function* converse({
     yield { type: "step" };
     const stream = client.beta.messages.stream(
       {
-        model: MODEL,
+        model,
         max_tokens: 64000,
         system: SYSTEM_PROMPT,
         tools: TURING_TOOLS,
@@ -239,8 +276,12 @@ export async function* converse({
         thinking: { type: "adaptive", block_binding: { prefix_mismatch_behavior: "drop_block" } },
         cache_control: { type: "ephemeral" },
         ...(containerId ? { container: containerId } : {}),
-        betas: ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
-        fallbacks: "default",
+        ...(fallsBackOnServer(model)
+          ? {
+              betas: ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
+              fallbacks: "default" as const,
+            }
+          : { betas: ["thinking-binding-controls-2026-08-01"] }),
       },
       { signal },
     );
@@ -286,8 +327,15 @@ export async function* converse({
     }
 
     if (signal.aborted) return;
+    if (message.stop_reason === "refusal" && !fallsBackOnServer(model)) {
+      console.error("turing: refused on", model, "- asking", RESCUE_MODEL);
+      model = RESCUE_MODEL;
+      yield { type: "restart" };
+      step--;
+      continue;
+    }
     const answer: MessageParam = { role: "assistant", content: message.content as ContentParam[] };
-    await saveMessage(conversationId, answer, message.usage);
+    await saveMessage(conversationId, answer, { usage: message.usage, model: message.model });
     history.push(answer);
 
     if (message.container) {

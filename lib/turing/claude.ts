@@ -8,8 +8,6 @@ import { catalogueText, ENTRIES } from "./catalogue-fields";
 import { CHART_LIBRARY } from "./page-rules";
 import { FILTER_OPS } from "./read-rules";
 
-export const MODEL = "claude-opus-5-5";
-
 /** The key lives in Vercel's settings (scripts/vercel-env.ts); unset, Turing says so instead of failing. */
 export function anthropicClient(): Anthropic | null {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
