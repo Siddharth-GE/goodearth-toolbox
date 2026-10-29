@@ -68,7 +68,8 @@ export const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 /** Within half a rupee counts as settled, as on the sheet. */
 const SETTLED = 0.5;
 
-const money = (n: number) => formatMoney(r2(n), { paise: !Number.isInteger(r2(n)) });
+/** Rupees as the sheet showed them: paise only when there are any. */
+export const rupees = (n: number) => formatMoney(r2(n), { paise: !Number.isInteger(r2(n)) });
 
 export const shortPlot = (plot: string) => plot.replace(/^Plot /, "");
 
@@ -404,7 +405,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
       if (Math.abs(sum - p.amount) > 0.009)
         add(
           "bad",
-          `${who}: a ${money(p.amount)} payment is split as ${money(sum)} across plots.`,
+          `${who}: a ${rupees(p.amount)} payment is split as ${rupees(sum)} across plots.`,
           "Open the payment and make the plot amounts add up to the payment.",
           o.id,
           p.id,
@@ -421,7 +422,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
     if (!p.paidOn)
       add(
         "warn",
-        `${who}: the ${money(p.amount)} ${p.kind.toLowerCase()} has no date.`,
+        `${who}: the ${rupees(p.amount)} ${p.kind.toLowerCase()} has no date.`,
         "Open it and add the date it was paid.",
         o.id,
         p.id,
@@ -447,7 +448,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
     const o = orders.get(group[0].orderId)!;
     add(
       "warn",
-      `${vendorName(o.vendorId)} · ${orderLabel(o)}: ${group.length} payments of ${money(group[0].amount)} on ${formatDate(group[0].paidOn)}.`,
+      `${vendorName(o.vendorId)} · ${orderLabel(o)}: ${group.length} payments of ${rupees(group[0].amount)} on ${formatDate(group[0].paidOn)}.`,
       "Check this wasn't entered twice.",
       o.id,
       group[1].id,
@@ -461,7 +462,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
     if (f.over)
       add(
         "bad",
-        `${who}: paid ${money(-f.balance)} more than the order value.`,
+        `${who}: paid ${rupees(-f.balance)} more than the order value.`,
         "Check the payments or the order value.",
         o.id,
       );
@@ -472,7 +473,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
         if (keys.length !== o.plots.length || Math.abs(sum - o.gross) > SETTLED)
           add(
             "warn",
-            `${who}: plot values add up to ${money(sum)}, but the order value is ${money(o.gross)}.`,
+            `${who}: plot values add up to ${rupees(sum)}, but the order value is ${rupees(o.gross)}.`,
             "Open the order and correct the plot values.",
             o.id,
           );
@@ -482,7 +483,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
         if (all[plot] && all[plot].balance < -SETTLED)
           add(
             "warn",
-            `${who}: ${plot} is paid ${money(-all[plot].balance)} more than its share.`,
+            `${who}: ${plot} is paid ${rupees(-all[plot].balance)} more than its share.`,
             "Check which plot each payment is marked for.",
             o.id,
           );
@@ -497,7 +498,7 @@ export function runChecks(ledger: Ledger, today: string): Check[] {
     if (due > SETTLED && !v.bank.trim())
       add(
         "warn",
-        `${v.name} has ${money(due)} due but no bank details.`,
+        `${v.name} has ${rupees(due)} due but no bank details.`,
         "Add the bank details on the Vendors tab.",
         null,
         null,

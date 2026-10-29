@@ -339,7 +339,7 @@ export async function deleteOrder(orderId: string): Promise<Result> {
   if (error) return failed(error, "Couldn't delete the order. Try again.");
   if (!data?.length) return GONE;
   refresh();
-  redirect("/kaadal-billing/orders");
+  return undefined;
 }
 
 /** Undo of a delete: the order and its payments back under their own ids, or nothing. */
@@ -424,7 +424,7 @@ export async function deleteVendor(vendorId: string): Promise<Result> {
   if (error) return failed(error, "Couldn't delete the vendor. Try again.");
   if (!data?.length) return { error: "That vendor is no longer there." };
   refresh();
-  redirect("/kaadal-billing/vendors");
+  return undefined;
 }
 
 export async function restoreVendor(vendor: Vendor): Promise<Result> {
