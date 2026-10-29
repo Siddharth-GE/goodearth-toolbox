@@ -3,24 +3,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
 import { ListToolbar } from "@/components/ui/list-toolbar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFoot,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-  TableTotalCell,
-} from "@/components/ui/table";
 import { NavTabs } from "@/components/ui/tabs";
-import { getBillFilterOptions, getCurrentBillActor, listBills } from "@/lib/bills/queries";
+import { getBillFilterOptions, listBills } from "@/lib/bills/queries";
 import type { BillStatus } from "@/lib/bills/workflow";
-import { formatCount, formatDate, formatMoney } from "@/lib/format";
 import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { Receipt } from "lucide-react";
-import Link from "next/link";
-import { BillStatusBadge } from "../_components/status-badge";
+import { BillsTable } from "./_components/bills-table";
 
 // "Unpaid" is a derived view (recorded + approved), not a fourth status; it rides the same query param.
 const TABS: { key: string; label: string; param?: string; status?: BillStatus; unpaid?: true }[] = [
@@ -42,6 +30,7 @@ export default async function BillsPage({
     q?: string;
     from?: string;
     to?: string;
+    sheet?: string;
   }>;
 }) {
   const raw = await searchParams;
@@ -52,9 +41,10 @@ export default async function BillsPage({
   const q = searchParam(raw.q);
   const from = dateParam(raw.from);
   const to = dateParam(raw.to);
+  const sheet = raw.sheet === "on" || raw.sheet === "none" ? raw.sheet : undefined;
   const tab = TABS.find((t) => t.param === statusParam) ?? TABS[0];
 
-  const [result, filterOptions, actor] = await Promise.all([
+  const [result, filterOptions] = await Promise.all([
     listBills({
       page: Number(page) || 1,
       status: tab.status,
@@ -64,9 +54,9 @@ export default async function BillsPage({
       q,
       from,
       to,
+      sheet,
     }),
     getBillFilterOptions(),
-    getCurrentBillActor(),
   ]);
   const { bills, total, page: currentPage, pageCount, pageSize, sums } = result;
 
@@ -76,6 +66,7 @@ export default async function BillsPage({
     if (q) params.set("q", q);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    if (sheet) params.set("sheet", sheet);
     const query = params.toString();
     return query ? `/bills/list?${query}` : "/bills/list";
   };
@@ -93,7 +84,7 @@ export default async function BillsPage({
     return hrefWith(params);
   };
 
-  const filtered = Boolean(vendor || project || q || from || to);
+  const filtered = Boolean(vendor || project || q || from || to || sheet);
 
   return (
     <div className="space-y-4">
@@ -109,11 +100,9 @@ export default async function BillsPage({
             <LinkButton href="/bills/work-orders" variant="secondary">
               Work orders
             </LinkButton>
-            {actor.isApprover && (
-              <LinkButton href="/bills/combine" variant="secondary">
-                Combine bills
-              </LinkButton>
-            )}
+            <LinkButton href="/bills/sheets" variant="secondary">
+              Consolidated
+            </LinkButton>
             <LinkButton href="/bills/new">Record bill</LinkButton>
           </>
         }
@@ -130,7 +119,7 @@ export default async function BillsPage({
 
       <ListToolbar
         action="/bills/list"
-        values={{ q, from, to, vendor, project }}
+        values={{ q, from, to, vendor, project, sheet }}
         keep={{ status: tab.param }}
         search={{ placeholder: "Bill no., invoice no. or vendor…" }}
         dates={{ label: "Invoice date" }}
@@ -146,6 +135,15 @@ export default async function BillsPage({
             label: "Project",
             allLabel: "All projects",
             options: filterOptions.projects.map((row) => ({ value: row.id, label: row.name })),
+          },
+          {
+            param: "sheet",
+            label: "Sheet",
+            allLabel: "Consolidated or not",
+            options: [
+              { value: "none", label: "Not consolidated" },
+              { value: "on", label: "On a sheet" },
+            ],
           },
         ]}
       />
@@ -171,67 +169,7 @@ export default async function BillsPage({
         />
       ) : (
         <>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Reference</TableHeaderCell>
-                <TableHeaderCell>Vendor</TableHeaderCell>
-                <TableHeaderCell>Project</TableHeaderCell>
-                <TableHeaderCell>Invoice no.</TableHeaderCell>
-                <TableHeaderCell>Invoice date</TableHeaderCell>
-                <TableHeaderCell className="text-right">Total</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {bills.map((bill) => (
-                <TableRow key={bill.id}>
-                  <TableCell className="text-foreground font-medium">
-                    {bill.reference}
-                    {bill.kind === "nmr" && (
-                      <span className="text-muted ml-1.5 text-[10px] font-semibold tracking-wider uppercase">
-                        No WO
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{bill.vendor_name ?? "Direct"}</TableCell>
-                  <TableCell>{bill.project_name}</TableCell>
-                  <TableCell className="font-mono text-xs">{bill.invoice_no}</TableCell>
-                  <TableCell className="text-muted">{formatDate(bill.invoice_date)}</TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatMoney(bill.total_amount)}
-                  </TableCell>
-                  <TableCell>
-                    <BillStatusBadge status={bill.status} />
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/bills/${bill.id}`}
-                      className="text-accent text-sm font-medium hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            {/* Over every bill these filters match, not just this page. */}
-            <TableFoot>
-              <tr>
-                <TableTotalCell colSpan={5}>
-                  {formatCount(total)} {total === 1 ? "bill" : "bills"}
-                  <span className="text-muted ml-2 text-xs font-normal">
-                    Taxable {formatMoney(sums.taxable)} · GST {formatMoney(sums.gst)}
-                  </span>
-                </TableTotalCell>
-                <TableTotalCell className="text-right font-mono text-xs">
-                  {formatMoney(sums.total)}
-                </TableTotalCell>
-                <TableTotalCell colSpan={2} />
-              </tr>
-            </TableFoot>
-          </Table>
+          <BillsTable bills={bills} total={total} sums={sums} />
 
           <Pagination
             page={currentPage}

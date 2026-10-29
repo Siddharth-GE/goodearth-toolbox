@@ -111,6 +111,19 @@ const KIND_LABEL: Record<BillDetail["kind"], string> = {
 };
 
 export function BillDocument({ data }: { data: BillPdfData }) {
+  return (
+    <Document
+      title={`Goodearth Bill — ${data.bill.reference}`}
+      author="Goodearth"
+      creator="Kaadal Toolbox"
+    >
+      <BillPage data={data} />
+    </Document>
+  );
+}
+
+/** One bill's page, on its own or in a printed bundle (/bills/print). */
+export function BillPage({ data }: { data: BillPdfData }) {
   const { bill, lines, settlement, villas } = data;
   const groups = villas
     ? groupByVilla(
@@ -150,118 +163,102 @@ export function BillDocument({ data }: { data: BillPdfData }) {
   };
 
   return (
-    <Document
-      title={`Goodearth Bill — ${bill.reference}`}
-      author="Goodearth"
-      creator="Kaadal Toolbox"
-    >
-      <DocumentPage meta={meta}>
-        <DocumentHeading
-          title={`${bill.reference} — ${party}`}
-          subtitle={[
-            bill.project_name,
-            groups.length > 1
-              ? `${groups.length} villas`
-              : villas && groups.length === 1
-                ? villaLabel(groups[0].villa, villas)
-                : (bill.scope_name ?? "General"),
-            KIND_LABEL[bill.kind],
-          ].join(" · ")}
-        />
+    <DocumentPage meta={meta}>
+      <DocumentHeading
+        title={`${bill.reference} — ${party}`}
+        subtitle={[
+          bill.project_name,
+          groups.length > 1
+            ? `${groups.length} villas`
+            : villas && groups.length === 1
+              ? villaLabel(groups[0].villa, villas)
+              : (bill.scope_name ?? "General"),
+          KIND_LABEL[bill.kind],
+        ].join(" · ")}
+      />
 
-        <MetaBlock
-          items={[
-            { label: bill.kind === "nmr" ? "Muster roll" : "Invoice", value: bill.invoice_no },
-            { label: "Invoice date", value: formatDate(bill.invoice_date) },
-            { label: "Against", value: against },
-            ...(bill.vendor_seq
-              ? [{ label: "Their bill no.", value: String(bill.vendor_seq) }]
-              : []),
-            {
-              label: "Status",
-              value: isDraft
-                ? "DRAFT — not approved"
-                : bill.status === "paid"
-                  ? "Paid"
-                  : "Approved",
-            },
-            { label: "Recorded by", value: bill.created_by_name ?? "—" },
-            { label: "Approved by", value: bill.approved_by_name ?? "—" },
-            { label: "Paid", value: formatAmount(settlement.paid + settlement.recovered) },
-            { label: "Pending", value: formatAmount(settlement.pending) },
-          ]}
-        />
+      <MetaBlock
+        items={[
+          { label: bill.kind === "nmr" ? "Muster roll" : "Invoice", value: bill.invoice_no },
+          { label: "Invoice date", value: formatDate(bill.invoice_date) },
+          { label: "Against", value: against },
+          ...(bill.vendor_seq ? [{ label: "Their bill no.", value: String(bill.vendor_seq) }] : []),
+          {
+            label: "Status",
+            value: isDraft ? "DRAFT — not approved" : bill.status === "paid" ? "Paid" : "Approved",
+          },
+          { label: "Recorded by", value: bill.created_by_name ?? "—" },
+          { label: "Approved by", value: bill.approved_by_name ?? "—" },
+          { label: "Paid", value: formatAmount(settlement.paid + settlement.recovered) },
+          { label: "Pending", value: formatAmount(settlement.pending) },
+        ]}
+      />
 
-        {lines.length > 0 && (
-          <>
-            <SectionLabel>Lines</SectionLabel>
-            <Text style={styles.currencyNote}>All amounts in Indian Rupees.</Text>
-            {villas && groups.length > 1 ? (
-              groups.map((group) => (
-                <View key={group.key}>
-                  <View style={styles.villaRow} minPresenceAhead={40}>
-                    <Text style={styles.villaLabel}>
-                      {villaLabel(
-                        group.villa,
-                        villas,
-                        spansProjects(groups.map((one) => one.villa)),
-                      )}
-                    </Text>
-                    <Text style={styles.villaLabel}>{formatAmount(group.total)}</Text>
-                  </View>
-                  <DocumentTable columns={columns} rows={group.lines} />
+      {lines.length > 0 && (
+        <>
+          <SectionLabel>Lines</SectionLabel>
+          <Text style={styles.currencyNote}>All amounts in Indian Rupees.</Text>
+          {villas && groups.length > 1 ? (
+            groups.map((group) => (
+              <View key={group.key}>
+                <View style={styles.villaRow} minPresenceAhead={40}>
+                  <Text style={styles.villaLabel}>
+                    {villaLabel(group.villa, villas, spansProjects(groups.map((one) => one.villa)))}
+                  </Text>
+                  <Text style={styles.villaLabel}>{formatAmount(group.total)}</Text>
                 </View>
-              ))
-            ) : (
-              <DocumentTable columns={columns} rows={lines} />
+                <DocumentTable columns={columns} rows={group.lines} />
+              </View>
+            ))
+          ) : (
+            <DocumentTable columns={columns} rows={lines} />
+          )}
+        </>
+      )}
+
+      <View style={styles.totalsBox} wrap={false}>
+        {summaryRows(totals).map((row) => (
+          <View key={row.label} style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>{row.label}</Text>
+            <Text style={styles.totalsValue}>{formatAmount(row.amount)}</Text>
+          </View>
+        ))}
+        <View style={styles.grandRow}>
+          <Text style={styles.grandLabel}>Total</Text>
+          <Text style={styles.grandValue}>{formatAmount(bill.total_amount)}</Text>
+        </View>
+        {settlement.paid + settlement.recovered > 0 && (
+          <>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Paid</Text>
+              <Text style={styles.totalsValue}>{formatAmount(settlement.paid)}</Text>
+            </View>
+            {settlement.recovered > 0 && (
+              <View style={styles.totalsRow}>
+                <Text style={styles.totalsLabel}>Recovered from advances</Text>
+                <Text style={styles.totalsValue}>{formatAmount(settlement.recovered)}</Text>
+              </View>
             )}
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Pending</Text>
+              <Text style={styles.totalsValue}>{formatAmount(settlement.pending)}</Text>
+            </View>
           </>
         )}
+      </View>
 
-        <View style={styles.totalsBox} wrap={false}>
-          {summaryRows(totals).map((row) => (
-            <View key={row.label} style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>{row.label}</Text>
-              <Text style={styles.totalsValue}>{formatAmount(row.amount)}</Text>
-            </View>
-          ))}
-          <View style={styles.grandRow}>
-            <Text style={styles.grandLabel}>Total</Text>
-            <Text style={styles.grandValue}>{formatAmount(bill.total_amount)}</Text>
-          </View>
-          {settlement.paid + settlement.recovered > 0 && (
-            <>
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>Paid</Text>
-                <Text style={styles.totalsValue}>{formatAmount(settlement.paid)}</Text>
-              </View>
-              {settlement.recovered > 0 && (
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Recovered from advances</Text>
-                  <Text style={styles.totalsValue}>{formatAmount(settlement.recovered)}</Text>
-                </View>
-              )}
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>Pending</Text>
-                <Text style={styles.totalsValue}>{formatAmount(settlement.pending)}</Text>
-              </View>
-            </>
-          )}
-        </View>
+      <NotesBlock
+        notes={[
+          { label: "Total set by hand", text: bill.total_override_note },
+          { label: "Note", text: bill.note },
+        ]}
+      />
 
-        <NotesBlock
-          notes={[
-            { label: "Total set by hand", text: bill.total_override_note },
-            { label: "Note", text: bill.note },
-          ]}
+      {!isDraft && (
+        <Signatures
+          labels={[...(data.signatures ?? ["Prepared by", "Approved by"]), `Received — ${party}`]}
         />
-
-        {!isDraft && (
-          <Signatures
-            labels={[...(data.signatures ?? ["Prepared by", "Approved by"]), `Received — ${party}`]}
-          />
-        )}
-      </DocumentPage>
-    </Document>
+      )}
+    </DocumentPage>
   );
 }

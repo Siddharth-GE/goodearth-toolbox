@@ -13,7 +13,6 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
-import type { CombineCandidate } from "./combine";
 import { companyVillas, type LineVillas } from "./villas";
 import type { BillKind, BillStatus } from "./workflow";
 
@@ -33,6 +32,9 @@ export type BillListRow = {
   project_name: string;
   /** Null on a directly-paid NMR bill — there is no vendor. */
   vendor_name: string | null;
+  /** The sheet it is on (0170), by its C number. */
+  sheet_id: string | null;
+  sheet_reference: string | null;
 };
 
 export type BillListPage = {
@@ -83,6 +85,8 @@ export type BillListFilters = {
   q?: string;
   from?: string;
   to?: string;
+  /** On a sheet, or not consolidated (0170). */
+  sheet?: "on" | "none";
 };
 
 export async function listBills({
@@ -94,6 +98,7 @@ export async function listBills({
   q,
   from,
   to,
+  sheet,
 }: BillListFilters = {}): Promise<BillListPage> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -124,6 +129,8 @@ export async function listBills({
     if (projectId) next = next.eq("project_id", projectId);
     if (from) next = next.gte("invoice_date", from);
     if (to) next = next.lte("invoice_date", to);
+    if (sheet === "on") next = next.not("sheet_id", "is", null);
+    if (sheet === "none") next = next.is("sheet_id", null);
     if (q) {
       const clauses = [`reference.ilike.*${q}*`, `invoice_no.ilike.*${q}*`];
       if (vendorIdsForSearch.length) clauses.push(`vendor_id.in.(${vendorIdsForSearch.join(",")})`);
@@ -137,7 +144,7 @@ export async function listBills({
       supabase
         .from("bills")
         .select(
-          "id, reference, status, kind, project_id, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
+          "id, reference, status, kind, project_id, invoice_no, invoice_date, total_amount, created_at, sheet_id, projects(name), vendors(name), bill_sheets!bills_sheet_id_fkey(reference)",
           { count: "exact" },
         ),
     )
@@ -203,6 +210,8 @@ export async function listBills({
         ((row.projects as { name: string } | null)?.name ?? "—") +
         (otherProjects.get(row.id)?.size ? ` and ${otherProjects.get(row.id)?.size} more` : ""),
       vendor_name: (row.vendors as { name: string } | null)?.name ?? null,
+      sheet_id: row.sheet_id,
+      sheet_reference: (row.bill_sheets as { reference: string } | null)?.reference ?? null,
     })),
     total,
     page: currentPage,
@@ -273,6 +282,10 @@ export type BillDetail = {
   created_by_name: string | null;
   approved_by_name: string | null;
   paid_by_name: string | null;
+  /** The sheet it is on (0170): its approval and money go through the sheet. */
+  sheet_id: string | null;
+  sheet_reference: string | null;
+  sheet_status: string | null;
 };
 
 export const getBill = cache(async (billId: string): Promise<BillDetail | null> => {
@@ -282,7 +295,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const { data: bill, error: billError } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, kind, project_id, plot_id, unit_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, vendor_seq, work_type, projects(name), plots(name), units(name), vendors(name, contractor_no, is_contractor), labour_contracts(description, reference)",
+      "id, reference, status, kind, project_id, plot_id, unit_id, vendor_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, charges_amount, charges_gst_pct, charges_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, vendor_seq, work_type, sheet_id, projects(name), plots(name), units(name), vendors(name, contractor_no, is_contractor), labour_contracts(description, reference), bill_sheets!bills_sheet_id_fkey(reference, status)",
     )
     .eq("id", billId)
     .maybeSingle();
@@ -376,6 +389,9 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     created_by_name: nameOf(bill.created_by),
     approved_by_name: nameOf(bill.approved_by),
     paid_by_name: nameOf(bill.paid_by),
+    sheet_id: bill.sheet_id,
+    sheet_reference: (bill.bill_sheets as { reference: string } | null)?.reference ?? null,
+    sheet_status: (bill.bill_sheets as { status: string } | null)?.status ?? null,
   };
 });
 
@@ -672,84 +688,4 @@ export async function getBillVillas(
     ...companyVillas(bill.project_id, projects, units, plots),
     bill: { projectId: bill.project_id, plotId: bill.plot_id, unitId: bill.unit_id },
   };
-}
-
-export type CombinableBill = CombineCandidate & {
-  projectName: string;
-  placeName: string;
-  invoiceDate: string;
-};
-
-/** A contractor's recorded and approved labour bills of one kind in one company's projects, each with what the
- * database would refuse it for (combine_contractor_bills, 0167). */
-export async function listCombinableBills(
-  vendorId: string,
-  companyId: string,
-  workType: "NMR" | "PW",
-): Promise<CombinableBill[]> {
-  await requireTool("/bills");
-  const supabase = await createClient();
-  const { data: projects, error: projectsError } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("company_id", companyId);
-  assertRead("bills", "the company's projects", projectsError);
-  const projectIds = (projects ?? []).map((project) => project.id);
-  if (projectIds.length === 0) return [];
-
-  const bills = await fetchAll((from, to) =>
-    supabase
-      .from("bills")
-      .select(
-        "id, reference, status, created_at, invoice_date, total_amount, charges_amount, total_override_note, projects(name), plots(name), units(name)",
-      )
-      .eq("kind", "nmr")
-      .eq("vendor_id", vendorId)
-      .eq("work_type", workType)
-      .in("project_id", projectIds)
-      .in("status", ["recorded", "approved"])
-      .order("created_at")
-      .order("id")
-      .range(from, to),
-  );
-  const ids = bills.map((bill) => bill.id);
-  if (ids.length === 0) return [];
-
-  const billIdsIn = (
-    table: "bill_payments" | "advance_recoveries" | "cash_request_items" | "bill_lines",
-  ) =>
-    fetchAll((from, to) =>
-      supabase.from(table).select("id, bill_id").in("bill_id", ids).order("id").range(from, to),
-    );
-  const [payments, recoveries, requested, lines] = await Promise.all([
-    billIdsIn("bill_payments"),
-    billIdsIn("advance_recoveries"),
-    billIdsIn("cash_request_items"),
-    billIdsIn("bill_lines"),
-  ]);
-  const withMoney = new Set([...payments, ...recoveries].map((row) => row.bill_id));
-  const onRequest = new Set(requested.map((row) => row.bill_id));
-  const lineCount = new Map<string, number>();
-  for (const line of lines) {
-    if (line.bill_id) lineCount.set(line.bill_id, (lineCount.get(line.bill_id) ?? 0) + 1);
-  }
-
-  return bills.map((bill) => ({
-    id: bill.id,
-    reference: bill.reference ?? "—",
-    status: bill.status,
-    createdAt: bill.created_at,
-    total: bill.total_amount ?? 0,
-    hasMoney: withMoney.has(bill.id),
-    onCashRequest: onRequest.has(bill.id),
-    hasCharges: (bill.charges_amount ?? 0) !== 0,
-    totalByHand: bill.total_override_note !== null,
-    lineCount: lineCount.get(bill.id) ?? 0,
-    projectName: (bill.projects as { name: string } | null)?.name ?? "—",
-    placeName:
-      (bill.units as { name: string } | null)?.name ??
-      (bill.plots as { name: string } | null)?.name ??
-      "General",
-    invoiceDate: bill.invoice_date,
-  }));
 }

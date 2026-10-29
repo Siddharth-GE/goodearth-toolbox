@@ -7,11 +7,18 @@ import { CASH_REQUEST_STATUS_LABEL } from "@/lib/bills/ledger";
 import { deleteCashRequest } from "@/lib/bills/payment-actions";
 import { getCashRequest, listPayableBills } from "@/lib/bills/payment-queries";
 import { getContractFormOptions, getCurrentBillActor } from "@/lib/bills/queries";
+import { listPayableSheets } from "@/lib/bills/sheet-queries";
 import { listWorkOrders } from "@/lib/bills/work-order-queries";
 import { formatDate, formatMoney } from "@/lib/format";
 import { listVendors } from "@/lib/masters/vendors";
 import { notFound } from "next/navigation";
-import { AddAdvance, AddBills, RequestActions, RequestLines } from "./_components/request-board";
+import {
+  AddAdvance,
+  AddBills,
+  AddSheets,
+  RequestActions,
+  RequestLines,
+} from "./_components/request-board";
 
 // "Pending" on a bill is what is left after every payment and recovery so far.
 export default async function CashRequestPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,15 +27,18 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
   if (!request) notFound();
 
   const drafting = request.status === "draft";
-  const [payable, options, vendors, workOrders] = drafting
+  const [payable, sheets, options, vendors, workOrders] = drafting
     ? await Promise.all([
         listPayableBills(),
+        listPayableSheets(),
         getContractFormOptions(),
         listVendors(true),
         listWorkOrders({ status: "approved" }),
       ])
-    : [[], null, [], []];
-  const onRequest = new Set(request.items.flatMap((item) => (item.bill_id ? [item.bill_id] : [])));
+    : [[], [], null, [], []];
+  const onRequest = new Set(
+    request.items.flatMap((item) => [item.bill_id, item.sheet_id].filter((id) => id !== null)),
+  );
   const isApprover = actor.isAdmin || actor.isApprover;
 
   return (
@@ -94,7 +104,9 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
       </FigureBand>
 
       {request.items.length === 0 ? (
-        <p className="text-muted text-sm">Nothing on it yet — add bills and advances below.</p>
+        <p className="text-muted text-sm">
+          Nothing on it yet — add sheets, bills and advances below.
+        </p>
       ) : (
         <RequestLines request={request} isApprover={isApprover} />
       )}
@@ -111,7 +123,14 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
       {drafting && options && (
         <>
           <div className="space-y-2">
-            <Heading>Add bills</Heading>
+            <Heading>Add contractors&apos; sheets</Heading>
+            <AddSheets
+              requestId={request.id}
+              sheets={sheets.filter((sheet) => !onRequest.has(sheet.id))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Heading>Add other bills</Heading>
             <AddBills
               requestId={request.id}
               bills={payable.filter((bill) => !onRequest.has(bill.id))}

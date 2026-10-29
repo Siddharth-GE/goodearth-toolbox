@@ -26,6 +26,8 @@ export type Database = {
           recovered_on: string
           reverse_reason: string | null
           reverses_id: string | null
+          sheet_entry_id: string | null
+          sheet_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -40,6 +42,8 @@ export type Database = {
           recovered_on?: string
           reverse_reason?: string | null
           reverses_id?: string | null
+          sheet_entry_id?: string | null
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -54,6 +58,8 @@ export type Database = {
           recovered_on?: string
           reverse_reason?: string | null
           reverses_id?: string | null
+          sheet_entry_id?: string | null
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -98,6 +104,13 @@ export type Database = {
             columns: ["reverses_id"]
             isOneToOne: false
             referencedRelation: "advance_recoveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_recoveries_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sheets"
             referencedColumns: ["id"]
           },
           {
@@ -494,6 +507,8 @@ export type Database = {
           payment_ref: string
           reverse_reason: string | null
           reverses_id: string | null
+          sheet_entry_id: string | null
+          sheet_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -509,6 +524,8 @@ export type Database = {
           payment_ref: string
           reverse_reason?: string | null
           reverses_id?: string | null
+          sheet_entry_id?: string | null
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -524,6 +541,8 @@ export type Database = {
           payment_ref?: string
           reverse_reason?: string | null
           reverses_id?: string | null
+          sheet_entry_id?: string | null
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -571,10 +590,232 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bill_payments_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sheets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bill_payments_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_sheet_bills: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          bill_id: string | null
+          bill_reference: string
+          id: string
+          removed_at: string | null
+          removed_by: string | null
+          sheet_id: string
+          updated_at: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          bill_id?: string | null
+          bill_reference: string
+          id?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          sheet_id: string
+          updated_at?: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          bill_id?: string | null
+          bill_reference?: string
+          id?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          sheet_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_sheet_bills_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_bills_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bill_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_bills_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bill_money_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_bills_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_bills_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_bills_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_sheet_counters: {
+        Row: {
+          company_id: string
+          last_no: number
+          vendor_id: string
+        }
+        Insert: {
+          company_id: string
+          last_no: number
+          vendor_id: string
+        }
+        Update: {
+          company_id?: string
+          last_no?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_sheet_counters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheet_counters_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_sheets: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_test: boolean
+          reference: string
+          sent_back_note: string | null
+          sheet_no: number
+          status: string
+          undone_at: string | null
+          undone_by: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+          work_type: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_test?: boolean
+          reference: string
+          sent_back_note?: string | null
+          sheet_no: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+          work_type: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_test?: boolean
+          reference?: string
+          sent_back_note?: string | null
+          sheet_no?: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_sheets_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheets_undone_by_fkey"
+            columns: ["undone_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheets_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_sheets_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -720,6 +961,7 @@ export type Database = {
           reference: string
           rejection_note: string | null
           scope_code: string
+          sheet_id: string | null
           status: string
           taxable_amount: number
           total_amount: number
@@ -756,6 +998,7 @@ export type Database = {
           reference: string
           rejection_note?: string | null
           scope_code: string
+          sheet_id?: string | null
           status?: string
           taxable_amount: number
           total_amount: number
@@ -792,6 +1035,7 @@ export type Database = {
           reference?: string
           rejection_note?: string | null
           scope_code?: string
+          sheet_id?: string | null
           status?: string
           taxable_amount?: number
           total_amount?: number
@@ -865,6 +1109,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sheets"
             referencedColumns: ["id"]
           },
           {
@@ -2730,6 +2981,7 @@ export type Database = {
           project_id: string | null
           released_amount: number | null
           requested_amount: number
+          sheet_id: string | null
           updated_at: string
           updated_by: string | null
           vendor_id: string | null
@@ -2746,6 +2998,7 @@ export type Database = {
           project_id?: string | null
           released_amount?: number | null
           requested_amount: number
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
@@ -2762,6 +3015,7 @@ export type Database = {
           project_id?: string | null
           released_amount?: number | null
           requested_amount?: number
+          sheet_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string | null
@@ -2814,6 +3068,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_request_items_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sheets"
             referencedColumns: ["id"]
           },
           {
@@ -13550,6 +13811,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      approve_bill_sheet: { Args: { p_sheet_id: string }; Returns: undefined }
       bill_approval_cap: { Args: { uid: string }; Returns: number }
       birdwing_confirm_salary: {
         Args: {
@@ -13591,10 +13853,7 @@ export type Database = {
           id: string
         }[]
       }
-      combine_contractor_bills: {
-        Args: { p_bill_ids: string[] }
-        Returns: string
-      }
+      consolidate_bills: { Args: { p_bill_ids: string[] }; Returns: Json }
       create_bill: {
         Args: {
           p_gst_amount: number
@@ -13865,6 +14124,17 @@ export type Database = {
             }
             Returns: string
           }
+      pay_bill_sheet: {
+        Args: {
+          p_amount: number
+          p_cash_request_item_id?: string
+          p_note?: string
+          p_paid_on: string
+          p_reference: string
+          p_sheet_id: string
+        }
+        Returns: string
+      }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       pusher_current_stage: { Args: { p_project_id: string }; Returns: string }
       record_site_return: {
@@ -13877,6 +14147,20 @@ export type Database = {
         }
         Returns: string
       }
+      recover_on_bill_sheet: {
+        Args: {
+          p_advance_id: string
+          p_amount: number
+          p_note?: string
+          p_recovered_on: string
+          p_sheet_id: string
+        }
+        Returns: string
+      }
+      remove_bill_from_sheet: {
+        Args: { p_bill_id: string }
+        Returns: undefined
+      }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }
@@ -13887,8 +14171,16 @@ export type Database = {
         Args: { p_id: string; p_kind: string; p_reason: string }
         Returns: string
       }
+      reverse_bill_sheet_money: {
+        Args: { p_entry_id: string; p_kind: string; p_reason: string }
+        Returns: string
+      }
       seed_default_project_stages: {
         Args: { p_project_id: string }
+        Returns: undefined
+      }
+      send_back_bill_sheet: {
+        Args: { p_note: string; p_sheet_id: string }
         Returns: undefined
       }
       send_labour_logs_to_bill: {
@@ -13926,6 +14218,7 @@ export type Database = {
         Returns: number
       }
       submit_estimate: { Args: { p_estimate_id: string }; Returns: string }
+      undo_bill_sheet: { Args: { p_sheet_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

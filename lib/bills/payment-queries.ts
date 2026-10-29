@@ -15,6 +15,8 @@ import {
   type MoneyKind,
 } from "./ledger";
 import { pendingOnBill } from "./math";
+import { listSheets } from "./sheet-queries";
+import { isContractorLabourBill } from "./sheets";
 import { roundPaise } from "@/lib/line-money";
 
 // A bill's paid state is derived: payments plus advance recoveries against its total. All /bills-gated (or /reporter on read).
@@ -242,6 +244,8 @@ type BillMoney = {
   paid: number;
   recovered: number;
   pending: number;
+  /** A contractor's labour bill reaches a cash request only on its sheet (0170). */
+  sheet_only: boolean;
 };
 
 async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
@@ -250,7 +254,7 @@ async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
       supabase
         .from("bills")
         .select(
-          "id, reference, status, vendor_id, project_id, invoice_date, total_amount, vendors(name), projects(name)",
+          "id, reference, status, kind, vendor_id, project_id, invoice_date, total_amount, vendors(name, is_contractor), projects(name)",
         )
         .in("status", ["approved", "paid"])
         .order("invoice_date")
@@ -287,6 +291,11 @@ async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
       paid: p,
       recovered: r,
       pending: pendingOnBill(total, p, r),
+      sheet_only: isContractorLabourBill({
+        kind: bill.kind,
+        vendorIsContractor:
+          (bill.vendors as { is_contractor: boolean } | null)?.is_contractor ?? false,
+      }),
     };
   });
 }
@@ -319,7 +328,7 @@ export async function listPayableBills(): Promise<PayableBill[]> {
   }
   // billsWithSettlement reads oldest invoice first, so each vendor's advance goes to their oldest bills.
   return bills
-    .filter((bill) => bill.status === "approved" && bill.pending > 0)
+    .filter((bill) => bill.status === "approved" && bill.pending > 0 && !bill.sheet_only)
     .map((bill) => {
       const left = Math.max(0, roundPaise(bill.vendor_id ? (out.get(bill.vendor_id) ?? 0) : 0));
       const share = Math.min(left, bill.pending);
@@ -346,13 +355,14 @@ type ItemRow = {
   vendor_id: string | null;
   project_id: string | null;
   labour_contract_id: string | null;
+  sheet_id: string | null;
   requested_amount: number;
   released_amount: number | null;
   note: string | null;
 };
 
 const ITEM_COLUMNS =
-  "id, cash_request_id, item_kind, bill_id, vendor_id, project_id, labour_contract_id, requested_amount, released_amount, note";
+  "id, cash_request_id, item_kind, bill_id, vendor_id, project_id, labour_contract_id, sheet_id, requested_amount, released_amount, note";
 
 /** Paid out against each cash-request line: payments for a bill line, the advance for an advance line. */
 async function paidByItem(supabase: Client, itemIds: string[]) {
@@ -427,9 +437,12 @@ export async function listCashRequests(): Promise<CashRequestRow[]> {
 
 export type CashRequestItem = {
   id: string;
-  kind: "bill" | "advance";
+  kind: "bill" | "advance" | "sheet";
   bill_id: string | null;
   bill_reference: string | null;
+  /** A sheet line (0170) shows the sheet's C number only; its bills are paid through it. */
+  sheet_id: string | null;
+  sheet_reference: string | null;
   vendor_id: string | null;
   vendor_name: string;
   project_id: string | null;
@@ -437,6 +450,7 @@ export type CashRequestItem = {
   /** The work order an advance is asked against, kept on the advance when it is paid. */
   labour_contract_id: string | null;
   work_order: string | null;
+  /** The bill's, or on a sheet line the sheet's. */
   bill_total: number | null;
   bill_pending: number | null;
   requested: number;
@@ -480,7 +494,7 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
     supabase
       .from("cash_request_items")
       .select(
-        `${ITEM_COLUMNS}, bills(reference, vendor_id, project_id, vendors(name), projects(name)), vendors(name), projects(name), labour_contracts(reference)`,
+        `${ITEM_COLUMNS}, bills(reference, vendor_id, project_id, vendors(name), projects(name)), vendors(name), projects(name), labour_contracts(reference), bill_sheets!cash_request_items_sheet_id_fkey(reference, vendor_id, vendors(name), companies(name))`,
       )
       .eq("cash_request_id", id)
       .order("created_at")
@@ -497,34 +511,54 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
     vendors: { name: string } | null;
     projects: { name: string } | null;
     labour_contracts: { reference: string | null } | null;
+    bill_sheets: {
+      reference: string;
+      vendor_id: string;
+      vendors: { name: string } | null;
+      companies: { name: string } | null;
+    } | null;
   })[];
 
-  const [paid, bills, names] = await Promise.all([
+  const hasSheets = items.some((item) => item.sheet_id);
+  const [paid, bills, names, sheets] = await Promise.all([
     paidByItem(
       supabase,
       items.map((item) => item.id),
     ),
     billsWithSettlement(supabase),
     profileNames(supabase, [request.created_by, request.submitted_by, request.released_by]),
+    hasSheets ? listSheets() : Promise.resolve([]),
   ]);
+  const sheetById = new Map(sheets.map((sheet) => [sheet.id, sheet]));
   const billById = new Map(bills.map((bill) => [bill.id, bill]));
   const nameOf = (person: string | null) => (person ? (names.get(person) ?? null) : null);
 
   const shaped: CashRequestItem[] = items.map((item) => {
     const bill = item.bill_id ? billById.get(item.bill_id) : undefined;
+    const sheet = item.sheet_id ? sheetById.get(item.sheet_id) : undefined;
     return {
       id: item.id,
-      kind: item.item_kind as "bill" | "advance",
+      kind: item.item_kind as "bill" | "advance" | "sheet",
       bill_id: item.bill_id,
       bill_reference: item.bills?.reference ?? null,
-      vendor_id: item.bills?.vendor_id ?? item.vendor_id,
-      vendor_name: item.bills?.vendors?.name ?? item.vendors?.name ?? "Direct labour",
+      sheet_id: item.sheet_id,
+      sheet_reference: item.bill_sheets?.reference ?? null,
+      vendor_id: item.bills?.vendor_id ?? item.bill_sheets?.vendor_id ?? item.vendor_id,
+      vendor_name:
+        item.bills?.vendors?.name ??
+        item.bill_sheets?.vendors?.name ??
+        item.vendors?.name ??
+        "Direct labour",
       project_id: item.bills?.project_id ?? item.project_id,
-      project_name: item.bills?.projects?.name ?? item.projects?.name ?? "—",
+      project_name:
+        item.bills?.projects?.name ??
+        item.bill_sheets?.companies?.name ??
+        item.projects?.name ??
+        "—",
       labour_contract_id: item.labour_contract_id,
       work_order: item.labour_contracts?.reference ?? null,
-      bill_total: bill?.total ?? null,
-      bill_pending: bill?.pending ?? null,
+      bill_total: bill?.total ?? sheet?.total ?? null,
+      bill_pending: bill?.pending ?? sheet?.pending ?? null,
       requested: item.requested_amount,
       released: item.released_amount,
       paid: paid.get(item.id) ?? 0,
@@ -562,8 +596,34 @@ export type LedgerRow = Reversible & {
   project_name: string;
   bill_id: string | null;
   bill_reference: string | null;
+  /** Money through a sheet (0170) is one row per payment, named by the sheet's C number, never its bills. */
+  sheet_id: string | null;
+  sheet_entry_id: string | null;
   note: string | null;
 };
+
+/** One sheet payment or recovery is several rows, one per bill: fold them back into the one that was made. */
+function foldSheetMoney(rows: LedgerRow[]): LedgerRow[] {
+  const folded = new Map<string, LedgerRow>();
+  const out: LedgerRow[] = [];
+  for (const row of rows) {
+    if (!row.sheet_entry_id) {
+      out.push(row);
+      continue;
+    }
+    const key = `${row.kind}:${row.sheet_entry_id}`;
+    const found = folded.get(key);
+    if (found) {
+      found.amount = roundPaise(found.amount + row.amount);
+      found.reversed ||= row.reversed;
+      continue;
+    }
+    const first = { ...row, id: row.sheet_entry_id, bill_id: null };
+    folded.set(key, first);
+    out.push(first);
+  }
+  return out;
+}
 
 export type LedgerFilters = {
   q?: string;
@@ -581,7 +641,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       supabase
         .from("bill_payments")
         .select(
-          "id, amount, paid_on, payment_ref, note, bill_id, reverses_id, reverse_reason, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
+          "id, amount, paid_on, payment_ref, note, bill_id, reverses_id, reverse_reason, sheet_id, sheet_entry_id, bills(reference, vendor_id, project_id, vendors(name), projects(name)), bill_sheets!bill_payments_sheet_id_fkey(reference)",
         )
         .order("paid_on", { ascending: false })
         .order("id")
@@ -601,7 +661,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       supabase
         .from("advance_recoveries")
         .select(
-          "id, amount, recovered_on, note, bill_id, advance_id, reverses_id, reverse_reason, bills(reference, vendor_id, project_id, vendors(name), projects(name))",
+          "id, amount, recovered_on, note, bill_id, advance_id, reverses_id, reverse_reason, sheet_id, sheet_entry_id, bills(reference, vendor_id, project_id, vendors(name), projects(name)), bill_sheets!advance_recoveries_sheet_id_fkey(reference)",
         )
         .order("recovered_on", { ascending: false })
         .order("id")
@@ -625,7 +685,8 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
     recoveredFrom.set(row.advance_id, (recoveredFrom.get(row.advance_id) ?? 0) + row.amount);
   }
 
-  const rows: LedgerRow[] = [
+  const sheetRef = (embed: unknown) => (embed as { reference: string } | null)?.reference ?? null;
+  const rows: LedgerRow[] = foldSheetMoney([
     ...payments.map((row) => {
       const bill = row.bills as BillEmbed;
       return {
@@ -641,7 +702,9 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
         project_id: bill?.project_id ?? null,
         project_name: bill?.projects?.name ?? "—",
         bill_id: row.bill_id,
-        bill_reference: bill?.reference ?? null,
+        bill_reference: sheetRef(row.bill_sheets) ?? bill?.reference ?? null,
+        sheet_id: row.sheet_id,
+        sheet_entry_id: row.sheet_entry_id,
         note: row.note,
       };
     }),
@@ -659,6 +722,8 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
       bill_id: null,
       bill_reference: null,
+      sheet_id: null,
+      sheet_entry_id: null,
       note: row.note,
     })),
     ...recoveries.map((row) => {
@@ -676,11 +741,13 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
         project_id: bill?.project_id ?? null,
         project_name: bill?.projects?.name ?? "—",
         bill_id: row.bill_id,
-        bill_reference: bill?.reference ?? null,
+        bill_reference: sheetRef(row.bill_sheets) ?? bill?.reference ?? null,
+        sheet_id: row.sheet_id,
+        sheet_entry_id: row.sheet_entry_id,
         note: row.note,
       };
     }),
-  ];
+  ]);
 
   const needle = filters.q?.toLowerCase();
   return rows
@@ -696,6 +763,30 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
         ),
     )
     .sort((a, b) => (a.on < b.on ? 1 : a.on > b.on ? -1 : 0));
+}
+
+/** A sheet's payment is one row per bill: the statement shows it once, by the sheet's C number (0170). */
+function sheetPaymentsFolded<
+  T extends { id: string; amount: number; sheet_entry_id: string | null; bill_sheets: unknown },
+>(rows: T[]): (T & { sheet_reference: string | null })[] {
+  const folded = new Map<string, T & { sheet_reference: string | null }>();
+  const out: (T & { sheet_reference: string | null })[] = [];
+  for (const row of rows) {
+    const sheet_reference = (row.bill_sheets as { reference: string } | null)?.reference ?? null;
+    if (!row.sheet_entry_id) {
+      out.push({ ...row, sheet_reference });
+      continue;
+    }
+    const found = folded.get(row.sheet_entry_id);
+    if (found) {
+      found.amount = roundPaise(found.amount + row.amount);
+      continue;
+    }
+    const first = { ...row, id: row.sheet_entry_id, sheet_reference };
+    folded.set(row.sheet_entry_id, first);
+    out.push(first);
+  }
+  return out;
 }
 
 export type ContractorRow = {
@@ -850,7 +941,9 @@ export async function getContractorLedger(
       ? fetchAll((from, to) =>
           supabase
             .from("bill_payments")
-            .select("id, bill_id, amount, paid_on, payment_ref, reverses_id")
+            .select(
+              "id, bill_id, amount, paid_on, payment_ref, reverses_id, sheet_entry_id, bill_sheets!bill_payments_sheet_id_fkey(reference)",
+            )
             .in("bill_id", billIds)
             .order("id")
             .range(from, to),
@@ -900,13 +993,15 @@ export async function getContractorLedger(
       project_name: projectName(bill.projects),
       reversal: false,
     })),
-    ...payments.map((row) => ({
+    ...sheetPaymentsFolded(payments).map((row) => ({
       id: row.id,
       kind: "payment" as const,
       on: row.paid_on,
       amount: row.amount,
-      label: `${row.payment_ref} · ${billLabel(row.bill_id)}`,
-      bill_id: row.bill_id,
+      label: row.sheet_reference
+        ? `${row.payment_ref} · ${row.sheet_reference}`
+        : `${row.payment_ref} · ${billLabel(row.bill_id)}`,
+      bill_id: row.sheet_reference ? null : row.bill_id,
       project_name: projectName(billById.get(row.bill_id)?.projects),
       reversal: row.reverses_id !== null,
     })),

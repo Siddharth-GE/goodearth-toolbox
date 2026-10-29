@@ -203,37 +203,3 @@ export async function deleteBill(billId: string): Promise<ActionState> {
   revalidatePath("/bills", "layout");
   redirect("/bills/list");
 }
-
-const COMBINE_PHRASES = [
-  "approver",
-  "Tick at least two",
-  "no longer exist",
-  "can be combined",
-  "one contractor",
-  "stay separate",
-  "one company",
-  "can't be combined",
-  "money on record",
-  "cash request",
-  "additional charges",
-  "set by hand",
-  "no lines",
-] as const;
-
-/** combine_contractor_bills (0167) folds the bills into the oldest and says what it refuses; lands on the kept bill. */
-export async function combineBills(billIds: string[]): Promise<ActionState> {
-  await requireTool("/bills");
-  if (billIds.length < 2) return { error: "Tick at least two bills to combine." };
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("combine_contractor_bills", { p_bill_ids: billIds });
-  if (error || !data) {
-    console.error("combineBills failed:", error);
-    return guardError(
-      error ?? { message: "" },
-      "Could not combine the bills. Try again.",
-      COMBINE_PHRASES,
-    );
-  }
-  revalidatePath("/bills", "layout");
-  redirect(`/bills/${data}`);
-}
