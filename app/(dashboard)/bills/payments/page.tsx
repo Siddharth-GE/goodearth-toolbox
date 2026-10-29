@@ -169,7 +169,11 @@ export default async function PaymentsPage({
                     verb="Reverse"
                     reasonPlaceholder="Paid twice by mistake"
                     removal={moneyReversal(row, actor)}
-                    cancelNote={REVERSE_NOTE[row.kind]}
+                    cancelNote={
+                      row.sheet_entry_id
+                        ? "The same amount is entered the other way on every bill of the sheet, with your reason, so the sheet has it pending again. Both entries stay on record. This can't be undone."
+                        : REVERSE_NOTE[row.kind]
+                    }
                     onCancel={
                       row.sheet_entry_id && row.kind !== "advance"
                         ? reverseSheetMoney.bind(null, row.kind, row.sheet_entry_id)

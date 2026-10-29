@@ -21,6 +21,7 @@ import {
 } from "@/lib/bills/payment-queries";
 import { getBill, getBillVillas, getCurrentBillActor } from "@/lib/bills/queries";
 import { groupByVilla, villaLabel, villaOfLine } from "@/lib/bills/villas";
+import { sheetHasBeenRequested } from "@/lib/bills/sheet-queries";
 import { isContractorLabourBill } from "@/lib/bills/sheets";
 import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -89,6 +90,12 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         ? villaLabel(villaGroups[0].villa, villas)
         : (bill.scope_name ?? "General");
   const hasMoney = events.length > 0;
+  // As remove_bill_from_sheet: a sheet still waiting, never on a cash request, and no money ever on this bill.
+  const canTakeOff =
+    onSheet &&
+    bill.sheet_status === "recorded" &&
+    !hasMoney &&
+    !(await sheetHasBeenRequested(bill.sheet_id ?? ""));
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
         listActiveGstRates(),
@@ -158,6 +165,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
                 createdBy={bill.created_by}
                 totalAmount={bill.total_amount}
                 hasMoney={hasMoney}
+                approveOnSheet={loose}
               />
             )}
           </>
@@ -176,7 +184,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             </Link>
             {" — it is approved, put on the cash request and paid there."}
           </p>
-          {bill.sheet_status === "recorded" && <TakeOffSheet billId={bill.id} />}
+          {canTakeOff && <TakeOffSheet billId={bill.id} />}
         </div>
       )}
 
@@ -200,9 +208,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             <Attribution name={bill.created_by_name} label="Recorded by" />
           </div>
           <p className="text-muted mt-1 text-xs">
-            {actor.isAdmin || actor.isApprover
-              ? "Yours to decide — approve it, or delete it if it was recorded wrongly."
-              : "Waiting for a named bill approver or an admin."}
+            {loose
+              ? "A contractor's labour bill is approved and paid on a sheet — press Put on a sheet."
+              : actor.isAdmin || actor.isApprover
+                ? "Yours to decide — approve it, or delete it if it was recorded wrongly."
+                : "Waiting for a named bill approver or an admin."}
           </p>
         </div>
       )}

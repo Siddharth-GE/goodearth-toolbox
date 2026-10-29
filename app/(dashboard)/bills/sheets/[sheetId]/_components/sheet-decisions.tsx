@@ -18,6 +18,7 @@ export function SheetDecisions({
   billCount,
   hasMoney,
   onCashRequest,
+  sendBackBlocked,
   actor,
 }: {
   sheetId: string;
@@ -28,6 +29,8 @@ export function SheetDecisions({
   /** Paid (even reversed): it is never undone, only sent back while its money nets to nothing. */
   hasMoney: boolean;
   onCashRequest: boolean;
+  /** Why send_back_bill_sheet would refuse it now; the button is not offered then. */
+  sendBackBlocked: string | null;
   actor: { isAdmin: boolean; isApprover: boolean; approvalLimit: number | null };
 }) {
   const router = useRouter();
@@ -56,7 +59,7 @@ export function SheetDecisions({
             onConfirm={async () => after(await undoSheet(sheetId))}
           />
         )}
-        {state === "approved" && decider && (
+        {state === "approved" && decider && !sendBackBlocked && (
           <ConfirmDialog
             trigger={<Button variant="secondary">Send back</Button>}
             title={`Send ${reference} back`}

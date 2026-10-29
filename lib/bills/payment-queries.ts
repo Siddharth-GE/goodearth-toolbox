@@ -686,7 +686,7 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
   }
 
   const sheetRef = (embed: unknown) => (embed as { reference: string } | null)?.reference ?? null;
-  const rows: LedgerRow[] = foldSheetMoney([
+  const rows: LedgerRow[] = [
     ...payments.map((row) => {
       const bill = row.bills as BillEmbed;
       return {
@@ -747,10 +747,11 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
         note: row.note,
       };
     }),
-  ]);
+  ];
 
   const needle = filters.q?.toLowerCase();
-  return rows
+  // Filtered row by row first: a sheet's payment over two projects counts under each project for its own bills.
+  const kept = rows
     .filter((row) => !filters.vendorId || row.vendor_id === filters.vendorId)
     .filter((row) => !filters.projectId || row.project_id === filters.projectId)
     .filter((row) => !filters.from || row.on >= filters.from)
@@ -761,11 +762,11 @@ export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<L
         [row.reference, row.vendor_name, row.bill_reference ?? "", row.note ?? ""].some((text) =>
           text.toLowerCase().includes(needle),
         ),
-    )
-    .sort((a, b) => (a.on < b.on ? 1 : a.on > b.on ? -1 : 0));
+    );
+  return foldSheetMoney(kept).sort((a, b) => (a.on < b.on ? 1 : a.on > b.on ? -1 : 0));
 }
 
-/** A sheet's payment is one row per bill: the statement shows it once, by the sheet's C number (0170). */
+/** A sheet's payment or recovery is one row per bill: the statement shows it once, by the sheet's C number (0170). */
 function sheetPaymentsFolded<
   T extends { id: string; amount: number; sheet_entry_id: string | null; bill_sheets: unknown },
 >(rows: T[]): (T & { sheet_reference: string | null })[] {
@@ -953,7 +954,9 @@ export async function getContractorLedger(
       ? fetchAll((from, to) =>
           supabase
             .from("advance_recoveries")
-            .select("id, bill_id, advance_id, amount, recovered_on, reverses_id")
+            .select(
+              "id, bill_id, advance_id, amount, recovered_on, reverses_id, sheet_entry_id, bill_sheets!advance_recoveries_sheet_id_fkey(reference)",
+            )
             .in("bill_id", allBillIds)
             .order("id")
             .range(from, to),
@@ -1017,7 +1020,7 @@ export async function getContractorLedger(
         project_name: projectName(row.projects),
         reversal: row.reverses_id !== null,
       })),
-    ...recoveries.map((row) => ({
+    ...sheetPaymentsFolded(recoveries).map((row) => ({
       id: row.id,
       kind: "recovery" as const,
       crossing: row.crossing,
@@ -1027,9 +1030,9 @@ export async function getContractorLedger(
         row.crossing === "returns"
           ? "Advance set against a bill outside this view"
           : row.crossing === "pays"
-            ? `An advance from outside this view set against ${billLabel(row.bill_id)}`
-            : `Advance set against ${billLabel(row.bill_id)}`,
-      bill_id: row.crossing === "returns" ? null : row.bill_id,
+            ? `An advance from outside this view set against ${row.sheet_reference ?? billLabel(row.bill_id)}`
+            : `Advance set against ${row.sheet_reference ?? billLabel(row.bill_id)}`,
+      bill_id: row.crossing === "returns" || row.sheet_reference ? null : row.bill_id,
       project_name:
         row.crossing === "returns" ? "—" : projectName(billById.get(row.bill_id)?.projects),
       reversal: row.reverses_id !== null,

@@ -26,10 +26,10 @@ Tables `bill_sheets`, `bill_sheet_bills`, `bill_sheet_counters` (RLS, one SELECT
 
 ## Steps — one branch `feature/consolidate-bills`, vetted on staging
 
-- [ ] `[Opus]` **1. The database.** `0170` and its trial; independent Opus review; applied to staging; `npm run db:types:staging`.
-- [ ] `[Opus]` **2. The Bills list.** Tick boxes and select all, the bulk bar (Consolidate, Print), the Sheet filter, "On C01" beside a bill. `/bills/print` makes one PDF of ticked bills and sheets. Rules in `lib/bills/sheets.ts` (pure, tested).
-- [ ] `[Opus]` **3. Consolidated.** `/bills/sheets` (the list) and `/bills/sheets/[id]` (its bills as lines, approve, send back, undo, take a bill off, pay, recover from an advance, reverse) and its print. A bill's page names its sheet, and its own approve and pay give way to the sheet's. The welcome links Consolidated.
-- [ ] `[Opus]` **4. Cash and the rest.** Cash requests add sheets (the contractor's labour bills no longer offered loose), a sheet's line shows its C number and pays the sheet; Payments and the contractor's statement show the C number for sheet money. Combine's screen, rules and links go. Bills `PLAN.md` rule 14, STATUS, TODO.
+- [x] `[Opus]` **1. The database.** `0170` and its trial; independent Opus review (two rounds: recovering on a sheet, a bill inserted onto a sheet or as approved, test bills, a sheet once on a cash request — all fixed and trialled); applied to staging; `npm run db:types:staging`.
+- [x] `[Opus]` **2. The Bills list.** Tick boxes and select all, the bulk bar (Consolidate, Print), the Sheet filter, "On C01" beside a bill. `/bills/print` makes one PDF of ticked bills and sheets. Rules in `lib/bills/sheets.ts` (pure, tested).
+- [x] `[Opus]` **3. Consolidated.** `/bills/sheets` (the list) and `/bills/sheets/[id]` (its bills as lines, approve, send back, undo, take a bill off, pay, recover from an advance, reverse) and its print. A bill's page names its sheet, and its own approve and pay give way to the sheet's. The welcome links Consolidated.
+- [x] `[Opus]` **4. Cash and the rest.** Cash requests add sheets (the contractor's labour bills no longer offered loose), a sheet's line shows its C number and pays the sheet; Payments and the contractor's statement show the C number for sheet money. Combine's screen, rules and links go. Bills `PLAN.md` rule 14, STATUS, TODO.
 - [ ] `[Opus]` **Independent review** of the full diff against this plan, SECURITY.md and BUGCATCHER.md before the merge to staging.
 
 ## Not in this build
@@ -37,6 +37,17 @@ Tables `bill_sheets`, `bill_sheet_bills`, `bill_sheet_counters` (RLS, one SELECT
 - Material and work-order bills on sheets.
 - Hiding bill numbers from the cash team by permission (they share the Bills grant).
 - Turing proposing consolidations.
+
+## The founder's checklist on staging
+
+1. **Bills → All bills**, Sheet filter **Not consolidated**: tick two or three of one contractor's labour bills (one company), press **Consolidate**. The box names the sheet (like THIN-PW-EF-C01) and anything left out with why.
+2. Tick a single bill of another contractor → Consolidate: it gets its own one-line sheet.
+3. Open the sheet (**Bills → Consolidated**): each bill is a line with its villa, date and amount. **Take one off**, then put it back from its own page (**Put on a sheet**).
+4. **Approve** the sheet: every bill on it shows Approved. A bill's own page says "On THIN-…" and has no Approve or Pay of its own.
+5. **Print**, and **Print with its bills**: one PDF, the sheet then each bill on its own page. In All bills, tick a few bills → **Print**.
+6. **Cash requests**: start one, **Add contractors' sheets** — the sheet shows by its C number only; a contractor's loose bill is not offered. Submit, release, **Pay** the sheet line with a UTR.
+7. **Payments**: that payment is one row, named by the C number. The contractor's statement (Contractors → the name) shows it the same way.
+8. On another approved sheet with nothing paid: **Undo** — its bills stand alone again; the sheet stays under Consolidated → Undone, listing the bills it had.
 
 ---
 
@@ -77,6 +88,8 @@ Tables `bill_sheets`, `bill_sheet_bills`, `bill_sheet_counters` (RLS, one SELECT
 7. Export to Excel: three sheets, as the page's export.
 
 # Combined contractor bills `[Opus planned 2026-10-28; the founder said go the same day; 5 not yet answered]`
+
+**Step 5 (Combine) was replaced by Consolidated bills, the top section (2026-10-29): its screen and function are gone, so skip check 5 below.**
 
 **The founder's ask** (2026-10-28): "we consolidate … one contractor one company multiple line items instead of million bills". Settled the same day: **by company, by contractor**; **material bills stay separate**; **contractors' bills only for now**.
 

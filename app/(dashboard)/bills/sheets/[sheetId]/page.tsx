@@ -47,10 +47,17 @@ export default async function SheetPage({ params }: { params: Promise<{ sheetId:
         description={`${party} · ${sheet.company_name} · ${sheet.work_type === "PW" ? "Piece-work" : "Daily wages (NMR)"} · ${sheet.bills.length} ${sheet.bills.length === 1 ? "bill" : "bills"}`}
         actions={
           <>
-            <LinkButton href={`/bills/sheets/${sheet.id}/pdf`} variant="secondary" size="sm" plain>
-              <FileDown className="size-4" />
-              Print
-            </LinkButton>
+            {sheet.state !== "undone" && (
+              <LinkButton
+                href={`/bills/sheets/${sheet.id}/pdf`}
+                variant="secondary"
+                size="sm"
+                plain
+              >
+                <FileDown className="size-4" />
+                Print
+              </LinkButton>
+            )}
             {sheet.bills.length > 0 && (
               <LinkButton
                 href={`/bills/print?sheets=${sheet.id}&bills=${sheet.bills.map((bill) => bill.id).join(",")}`}
@@ -70,6 +77,15 @@ export default async function SheetPage({ params }: { params: Promise<{ sheetId:
               billCount={sheet.bills.length}
               hasMoney={hasMoney}
               onCashRequest={sheet.cash_requests.length > 0}
+              sendBackBlocked={
+                sheet.cash_requests.some(
+                  (request) => request.status === "draft" || request.status === "submitted",
+                )
+                  ? "It is on a cash request still being decided — take it off there first."
+                  : sheet.paid + sheet.recovered > 0.005
+                    ? "Money has gone out on it — reverse it before sending the sheet back."
+                    : null
+              }
               actor={actor}
             />
           </>
@@ -176,7 +192,7 @@ export default async function SheetPage({ params }: { params: Promise<{ sheetId:
                     {formatMoney(bill.pending, { paise: true })}
                   </TableCell>
                   <TableCell className="text-right">
-                    {sheet.state === "waiting" && sheet.cash_requests.length === 0 && (
+                    {sheet.state === "waiting" && sheet.cash_requests.length === 0 && !hasMoney && (
                       <TakeOffSheet billId={bill.id} />
                     )}
                   </TableCell>

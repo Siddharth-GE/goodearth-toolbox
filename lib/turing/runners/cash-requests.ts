@@ -15,6 +15,7 @@ import {
   setCashRequestNote,
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
+import { paySheet } from "@/lib/bills/sheet-actions";
 import { formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
@@ -72,6 +73,7 @@ async function lineNow(itemId: string) {
       "vendor_id",
       "project_id",
       "labour_contract_id",
+      "sheet_id",
       "requested_amount",
       "released_amount",
       "note",
@@ -290,6 +292,16 @@ export const CASH_REQUEST_RUNNERS: Runners<(typeof CASH_REQUESTS)[number]["key"]
     if (amount > cap + 0.005)
       return { error: `That is more than is left to pay on this line (₹${cap.toFixed(2)}).` };
     const reference = String(v.reference);
+    // A sheet line (0170) pays the sheet, spread over its bills; pay_bill_sheet refuses past what it has pending.
+    if (now.line.item_kind === "sheet") {
+      return paySheet(String(now.line.sheet_id), {
+        amount,
+        paidOn: String(v.paid_on),
+        reference,
+        note: null,
+        cashRequestItemId: itemId,
+      });
+    }
     if (now.line.item_kind === "bill") {
       const billId = String(now.line.bill_id);
       // The board pays a bill at most what it still has pending, as well as the line's cap.

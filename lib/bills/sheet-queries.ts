@@ -84,21 +84,42 @@ export async function listSheets(filters: SheetListFilters = {}): Promise<SheetL
     if (filters.q) query = query.ilike("reference", `%${filters.q}%`);
     return query.range(from, to);
   });
-  const sheetIds = sheets.map((sheet) => sheet.id);
-  const bills = sheetIds.length
-    ? await fetchAll((from, to) =>
-        supabase
-          .from("bills")
-          .select("id, sheet_id, total_amount")
-          .in("sheet_id", sheetIds)
-          .order("id")
-          .range(from, to),
-      )
-    : [];
-  const money = await billMoney(
-    supabase,
-    bills.map((bill) => bill.id),
-  );
+  // Every bill on any sheet, and every row of sheet money: never a list of ids, which outgrows a request's address.
+  // A bill on a sheet has no money but the sheet's (0170 consolidates only bills with none).
+  const [bills, payments, recoveries] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("bills")
+        .select("id, sheet_id, total_amount")
+        .not("sheet_id", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("bill_payments")
+        .select("id, bill_id, amount")
+        .not("sheet_id", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("advance_recoveries")
+        .select("id, bill_id, amount")
+        .not("sheet_id", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const money = new Map<string, { paid: number; recovered: number }>();
+  const entry = (id: string) => {
+    const found = money.get(id) ?? { paid: 0, recovered: 0 };
+    money.set(id, found);
+    return found;
+  };
+  for (const row of payments) entry(row.bill_id).paid += row.amount;
+  for (const row of recoveries) entry(row.bill_id).recovered += row.amount;
 
   const bySheet = new Map<string, { count: number; total: number; pending: number }>();
   for (const bill of bills) {
@@ -380,15 +401,16 @@ export async function getSheet(id: string): Promise<SheetDetail | null> {
   };
 }
 
-/** Which sheet each bill is on, for the Bills list and a bill's page. */
-export async function sheetReferences(billSheetIds: (string | null)[]) {
+/** Once on a cash request, a sheet keeps its bills (remove_bill_from_sheet, 0170). */
+export async function sheetHasBeenRequested(sheetId: string): Promise<boolean> {
   await requireTool("/bills");
-  const ids = [...new Set(billSheetIds.filter((id): id is string => id !== null))];
-  if (ids.length === 0) return new Map<string, string>();
   const supabase = await createClient();
-  const { data, error } = await supabase.from("bill_sheets").select("id, reference").in("id", ids);
-  assertRead("bills", "the sheets' numbers", error);
-  return new Map((data ?? []).map((row) => [row.id, row.reference]));
+  const { count, error } = await supabase
+    .from("cash_request_items")
+    .select("id", { count: "exact", head: true })
+    .eq("sheet_id", sheetId);
+  assertRead("bills", "the sheet's cash requests", error);
+  return (count ?? 0) > 0;
 }
 
 export type PayableSheet = {

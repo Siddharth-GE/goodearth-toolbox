@@ -95,10 +95,10 @@ export function SheetsTable({ sheets }: { sheets: SheetListRow[] }) {
               <TableCell>{sheet.vendor_name}</TableCell>
               <TableCell className="text-muted">{sheet.company_name}</TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatCount(sheet.bill_count)}
+                {sheet.state === "undone" ? "—" : formatCount(sheet.bill_count)}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatMoney(sheet.total)}
+                {sheet.state === "undone" ? "—" : formatMoney(sheet.total)}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
                 {sheet.state === "undone" ? "—" : formatMoney(sheet.pending)}

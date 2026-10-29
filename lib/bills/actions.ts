@@ -36,6 +36,9 @@ const BILL_GUARD_PHRASES = [
   "muster roll",
   "reverse",
   "stays on record",
+  "the sheet",
+  "on a sheet",
+  "new bill is recorded",
 ] as const;
 
 export async function approveLabourContract(contractId: string): Promise<ActionState> {
