@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   Target,
   Users,
+  Wallet,
   Warehouse,
 } from "lucide-react";
 
@@ -47,6 +48,7 @@ export const TOOL_ICONS = {
   ShoppingCart,
   Target,
   Users,
+  Wallet,
   Warehouse,
 } satisfies Record<string, LucideIcon>;
 
@@ -101,6 +103,14 @@ export const TOOLS: Tool[] = [
     icon: "PiggyBank",
     built: true,
     catalogue: true,
+  },
+  {
+    name: "Kaadal Billing",
+    description: "Vendor orders for the Kaadal plots, and what Kaadal and the client have paid.",
+    href: "/kaadal-billing",
+    icon: "Wallet",
+    built: true,
+    grantWarning: "Shows every Kaadal vendor order and payment, and the vendors' bank details.",
   },
   {
     name: "Indents",
